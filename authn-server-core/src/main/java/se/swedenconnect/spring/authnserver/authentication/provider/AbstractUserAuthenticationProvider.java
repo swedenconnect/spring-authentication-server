@@ -265,7 +265,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param token what the provider was given
    * @throws AuthenticationErrorException if the post-authentication processing rejects the result
    */
-  private void completeResult(final @Nonnull UserAuthentication authentication,
+  protected void completeResult(final @Nonnull UserAuthentication authentication,
       final @Nonnull UserAuthenticationInputToken token) throws AuthenticationErrorException {
     authentication.setAuthnRequirements(token.getAuthnRequirements());
     authentication.setProtocolRequestData(token.getProtocolRequestData());

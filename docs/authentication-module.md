@@ -20,9 +20,6 @@ done.
 - It receives an `AuthenticationRequirements` object, wrapped in a `UserAuthenticationInputToken`.
 - It returns a `UserAuthentication` object holding an `AuthenticatedUser`.
 
-This guide will grow as the library does: the redirect flow, which sends the user to the module's own web pages and
-resumes afterwards, is not built yet.
-
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
@@ -77,6 +74,9 @@ and the protocol data of the request, records its use, and runs the
 
 Several providers may be installed, each supporting its own authentication contexts. A provider is asked only about
 requests it can serve, so a module never has to check whether it is the right one.
+
+A module that cannot authenticate the user inside this call, because it needs pages of its own, is written slightly
+differently, see [Modules with pages of their own](#modules-with-pages-of-their-own).
 
 ## What the module receives
 
@@ -425,6 +425,139 @@ The core defines the two that do not depend on a protocol, in
 [`CommonUnrecoverableError`][CommonUnrecoverableError]: an internal error and an invalid session. Each protocol module
 adds its own as its request processing is built, which is why `UnrecoverableError` is an interface and not an enum.
 
+## Modules with pages of their own
+
+Most modules cannot authenticate the user inside the call to `authenticate`. They need to show a login screen, poll a
+BankID server, or walk the user through a few steps. Such a module is sent the user instead: the server redirects to a
+controller of the module's own, the controller authenticates the user, and the flow resumes afterwards.
+
+The module writes two things, a provider and a controller, and neither of them has to know which protocol the requester
+used. A SAML login and an OpenID Connect login reach the same controller and return to the same resume path.
+
+### The provider
+
+Extend [`AbstractUserRedirectAuthenticationProvider`][AbstractUserRedirectAuthenticationProvider] instead of
+`AbstractUserAuthenticationProvider`. It takes the two paths, the one the user is sent to and the one the user comes
+back to:
+
+```java
+public class MyAuthenticationProvider extends AbstractUserRedirectAuthenticationProvider {
+
+  public MyAuthenticationProvider() {
+    super("/authn/login", "/authn/resume");
+  }
+
+  @Override
+  public boolean supportsUserAuthenticationToken(final @Nullable Authentication authentication) {
+    return authentication instanceof UserAuthentication;
+  }
+
+  @Override
+  protected @Nonnull UserAuthentication createUserAuthentication(final @Nonnull ResumedAuthenticationToken token) {
+    return (UserAuthentication) token.getAuthnToken();
+  }
+}
+```
+
+Everything the base class does around an authentication still happens, and it happens before the user is sent
+anywhere: the authentication contexts are filtered, single sign-on is decided, and a passive request that cannot be
+answered fails. Only when the user really has to authenticate is a
+[`RedirectForAuthenticationToken`][RedirectForAuthenticationToken] returned instead of a result. Registering the two
+paths with Spring Security is the auto-configuration's job.
+
+`createUserAuthentication` is the counterpart of `authenticate`. It is called when the user comes back, and it turns
+what the controller delivered into the result. A controller that already delivers a `UserAuthentication` has nothing to
+do but cast; one that delivers a token of its own builds the result from it. The result then runs through the same
+post-authentication processing as a direct authentication, so a module does not do anything differently because the
+authentication happened elsewhere.
+
+`supportsUserAuthenticationToken` says whether the provider can use what the controller delivered. It is how the right
+provider is found when several are installed.
+
+### The identifier of the authentication
+
+Each authentication gets an unguessable identifier when the redirect starts. It travels to the controller and back as
+the `authnId` request parameter, and it is what makes several authentications in the same session independent of each
+other: an OpenID Connect login in one browser tab and a SAML login in another do not disturb each other, and each
+resumes with its own input and its own result.
+
+An authentication is removed once it has been resumed, and one that is never resumed is removed when it is older than
+the maximum age, 30 minutes by default. A request to the resume path that carries no identifier, or an identifier that
+is unknown, expired or already resumed, is the invalid session error, and the user is shown an error page.
+
+### The controller
+
+Extend [`AbstractAuthenticationController`][AbstractAuthenticationController], which gives the controller what it needs
+and takes care of getting the user back into the flow:
+
+```java
+@Controller
+@RequestMapping("/authn")
+public class MyAuthenticationController extends AbstractAuthenticationController<MyAuthenticationProvider> {
+
+  private final MyAuthenticationProvider provider;
+
+  public MyAuthenticationController(final MyAuthenticationProvider provider) {
+    this.provider = provider;
+  }
+
+  @GetMapping("/login")
+  public ModelAndView login(final HttpServletRequest request) {
+    final RedirectForAuthenticationToken token = this.getInputToken(request);
+    final ModelAndView view = new ModelAndView("login");
+    view.addObject("authnId", token.getAuthnId());
+    view.addObject("userMessage", token.getAuthnInputToken().getAuthnRequirements().getUserMessage());
+    return view;
+  }
+
+  @PostMapping("/complete")
+  public ModelAndView complete(final HttpServletRequest request) {
+    ...
+    return this.complete(request, new UserAuthentication(user));
+  }
+
+  @PostMapping("/cancel")
+  public ModelAndView cancelled(final HttpServletRequest request) {
+    return this.cancel(request);
+  }
+
+  @Override
+  protected @Nonnull MyAuthenticationProvider getProvider() {
+    return this.provider;
+  }
+}
+```
+
+`getInputToken` gives what this authentication was asked to do, the same `UserAuthenticationInputToken` the provider
+was given, plus the authentication contexts that are left after filtering. There are three ways to finish, and all
+three redirect the user to the resume path:
+
+- `complete(request, authentication)` with what the module established.
+- `complete(request, error)` with an `AuthenticationErrorException`, for an authentication that failed.
+- `cancel(request)`, which is the same as completing with `AuthenticationError.CANCEL`.
+
+A controller that spreads the authentication over several pages must carry the identifier along, as a hidden field or
+in the link, so that every request lands on the right authentication. Losing it means the user cannot be brought back.
+
+### Where the authentications are kept
+
+The storage has two sides: [`RedirectFlowRepository`][RedirectFlowRepository], which the protocol flow uses to start an
+authentication and pick up its outcome, and [`RedirectAuthenticatorRepository`][RedirectAuthenticatorRepository], which
+is what the controller uses. They work on the same data, so one object,
+[`RedirectAuthenticationRepository`][RedirectAuthenticationRepository], implements both.
+
+[`SessionBasedRedirectAuthenticationRepository`][SessionBasedRedirectAuthenticationRepository] keeps them in the user's
+session and is installed by default. Replace it to keep them somewhere else, and set the maximum age on it:
+
+```java
+final SessionBasedRedirectAuthenticationRepository repository = new SessionBasedRedirectAuthenticationRepository();
+repository.setMaxAge(Duration.ofMinutes(10));
+provider.setRepository(repository);
+```
+
+Whatever the storage, everything the module puts in it must survive Java serialization, including the token the
+controller delivers.
+
 ## Post-authentication processing
 
 A [`PostAuthenticationProcessor`][PostAuthenticationProcessor] runs on the result before it becomes an assertion or a
@@ -440,7 +573,9 @@ provider.getPostAuthenticationProcessors().add(authentication -> {
 });
 ```
 
+[AbstractAuthenticationController]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/AbstractAuthenticationController.java
 [AbstractUserAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/AbstractUserAuthenticationProvider.java
+[AbstractUserRedirectAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/AbstractUserRedirectAuthenticationProvider.java
 [AuthenticatedUser]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/AuthenticatedUser.java
 [AuthenticationError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/error/AuthenticationError.java
 [AuthenticationErrorException]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/error/AuthenticationErrorException.java
@@ -454,8 +589,13 @@ provider.getPostAuthenticationProcessors().add(authentication -> {
 [OidcErrorMapping]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcErrorMapping.java
 [OriginalRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/OriginalRequester.java
 [PostAuthenticationProcessor]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/PostAuthenticationProcessor.java
+[RedirectAuthenticationRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/RedirectAuthenticationRepository.java
+[RedirectAuthenticatorRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/RedirectAuthenticatorRepository.java
+[RedirectFlowRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/RedirectFlowRepository.java
+[RedirectForAuthenticationToken]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/RedirectForAuthenticationToken.java
 [SamlAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/authentication/SamlAuthenticationRequirements.java
 [SamlErrorStatus]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/error/SamlErrorStatus.java
+[SessionBasedRedirectAuthenticationRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/SessionBasedRedirectAuthenticationRepository.java
 [SsoDenialReason]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoDenialReason.java
 [SsoPolicy]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoPolicy.java
 [SsoVoter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoVoter.java
