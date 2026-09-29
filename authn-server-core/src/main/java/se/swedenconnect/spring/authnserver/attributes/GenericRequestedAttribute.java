@@ -151,6 +151,10 @@ public class GenericRequestedAttribute implements Serializable {
   /**
    * Creates a copy of this requested attribute where the essential flag is the logical or of this attribute's flag
    * and the supplied one, and where the protocol data of both attributes is merged.
+   * <p>
+   * Protocol data of the supplied attribute replaces the data of this attribute, key by key, unless the data
+   * implements {@link MergeableProtocolData} and so decides the result for its key itself.
+   * </p>
    *
    * @param other the requested attribute to merge with
    * @return a merged {@link GenericRequestedAttribute}
@@ -160,7 +164,10 @@ public class GenericRequestedAttribute implements Serializable {
       throw new IllegalArgumentException("Can not merge requested attributes with different identifiers");
     }
     final Map<String, Serializable> data = new LinkedHashMap<>(this.protocolData);
-    data.putAll(other.protocolData);
+    for (final Map.Entry<String, Serializable> entry : other.protocolData.entrySet()) {
+      data.merge(entry.getKey(), entry.getValue(), (existing, added) ->
+          existing instanceof final MergeableProtocolData mergeable ? mergeable.mergeWith(added) : added);
+    }
     final List<? extends Serializable> values =
         !this.requestedValues.isEmpty() ? this.requestedValues : other.requestedValues;
     return new GenericRequestedAttribute(

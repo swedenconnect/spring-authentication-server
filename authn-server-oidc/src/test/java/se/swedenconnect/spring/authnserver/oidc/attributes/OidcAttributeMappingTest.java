@@ -122,7 +122,7 @@ class OidcAttributeMappingTest {
   }
 
   @Test
-  void aClaimRequestedInBothSectionsGetsTheIdTokenAsTarget() {
+  void aClaimRequestedInBothSectionsIsDeliveredInBothPlaces() {
     final List<GenericRequestedAttribute> result = this.mapping.toGeneric(List.of(
         requested(PersonClaims.FAMILY_NAME_CLAIM_NAME, false, ClaimDeliveryTarget.USER_INFO),
         requested(PersonClaims.FAMILY_NAME_CLAIM_NAME, true, ClaimDeliveryTarget.ID_TOKEN)));
@@ -130,7 +130,7 @@ class OidcAttributeMappingTest {
     assertThat(result).singleElement().satisfies(a -> {
       assertThat(a.isEssential()).isTrue();
       assertThat(a.getProtocolData(ClaimDeliveryTarget.PROTOCOL_DATA_KEY, ClaimDeliveryTarget.class))
-          .isEqualTo(ClaimDeliveryTarget.ID_TOKEN);
+          .isEqualTo(ClaimDeliveryTarget.ID_TOKEN_AND_USER_INFO);
     });
   }
 

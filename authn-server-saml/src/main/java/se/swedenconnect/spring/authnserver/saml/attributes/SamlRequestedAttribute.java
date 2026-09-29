@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.saml.attributes;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -70,6 +71,33 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    */
   public static @Nonnull SamlRequestedAttribute of(final @Nonnull String name) {
     return new SamlRequestedAttribute(SamlAttributeValues.createAttribute(name, null, List.of()), false);
+  }
+
+  /**
+   * Creates a {@code SamlRequestedAttribute} that carries no values.
+   *
+   * @param name the SAML attribute name
+   * @param friendlyName the attribute friendly name, may be {@code null}
+   * @param required whether the requester requires the attribute
+   * @return a {@link SamlRequestedAttribute}
+   */
+  public static @Nonnull SamlRequestedAttribute of(final @Nonnull String name, final @Nullable String friendlyName,
+      final boolean required) {
+    return of(name, friendlyName, required, List.of());
+  }
+
+  /**
+   * Creates a {@code SamlRequestedAttribute}.
+   *
+   * @param name the SAML attribute name
+   * @param friendlyName the attribute friendly name, may be {@code null}
+   * @param required whether the requester requires the attribute
+   * @param values the values that the requester will accept
+   * @return a {@link SamlRequestedAttribute}
+   */
+  public static @Nonnull SamlRequestedAttribute of(final @Nonnull String name, final @Nullable String friendlyName,
+      final boolean required, final @Nonnull List<String> values) {
+    return new SamlRequestedAttribute(SamlAttributeValues.createAttribute(name, friendlyName, values), required);
   }
 
   /**

@@ -36,8 +36,7 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.RequestedClaim;
  * Maps one requested claim into one or more generic requested attributes.
  * <p>
  * The delivery target of the claim is carried over as protocol data, see {@link ClaimDeliveryTarget}. A claim that is
- * requested both in the ID token and from the UserInfo endpoint gets the ID token as its target, since that is the
- * stricter of the two.
+ * requested both in the ID token and from the UserInfo endpoint carries both targets.
  * </p>
  *
  * @author Martin Lindström
@@ -132,15 +131,16 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
   }
 
   /**
-   * Gets the delivery target to use, letting the ID token win over the UserInfo endpoint.
+   * Gets the delivery target to use, which is the target covering every target of the supplied requested claims.
    *
    * @param inputs the requested claims
    * @return a {@link ClaimDeliveryTarget}
    */
   static @Nonnull ClaimDeliveryTarget deliveryTarget(final @Nonnull List<RequestedClaim> inputs) {
-    return inputs.stream().anyMatch(i -> i.target() == ClaimDeliveryTarget.ID_TOKEN)
-        ? ClaimDeliveryTarget.ID_TOKEN
-        : ClaimDeliveryTarget.USER_INFO;
+    return inputs.stream()
+        .map(RequestedClaim::target)
+        .reduce(ClaimDeliveryTarget::combine)
+        .orElse(ClaimDeliveryTarget.USER_INFO);
   }
 
   /**

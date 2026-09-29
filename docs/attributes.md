@@ -37,12 +37,17 @@ essential ("required" in SAML, "essential" in OpenID Connect), the values that t
 protocol data.
 
 Protocol data is data that only the protocol layer understands. The generic layer carries it and never looks at it.
-The delivery target of an OpenID Connect claim, the ID token or the UserInfo endpoint, is such data:
+The delivery target of an OpenID Connect claim, the ID token, the UserInfo endpoint or both, is such data:
 
 ```java
 ClaimDeliveryTarget target = requested.getProtocolData(
     ClaimDeliveryTarget.PROTOCOL_DATA_KEY, ClaimDeliveryTarget.class);
 ```
+
+The same attribute may be asked for in more than one place. Merging two requested attributes gives an attribute that
+is essential if either of them was, and the protocol data of the second one replaces the data of the first, key by
+key. Data that implements `MergeableProtocolData` decides the result for its key itself, which is how a claim asked
+for in the ID token by one source and from the UserInfo endpoint by another ends up delivered in both places.
 
 ### Attribute definitions
 
@@ -86,6 +91,135 @@ OidcAttributeMapping oidc = new OidcAttributeMapping();
 List<GenericRequestedAttribute> requested = oidc.toGenericFromClaimsRequest(claimsRequest);
 List<UserClaim> claims = oidc.toClaims(userAttributes, requested);
 ```
+
+## What a request asks for
+
+The mapping above turns one requested attribute, or one claims request entry, into the generic form. Working out what
+a whole request asks for is a step above that, and it has a resolver per protocol. The request processing calls the
+resolver and puts the result in the authentication requirements, see
+[Writing an authentication module](authentication-module.html).
+
+### SAML
+
+A Service Provider states what it needs in more than one place, and `SamlRequestedAttributeResolver` collects them
+all:
+
+- The `AttributeConsumingService` element of its metadata. The `AttributeConsumingServiceIndex` of the request picks
+  the element, and without it the element marked as the default is used, failing that the one with the lowest index.
+- The service entity categories it declares, which is the preferred way within the Swedish eID Framework.
+- The `RequestedAttributes` extension of the request, both the one of the SAML protocol extension for requesting
+  attributes and the eIDAS one.
+- The `PrincipalSelection` extension, whose attributes become requested attributes carrying the given values. They
+  are never essential. The requester is stating who the user is, not asking for the attribute to be released.
+
+Each source has a `RequestedAttributeProcessor` of its own. An attribute that more than one source asks for appears
+once in the result and is essential if any source said so.
+
+```java
+SamlRequestedAttributeResolver resolver = new SamlRequestedAttributeResolver(idpEntityCategories);
+List<GenericRequestedAttribute> requested =
+    resolver.resolve(new RequestedAttributeContext(authnRequest, spMetadata));
+```
+
+An eIDAS Proxy Service works with the eIDAS attribute names rather than the names of the Swedish eID Framework, so it
+hands the mapping of `EidasAttributeMapping` to the constructor:
+
+```java
+SamlRequestedAttributeResolver resolver = new SamlRequestedAttributeResolver(
+    new EidasAttributeMapping().getFromProtocolMapping(),
+    SamlRequestedAttributeResolver.getDefaultProcessors(idpEntityCategories));
+```
+
+Pass a list of processors of your own to the same constructor to add a source, or to leave one out.
+
+#### Entity categories
+
+Only the categories that the Identity Provider itself declares are used, and every category brings the attributes of
+its attribute set. The required attributes of the set are essential and the recommended ones are not.
+
+A Service Provider may declare several categories while the Identity Provider delivers according to only one of them.
+An attribute is therefore essential only when every declared category requires it, and an attribute that one of the
+categories does not hold at all is never essential. This is the one exception to "essential if any source says so".
+
+`EntityCategoryRequestedAttributeProcessor` knows the categories of
+[Entity Categories for the Swedish eID Framework](https://docs.swedenconnect.se/technical-framework/latest/06_-_Entity_Categories_for_the_Swedish_eID_Framework.html).
+To add a category of your own, hand it a registry holding the default categories and yours:
+
+```java
+List<EntityCategory> categories =
+    new ArrayList<>(EntityCategoryRequestedAttributeProcessor.getDefaultEntityCategories());
+categories.add(new ServiceEntityCategoryImpl("https://example.com/ec/own", loaUris, attributeSet));
+
+EntityCategoryRequestedAttributeProcessor processor =
+    new EntityCategoryRequestedAttributeProcessor(idpEntityCategories);
+processor.setEntityCategoryRegistry(new EntityCategoryRegistryImpl(categories));
+```
+
+An entity category that is not in the registry, and one that is not a service entity category, asks for nothing.
+
+### OpenID Connect
+
+A client asks for claims by the scopes it requests and by the `claims` request parameter.
+`OidcRequestedAttributeResolver` expands the scopes into the claims they stand for, merges the `claims` parameter in
+and maps the result:
+
+```java
+OidcRequestedAttributeResolver resolver = new OidcRequestedAttributeResolver();
+List<GenericRequestedAttribute> requested = resolver.resolve(scope, claimsRequest, logString);
+```
+
+A claim is essential if any source says so. Claims that are not user attributes, such as `sub`, `auth_time` and
+`acr`, have no mapping and are left out, like any other claim that no mapper handles.
+
+#### Where a claim is delivered
+
+Section 4.2 of the Swedish OpenID Connect Profile decides this, and the answer is carried as the protocol data
+`ClaimDeliveryTarget`:
+
+- A claim of the `claims` parameter is delivered where the parameter says, `id_token` or `userinfo`.
+- A claim of a scope is delivered where the scope definition says.
+- Any other claim is delivered from the UserInfo endpoint.
+
+When more than one source asks for the same claim the targets are combined. A claim asked for in the ID token by the
+`claims` parameter is therefore also delivered from the UserInfo endpoint when a requested scope covers it, which is
+what the profile requires.
+
+#### The built-in scopes
+
+`ScopeRegistry` holds the scopes that the OpenID Provider knows about, and `DefaultScopeRegistry` starts with the
+built-in ones:
+
+| Scope | Specification |
+| :--- | :--- |
+| `openid`, `profile`, `email`, `address`, `phone` | OpenID Connect Core, Section 5.4 |
+| `https://id.oidc.se/scope/naturalPersonInfo` | Claims and Scopes Specification for the Swedish OpenID Connect Profile |
+| `https://id.oidc.se/scope/naturalPersonNumber` | Claims and Scopes Specification for the Swedish OpenID Connect Profile |
+| `https://id.oidc.se/scope/naturalPersonOrgId` | Claims and Scopes Specification for the Swedish OpenID Connect Profile |
+| `https://id.oidc.se/scope/sign` | Signature Extension for OpenID Connect |
+| `https://id.oidc.se/scope/signApproval` | Signature Extension for OpenID Connect |
+| `https://id.swedenconnect.se/scope/eidasNaturalPersonIdentity` | OpenID Connect Claims and Scopes Specification for Sweden Connect |
+| `https://id.swedenconnect.se/scope/eidasSwedishIdentity` | OpenID Connect Claims and Scopes Specification for Sweden Connect |
+
+The `openid` scope asks for `sub`, and `signApproval` asks for no claims at all, so neither of them gives a requested
+attribute. A scope that is not registered asks for nothing, which is not an error.
+
+#### Adding a scope
+
+A scope is an `OidcScopeValue`, which states its claims and, for each of them, whether it is essential and where it is
+delivered by default. Register it, and a mapper for the claim if it is one of your own:
+
+```java
+ScopeRegistry scopes = new DefaultScopeRegistry();
+scopes.register(new OidcScopeValue("https://example.com/scope/employee", new ClaimRequirement[] {
+    ClaimRequirement.of("https://example.com/claim/employeeNumber", true, true, false) }));
+
+OidcRequestedAttributeResolver resolver = new OidcRequestedAttributeResolver(oidcAttributeMapping, scopes);
+```
+
+The three flags of a `ClaimRequirement` are, in order, whether the claim is essential, whether it is delivered in the
+ID token and whether it is delivered from the UserInfo endpoint. At least one of the two delivery flags must be set.
+Registering a scope whose value is already registered replaces it, which is how a built-in scope is given a definition
+of your own.
 
 ## Adding an attribute
 

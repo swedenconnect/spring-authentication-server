@@ -41,8 +41,8 @@ The Spring Boot starters:
 - [Writing an authentication module](authentication-module.html) - How to authenticate users: what an authentication
   module receives, what it returns, how single sign-on is decided, and the errors a module can raise.
 
-- [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes and how they map to
-  SAML attributes and OpenID Connect claims.
+- [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes, how they map to SAML
+  attributes and OpenID Connect claims, and how a request is worked out into the attributes it asks for.
 
 - [Configuration](configuration.html) - Auto-configuration and the complete set of properties.
 
