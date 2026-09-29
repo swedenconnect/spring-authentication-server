@@ -45,6 +45,10 @@ The Spring Boot starters:
   attributes and OpenID Connect claims, how a request is worked out into the attributes it asks for, how what is
   released is decided, and how the identifier of the user, the SAML `NameID` and the OpenID Connect `sub`, is produced.
 
+- [The client registry](client-registry.html) - How the server finds out about a requester: the protocol-neutral
+  record and its marks, the SAML metadata sources, the three OpenID Connect backends, and resolving clients through
+  OpenID Federation with caching and trust marks on demand.
+
 - [Configuration](configuration.html) - Auto-configuration and the complete set of properties.
 
 - [Release Notes](release-notes.html)
