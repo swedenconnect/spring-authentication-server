@@ -52,14 +52,15 @@ public record AuthenticationUse(@Nonnull AuthenticationProtocol protocol, @Nonnu
    * @param requester the requester, a SAML SP entityID or an OpenID Connect {@code client_id}
    * @param requestId the identifier of the request, may be {@code null}
    * @param instant the instant of the use
-   * @param requestedAttributes the identifiers of the generic attributes that the requester asked for, may be
-   *          {@code null}
+   * @param requestedAttributes the identifiers of the generic attributes that the requester asked for, empty when the
+   *          requester asked for none
    */
   public AuthenticationUse {
     Objects.requireNonNull(protocol, "protocol must not be null");
     Objects.requireNonNull(requester, "requester must not be null");
     Objects.requireNonNull(instant, "instant must not be null");
-    requestedAttributes = requestedAttributes != null ? List.copyOf(requestedAttributes) : List.of();
+    Objects.requireNonNull(requestedAttributes, "requestedAttributes must not be null");
+    requestedAttributes = List.copyOf(requestedAttributes);
   }
 
 }

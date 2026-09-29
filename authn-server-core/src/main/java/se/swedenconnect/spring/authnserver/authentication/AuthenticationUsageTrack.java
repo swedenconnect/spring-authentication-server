@@ -75,7 +75,7 @@ public class AuthenticationUsageTrack implements Serializable {
    * @return the original authentication, or {@code null} if no use has been registered
    */
   public @Nullable AuthenticationUse getOriginalAuthentication() {
-    return this.usages.isEmpty() ? null : this.usages.get(0);
+    return this.usages.isEmpty() ? null : this.usages.getFirst();
   }
 
   /**
@@ -84,7 +84,7 @@ public class AuthenticationUsageTrack implements Serializable {
    * @return the latest use, or {@code null} if no use has been registered
    */
   public @Nullable AuthenticationUse getLatestUse() {
-    return this.usages.isEmpty() ? null : this.usages.get(this.usages.size() - 1);
+    return this.usages.isEmpty() ? null : this.usages.getLast();
   }
 
   /**

@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import se.swedenconnect.spring.authnserver.SerializationTestSupport;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 
 /**
@@ -51,6 +52,7 @@ class UserAuthenticationTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void aMissingUserIsRejected() {
     assertThatExceptionOfType(NullPointerException.class)
         .isThrownBy(() -> new UserAuthentication(null))

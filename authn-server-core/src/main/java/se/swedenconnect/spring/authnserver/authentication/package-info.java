@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * The protocol-neutral result of a user authentication: the authenticated user, the authentication token that is
- * stored in the session, and the tracking of how the authentication has been used.
+ * The protocol-neutral user authentication: what the requester asks for, the authenticated user, the authentication
+ * token that is stored in the session, and the tracking of how the authentication has been used.
  */
 package se.swedenconnect.spring.authnserver.authentication;

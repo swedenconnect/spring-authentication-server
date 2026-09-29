@@ -13,19 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.authentication;
-
 /**
- * The protocol that a requester used when it asked for an authentication.
- *
- * @author Martin Lindström
+ * The protocol-neutral messages that a requester may ask the server to show to the user: the user message and the sign
+ * message.
  */
-public enum AuthenticationProtocol {
-
-  /** SAML. */
-  SAML,
-
-  /** OpenID Connect. */
-  OIDC
-
-}
+package se.swedenconnect.spring.authnserver.message;

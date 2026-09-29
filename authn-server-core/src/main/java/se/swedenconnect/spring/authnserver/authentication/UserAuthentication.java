@@ -57,6 +57,9 @@ public class UserAuthentication extends AbstractAuthenticationToken {
   /** Protocol specific data about the request that the result was produced for. */
   private Serializable protocolRequestData;
 
+  /** What the requester asked for. */
+  private AuthenticationRequirements authnRequirements;
+
   /**
    * Constructor.
    *
@@ -160,6 +163,32 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    */
   public void clearProtocolRequestData() {
     this.protocolRequestData = null;
+  }
+
+  /**
+   * Gets what the requester asked for.
+   *
+   * @return the authentication requirements, or {@code null} if they are not set or have been cleared
+   */
+  public @Nullable AuthenticationRequirements getAuthnRequirements() {
+    return this.authnRequirements;
+  }
+
+  /**
+   * Assigns what the requester asked for.
+   *
+   * @param authnRequirements the authentication requirements
+   */
+  public void setAuthnRequirements(final @Nullable AuthenticationRequirements authnRequirements) {
+    this.authnRequirements = authnRequirements;
+  }
+
+  /**
+   * Clears the authentication requirements. This is done before the result is saved for single sign-on, since the
+   * request they were deduced from has been answered by then.
+   */
+  public void clearAuthnRequirements() {
+    this.authnRequirements = null;
   }
 
   /**

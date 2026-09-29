@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import se.swedenconnect.spring.authnserver.SerializationTestSupport;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 
 /**
@@ -72,7 +73,8 @@ class AuthenticationUsageTrackTest {
   }
 
   @Test
-  void aRecordRequiresProtocolRequesterAndInstant() {
+  @SuppressWarnings("DataFlowIssue")
+  void aRecordRequiresProtocolRequesterInstantAndRequestedAttributes() {
     assertThatExceptionOfType(NullPointerException.class)
         .isThrownBy(() -> new AuthenticationUse(null, "client-1", null, INSTANT, List.of()))
         .withMessage("protocol must not be null");
@@ -83,14 +85,17 @@ class AuthenticationUsageTrackTest {
         .isThrownBy(() -> new AuthenticationUse(AuthenticationProtocol.OIDC, "client-1", null, null, List.of()))
         .withMessage("instant must not be null");
     assertThatExceptionOfType(NullPointerException.class)
+        .isThrownBy(() -> new AuthenticationUse(AuthenticationProtocol.OIDC, "client-1", null, INSTANT, null))
+        .withMessage("requestedAttributes must not be null");
+    assertThatExceptionOfType(NullPointerException.class)
         .isThrownBy(() -> new AuthenticationUsageTrack().registerUse(null))
         .withMessage("use must not be null");
   }
 
   @Test
-  void aRecordWithoutRequestIdOrRequestedAttributesIsAllowed() {
+  void aRecordWithoutARequestIdOrRequestedAttributesIsAllowed() {
     final AuthenticationUse use =
-        new AuthenticationUse(AuthenticationProtocol.OIDC, "client-1", null, INSTANT, null);
+        new AuthenticationUse(AuthenticationProtocol.OIDC, "client-1", null, INSTANT, List.of());
     assertThat(use.requestId()).isNull();
     assertThat(use.requestedAttributes()).isEmpty();
   }

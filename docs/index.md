@@ -7,7 +7,9 @@
 -----
 
 The [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository comprises
-base libraries for building a SAML Identity Provider, an OpenID Provider, or a server that is both.
+base libraries for building a SAML Identity Provider, an OpenID Provider, or a server that is both, according to the
+[Swedish eID Framework specifications](https://docs.swedenconnect.se/technical-framework) and the
+[Swedish OpenID Connect specifications](https://www.oidc.se/specifications/).
 
 User authentication is implemented once and serves both protocols. A deployment that offers both gets shared single
 sign-on across them, and a deployment that offers only one never has to know that the other exists.
@@ -36,11 +38,11 @@ The Spring Boot starters:
 
 ## Documentation
 
+- [Writing an authentication module](authentication-module.html) - How to authenticate users: what an authentication
+  module receives, what it returns, and how single sign-on affects it.
+
 - [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes and how they map to
   SAML attributes and OpenID Connect claims.
-
-- [The authentication result](authentication.html) - The protocol-neutral authenticated user, the authentication result
-  that is kept in the session, and how single sign-on usage is tracked.
 
 - [Configuration](configuration.html) - Auto-configuration and the complete set of properties.
 

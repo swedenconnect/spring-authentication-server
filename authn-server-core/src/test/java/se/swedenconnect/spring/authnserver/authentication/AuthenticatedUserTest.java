@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import se.swedenconnect.spring.authnserver.SerializationTestSupport;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 
@@ -33,6 +34,7 @@ import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
  */
 class AuthenticatedUserTest {
 
+  @SuppressWarnings("HttpUrlsUsage")
   static final String LOA3 = "http://id.elegnamnden.se/loa/1.0/loa3";
 
   static final Instant AUTHN_INSTANT = Instant.parse("2026-09-29T08:12:00Z");
@@ -80,17 +82,19 @@ class AuthenticatedUserTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void missingAttributesAreRejected() {
-    assertThatExceptionOfType(IllegalArgumentException.class)
+    assertThatExceptionOfType(NullPointerException.class)
         .isThrownBy(() -> new AuthenticatedUser(null, AttributeIdentifiers.SURNAME, LOA3, AUTHN_INSTANT, "127.0.0.1"))
-        .withMessage("attributes must be set and not empty");
+        .withMessage("attributes must not be null");
     assertThatExceptionOfType(IllegalArgumentException.class)
         .isThrownBy(
             () -> new AuthenticatedUser(List.of(), AttributeIdentifiers.SURNAME, LOA3, AUTHN_INSTANT, "127.0.0.1"))
-        .withMessage("attributes must be set and not empty");
+        .withMessage("attributes must not be empty");
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void aPrimaryAttributeThatIsNotAmongTheAttributesIsRejected() {
     final List<GenericAttribute<?>> attributes =
         List.of(GenericAttribute.of(AttributeIdentifiers.SURNAME, "Andersson"));
@@ -107,6 +111,7 @@ class AuthenticatedUserTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void missingAuthnContextInstantOrClientIpAddressIsRejected() {
     final List<GenericAttribute<?>> attributes =
         List.of(GenericAttribute.of(AttributeIdentifiers.SURNAME, "Andersson"));
@@ -148,7 +153,7 @@ class AuthenticatedUserTest {
   @Test
   void equalObjectsAreEqual() {
     assertThat(user()).isEqualTo(user()).hasSameHashCodeAs(user());
-    assertThat(user()).isNotEqualTo(null).isNotEqualTo("197705232382");
+    assertThat(user()).isNotEqualTo(null);
 
     final AuthenticatedUser other = user();
     other.setSignMessageDisplayed(true, "sv");

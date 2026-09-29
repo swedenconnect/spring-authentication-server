@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.authentication;
+package se.swedenconnect.spring.authnserver;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -26,7 +26,7 @@ import java.io.Serializable;
  *
  * @author Martin Lindström
  */
-final class SerializationTestSupport {
+public final class SerializationTestSupport {
 
   /**
    * Serializes and deserializes the supplied object.
@@ -37,7 +37,7 @@ final class SerializationTestSupport {
    * @throws Exception for serialization errors
    */
   @SuppressWarnings("unchecked")
-  static <T extends Serializable> T roundTrip(final T object) throws Exception {
+  public static <T extends Serializable> T roundTrip(final T object) throws Exception {
     final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     try (final ObjectOutputStream out = new ObjectOutputStream(bytes)) {
       out.writeObject(object);

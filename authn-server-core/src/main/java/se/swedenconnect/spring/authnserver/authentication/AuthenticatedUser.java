@@ -86,8 +86,9 @@ public class AuthenticatedUser implements UserDetails {
       final @Nonnull String primaryAttribute, final @Nonnull String authnContextUri,
       final @Nonnull Instant authnInstant, final @Nonnull String clientIpAddress) {
 
-    if (attributes == null || attributes.isEmpty()) {
-      throw new IllegalArgumentException("attributes must be set and not empty");
+    Objects.requireNonNull(attributes, "attributes must not be null");
+    if (attributes.isEmpty()) {
+      throw new IllegalArgumentException("attributes must not be empty");
     }
     this.attributes = List.copyOf(attributes);
     if (!StringUtils.hasText(primaryAttribute) || this.attributes.stream()
