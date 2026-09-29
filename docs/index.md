@@ -39,6 +39,9 @@ The Spring Boot starters:
 - [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes and how they map to
   SAML attributes and OpenID Connect claims.
 
+- [The authentication result](authentication.html) - The protocol-neutral authenticated user, the authentication result
+  that is kept in the session, and how single sign-on usage is tracked.
+
 - [Configuration](configuration.html) - Auto-configuration and the complete set of properties.
 
 - [Release Notes](release-notes.html)
