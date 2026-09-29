@@ -8,8 +8,8 @@
 
 User authentication is implemented once and serves both SAML and OpenID Connect. The authentication step therefore
 sees requested attributes, and produces user attributes, in a form that does not depend on the protocol. This page
-describes that form, the mapping to and from SAML attributes and OpenID Connect claims, and how an application adds
-attributes and mappings of its own.
+describes that form, the mapping to and from SAML attributes and OpenID Connect claims, how the identifier of the
+user is produced, and how an application adds attributes and mappings of its own.
 
 ## The generic attribute model
 
@@ -334,6 +334,121 @@ Categories for the Swedish eID Framework. The rule covers `attribute.coordinatio
 
 The voter votes `DONT_KNOW` for everything else, so it is combined with the other voters rather than used alone.
 
+## Identifying the user
+
+Every response carries an identifier of the user: the `NameID` of a SAML assertion and the `sub` claim of an OpenID
+Connect ID token. It is not one of the released attributes, but it is computed from one of them.
+
+The protocol-neutral part lives in `authn-server-core`. A [SubjectIdentifierGenerator] is created for the request being
+answered, and the response building asks it for the identifier of the authenticated user:
+
+```java
+String identifier = generator.getSubjectIdentifier(authenticatedUser, requester);
+```
+
+[AbstractSubjectIdentifierGenerator] is the base class that the generators of both protocols build on. It computes a
+stable identifier by hashing the user ID, which is the value of the user's primary attribute, together with a qualifier
+for the issuer and, when the identifier is to differ between requesters, a qualifier for the requester. The same user
+therefore gets the same identifier for the same qualifiers every time, and the identifier does not reveal the user ID.
+Delivering a user attribute as the identifier is never an option: the Swedish OpenID Connect Profile, Section 3.2.1.1,
+forbids using a value that reveals personal information, such as a personal identity number, as `sub`.
+
+A generator is kept in the user session until the response has been sent, so it survives Java serialization.
+
+### The server secret
+
+Assign a server secret. Without one, the identifier is a plain hash of values that anyone may know, and since the number
+of possible Swedish personal identity numbers is small enough to try them all, the identifier can be traced back to the
+person it was issued for. With a secret, the identifier is a MAC over the same data and only the server can compute it.
+
+The secret is assigned to the factory that creates the generators, and reaches every generator it hands out:
+
+```java
+DefaultNameIDGeneratorFactory nameIDGenerators = new DefaultNameIDGeneratorFactory("https://idp.example.com");
+nameIDGenerators.setSecret(secret);
+```
+
+The secret is part of the identifier, so changing it changes every identifier the server issues. Treat it as something
+that is set once and kept, and back it up together with the server keys.
+
+When no secret has been assigned, a warning is logged the first time an identifier is computed, saying that the
+identifiers can be traced back to the users they were issued for.
+
+### SAML
+
+[DefaultNameIDGeneratorFactory] follows the requirements of the Swedish eID Framework. It works out the `Format` from
+the request and the Service Provider metadata:
+
+- The `Format` of the `NameIDPolicy` of the authentication request, if it states one.
+- Otherwise the first persistent or transient `NameIDFormat` declared in the Service Provider metadata.
+- Otherwise the configured default format, which is persistent unless `setDefaultFormat` says otherwise.
+
+The unspecified format means the default format. Any other format is reported back to the Service Provider as an invalid
+`NameIDPolicy`, a `Status` with `Requester` and `InvalidNameIDPolicy`. The `AllowCreate` flag is ignored, since all user
+IDs are known to the Identity Provider.
+
+The `NameQualifier` is the Identity Provider entityID. The `SPNameQualifier` is the one of the `NameIDPolicy` when the
+request states one, and the Service Provider entityID otherwise. Service Providers that share an `SPNameQualifier`
+therefore get the same `NameID` for a user, which is how a group of Service Providers is given one identity for the
+user.
+
+[PersistentNameIDGenerator] produces a value that is stable for the same user and the same `SPNameQualifier`.
+[TransientNameIDGenerator] produces a new random value every time, so the secret plays no part in it.
+
+A deployment moving from an Identity Provider built on
+[saml-identity-provider](https://github.com/swedenconnect/saml-identity-provider) keeps its users' persistent
+`NameID`s as long as no secret is assigned: the value is then computed exactly as that library computes it. Assigning a
+secret gives the Service Providers new `NameID`s for their users, so it is a decision to take when the Identity Provider
+is set up rather than later.
+
+### OpenID Connect
+
+[DefaultSubjectGeneratorFactory] supports both subject identifier types of OpenID Connect Core, Section 8. The type
+comes from the `subject_type` of the client, and a client that has not registered one gets `public`, as the Swedish
+OpenID Connect Profile, Section 6, says it should.
+
+[PublicSubjectGenerator] gives the same `sub` to every client. The issuer is the only qualifier.
+
+[PairwiseSubjectGenerator] gives a different `sub` per sector identifier, so that clients cannot correlate what a user
+does without permission. Clients that share a sector identifier get the same `sub` for a user.
+
+The sector identifier follows OpenID Connect Core, Section 8.1, and [SectorIdentifiers] works it out:
+
+- The host component of the `sector_identifier_uri` of the client, when it has registered one.
+- Otherwise the host component of its redirect URIs.
+
+A client without a `sector_identifier_uri` whose redirect URIs have more than one host cannot be given a pairwise `sub`.
+OpenID Connect Core requires such a client to register a `sector_identifier_uri`, and until it does there is no value to
+compute the `sub` from. This is a client registration error, and the library reports it as one rather than falling back
+on something else, such as the `client_id`: a fallback would give the client a `sub` that changes as soon as it
+registers the URI it should have registered from the start.
+
+Fetching the `sector_identifier_uri` and checking that the redirect URIs of the client are among the ones it lists, as
+OpenID Connect Dynamic Client Registration, Section 5, requires, belongs to client registration.
+
+### Supplying a generator of your own
+
+Implement [SubjectIdentifierGenerator], or extend one of the classes above, when the identifiers are to come from
+somewhere else, for example a table that records which identifier a user was given for a requester:
+
+```java
+public class LookedUpSubjectIdentifierGenerator implements SubjectIdentifierGenerator {
+
+  private final transient SubjectIdentifierRepository repository;
+
+  @Override
+  public @Nonnull String getSubjectIdentifier(final @Nonnull AuthenticatedUser user,
+      final @Nonnull Requester requester) {
+    return this.repository.getOrCreate(user.getUsername(), requester);
+  }
+}
+```
+
+For SAML, implement [NameIDGenerator] instead, so that the `Format` and the name qualifiers are set as well, and hand
+out the generator from a [NameIDGeneratorFactory] of your own. For OpenID Connect, implement [SubjectGenerator] and a
+[SubjectGeneratorFactory]. Extending `AbstractNameIDGenerator`, or the two OpenID Connect generators, is enough when
+only the computation of the value is to change.
+
 ## Adding an attribute
 
 Register a definition for it, and a mapper for each protocol it is to be released in.
@@ -649,6 +764,20 @@ generic attribute, and it is simply left out when the other protocol is used.
 - `attribute.credential-valid-to`
 - `attribute.device-ip`
 - `attribute.authentication-provider`
+
+[AbstractSubjectIdentifierGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/subject/AbstractSubjectIdentifierGenerator.java
+[DefaultNameIDGeneratorFactory]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/nameid/DefaultNameIDGeneratorFactory.java
+[DefaultSubjectGeneratorFactory]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/subject/DefaultSubjectGeneratorFactory.java
+[NameIDGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/nameid/NameIDGenerator.java
+[NameIDGeneratorFactory]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/nameid/NameIDGeneratorFactory.java
+[PairwiseSubjectGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/subject/PairwiseSubjectGenerator.java
+[PersistentNameIDGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/nameid/PersistentNameIDGenerator.java
+[PublicSubjectGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/subject/PublicSubjectGenerator.java
+[SectorIdentifiers]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/subject/SectorIdentifiers.java
+[SubjectGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/subject/SubjectGenerator.java
+[SubjectGeneratorFactory]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/subject/SubjectGeneratorFactory.java
+[SubjectIdentifierGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/subject/SubjectIdentifierGenerator.java
+[TransientNameIDGenerator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/nameid/TransientNameIDGenerator.java
 
 -----
 

@@ -51,6 +51,13 @@ public record SamlErrorStatus(@Nonnull String statusCode, @Nonnull String subSta
   public static final String POSSIBLE_FRAUD = "http://id.elegnamnden.se/status/1.0/possibleFraud";
 
   /**
+   * The status reported when the {@code NameIDPolicy} of an authentication request asks for a {@code Format} that the
+   * Identity Provider does not support.
+   */
+  public static final SamlErrorStatus INVALID_NAMEID_POLICY =
+      new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.INVALID_NAMEID_POLICY);
+
+  /**
    * Constructor.
    *
    * @param statusCode the main status code

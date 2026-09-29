@@ -42,8 +42,8 @@ The Spring Boot starters:
   module receives, what it returns, how single sign-on is decided, and the errors a module can raise.
 
 - [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes, how they map to SAML
-  attributes and OpenID Connect claims, how a request is worked out into the attributes it asks for, and how what is
-  released is decided.
+  attributes and OpenID Connect claims, how a request is worked out into the attributes it asks for, how what is
+  released is decided, and how the identifier of the user, the SAML `NameID` and the OpenID Connect `sub`, is produced.
 
 - [Configuration](configuration.html) - Auto-configuration and the complete set of properties.
 
