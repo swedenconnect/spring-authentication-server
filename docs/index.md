@@ -39,7 +39,7 @@ The Spring Boot starters:
 ## Documentation
 
 - [Writing an authentication module](authentication-module.html) - How to authenticate users: what an authentication
-  module receives, what it returns, and how single sign-on affects it.
+  module receives, what it returns, how single sign-on is decided, and the errors a module can raise.
 
 - [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes and how they map to
   SAML attributes and OpenID Connect claims.

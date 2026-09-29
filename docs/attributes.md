@@ -176,15 +176,15 @@ key-value list that the SAML attribute holds.
 | `attribute.locality` | String | `urn:oid:2.5.4.7`<br />`l` | `address.locality` |
 | `attribute.region` | String | - | `address.region` |
 | `attribute.country` | String | `urn:oid:2.5.4.6`<br />`c` | `address.country` |
-| `attribute.eidas-address-po-box` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `PoBox` | - |
-| `attribute.`<br />`eidas-address-locator-designator` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `LocatorDesignator` | - |
-| `attribute.`<br />`eidas-address-locator-name` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `LocatorName` | - |
-| `attribute.eidas-address-area` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `CvaddressArea` | - |
-| `attribute.`<br />`eidas-address-thoroughfare` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `Thoroughfare` | - |
-| `attribute.`<br />`eidas-address-post-name` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `PostName` | - |
-| `attribute.`<br />`eidas-address-admin-unit-first-line` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `AdminunitFirstline` | - |
-| `attribute.`<br />`eidas-address-admin-unit-second-line` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `AdminunitSecondline` | - |
-| `attribute.`<br />`eidas-address-post-code` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `PostCode` | - |
+| `attribute.eidas-address-po-box` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `PoBox` | `address.street_address` |
+| `attribute.`<br />`eidas-address-locator-designator` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `LocatorDesignator` | `address.street_address` |
+| `attribute.`<br />`eidas-address-locator-name` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `LocatorName` | `address.street_address` |
+| `attribute.eidas-address-area` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `CvaddressArea` | `address.street_address` |
+| `attribute.`<br />`eidas-address-thoroughfare` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `Thoroughfare` | `address.street_address` |
+| `attribute.`<br />`eidas-address-post-name` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `PostName` | `address.locality` |
+| `attribute.`<br />`eidas-address-admin-unit-first-line` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `AdminunitFirstline` | `address.country` |
+| `attribute.`<br />`eidas-address-admin-unit-second-line` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `AdminunitSecondline` | `address.region` |
+| `attribute.`<br />`eidas-address-post-code` | String | `urn:oid:1.2.752.201.3.9`<br />`eidasNaturalPersonAddress`,<br />the key `PostCode` | `address.postal_code` |
 | `attribute.telephone-number` | String,<br />multi-valued | `urn:oid:2.5.4.20`<br />`telephoneNumber` | `phone_number` |
 | `attribute.mobile-number` | String,<br />multi-valued | `urn:oid:0.9.2342.19200300.100.1.41`<br />`mobile` | `phone_number`, `msisdn` |
 | `attribute.phone-number-verified` | Boolean | - | `phone_number_verified` |
@@ -296,8 +296,26 @@ so such values are dropped when an attribute is read.
 ### The OpenID Connect address
 
 Each part of the `address` claim is a generic attribute of its own, and a request for the claim is a request for all
-of them. The street address and the post office box both go into `street_address`, which OpenID Connect Core allows
-to hold several lines. When both are known they are written on a line each, the street address first.
+of them, the parts of the eIDAS address included. The street address and the post office box both go into
+`street_address`, which OpenID Connect Core allows to hold several lines. When both are known they are written on a
+line each, the street address first.
+
+The parts of the eIDAS address fill the claim too, since the OpenID Connect Claims and Scopes Specification for Sweden
+Connect, Appendix A, maps the eIDAS `CurrentAddress` to `address`. `PostName` is the city, `AdminunitFirstline` the
+country and `AdminunitSecondline` the level below that, which is what the eIDAS SAML Attribute Profile gives as the
+equivalent of the country and region of residence.
+
+`street_address` gets one line per part, in this order, skipping the parts that are missing:
+
+1. `LocatorName`, a building, site or room name.
+2. `Thoroughfare`, the street, followed by a space and `LocatorDesignator`, the building or apartment number, for
+   example `Arcacia Avenue 22`. When only one of the two is known, that one alone is the line.
+3. `CvaddressArea`.
+4. `PoBox`.
+
+When a generic address attribute and an eIDAS part would fill the same field of the claim, the generic attribute wins.
+The two sets are never mixed within one field: a known generic street address or post office box means that
+`street_address` holds those and none of the eIDAS lines.
 
 ## eIDAS attributes
 
@@ -359,15 +377,6 @@ generic attribute, and it is simply left out when the other protocol is used.
 - `attribute.birth-name`
 - `attribute.previous-personal-identity-number`
 - `attribute.country-of-residence`
-- `attribute.eidas-address-po-box`
-- `attribute.eidas-address-locator-designator`
-- `attribute.eidas-address-locator-name`
-- `attribute.eidas-address-area`
-- `attribute.eidas-address-thoroughfare`
-- `attribute.eidas-address-post-name`
-- `attribute.eidas-address-admin-unit-first-line`
-- `attribute.eidas-address-admin-unit-second-line`
-- `attribute.eidas-address-post-code`
 - `attribute.sad`
 - `attribute.sign-message-digest`
 - `attribute.auth-context-params`

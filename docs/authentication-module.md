@@ -17,19 +17,73 @@ Provider, in an OpenID Provider, and in a server that is both, with single sign-
 A module has one job: take what the requester asked for, authenticate the user, and say who the user is and how it was
 done.
 
-- It receives an `AuthenticationRequirements` object.
+- It receives an `AuthenticationRequirements` object, wrapped in a `UserAuthenticationInputToken`.
 - It returns a `UserAuthentication` object holding an `AuthenticatedUser`.
 
-This guide covers those two objects. It will grow as the library does: the provider interface that a module plugs into,
-the single sign-on policies and the redirect flow to a module's own web pages are not built yet.
+This guide will grow as the library does: the redirect flow, which sends the user to the module's own web pages and
+resumes afterwards, is not built yet.
 
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
+## Writing the provider
+
+A module plugs into the server as a [`UserAuthenticationProvider`][UserAuthenticationProvider], which is a Spring
+Security `AuthenticationProvider`. Extend [`AbstractUserAuthenticationProvider`][AbstractUserAuthenticationProvider] and
+implement three methods:
+
+```java
+public class MyAuthenticationProvider extends AbstractUserAuthenticationProvider {
+
+  @Override
+  public @Nonnull String getName() {
+    return "my-provider";
+  }
+
+  @Override
+  public @Nonnull List<String> getSupportedAuthnContextUris() {
+    return List.of(LOA3, LOA4);
+  }
+
+  @Override
+  protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
+      final @Nonnull List<String> authnContextUris) {
+    ...
+    return new UserAuthentication(user);
+  }
+}
+```
+
+The base class does everything around the authentication, in this order:
+
+1. The requested authentication contexts are filtered against the ones the provider supports. If none remain, the
+   provider does not handle the request at all and the next provider is asked. When no provider handles it, the
+   requester gets `NO_AUTHN_CONTEXT`.
+
+2. Single sign-on is decided. If a previous authentication may be reused, it is returned and `authenticate` is never
+   called.
+
+3. If the request required that the user was not interacted with, and single sign-on was refused, the request fails
+   with `PASSIVE_NOT_POSSIBLE`.
+
+4. Otherwise `authenticate` is called with the contexts that remain, in the requester's order of preference.
+
+So `authenticate` is called only when the provider can serve the request and the user really has to authenticate. It
+picks a context from `authnContextUris`, authenticates at that level, and returns the result.
+
+Whatever the result comes from, single sign-on or a new authentication, the base class then gives it the requirements
+and the protocol data of the request, records its use, and runs the
+[post-authentication processing](#post-authentication-processing). A module does not do any of that itself.
+
+Several providers may be installed, each supporting its own authentication contexts. A provider is asked only about
+requests it can serve, so a module never has to check whether it is the right one.
+
 ## What the module receives
 
 [`AuthenticationRequirements`][AuthenticationRequirements] is what the requester asked for, with the differences
-between the two protocols already resolved. The module does not need to know which protocol was used.
+between the two protocols already resolved. The module does not need to know which protocol was used. The
+[`UserAuthenticationInputToken`][UserAuthenticationInputToken] adds who is asking, the identifier of the request, the
+previous authentication if there is one, and the protocol data of the request.
 
 This is the mapping, in case you need to reason about a request you are looking at:
 
@@ -52,8 +106,9 @@ This is the mapping, in case you need to reason about a request you are looking 
 maximum authentication age of zero means the same thing, since that is how OpenID Connect defines `max_age=0`, so the
 module only has to look at `isForceAuthn()`.
 
-`isPassiveAuthn()` means the module must not interact with the user at all. A module that can only work by asking the
-user something cannot serve such a request and must say so rather than show a screen.
+`isPassiveAuthn()` means the module must not interact with the user at all. The base class already fails such a request
+when single sign-on was refused, so `authenticate` is reached for a passive request only if the module can authenticate
+the user without asking anything, for instance from a client certificate.
 
 ### Which authentication contexts are acceptable
 
@@ -61,8 +116,8 @@ user something cannot serve such a request and must say so rather than show a sc
 preference, because that is how `acr_values` is defined. Sweden Connect uses the same URIs in SAML and in OpenID
 Connect, so this is one list for both protocols.
 
-The module picks the context it can deliver, authenticates at that level, and reports the URI it actually used as part
-of the authenticated user.
+A module does not read this list. It gets the contexts that are left after filtering, in the same order, as the second
+argument to `authenticate`. It picks the one it delivers and reports it as part of the authenticated user.
 
 ### Which attributes are requested
 
@@ -126,9 +181,9 @@ message, and adds two things:
 
 - `getTbsData()`, the data to be signed, Base64 encoded. Only the OpenID Connect signing case carries it.
 
-A module that displays a sign message must record that it did, and in which language, on the authenticated user. That
-is what makes the result non-reusable, see
-[When a result must not be reused](#when-a-result-must-not-be-reused-for-single-sign-on) below.
+A module that displays a sign message must record that it did, and in which language, on the authenticated user. The
+post-authentication processing checks that, and a result where the message was not displayed fails with
+`SIGN_MESSAGE_NOT_DISPLAYED`.
 
 An encrypted SAML sign message is decrypted before the module sees it, and the SAML `DisplayEntity` has already been
 checked against the server's own entityID. Neither reaches the module.
@@ -144,6 +199,13 @@ Provider declares in its metadata and the `SADRequest` extension that a signatur
 if (requirements instanceof final SamlAuthenticationRequirements saml) {
   ...
 }
+```
+
+The same goes for the protocol data of the request, which the generic layer carries without looking at it. A module
+that needs the request itself asks for it and casts it to the type its protocol module uses:
+
+```java
+Object requestData = token.getProtocolRequestData();
 ```
 
 ## What the module returns
@@ -227,6 +289,70 @@ sign-on, and the same holds for a SAML signature service. Recording the displaye
 Turning reuse off is a decision that the result must not be saved. Leaving it on is not a decision that it will be: the
 server may still choose not to save it.
 
+## Single sign-on
+
+Single sign-on is what makes a previous authentication answer a new request, and it works across the two protocols: a
+user who signed in at a SAML Service Provider can be let straight through at an OpenID Connect client.
+
+### The rules that always apply
+
+These are checked before any policy or voter, and no configuration turns them off:
+
+- The requester asked for a new authentication, with `ForceAuthn` or `prompt=login`.
+- The previous authentication is older than the maximum authentication age the requester accepts.
+- The previous authentication may not be reused, which is the case when a sign message was displayed for it.
+- The request carries a sign message. A signature is approved by the user every time, see the Deployment Profile,
+  Section 7.1.1.
+- An attribute value the requester asked for does not match the value the user has. A request that states that the user
+  is `197705232382` is never answered with an authentication of somebody else.
+
+### The policy
+
+Everything else is an [`SsoPolicy`][SsoPolicy]. The default policy allows single sign-on for 60 minutes, which is the
+Sweden Connect maximum, and only for the requester the authentication was made for. Two things are configurable:
+
+- The time limit. `null` means single sign-on for as long as the user's session lives.
+- Whether the same requester is required. It is, by default. "The same requester" means the same protocol and the same
+  identity within it, so an organisation registered both as a SAML Service Provider and as an OpenID Connect client is
+  two requesters.
+
+What the policy never relaxes, beyond the rules above, is the authentication context: a previous authentication is
+reused only when it was made under a context that is acceptable for the new request.
+
+```java
+SsoPolicy.defaultPolicy();      // 60 minutes, same requester
+SsoPolicy.none();               // never
+SsoPolicy.forSessionLifetime(); // as long as the session lives, any requester
+```
+
+The policy is set as a server default, and a provider may override it. The override wins:
+
+```java
+provider.setServerSsoPolicy(SsoPolicy.none());   // normally set by the auto-configuration
+provider.setSsoPolicy(myOwnPolicy);              // this provider only
+```
+
+The properties that set the server default come with the auto-configuration.
+
+### Voters
+
+The decision is made by an ordered list of [`SsoVoter`][SsoVoter]s. One denial ends it, and at least one voter has to
+allow it, so a request where every voter abstains gets no single sign-on. Three voters are installed: one applies the
+policy, one requires the same authentication context, and one refuses when the requester asks for another set of
+attributes than the original authentication was made for.
+
+An application adds voters of its own to refuse single sign-on in cases the library knows nothing about:
+
+```java
+provider.getSsoVoters().add((previous, requirements, requester, contexts) ->
+    previous.getAuthenticatedUser().getClientIpAddress().equals(currentIpAddress())
+        ? SsoDecision.abstain()
+        : SsoDecision.deny(SsoDenialReason.NOT_ALLOWED));
+```
+
+A refusal always states its reason, an [`SsoDenialReason`][SsoDenialReason]. That matters for a passive request, see
+below.
+
 ### How use of the result is tracked
 
 The library records every time a result is used, one record per use, in an
@@ -234,25 +360,109 @@ The library records every time a result is used, one record per use, in an
 identifier where the protocol has one, the instant and the attributes that requester asked for. The first record is the
 original authentication, and `isSsoApplied()` tells whether there were more.
 
-A module does not write these records. It is worth knowing they exist, because they are what the single sign-on
-policies will decide from: how long ago the user was authenticated, at which context, for which requester, and whether
-a different set of attributes is being asked for the second time. That last one is why the requested attributes are
-part of each record; the Sweden Connect OpenID Connect profile, Section 2.2.1, requires `interaction_required` when a
-different set of claims is requested.
+A module does not write these records, and it should not read them either. They are what the voters decide from: how
+long ago the user was authenticated, for which requester, and whether a different set of attributes is being asked for
+the second time.
 
 The requirements and the protocol data of the request are cleared from the result before it is saved, so a module must
 not expect them to still be there when a result comes back from the session.
 
+## Errors
+
+A module reports a failure by throwing an [`AuthenticationErrorException`][AuthenticationErrorException] carrying an
+[`AuthenticationError`][AuthenticationError]. The protocol module turns it into a SAML `Status` or an OpenID Connect
+error response, so a module never writes protocol-specific error handling.
+
+```java
+throw new AuthenticationErrorException(AuthenticationError.CANCEL);
+throw new AuthenticationErrorException(AuthenticationError.AUTHN_FAILED, "The BankID server refused the order");
+```
+
+The second argument is a description for logs. In OpenID Connect it becomes the `error_description`, which the Swedish
+OpenID Connect Profile, Section 2.3, asks to be something the Relying Party can put in its application logs. It is
+never shown to the user, so write it for an operator, not for an end user.
+
+These are the errors and how they reach the requester:
+
+| Error | SAML status | OpenID Connect error |
+| :--- | :--- | :--- |
+| `AUTHN_FAILED` | `Responder` / `AuthnFailed` | `access_denied` |
+| `CANCEL` | `Responder` / `.../status/1.0/cancel` | `access_denied` |
+| `FRAUD` | `Responder` / `.../status/1.0/fraud` | `access_denied` |
+| `POSSIBLE_FRAUD` | `Responder` / `.../status/1.0/possibleFraud` | `access_denied` |
+| `SIGN_MESSAGE_NOT_DISPLAYED` | `Responder` / `AuthnFailed` | `access_denied` |
+| `UNKNOWN_PRINCIPAL` | `Requester` / `UnknownPrincipal` | `access_denied` |
+| `PASSIVE_NOT_POSSIBLE` | `Requester` / `NoPassive` | `login_required` or `interaction_required` |
+| `NO_AUTHN_CONTEXT` | `Requester` / `NoAuthnContext` | `unmet_authentication_requirements` |
+| `NOT_AUTHORIZED` | `Responder` / `AuthnFailed` | `unauthorized_client` |
+
+The three Sweden Connect status codes are `http://id.elegnamnden.se/status/1.0/` followed by `cancel`, `fraud` or
+`possibleFraud`. They are second-level codes under `Responder`, as the Deployment Profile, Section 6.4, requires. A
+server that detects fraud must not issue an assertion.
+
+`CANCEL`, `FRAUD` and `POSSIBLE_FRAUD` are the errors a module raises that are not plain failures. Use `CANCEL` when
+the user chose to stop, and the fraud codes when a security check alerted, not when the authentication merely failed.
+
+The mappings live in the protocol modules, [`SamlErrorStatus`][SamlErrorStatus] and
+[`OidcErrorMapping`][OidcErrorMapping], and a module does not call them.
+
+### The passive case
+
+`PASSIVE_NOT_POSSIBLE` is the one error whose OpenID Connect code depends on why it happened, so the exception carries
+the `SsoDenialReason` that refused single sign-on. A request that could have been answered except that the requester
+asks for another set of attributes gets `interaction_required`, as the OpenID Connect Profile for Sweden Connect,
+Section 2.2.1, requires. Every other reason gets `login_required`. SAML has one code for all of them, `NoPassive`.
+
+The base class raises this error, so a module does not.
+
+### Errors that cannot be reported
+
+Some failures make it impossible to send the user back to the requester at all, for instance when the request cannot be
+tied to a session. The user is shown an error page instead. Those are an
+[`UnrecoverableError`][UnrecoverableError], thrown as an `UnrecoverableErrorException`.
+
+The core defines the two that do not depend on a protocol, in
+[`CommonUnrecoverableError`][CommonUnrecoverableError]: an internal error and an invalid session. Each protocol module
+adds its own as its request processing is built, which is why `UnrecoverableError` is an interface and not an enum.
+
+## Post-authentication processing
+
+A [`PostAuthenticationProcessor`][PostAuthenticationProcessor] runs on the result before it becomes an assertion or a
+set of tokens, and asserts that the authentication delivered what the request needed. It may also change the result.
+
+One is installed: it fails a result where a sign message had to be shown but was not. An application adds its own:
+
+```java
+provider.getPostAuthenticationProcessors().add(authentication -> {
+  if (somethingIsWrong(authentication)) {
+    throw new AuthenticationErrorException(AuthenticationError.NOT_AUTHORIZED, "why");
+  }
+});
+```
+
+[AbstractUserAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/AbstractUserAuthenticationProvider.java
 [AuthenticatedUser]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/AuthenticatedUser.java
+[AuthenticationError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/error/AuthenticationError.java
+[AuthenticationErrorException]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/error/AuthenticationErrorException.java
 [AuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/AuthenticationRequirements.java
 [AuthenticationUsageTrack]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/AuthenticationUsageTrack.java
+[CommonUnrecoverableError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/error/CommonUnrecoverableError.java
 [GenericSignMessage]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/GenericSignMessage.java
 [GenericUserMessage]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/GenericUserMessage.java
 [LocalizedMessage]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/LocalizedMessage.java
 [MessageMimeType]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/MessageMimeType.java
+[OidcErrorMapping]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcErrorMapping.java
 [OriginalRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/OriginalRequester.java
+[PostAuthenticationProcessor]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/PostAuthenticationProcessor.java
 [SamlAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/authentication/SamlAuthenticationRequirements.java
+[SamlErrorStatus]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/error/SamlErrorStatus.java
+[SsoDenialReason]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoDenialReason.java
+[SsoPolicy]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoPolicy.java
+[SsoVoter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoVoter.java
+[UnrecoverableError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/error/UnrecoverableError.java
 [UserAuthentication]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/UserAuthentication.java
+[UserAuthenticationInputToken]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/UserAuthenticationInputToken.java
+[UserAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/UserAuthenticationProvider.java
 
 -----
 

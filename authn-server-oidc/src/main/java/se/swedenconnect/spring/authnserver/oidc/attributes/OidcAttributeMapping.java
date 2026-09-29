@@ -205,7 +205,12 @@ public class OidcAttributeMapping {
     mappers.add(ClaimFromProtocolMapper.withoutValues(PersonClaims.ADDRESS_CLAIM_NAME,
         AttributeIdentifiers.FORMATTED_ADDRESS, AttributeIdentifiers.STREET_ADDRESS,
         AttributeIdentifiers.POST_OFFICE_BOX, AttributeIdentifiers.POSTAL_CODE, AttributeIdentifiers.LOCALITY,
-        AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY));
+        AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY,
+        AttributeIdentifiers.EIDAS_ADDRESS_PO_BOX, AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR,
+        AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME, AttributeIdentifiers.EIDAS_ADDRESS_AREA,
+        AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME,
+        AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE,
+        AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE, AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE));
     mappers.add(new ClaimFromProtocolMapper(PersonClaims.UPDATED_AT_CLAIM_NAME, AttributeIdentifiers.UPDATED_AT));
 
     // Claims from OpenID Connect for Identity Assurance and RFC 8417.

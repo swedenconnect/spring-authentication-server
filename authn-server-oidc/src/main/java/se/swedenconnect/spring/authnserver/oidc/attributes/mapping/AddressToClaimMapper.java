@@ -16,11 +16,13 @@
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 import com.nimbusds.openid.connect.sdk.claims.Address;
 import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
@@ -37,6 +39,12 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
  * The street address and the post office box both go into {@code street_address}, which OpenID Connect Core allows to
  * hold several lines. When both are present they are written on a line each, the street address first.
  * </p>
+ * <p>
+ * The parts of the eIDAS address are released here too, as the OpenID Connect Claims and Scopes Specification for
+ * Sweden Connect, Appendix A, maps the eIDAS {@code CurrentAddress} to the {@code address} claim. When a generic
+ * address attribute and an eIDAS part would fill the same field of the claim, the generic attribute wins. The two sets
+ * are never mixed within one field.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -47,7 +55,12 @@ public class AddressToClaimMapper implements ToProtocolAttributeMapper<UserClaim
   public @Nonnull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.FORMATTED_ADDRESS, AttributeIdentifiers.STREET_ADDRESS,
         AttributeIdentifiers.POST_OFFICE_BOX, AttributeIdentifiers.POSTAL_CODE, AttributeIdentifiers.LOCALITY,
-        AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY);
+        AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY,
+        AttributeIdentifiers.EIDAS_ADDRESS_PO_BOX, AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR,
+        AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME, AttributeIdentifiers.EIDAS_ADDRESS_AREA,
+        AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME,
+        AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE,
+        AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE, AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE);
   }
 
   /** {@inheritDoc} */
@@ -57,18 +70,20 @@ public class AddressToClaimMapper implements ToProtocolAttributeMapper<UserClaim
 
     final Address address = new Address();
     setIfPresent(context.getStringValue(AttributeIdentifiers.FORMATTED_ADDRESS), address::setFormatted);
-    setIfPresent(context.getStringValue(AttributeIdentifiers.POSTAL_CODE), address::setPostalCode);
-    setIfPresent(context.getStringValue(AttributeIdentifiers.LOCALITY), address::setLocality);
-    setIfPresent(context.getStringValue(AttributeIdentifiers.REGION), address::setRegion);
-    setIfPresent(context.getStringValue(AttributeIdentifiers.COUNTRY), address::setCountry);
+    setIfPresent(first(context, AttributeIdentifiers.POSTAL_CODE, AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE),
+        address::setPostalCode);
+    setIfPresent(first(context, AttributeIdentifiers.LOCALITY, AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME),
+        address::setLocality);
+    setIfPresent(
+        first(context, AttributeIdentifiers.REGION, AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE),
+        address::setRegion);
+    setIfPresent(
+        first(context, AttributeIdentifiers.COUNTRY, AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE),
+        address::setCountry);
 
-    final List<String> streetLines = new ArrayList<>();
-    for (final String identifier : List.of(AttributeIdentifiers.STREET_ADDRESS,
-        AttributeIdentifiers.POST_OFFICE_BOX)) {
-      final String line = context.getStringValue(identifier);
-      if (line != null && !line.isBlank()) {
-        streetLines.add(line);
-      }
+    final List<String> streetLines = genericStreetLines(context);
+    if (streetLines.isEmpty()) {
+      streetLines.addAll(eidasStreetLines(context));
     }
     if (!streetLines.isEmpty()) {
       address.setStreetAddress(String.join("\n", streetLines));
@@ -80,15 +95,96 @@ public class AddressToClaimMapper implements ToProtocolAttributeMapper<UserClaim
   }
 
   /**
+   * Gets the lines of {@code street_address} that the generic address attributes give: the street address and the post
+   * office box, in that order.
+   *
+   * @param context the mapping context
+   * @return the lines, possibly empty
+   */
+  private static @Nonnull List<String> genericStreetLines(final @Nonnull ToProtocolMappingContext context) {
+    final List<String> lines = new ArrayList<>();
+    addIfPresent(lines, context.getStringValue(AttributeIdentifiers.STREET_ADDRESS));
+    addIfPresent(lines, context.getStringValue(AttributeIdentifiers.POST_OFFICE_BOX));
+    return lines;
+  }
+
+  /**
+   * Gets the lines of {@code street_address} that the parts of the eIDAS address give: the locator name, the
+   * thoroughfare with its locator designator, the address area and the post office box, in that order.
+   *
+   * @param context the mapping context
+   * @return the lines, possibly empty
+   */
+  private static @Nonnull List<String> eidasStreetLines(final @Nonnull ToProtocolMappingContext context) {
+    final List<String> lines = new ArrayList<>();
+    addIfPresent(lines, context.getStringValue(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME));
+
+    final String thoroughfare = context.getStringValue(AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE);
+    final String locatorDesignator = context.getStringValue(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR);
+    if (hasText(thoroughfare) && hasText(locatorDesignator)) {
+      lines.add(thoroughfare + " " + locatorDesignator);
+    }
+    else {
+      addIfPresent(lines, thoroughfare);
+      addIfPresent(lines, locatorDesignator);
+    }
+
+    addIfPresent(lines, context.getStringValue(AttributeIdentifiers.EIDAS_ADDRESS_AREA));
+    addIfPresent(lines, context.getStringValue(AttributeIdentifiers.EIDAS_ADDRESS_PO_BOX));
+    return lines;
+  }
+
+  /**
+   * Gets the value of the first of the supplied attributes that is present. The generic address attributes are given
+   * before their eIDAS counterparts, so that they take precedence.
+   *
+   * @param context the mapping context
+   * @param identifiers the attribute identifiers, in order of precedence
+   * @return the value, or {@code null} if none of the attributes is present
+   */
+  private static @Nullable String first(final @Nonnull ToProtocolMappingContext context,
+      final @Nonnull String... identifiers) {
+    for (final String identifier : identifiers) {
+      final String value = context.getStringValue(identifier);
+      if (hasText(value)) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Adds the value to the list of lines when it is present.
+   *
+   * @param lines the lines
+   * @param value the value
+   */
+  private static void addIfPresent(final @Nonnull List<String> lines, final @Nullable String value) {
+    if (hasText(value)) {
+      lines.add(value);
+    }
+  }
+
+  /**
    * Calls the supplied setter when the value is present.
    *
    * @param value the value
    * @param setter the setter to call
    */
-  private static void setIfPresent(final String value, final java.util.function.Consumer<String> setter) {
-    if (value != null && !value.isBlank()) {
+  private static void setIfPresent(final @Nullable String value, final @Nonnull Consumer<String> setter) {
+    if (hasText(value)) {
       setter.accept(value);
     }
+  }
+
+  /**
+   * Predicate telling whether the value holds anything.
+   *
+   * @param value the value
+   * @return {@code true} if the value holds anything and {@code false} otherwise
+   */
+  private static boolean hasText(final @Nullable String value) {
+    return value != null && !value.isBlank();
   }
 
 }

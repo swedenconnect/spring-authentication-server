@@ -17,6 +17,8 @@ package se.swedenconnect.spring.authnserver.oidc.attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.annotation.Nonnull;
+
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -36,10 +38,12 @@ import net.minidev.json.JSONObject;
 
 import se.oidc.nimbus.claims.ClaimConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
+import se.swedenconnect.spring.authnserver.attributes.DefaultAttributeDefinitionRegistry;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
+import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.ClaimFromProtocolMapper;
 import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.ClaimToProtocolMapper;
 
 /**
@@ -73,6 +77,13 @@ class OidcAttributeMappingTest {
     return claims.stream().filter(c -> c.name().equals(name)).map(UserClaim::value).findFirst().orElse(null);
   }
 
+  private Address address(final List<GenericAttribute<? extends Serializable>> attributes) {
+    final Address address = (Address) this.claim(this.mapping.toClaims(attributes, null),
+        PersonClaims.ADDRESS_CLAIM_NAME);
+    assertThat(address).isNotNull();
+    return address;
+  }
+
   // ---- From OpenID Connect ----
 
   @Test
@@ -102,7 +113,12 @@ class OidcAttributeMappingTest {
         List.of(requested(PersonClaims.ADDRESS_CLAIM_NAME, false, ClaimDeliveryTarget.USER_INFO)))))
         .containsExactlyInAnyOrder(AttributeIdentifiers.FORMATTED_ADDRESS, AttributeIdentifiers.STREET_ADDRESS,
             AttributeIdentifiers.POST_OFFICE_BOX, AttributeIdentifiers.POSTAL_CODE, AttributeIdentifiers.LOCALITY,
-            AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY);
+            AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY,
+            AttributeIdentifiers.EIDAS_ADDRESS_PO_BOX, AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR,
+            AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME, AttributeIdentifiers.EIDAS_ADDRESS_AREA,
+            AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME,
+            AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE,
+            AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE, AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE);
   }
 
   @Test
@@ -233,7 +249,7 @@ class OidcAttributeMappingTest {
     final List<UserClaim> onlyTelephone = this.mapping.toClaims(
         List.of(GenericAttribute.of(AttributeIdentifiers.TELEPHONE_NUMBER, "+46890510")), null);
     assertThat(this.claim(onlyTelephone, PersonClaims.PHONE_NUMBER_CLAIM_NAME)).isEqualTo("+46890510");
-    assertThat(this.claim(onlyTelephone, PersonClaims.MSISDN_CLAIM_NAME)).isNull();
+    assertThat(onlyTelephone).noneMatch(c -> c.name().equals(PersonClaims.MSISDN_CLAIM_NAME));
   }
 
   @Test
@@ -251,6 +267,91 @@ class OidcAttributeMappingTest {
     assertThat(address.getPostalCode()).isEqualTo("11826");
     assertThat(address.getLocality()).isEqualTo("Stockholm");
     assertThat(address.getCountry()).isEqualTo("SE");
+  }
+
+  @Test
+  void theEidasAddressBecomesTheAddressClaim() {
+    final Address address = this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME, "Sherlock House"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, "Arcacia Avenue"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR, "22"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_AREA, "Camden"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_PO_BOX, "Box 1122"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME, "London"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE, "SW1A 2AA"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE, "UK"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE, "Greater London")));
+
+    assertThat(address).isNotNull();
+    assertThat(address.getStreetAddress())
+        .isEqualTo("Sherlock House\nArcacia Avenue 22\nCamden\nBox 1122");
+    assertThat(address.getLocality()).isEqualTo("London");
+    assertThat(address.getPostalCode()).isEqualTo("SW1A 2AA");
+    assertThat(address.getRegion()).isEqualTo("Greater London");
+    assertThat(address.getCountry()).isEqualTo("UK");
+  }
+
+  @Test
+  void theEidasStreetAddressSkipsThePartsThatAreMissing() {
+    assertThat(this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, "Arcacia Avenue"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME, "London"))))
+            .satisfies(a -> {
+              assertThat(a.getStreetAddress()).isEqualTo("Arcacia Avenue");
+              assertThat(a.getLocality()).isEqualTo("London");
+              assertThat(a.getRegion()).isNull();
+              assertThat(a.getCountry()).isNull();
+              assertThat(a.getPostalCode()).isNull();
+            });
+  }
+
+  @Test
+  void anEidasLocatorDesignatorWithoutAThoroughfareIsALineOfItsOwn() {
+    assertThat(this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME, "Sherlock House"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR, "22"))).getStreetAddress())
+            .isEqualTo("Sherlock House\n22");
+  }
+
+  @Test
+  void aSingleEidasAddressPartIsEnoughForTheClaim() {
+    assertThat(this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME, "London"))))
+            .satisfies(a -> {
+              assertThat(a.getLocality()).isEqualTo("London");
+              assertThat(a.getStreetAddress()).isNull();
+            });
+  }
+
+  @Test
+  void theGenericAddressAttributesTakePrecedenceFieldByField() {
+    final Address address = this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.LOCALITY, "Stockholm"),
+        GenericAttribute.of(AttributeIdentifiers.COUNTRY, "SE"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME, "London"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE, "SW1A 2AA"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE, "UK"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE, "Greater London")));
+
+    assertThat(address.getLocality()).isEqualTo("Stockholm");
+    assertThat(address.getCountry()).isEqualTo("SE");
+    assertThat(address.getPostalCode()).isEqualTo("SW1A 2AA");
+    assertThat(address.getRegion()).isEqualTo("Greater London");
+  }
+
+  @Test
+  void theTwoSetsAreNotMixedWithinTheStreetAddress() {
+    assertThat(this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.STREET_ADDRESS, "Mosebacke torg 3"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, "Arcacia Avenue"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_DESIGNATOR, "22"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_PO_BOX, "Box 1122"))).getStreetAddress())
+            .isEqualTo("Mosebacke torg 3");
+
+    assertThat(this.address(List.of(
+        GenericAttribute.of(AttributeIdentifiers.POST_OFFICE_BOX, "Box 4711"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, "Arcacia Avenue"))).getStreetAddress())
+            .isEqualTo("Box 4711");
   }
 
   @Test
@@ -301,8 +402,7 @@ class OidcAttributeMappingTest {
         GenericAttribute.of(AttributeIdentifiers.SAD, "sad-value"),
         GenericAttribute.of(AttributeIdentifiers.SIGN_MESSAGE_DIGEST, "digest"),
         GenericAttribute.of(AttributeIdentifiers.AUTH_CONTEXT_PARAMS, "params"),
-        GenericAttribute.of(AttributeIdentifiers.EMPLOYEE_HSA_ID, "hsa"),
-        GenericAttribute.of(AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME, "London")), null))
+        GenericAttribute.of(AttributeIdentifiers.EMPLOYEE_HSA_ID, "hsa")), null))
         .isEmpty();
   }
 
@@ -316,24 +416,36 @@ class OidcAttributeMappingTest {
 
   @Test
   void anApplicationCanReplaceABuiltInMapper() {
-    this.mapping.getToProtocolMapping().register(new ToProtocolAttributeMapper<UserClaim>() {
+    this.mapping.getToProtocolMapping().register(new ToProtocolAttributeMapper<>() {
 
       @Override
-      public Collection<String> getSupportedIdentifiers() {
+      public @Nonnull Collection<String> getSupportedIdentifiers() {
         return List.of(AttributeIdentifiers.SURNAME);
       }
 
       @Override
-      public List<UserClaim> map(final List<GenericAttribute<? extends Serializable>> attributes,
-          final ToProtocolMappingContext context) {
+      public @Nonnull List<UserClaim> map(
+          final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
+          final @Nonnull ToProtocolMappingContext context) {
         return List.of(UserClaim.of("https://example.com/claim/surname",
-            attributes.get(0).getStringValues().get(0)));
+            attributes.getFirst().getStringValues().getFirst()));
       }
     });
 
     final List<UserClaim> claims = this.mapping.toClaims(
         List.of(GenericAttribute.of(AttributeIdentifiers.SURNAME, "Lindeman")), null);
     assertThat(claims).singleElement().extracting(UserClaim::name).isEqualTo("https://example.com/claim/surname");
+  }
+
+  @Test
+  void anApplicationCanAddAMapperForARequestedClaimOfItsOwn() {
+    final OidcAttributeMapping mapping = new OidcAttributeMapping(new DefaultAttributeDefinitionRegistry());
+    mapping.getFromProtocolMapping().register(
+        new ClaimFromProtocolMapper("https://example.com/claim/employeeNumber", "attribute.employee-number"));
+
+    assertThat(this.identifiers(mapping.toGeneric(List.of(
+        requested("https://example.com/claim/employeeNumber", true, ClaimDeliveryTarget.ID_TOKEN)))))
+            .containsExactly("attribute.employee-number");
   }
 
   @Test
