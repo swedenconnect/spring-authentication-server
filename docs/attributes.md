@@ -221,6 +221,119 @@ ID token and whether it is delivered from the UserInfo endpoint. At least one of
 Registering a scope whose value is already registered replaces it, which is how a built-in scope is given a definition
 of your own.
 
+## Releasing attributes
+
+Working out what a request asks for is one side. The other is deciding what goes back once the user has been
+authenticated. That is the release step, and it works on generic attributes: mapping them to SAML attributes or
+OpenID Connect claims happens afterwards, so nothing in the release step sees protocol attributes.
+
+`AttributeReleaseManager` is what the response building asks. It holds a list of `AttributeProducer`s, which say what
+may be released, and a list of `AttributeReleaseVoter`s, which say what is kept:
+
+```java
+AttributeReleaseManager manager = new DefaultAttributeReleaseManager(
+    List.of(new DefaultAttributeProducer()),
+    List.of(new MyOwnAttributeReleaseVoter()));
+
+List<GenericAttribute<? extends Serializable>> released = manager.releaseAttributes(userAuthentication);
+```
+
+The producers are run in order, and the first one to release an attribute wins. A later producer releasing the same
+generic attribute is ignored, so putting the most specific producer first is how its version of an attribute is the
+one that is used. At least one producer must be given.
+
+Every released attribute is then put to the voters, in order:
+
+- A `DONT_INCLUDE` ends the vote and the attribute is left out.
+- Otherwise at least one `INCLUDE` is needed.
+- `DONT_KNOW` leaves the decision to the other voters, so an attribute that every voter is indifferent about is left
+  out.
+
+A manager created without voters uses `IncludeAllAttributeReleaseVoter`, which keeps everything the producers
+released.
+
+### The built-in producers
+
+`DefaultAttributeProducer` releases the user attributes that are among the requested attributes of the authentication
+requirements. That covers both what the request stated and what it asked for implicitly, through SAML entity
+categories or OpenID Connect scopes. A result that carries no requirements is an internal error.
+
+`ReleaseAllAttributeProducer` releases every attribute the user has, whether it was asked for or not, and leaves the
+filtering to the voters.
+
+The requirements are those of the request being answered. When a previous authentication is reused for single
+sign-on, what is released is therefore what the new request asked for, not what the original request asked for.
+
+### Deciding what a requester may receive
+
+The library ships no list of the attributes a given Service Provider or OpenID Connect client is allowed to receive.
+An integrator who needs one writes a voter:
+
+```java
+public class AllowedAttributesVoter implements AttributeReleaseVoter {
+
+  @Override
+  public AttributeReleaseVote vote(final UserAuthentication userAuthentication,
+      final GenericAttribute<? extends Serializable> attribute) {
+    final AuthenticationUse use = userAuthentication.getUsageTrack().getLatestUse();
+    if (use == null || !this.allowedFor(use.requester()).contains(attribute.getIdentifier())) {
+      return AttributeReleaseVote.DONT_INCLUDE;
+    }
+    return AttributeReleaseVote.DONT_KNOW;
+  }
+}
+```
+
+The usage track tells who is being answered. Its latest use holds the requester and, in SAML, the request identifier.
+
+Voting `DONT_KNOW` rather than `INCLUDE` for what is allowed leaves room for another voter to object, and needs an
+include-all voter last in the list. Vote `INCLUDE` only where this voter is to have the final say.
+
+A producer of your own releases attributes that are not simply taken from the user, such as an attribute about the
+authentication event:
+
+```java
+public class MyOwnAttributeProducer implements AttributeProducer {
+
+  @Override
+  public List<GenericAttribute<? extends Serializable>> releaseAttributes(
+      final UserAuthentication userAuthentication) {
+    return List.of(GenericAttribute.of("attribute.my-own", theValue(userAuthentication)));
+  }
+}
+```
+
+### The Sweden Connect rules for SAML
+
+`SwedenConnectAttributeProducer` in `authn-server-saml` builds on the default producer and adds the two attributes
+that the Swedish eID Framework asks an Identity Provider for. Both are about the authentication event rather than
+about the user.
+
+**The sign message digest** is the proof that the user saw and approved the sign message, see Section 3.2.4 of the
+Attribute Specification for the Swedish eID Framework. It is released when the request carried a sign message and the
+result says the message was displayed. If the digest cannot be built the outcome depends on the message: one that had
+to be shown gives the `SIGN_MESSAGE_NOT_DISPLAYED` error, one that did not is simply released without the digest.
+
+**The SAD**, the Signature Activation Data, is released together with the sign message digest, when the request
+carried a `SADRequest` extension and a `SADFactory` has been assigned to the producer. Without a factory no SAD is
+released.
+
+```java
+SwedenConnectAttributeProducer producer = new SwedenConnectAttributeProducer();
+producer.setSadFactory(new SADFactory(idpEntityId, signingCredential));
+```
+
+`SwedenConnectAttributeReleaseVoter` keeps the coordination number rule. A Swedish coordination number
+("samordningsnummer") is released only to a Service Provider that has declared the
+`http://id.swedenconnect.se/general-ec/1.0/accepts-coordination-number` entity category, see Section 6.2 of Entity
+Categories for the Swedish eID Framework. The rule covers `attribute.coordination-number` only:
+
+- A personal identity number is not affected by the opt-in.
+- `attribute.mapped-coordination-number` is not affected either. The specification states that the category does not
+  apply to `mappedPersonalIdentityNumber`.
+
+The voter votes `DONT_KNOW` for everything else, so it is combined with the other voters rather than used alone.
+
 ## Adding an attribute
 
 Register a definition for it, and a mapper for each protocol it is to be released in.

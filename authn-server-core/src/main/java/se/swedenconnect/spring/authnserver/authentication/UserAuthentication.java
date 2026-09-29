@@ -226,4 +226,19 @@ public class UserAuthentication extends AbstractAuthenticationToken {
     return this.usageTrack.size() > 1;
   }
 
+  /**
+   * Gets a string that identifies the request being answered, for logging. It is built from the latest registered use.
+   *
+   * @return a log string
+   */
+  public @Nonnull String getLogString() {
+    final AuthenticationUse use = this.usageTrack.getLatestUse();
+    if (use == null) {
+      return "requester: 'unknown'";
+    }
+    return use.requestId() != null
+        ? "requester: '%s', request: '%s'".formatted(use.requester(), use.requestId())
+        : "requester: '%s'".formatted(use.requester());
+  }
+
 }
