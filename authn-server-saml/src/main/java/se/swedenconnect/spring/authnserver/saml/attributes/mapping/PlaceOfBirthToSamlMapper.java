@@ -1,0 +1,77 @@
+/*
+ * Copyright 2026 Sweden Connect
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
+
+import jakarta.annotation.Nonnull;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import org.opensaml.saml.saml2.core.Attribute;
+
+import se.swedenconnect.opensaml.sweid.saml2.attribute.AttributeConstants;
+import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
+import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
+import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
+import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
+import se.swedenconnect.spring.authnserver.saml.attributes.SamlAttributeValues;
+
+/**
+ * Maps the generic place of birth attributes into the SAML {@code placeOfBirth} attribute.
+ * <p>
+ * The free text place of birth is used when it is present. Otherwise the parts are joined with a comma and a space,
+ * in the order locality, region and country, and parts that are missing are skipped, giving for example
+ * {@code Stockholm, SE}.
+ * </p>
+ *
+ * @author Martin Lindström
+ */
+public class PlaceOfBirthToSamlMapper implements ToProtocolAttributeMapper<Attribute> {
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull Collection<String> getSupportedIdentifiers() {
+    return List.of(AttributeIdentifiers.PLACE_OF_BIRTH, AttributeIdentifiers.PLACE_OF_BIRTH_LOCALITY,
+        AttributeIdentifiers.PLACE_OF_BIRTH_REGION, AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull List<Attribute> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
+      final @Nonnull ToProtocolMappingContext context) {
+
+    String placeOfBirth = context.getStringValue(AttributeIdentifiers.PLACE_OF_BIRTH);
+    if (placeOfBirth == null) {
+      final List<String> parts = new ArrayList<>();
+      for (final String identifier : List.of(AttributeIdentifiers.PLACE_OF_BIRTH_LOCALITY,
+          AttributeIdentifiers.PLACE_OF_BIRTH_REGION, AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY)) {
+        final String part = context.getStringValue(identifier);
+        if (part != null && !part.isBlank()) {
+          parts.add(part);
+        }
+      }
+      placeOfBirth = !parts.isEmpty() ? String.join(", ", parts) : null;
+    }
+    if (placeOfBirth == null) {
+      return List.of();
+    }
+    return List.of(SamlAttributeValues.createAttribute(AttributeConstants.ATTRIBUTE_NAME_PLACE_OF_BIRTH,
+        AttributeConstants.ATTRIBUTE_FRIENDLY_NAME_PLACE_OF_BIRTH, List.of(placeOfBirth)));
+  }
+
+}

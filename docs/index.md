@@ -36,10 +36,13 @@ The Spring Boot starters:
 
 ## Documentation
 
+- [Attributes](attributes.html) - The protocol-neutral attribute model, the built-in attributes and how they map to
+  SAML attributes and OpenID Connect claims.
+
 - [Configuration](configuration.html) - Auto-configuration and the complete set of properties.
 
 - [Release Notes](release-notes.html)
 
 -----
 
-Copyright &copy; 2026, [Myndigheten för digital förvaltning - Swedish Agency for Digital Government (DIGG)](http://www.digg.se). Licensed under version 2.0 of the [Apache License](http://www.apache.org/licenses/LICENSE-2.0).
+Copyright &copy; 2026, [Sweden Connect](https://www.swedenconnect.se). Licensed under version 2.0 of the [Apache License](http://www.apache.org/licenses/LICENSE-2.0).
