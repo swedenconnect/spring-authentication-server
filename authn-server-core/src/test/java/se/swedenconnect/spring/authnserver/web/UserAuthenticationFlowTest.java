@@ -135,6 +135,53 @@ class UserAuthenticationFlowTest {
     assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNull();
   }
 
+  @Test
+  void anErrorFromAProviderRemovesTheSessionAuthentication() {
+    final MockHttpServletRequest request = sessionWithAuthentication();
+    final UserAuthenticationFlow flow = new UserAuthenticationFlow(List.of(failing(AuthenticationError.CANCEL)));
+    assertThatExceptionOfType(AuthenticationErrorException.class)
+        .isThrownBy(() -> flow.authenticate(token(), request, new MockHttpServletResponse()));
+    assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNull();
+    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+  }
+
+  @Test
+  void errorsThatSayNothingAboutTheUserKeepTheSessionAuthentication() {
+    for (final AuthenticationError error : List.of(AuthenticationError.NO_AUTHN_CONTEXT,
+        AuthenticationError.PASSIVE_NOT_POSSIBLE)) {
+      final MockHttpServletRequest request = sessionWithAuthentication();
+      final UserAuthenticationFlow flow = new UserAuthenticationFlow(List.of(failing(error)));
+      assertThatExceptionOfType(AuthenticationErrorException.class)
+          .isThrownBy(() -> flow.authenticate(token(), request, new MockHttpServletResponse()));
+      assertThat(request.getSession().getAttribute(CONTEXT_KEY)).as(error.name()).isNotNull();
+    }
+  }
+
+  @Test
+  void aProtocolModuleCanReportAFailureWhileCompletingTheResult() {
+    final MockHttpServletRequest request = sessionWithAuthentication();
+    new UserAuthenticationFlow(List.of()).failAuthentication(request, new MockHttpServletResponse(),
+        new AuthenticationErrorException(AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED));
+    assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNull();
+  }
+
+  private static MockHttpServletRequest sessionWithAuthentication() {
+    final MockHttpServletRequest request = new MockHttpServletRequest();
+    new UserAuthenticationFlow(List.of())
+        .saveAuthentication(new UserAuthentication(user()), request, new MockHttpServletResponse());
+    assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNotNull();
+    return request;
+  }
+
+  private static UserAuthenticationProvider failing(final AuthenticationError error) {
+    return new TestProvider("failing") {
+      @Override
+      public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+        throw new AuthenticationErrorException(error);
+      }
+    };
+  }
+
   private static UserAuthenticationInputToken token() {
     final AuthenticationRequirements requirements = new AuthenticationRequirements();
     requirements.setAuthnContextRequirements(List.of(LOA3));

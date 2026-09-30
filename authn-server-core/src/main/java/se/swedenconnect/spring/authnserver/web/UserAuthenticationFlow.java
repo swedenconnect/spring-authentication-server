@@ -54,6 +54,15 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
  * Spring Security {@link SecurityContext}. Whether it may be reused for a request is decided by the provider, from its
  * single sign-on policy and voters.
  * </p>
+ * <p>
+ * The session authentication stays when a request leads to a redirect for a new authentication, and when a request
+ * fails before any authentication has started, since neither says anything about the user. It is removed when an
+ * authentication that has started ends in an error, whether the provider reported it, including cancel, fraud and
+ * possible fraud, or it was raised while the result was completed, see
+ * {@link #failAuthentication(HttpServletRequest, HttpServletResponse, AuthenticationErrorException)}. The errors
+ * {@link AuthenticationError#NO_AUTHN_CONTEXT} and {@link AuthenticationError#PASSIVE_NOT_POSSIBLE} are not failures
+ * of an authentication, since no provider could take the request or the user was never asked.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -109,7 +118,14 @@ public class UserAuthenticationFlow {
     token.setPreviousAuthentication(this.getSessionAuthentication());
 
     for (final UserAuthenticationProvider provider : this.providers) {
-      final Authentication result = provider.authenticateUser(token);
+      final Authentication result;
+      try {
+        result = provider.authenticateUser(token);
+      }
+      catch (final AuthenticationErrorException e) {
+        this.failAuthentication(request, response, e);
+        throw e;
+      }
       if (result == null) {
         continue;
       }
@@ -144,11 +160,15 @@ public class UserAuthenticationFlow {
    * found among the redirect providers with the same resume path, and it turns the outcome into the result.
    *
    * @param token the resumed token
+   * @param request the HTTP servlet request
+   * @param response the HTTP servlet response
    * @return the authentication
-   * @throws AuthenticationErrorException if the authentication failed
+   * @throws AuthenticationErrorException if the authentication failed, in which case the session authentication has
+   *     been removed
    * @throws UnrecoverableErrorException if no provider can use what the module delivered
    */
-  public @Nonnull UserAuthentication resume(final @Nonnull ResumedAuthenticationToken token)
+  public @Nonnull UserAuthentication resume(final @Nonnull ResumedAuthenticationToken token,
+      final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response)
       throws AuthenticationErrorException, UnrecoverableErrorException {
 
     final UserAuthenticationInputToken inputToken = token.getAuthnInputToken();
@@ -159,7 +179,13 @@ public class UserAuthenticationFlow {
       if (!token.isError() && !provider.supportsUserAuthenticationToken(token.getAuthnToken())) {
         continue;
       }
-      return prepare(provider.resumeAuthentication(token), inputToken);
+      try {
+        return prepare(provider.resumeAuthentication(token), inputToken);
+      }
+      catch (final AuthenticationErrorException e) {
+        this.failAuthentication(request, response, e);
+        throw e;
+      }
     }
     log.error("No authentication provider can use the result of the authentication '{}' [{}]",
         token.getAuthnId(), inputToken.getLogString());
@@ -195,6 +221,36 @@ public class UserAuthenticationFlow {
       log.debug("The authentication of '{}' may not be reused - it is not saved for single sign-on [{}]",
           authentication.getName(), authentication.getLogString());
     }
+    SecurityContextHolder.setContext(context);
+    this.securityContextRepository.saveContext(context, request, response);
+  }
+
+  /**
+   * Records that an authentication that has started ended in an error, by removing the authentication from the
+   * session so that the next request cannot reuse it. The flow calls it for errors from the providers. A protocol
+   * module calls it for errors raised while it completes the result, such as when the attributes are released.
+   * <p>
+   * Nothing is done for {@link AuthenticationError#NO_AUTHN_CONTEXT} and
+   * {@link AuthenticationError#PASSIVE_NOT_POSSIBLE}, which say nothing about the user.
+   * </p>
+   * <p>
+   * Call it before the error response is written.
+   * </p>
+   *
+   * @param request the HTTP servlet request
+   * @param response the HTTP servlet response
+   * @param error the error
+   */
+  public void failAuthentication(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
+      final @Nonnull AuthenticationErrorException error) {
+    if (error.getError() == AuthenticationError.NO_AUTHN_CONTEXT
+        || error.getError() == AuthenticationError.PASSIVE_NOT_POSSIBLE) {
+      return;
+    }
+    if (this.getSessionAuthentication() != null) {
+      log.debug("The authentication failed ({}) - removing the authentication from the session", error.getError());
+    }
+    final SecurityContext context = SecurityContextHolder.createEmptyContext();
     SecurityContextHolder.setContext(context);
     this.securityContextRepository.saveContext(context, request, response);
   }

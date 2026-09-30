@@ -253,8 +253,9 @@ A manager created without voters uses `IncludeAllAttributeReleaseVoter`, which k
 released.
 
 The server creates the manager for each protocol from the producers and voters of the configuration: the protocol's
-own followed by the shared ones. For SAML the defaults are `SwedenConnectAttributeProducer` and
-`SwedenConnectAttributeReleaseVoter`, followed by the shared `IncludeAllAttributeReleaseVoter`, see
+own followed by the shared ones. The shared defaults are `DefaultAttributeProducer` and
+`IncludeAllAttributeReleaseVoter`. For SAML, `SwedenConnectAttributeProducer` and `SwedenConnectAttributeReleaseVoter`
+come before them, see
 [Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
 
 ### The built-in producers

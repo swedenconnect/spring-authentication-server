@@ -40,7 +40,8 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  * <p>
  * A success is answered with a response holding the assertion. The authentication is kept in the session for single
  * sign-on before the response is sent, and only once the response has been built, so that an authentication that
- * could not be answered is never saved.
+ * could not be answered is never saved. An error raised while the assertion is built, such as when the attributes are
+ * released, removes the authentication from the session, as any failed authentication does.
  * </p>
  *
  * @author Martin Lindström
@@ -88,7 +89,7 @@ public class Saml2UserAuthenticationResponder {
    * @param token the request being answered
    * @param authentication the authentication
    * @throws AuthenticationErrorException if the attribute release fails in a way that is reported to the Service
-   *     Provider
+   *     Provider, in which case the session authentication has been removed
    * @throws UnrecoverableErrorException if the response cannot be built or sent
    */
   public void sendResponse(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
@@ -96,7 +97,14 @@ public class Saml2UserAuthenticationResponder {
       throws AuthenticationErrorException, UnrecoverableErrorException {
 
     final Saml2AuthnRequestData requestData = getRequestData(token);
-    final Assertion assertion = this.assertionBuilder.buildAssertion(authentication, requestData, token.getRequester());
+    final Assertion assertion;
+    try {
+      assertion = this.assertionBuilder.buildAssertion(authentication, requestData, token.getRequester());
+    }
+    catch (final AuthenticationErrorException e) {
+      this.flow.failAuthentication(request, response, e);
+      throw e;
+    }
     final Saml2ResponseAttributes responseAttributes = requestData.responseAttributes();
     final Response samlResponse = this.responseBuilder.buildResponse(responseAttributes, assertion);
 

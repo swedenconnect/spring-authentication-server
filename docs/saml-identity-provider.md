@@ -122,8 +122,8 @@ released are therefore what the new request asks for, not what the original requ
 
 After a successful response, the authentication is saved in the session. An authentication that may not be reused,
 such as one where a sign message was displayed, is not saved, and it also removes any earlier authentication from the
-session. An authentication in progress on the pages of a module, or a request that fails, leaves the session as it
-was.
+session. What happens to the session authentication otherwise is described in
+[Writing an authentication module](authentication-module.html#what-happens-to-the-session-authentication).
 
 <a name="modules-with-pages-of-their-own"></a>
 ### Modules with pages of their own
@@ -132,8 +132,9 @@ A provider that authenticates the user on pages of its own, see
 [Writing an authentication module](authentication-module.html#modules-with-pages-of-their-own), sends the user to its
 authentication path. The server's filter chain serves both paths of every such provider:
 
-- The authentication path is open to everyone, since the user is not authenticated yet. Other pages of the module are
-  served by the application's own security configuration.
+- The authentication path is open to everyone, since the user is not authenticated yet. Only this exact path is
+  covered. Other pages of the module are not part of the server's filter chain, and the application must secure them
+  in its own security configuration.
 - The resume path is where the user comes back. The resume is handled once for the whole server: the authentication
   in progress records which protocol it was started for, and the flow continues in that protocol. For SAML, the
   response is sent to the Service Provider that sent the request, with the relay state of the request.
@@ -161,7 +162,7 @@ The defaults are:
 
 | List | SAML | Shared |
 | :--- | :--- | :--- |
-| Attribute producers | `SwedenConnectAttributeProducer` | - |
+| Attribute producers | `SwedenConnectAttributeProducer` | `DefaultAttributeProducer` |
 | Attribute release voters | `SwedenConnectAttributeReleaseVoter` | `IncludeAllAttributeReleaseVoter` |
 | Single sign-on voters | - | - |
 | Post-authentication processors | - | `SwedenConnectPostAuthenticationProcessor` |
@@ -169,7 +170,9 @@ The defaults are:
 Together they give the rules of the Swedish eID Framework: the requested attributes are released, with the sign
 message digest and the SAD for a signature service, a coordination number is only released to a Service Provider
 that accepts it, and a sign message that had to be displayed but was not fails the request. This is the same result as
-the defaults of saml-identity-provider. The `SADFactory` of the producer defaults to one that signs with the signing
+the defaults of saml-identity-provider. The shared `DefaultAttributeProducer` releases the requested attributes for
+every protocol; for SAML it adds nothing, since `SwedenConnectAttributeProducer` runs first and releases the same
+attributes, and a later producer releasing an attribute that has already been released is ignored. The `SADFactory` of the producer defaults to one that signs with the signing
 credential of the Identity Provider.
 
 Add entries in an [adapter](configuration.html#adjusting-the-configuration-in-code). An entry that applies to all

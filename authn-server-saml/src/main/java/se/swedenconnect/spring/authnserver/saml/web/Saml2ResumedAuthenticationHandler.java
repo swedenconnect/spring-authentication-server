@@ -87,7 +87,7 @@ public class Saml2ResumedAuthenticationHandler implements ResumedAuthenticationH
 
     SamlErrorStatusException error;
     try {
-      final UserAuthentication authentication = this.flow.resume(token);
+      final UserAuthentication authentication = this.flow.resume(token, request, response);
       this.responder.sendResponse(request, response, inputToken, authentication);
       return;
     }

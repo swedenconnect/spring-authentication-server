@@ -43,6 +43,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeProducer;
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseVoter;
+import se.swedenconnect.spring.authnserver.attributes.release.DefaultAttributeProducer;
 import se.swedenconnect.spring.authnserver.attributes.release.IncludeAllAttributeReleaseVoter;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -160,7 +161,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   private RequesterAcceptance requesterAcceptance;
 
   /** The shared attribute producers. */
-  private final List<AttributeProducer> attributeProducers = new ArrayList<>();
+  private final List<AttributeProducer> attributeProducers = new ArrayList<>(List.of(new DefaultAttributeProducer()));
 
   /** The shared attribute release voters. */
   private final List<AttributeReleaseVoter> attributeReleaseVoters =
@@ -450,7 +451,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /**
    * Customizes the shared attribute producers. They run after the producers of the protocol, and the first producer to
-   * release an attribute wins. The list is empty by default.
+   * release an attribute wins. The default is a {@link DefaultAttributeProducer}.
    *
    * @param customizer the customizer
    * @return this configurer

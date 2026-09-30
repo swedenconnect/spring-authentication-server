@@ -364,6 +364,24 @@ protocols, or to the list of one protocol. They are asked after the provider's o
 A refusal always states its reason, an [`SsoDenialReason`][SsoDenialReason]. That matters for a passive request, see
 below.
 
+<a name="what-happens-to-the-session-authentication"></a>
+### What happens to the session authentication
+
+The session holds one authentication for the whole server, the one that a later request may reuse. What happens to it
+depends on how a request ends:
+
+- A successful authentication replaces it, provided that the new result may be reused. A result that may not be
+  reused, such as one where a sign message was displayed, removes it.
+- A redirect to the pages of a module leaves it in place. Starting a new authentication says nothing about the old one,
+  so another request, for example in another browser tab, may still reuse it.
+- An authentication that has started and ends in an error removes it. This covers every error a module reports,
+  including `CANCEL`, `FRAUD` and `POSSIBLE_FRAUD`, and errors raised while the result is completed, such as
+  `SIGN_MESSAGE_NOT_DISPLAYED`. After fraud, or after the user stopped, the earlier authentication must not let the next
+  request through.
+- A request that fails before any authentication started leaves it in place, since such a failure says nothing about
+  the user. That is an invalid request, an unknown or rejected requester, `NO_AUTHN_CONTEXT` when no provider could
+  take the request, and `PASSIVE_NOT_POSSIBLE` when the user was never asked.
+
 ### How use of the result is tracked
 
 The library records every time a result is used, one record per use, in an
@@ -477,6 +495,21 @@ answered fails. Only when the user really has to authenticate is a
 chain serves the two paths: the authentication path is open to everyone, and the resume path is where the flow
 continues, in the protocol that the requester used. See
 [The SAML Identity Provider](saml-identity-provider.html#modules-with-pages-of-their-own).
+
+:raised_hand: Only these two exact paths are covered by the server's filter chain. Any other page of the module, such as
+the one a login form posts to, is not, and the application must secure it in its own security configuration. For
+example, permit the module's paths in the application's filter chain:
+
+```java
+@Bean
+@Order(2)
+SecurityFilterChain applicationSecurityFilterChain(final HttpSecurity http) throws Exception {
+  http.authorizeHttpRequests(authorize -> authorize
+      .requestMatchers("/authn/**").permitAll()
+      .anyRequest().denyAll());
+  return http.build();
+}
+```
 
 `createUserAuthentication` is the counterpart of `authenticate`. It is called when the user comes back, and it turns
 what the controller delivered into the result. A controller that already delivers a `UserAuthentication` has nothing to

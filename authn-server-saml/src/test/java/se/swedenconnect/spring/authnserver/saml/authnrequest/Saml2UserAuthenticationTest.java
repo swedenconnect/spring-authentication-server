@@ -100,6 +100,7 @@ import se.swedenconnect.security.credential.opensaml.OpenSamlCredential;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseVote;
+import se.swedenconnect.spring.authnserver.attributes.release.DefaultAttributeProducer;
 import se.swedenconnect.spring.authnserver.attributes.release.IncludeAllAttributeReleaseVoter;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
@@ -515,6 +516,107 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
   }
 
   @Test
+  void anErrorFromTheProviderRemovesTheSessionAuthentication() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, provider);
+    this.send(toHttpRequest(this.request(r -> {})));
+
+    for (final AuthenticationError error : List.of(AuthenticationError.FRAUD, AuthenticationError.POSSIBLE_FRAUD,
+        AuthenticationError.AUTHN_FAILED)) {
+      this.send(toHttpRequest(this.request(r -> {})));
+      final int calls = provider.calls;
+      provider.error = new AuthenticationErrorException(error);
+      final RequestHttpObject<AuthnRequest> failing = this.request(r -> r.setForceAuthn(true));
+      this.assertErrorResponse(this.send(toHttpRequest(failing)), failing, StatusCode.RESPONDER,
+          SamlErrorStatus.of(error).subStatusCode());
+      assertThat(this.session.getAttribute("SPRING_SECURITY_CONTEXT")).isNull();
+
+      provider.error = null;
+      this.send(toHttpRequest(this.request(r -> {})));
+      assertThat(provider.calls).as("not reused after " + error).isEqualTo(calls + 2);
+    }
+  }
+
+  @Test
+  void aCancelledRedirectAuthenticationRemovesTheSessionAuthentication() throws Exception {
+    final TestProvider direct = new TestProvider("direct", LOA3);
+    final TestRedirectProvider redirect = new TestRedirectProvider(LOA4);
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, direct, redirect);
+    this.send(toHttpRequest(this.request(r -> {})));
+
+    final String authnId = this.redirectedAuthnId(this.send(toHttpRequest(this.request(r -> r.setRequestedAuthnContext(
+        RequestedAuthnContextBuilder.builder()
+            .comparison(AuthnContextComparisonTypeEnumeration.EXACT).authnContextClassRefs(LOA4).build())))));
+    // A redirect keeps the session authentication ...
+    assertThat(this.session.getAttribute("SPRING_SECURITY_CONTEXT")).isNotNull();
+
+    redirect.getAuthenticatorRepository().complete(new AuthenticationErrorException(AuthenticationError.CANCEL),
+        this.appRequest("POST", "/authn/cancel", authnId));
+    this.send(this.appRequest("GET", RESUME_PATH, authnId));
+
+    // ... but the cancel removes it
+    this.send(toHttpRequest(this.request(r -> {})));
+    assertThat(direct.calls).isEqualTo(2);
+  }
+
+  @Test
+  void aFailureWhileCompletingTheResultRemovesTheSessionAuthentication() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    final boolean[] failRelease = { false };
+    this.start(spMetadata(sp -> {}, LOA3_PNR, SIGSERVICE), c -> c.protocol(Saml2IdpConfigurer.class,
+        saml -> saml.attributeProducers(l -> l.addFirst(a -> {
+          if (failRelease[0]) {
+            throw new AuthenticationErrorException(AuthenticationError.AUTHN_FAILED, "Release failed");
+          }
+          return List.of();
+        }))), provider);
+    this.send(toHttpRequest(this.request(r -> {})));
+
+    // Sign message not displayed, raised by the post-authentication processing ...
+    final RequestHttpObject<AuthnRequest> withSignMessage =
+        this.request(r -> r.setExtensions(ExtensionsBuilder.builder().extension(signMessage("Sign it")).build()));
+    this.assertErrorResponse(this.send(toHttpRequest(withSignMessage)), withSignMessage, StatusCode.RESPONDER,
+        StatusCode.AUTHN_FAILED);
+    this.send(toHttpRequest(this.request(r -> {})));
+    assertThat(provider.calls).isEqualTo(3);
+
+    // ... and an error from the release, after single sign-on
+    failRelease[0] = true;
+    final RequestHttpObject<AuthnRequest> failing = this.request(r -> {});
+    this.assertErrorResponse(this.send(toHttpRequest(failing)), failing, StatusCode.RESPONDER,
+        StatusCode.AUTHN_FAILED);
+    assertThat(provider.calls).isEqualTo(3);
+    failRelease[0] = false;
+    this.send(toHttpRequest(this.request(r -> {})));
+    assertThat(provider.calls).isEqualTo(4);
+  }
+
+  @Test
+  void aFailureBeforeTheAuthenticationStartedKeepsTheSessionAuthentication() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, provider);
+    this.send(toHttpRequest(this.request(r -> {})));
+
+    // An invalid request
+    final RequestHttpObject<AuthnRequest> invalid = this.request(r -> {
+      r.setForceAuthn(true);
+      r.setIsPassive(true);
+    });
+    this.assertErrorResponse(this.send(toHttpRequest(invalid)), invalid, StatusCode.REQUESTER,
+        StatusCode.REQUEST_UNSUPPORTED);
+
+    // No provider for the requested authentication context
+    final RequestHttpObject<AuthnRequest> noProvider = this.request(r -> r.setRequestedAuthnContext(
+        RequestedAuthnContextBuilder.builder()
+            .comparison(AuthnContextComparisonTypeEnumeration.EXACT).authnContextClassRefs(LOA2).build()));
+    this.assertErrorResponse(this.send(toHttpRequest(noProvider)), noProvider, StatusCode.REQUESTER,
+        StatusCode.NO_AUTHN_CONTEXT);
+
+    this.send(toHttpRequest(this.request(r -> {})));
+    assertThat(provider.calls).isOne();
+  }
+
+  @Test
   void theSamlPolicyWinsOverTheSharedPolicy() throws Exception {
     final TestProvider provider = new TestProvider("direct", LOA3);
     this.start(spMetadata(sp -> {}, LOA3_PNR), c -> c
@@ -586,7 +688,7 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     assertThat(saml.getAttributeReleaseVoters()).singleElement().isInstanceOf(SwedenConnectAttributeReleaseVoter.class);
     assertThat(saml.getSsoVoters()).isEmpty();
     assertThat(saml.getPostAuthenticationProcessors()).isEmpty();
-    assertThat(server.getAttributeProducers()).isEmpty();
+    assertThat(server.getAttributeProducers()).singleElement().isInstanceOf(DefaultAttributeProducer.class);
     assertThat(server.getAttributeReleaseVoters()).singleElement().isInstanceOf(IncludeAllAttributeReleaseVoter.class);
     assertThat(server.getSsoVoters()).isEmpty();
     assertThat(server.getPostAuthenticationProcessors()).singleElement()
