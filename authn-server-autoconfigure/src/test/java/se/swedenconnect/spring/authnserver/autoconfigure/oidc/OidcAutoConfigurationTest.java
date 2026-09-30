@@ -43,9 +43,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
 
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.langtag.LangTag;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.id.Identifier;
@@ -63,6 +67,8 @@ import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfigurat
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
+import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
+import se.swedenconnect.spring.authnserver.oidc.federation.TrustMarkState;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
@@ -80,6 +86,16 @@ class OidcAutoConfigurationTest {
   private static final String LOA3 = "http://id.elegnamnden.se/loa/1.0/loa3";
 
   private static final String DISCOVERY = "/.well-known/openid-configuration";
+
+  private static final String[] FEDERATION = {
+      "authn-server.oidc.federation.enabled=true",
+      "authn-server.oidc.federation.authority-hints[0]=https://ia.example.com",
+      "authn-server.entity-information.ui-info.display-names.sv=Exempel-OP",
+      "authn-server.entity-information.ui-info.logotypes[0].url=https://cdn.example.com/logo.svg",
+      "authn-server.entity-information.organization.names.sv=Exempel AB",
+      "authn-server.entity-information.organization.number=5561234567",
+      "authn-server.entity-information.contact-persons.technical.email-addresses[0]=ops@example.com"
+  };
 
   private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
       .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
@@ -400,6 +416,112 @@ class OidcAutoConfigurationTest {
     assertThat(OidcAutoConfiguration.toParameterValue(Map.of("0", "a", "2", "b")))
         .isEqualTo(Map.of("0", "a", "2", "b"));
     assertThat(OidcAutoConfiguration.toParameterValue(List.of("true"))).isEqualTo(List.of(true));
+  }
+
+  @Test
+  void withFederationEnabledTheEntityConfigurationIsPublished() {
+    this.runner.withPropertyValues(signingKey(0, "ec-sign", "active", true))
+        .withPropertyValues(federationKey(0, "rsa-sign", "active"))
+        .withPropertyValues(federationKey(1, "rsa-future", "future"))
+        .withPropertyValues(FEDERATION)
+        .withPropertyValues(
+            "authn-server.oidc.federation.entity-configuration-lifetime=PT12H",
+            "authn-server.oidc.federation.additional-parameters.trust_anchor_hints[0]=https://ta.example.com",
+            "authn-server.oidc.entity-information.ui-info.display-names.en=Example OP",
+            "authn-server.oidc.entity-information.organization-uri=https://op.example.com/about",
+            "authn-server.oidc.federation.trust-marks[0].type=https://id.swedenconnect.se/loa/loa3",
+            "authn-server.oidc.federation.trust-marks[0].issuer=https://tmi.example.com",
+            "authn-server.oidc.federation.trust-marks[0].endpoint=http://localhost:1/trust_mark",
+            "authn-server.oidc.federation.trust-marks[0].jwks=classpath:federation/tmi-jwks.json")
+        .withUserConfiguration(ProviderConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context).hasSingleBean(ProviderTrustMarks.class);
+          assertThat(context.getBean(ProviderTrustMarks.class).getStates())
+              .extracting(TrustMarkState::trustMarkType).containsExactly("https://id.swedenconnect.se/loa/loa3");
+
+          final MockHttpServletResponse response = get(context, "/.well-known/openid-federation");
+          assertThat(response.getStatus()).isEqualTo(200);
+          assertThat(response.getContentType()).isEqualTo("application/entity-statement+jwt");
+          final SignedJWT jwt = SignedJWT.parse(response.getContentAsString());
+          final JWTClaimsSet claims = jwt.getJWTClaimsSet();
+          assertThat(claims.getIssuer()).isEqualTo(BASE_URL);
+          assertThat(claims.getStringListClaim("authority_hints")).containsExactly("https://ia.example.com");
+          assertThat(claims.getStringListClaim("trust_anchor_hints")).containsExactly("https://ta.example.com");
+          assertThat(Duration.between(claims.getIssueTime().toInstant(), claims.getExpirationTime().toInstant()))
+              .isEqualTo(Duration.ofHours(12));
+          final JWKSet published = JWKSet.parse(claims.getJSONObjectClaim("jwks"));
+          assertThat(published.getKeys()).hasSize(2);
+          assertThat(jwt.verify(new RSASSAVerifier((RSAKey) published.getKeyByKeyId(jwt.getHeader().getKeyID()))))
+              .isTrue();
+
+          @SuppressWarnings("unchecked")
+          final Map<String, Object> op =
+              (Map<String, Object>) claims.getJSONObjectClaim("metadata").get("openid_provider");
+          assertThat(op)
+              .containsEntry("issuer", BASE_URL)
+              .containsEntry("display_name#en", "Example OP")
+              .containsEntry("organization_name#sv", "Exempel AB")
+              .containsEntry("organization_uri", "https://op.example.com/about")
+              .containsEntry("organization_identifier", "urn:glue:iso6523:0007:5561234567")
+              .containsEntry("logo_uri", "https://cdn.example.com/logo.svg")
+              .containsEntry("contacts", List.of("ops@example.com"));
+          assertThat(op).doesNotContainKey("display_name#sv");
+        });
+  }
+
+  @Test
+  void withoutFederationNoEntityConfigurationIsPublished() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", true))
+        .withUserConfiguration(ProviderConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context).doesNotHaveBean(ProviderTrustMarks.class);
+          assertThat(get(context, "/.well-known/openid-federation").getContentAsByteArray()).isEmpty();
+        });
+  }
+
+  @Test
+  void federationWithoutKeysOrAuthorityHintsFailsStartup() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", true))
+        .withPropertyValues(FEDERATION)
+        .withUserConfiguration(ProviderConfiguration.class)
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("federation keys"));
+
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", true))
+        .withPropertyValues(federationKey(0, "rsa-sign", "active"))
+        .withPropertyValues(FEDERATION)
+        .withPropertyValues("authn-server.oidc.federation.authority-hints=")
+        .withUserConfiguration(ProviderConfiguration.class)
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("authority hints"));
+  }
+
+  @Test
+  void invalidContactsOrLogoFailStartup() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", true))
+        .withPropertyValues(federationKey(0, "rsa-sign", "active"))
+        .withPropertyValues(FEDERATION)
+        .withPropertyValues("authn-server.oidc.entity-information.logo-uri=http://cdn.example.com/logo.svg")
+        .withUserConfiguration(ProviderConfiguration.class)
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("logo_uri"));
+
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", true))
+        .withPropertyValues(federationKey(0, "rsa-sign", "active"))
+        .withPropertyValues(FEDERATION)
+        .withPropertyValues("authn-server.oidc.entity-information.contacts=not-an-address")
+        .withUserConfiguration(ProviderConfiguration.class)
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("contacts"));
+  }
+
+  private static String[] federationKey(final int index, final String alias, final String state) {
+    final String prefix = "authn-server.oidc.federation.keys[%d].".formatted(index);
+    final List<String> values = new ArrayList<>(credential(prefix, alias));
+    values.add(prefix + "state=" + state);
+    return values.toArray(String[]::new);
   }
 
   private static String[] signingKey(final int index, final String alias, final String state,

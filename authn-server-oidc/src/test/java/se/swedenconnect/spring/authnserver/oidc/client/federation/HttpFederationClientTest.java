@@ -40,8 +40,10 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
+import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationTrustMarkStatusRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.ResolveRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
+import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMarkStatusResponse;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -56,6 +58,9 @@ class HttpFederationClientTest extends FederationTestSupport {
 
   /** The queries that the server was called with. */
   private final List<String> queries = new ArrayList<>();
+
+  /** The methods and bodies that the server was called with. */
+  private final List<String> requests = new ArrayList<>();
 
   /** What the server answers. */
   private int status = 200;
@@ -108,6 +113,36 @@ class HttpFederationClientTest extends FederationTestSupport {
     assertThat(this.queries.get(0))
         .contains("trust_mark_type=https%3A%2F%2Fexample.com%2Fmark-one")
         .contains("sub=https%3A%2F%2Fclient.example.com");
+  }
+
+  @Test
+  void theTrustMarkStatusRequestPostsTheTrustMark() throws Exception {
+    final ECKey key = key("k1");
+    final String trustMark = trustMark(key, TRUST_MARK_ISSUER, CLIENT_ID, MARK_ONE, null).serialize();
+    this.body = trustMarkStatus(key, TRUST_MARK_ISSUER, trustMark, "active").serialize();
+    final int port = this.startServer();
+
+    final TrustMarkStatusResponse answer = new HttpFederationClient().trustMarkStatus(new FederationRequest<>(
+        new FederationTrustMarkStatusRequest(trustMark, TRUST_MARK_ISSUER),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
+            "http://localhost:%d/trust_mark_status".formatted(port))));
+
+    assertThat(answer.isError()).isFalse();
+    assertThat(answer.getSignedJWT().serialize()).isEqualTo(this.body);
+    assertThat(this.requests).containsExactly("POST trust_mark=" + trustMark);
+  }
+
+  @Test
+  void aTrustMarkStatusEndpointThatAnswersNotFoundIsAnError() throws Exception {
+    this.status = 404;
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> new HttpFederationClient().trustMarkStatus(new FederationRequest<>(
+        new FederationTrustMarkStatusRequest("a.b.c", TRUST_MARK_ISSUER),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
+            "http://localhost:%d/trust_mark_status".formatted(port)))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("404");
   }
 
   @Test
@@ -171,7 +206,6 @@ class HttpFederationClientTest extends FederationTestSupport {
     assertThatThrownBy(() -> client.fetch(null)).isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> client.subordinateListing(null)).isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> client.trustMarkedListing(null)).isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> client.trustMarkStatus(null)).isInstanceOf(UnsupportedOperationException.class);
   }
 
   private FederationRequest<ResolveRequest> resolveRequest(final int port) {
@@ -195,6 +229,8 @@ class HttpFederationClientTest extends FederationTestSupport {
 
   private void handle(final HttpExchange exchange) throws IOException {
     this.queries.add(exchange.getRequestURI().getRawQuery());
+    this.requests.add(exchange.getRequestMethod() + " "
+        + new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
     final byte[] bytes = this.body.getBytes(StandardCharsets.UTF_8);
     if (bytes.length == 0) {
       exchange.sendResponseHeaders(this.status, -1);

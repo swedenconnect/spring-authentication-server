@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
 
 /**
@@ -68,6 +69,12 @@ public class AuthnServerConfigurationProperties {
    * from an authentication module. Defaults to 30 minutes.
    */
   private Duration authnFlowMaxAge;
+
+  /**
+   * The descriptive information about the server and its organization that every protocol publishes: the SAML
+   * metadata and the OpenID Federation entity configuration. A protocol may override any part of it.
+   */
+  private final EntityInformationProperties entityInformation = new EntityInformationProperties();
 
   /**
    * Gets the base URL.
@@ -160,6 +167,15 @@ public class AuthnServerConfigurationProperties {
   }
 
   /**
+   * Gets the shared entity information.
+   *
+   * @return the entity information properties
+   */
+  public @NonNull EntityInformationProperties getEntityInformation() {
+    return this.entityInformation;
+  }
+
+  /**
    * Applies the property values to a shared configurer. Values that have not been assigned are left at the configurer's
    * defaults.
    *
@@ -186,6 +202,10 @@ public class AuthnServerConfigurationProperties {
     }
     if (this.authnFlowMaxAge != null) {
       configurer.authnFlowMaxAge(this.authnFlowMaxAge);
+    }
+    final EntityInformation information = this.entityInformation.toEntityInformation();
+    if (!information.isEmpty()) {
+      configurer.entityInformation(information);
     }
   }
 

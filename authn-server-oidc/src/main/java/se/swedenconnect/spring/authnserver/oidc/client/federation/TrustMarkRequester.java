@@ -48,20 +48,32 @@ public interface TrustMarkRequester {
    *
    * @param type the trust mark type
    * @param expiresAt when the trust mark is no longer valid, or {@code null} if it does not expire
+   * @param trustMark the trust mark JWT, needed to check its status, or {@code null} if it is not known
    */
-  record TrustMark(@NonNull String type, @Nullable Instant expiresAt) {
+  record TrustMark(@NonNull String type, @Nullable Instant expiresAt, @Nullable String trustMark) {
 
     /**
      * Constructor.
      *
      * @param type the trust mark type
      * @param expiresAt when the trust mark is no longer valid, or {@code null}
+     * @param trustMark the trust mark JWT, or {@code null}
      */
     public TrustMark {
       Objects.requireNonNull(type, "type must not be null");
       if (!StringUtils.hasText(type)) {
         throw new IllegalArgumentException("type must not be empty");
       }
+    }
+
+    /**
+     * Constructor for a trust mark whose JWT is not kept.
+     *
+     * @param type the trust mark type
+     * @param expiresAt when the trust mark is no longer valid, or {@code null}
+     */
+    public TrustMark(final @NonNull String type, final @Nullable Instant expiresAt) {
+      this(type, expiresAt, null);
     }
 
   }

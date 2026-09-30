@@ -16,11 +16,7 @@
 package se.swedenconnect.spring.authnserver.autoconfigure.saml;
 
 import java.security.cert.X509Certificate;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.opensaml.storage.ReplayCache;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,7 +38,9 @@ import se.swedenconnect.opensaml.sweid.xmlsec.config.SwedishEidSecurityConfigura
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConfigurerFactory;
+import se.swedenconnect.spring.authnserver.autoconfigure.EntityInformationProperties;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
 import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequesterPredicate;
@@ -238,21 +236,12 @@ public class SamlAutoConfiguration {
                 e.getAlgorithm(), e.getKeySize(), e.getOaepParams(), e.getDigestMethod()))
             .toList());
       }
-      m.uiInfo(toUiInfo(md.getUiInfo()));
       m.requestedPrincipalSelection(md.getRequestedPrincipalSelection());
-      if (md.getOrganization() != null) {
-        final SamlConfigurationProperties.MetadataProperties.Organization o = md.getOrganization();
-        m.organization(new IdpMetadataElements.Organization(o.getNames(), o.getDisplayNames(), o.getUrls(),
-            o.getNumber()));
-      }
-      if (md.getContactPersons() != null) {
-        final Map<IdpMetadataElements.ContactPersonType, IdpMetadataElements.ContactPerson> contactPersons =
-            new LinkedHashMap<>();
-        md.getContactPersons().forEach((type, c) -> contactPersons.put(type,
-            new IdpMetadataElements.ContactPerson(c.getCompany(), c.getGivenName(), c.getSurname(),
-                c.getEmailAddresses(), c.getTelephoneNumbers())));
-        m.contactPersons(contactPersons);
-      }
+      final EntityInformation information = EntityInformationProperties.toEntityInformation(
+          md.getUiInfo(), md.getOrganization(), md.getContactPersons());
+      m.uiInfo(information.uiInfo());
+      m.organization(information.organization());
+      m.contactPersons(information.contactPersons());
     });
     return configurer;
   }
@@ -314,26 +303,6 @@ public class SamlAutoConfiguration {
         .validationCertificate(properties.getValidationCertificate())
         .httpProxy(proxy)
         .build();
-  }
-
-  /**
-   * Maps the UI information properties.
-   *
-   * @param uiInfo the properties
-   * @return the UI information, or {@code null}
-   */
-  private static IdpMetadataElements.@Nullable UiInfo toUiInfo(
-      final SamlConfigurationProperties.MetadataProperties.@Nullable UiInfo uiInfo) {
-    if (uiInfo == null) {
-      return null;
-    }
-    return new IdpMetadataElements.UiInfo(uiInfo.getDisplayNames(), uiInfo.getDescriptions(),
-        uiInfo.getLogotypes() != null
-            ? uiInfo.getLogotypes().stream()
-                .map(l -> new IdpMetadataElements.Logo(l.getUrl(), l.getPath(), l.getHeight(), l.getWidth(),
-                    l.getLanguageTag()))
-                .toList()
-            : null);
   }
 
 }

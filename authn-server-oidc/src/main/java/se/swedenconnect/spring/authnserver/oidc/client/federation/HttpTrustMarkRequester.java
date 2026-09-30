@@ -122,7 +122,7 @@ public class HttpTrustMarkRequester implements TrustMarkRequester {
     }
     log.debug("The issuer {} issued a trust mark of type '{}' to '{}'", issuer.entityId(), trustMarkType, clientId);
     return new TrustMark(trustMarkType,
-        Optional.ofNullable(claims.getExpirationTime()).map(Date::toInstant).orElse(null));
+        Optional.ofNullable(claims.getExpirationTime()).map(Date::toInstant).orElse(null), response.serialize());
   }
 
 }

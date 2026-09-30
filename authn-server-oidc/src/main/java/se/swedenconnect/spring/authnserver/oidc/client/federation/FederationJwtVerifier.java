@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -41,7 +42,7 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  *
  * @author Martin Lindström
  */
-class FederationJwtVerifier {
+public final class FederationJwtVerifier {
 
   /**
    * Verifies a signed JWT and returns its claims.
@@ -50,13 +51,14 @@ class FederationJwtVerifier {
    * @param type the value that the {@code typ} header must have
    * @param keys the keys that the signature is verified against
    * @param issuer the entity identifier that the {@code iss} claim must have
-   * @param subject the entity identifier that the {@code sub} claim must have
+   * @param subject the entity identifier that the {@code sub} claim must have, or {@code null} when the JWT has no
+   *     subject
    * @param requiredClaims the claims that must be present
    * @return the claims of the JWT
    * @throws ClientRegistryException if the JWT does not verify
    */
-  static @NonNull JWTClaimsSet verify(final @NonNull SignedJWT jwt, final @NonNull String type,
-      final @NonNull JWKSet keys, final @NonNull String issuer, final @NonNull String subject,
+  public static @NonNull JWTClaimsSet verify(final @NonNull SignedJWT jwt, final @NonNull String type,
+      final @NonNull JWKSet keys, final @NonNull String issuer, final @Nullable String subject,
       final @NonNull Set<String> requiredClaims) throws ClientRegistryException {
 
     Objects.requireNonNull(jwt, "jwt must not be null");
@@ -64,14 +66,18 @@ class FederationJwtVerifier {
     processor.setJWSTypeVerifier(new DefaultJOSEObjectTypeVerifier<>(new JOSEObjectType(type)));
     processor.setJWSKeySelector(new JWSVerificationKeySelector<>(
         JWSAlgorithm.Family.SIGNATURE, new ImmutableJWKSet<>(keys)));
-    processor.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(
-        new JWTClaimsSet.Builder().issuer(issuer).subject(subject).build(), requiredClaims));
+    final JWTClaimsSet.Builder exactMatch = new JWTClaimsSet.Builder().issuer(issuer);
+    if (subject != null) {
+      exactMatch.subject(subject);
+    }
+    processor.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(exactMatch.build(), requiredClaims));
     try {
       return processor.process(jwt, null);
     }
     catch (final Exception e) {
       throw new ClientRegistryException(
-          "Failed to verify %s issued by %s for %s - %s".formatted(type, issuer, subject, e.getMessage()), e);
+          "Failed to verify %s issued by %s%s - %s".formatted(
+              type, issuer, subject != null ? " for " + subject : "", e.getMessage()), e);
     }
   }
 

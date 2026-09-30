@@ -30,8 +30,11 @@ import java.util.function.Consumer;
 
 import javax.xml.namespace.QName;
 
+import net.shibboleth.shared.xml.SerializeSupport;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
+import org.opensaml.core.xml.XMLObject;
+import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.saml.ext.saml2alg.DigestMethod;
@@ -63,6 +66,7 @@ import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.spring.authnserver.authentication.provider.AbstractUserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.saml.attributes.OpenSamlTestBase;
 import se.swedenconnect.spring.authnserver.saml.nameid.DefaultNameIDGeneratorFactory;
 
@@ -261,20 +265,20 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
 
   @Test
   void theUiInfoOrganizationAndContactsArePublished() throws Exception {
-    final Map<IdpMetadataElements.ContactPersonType, IdpMetadataElements.ContactPerson> contacts =
+    final Map<EntityInformation.ContactPersonType, EntityInformation.ContactPerson> contacts =
         new LinkedHashMap<>();
-    contacts.put(IdpMetadataElements.ContactPersonType.technical,
-        new IdpMetadataElements.ContactPerson("Company", "Kalle", "Kula", List.of("kalle@example.com"), null));
-    contacts.put(IdpMetadataElements.ContactPersonType.security,
-        new IdpMetadataElements.ContactPerson(null, null, null, List.of("security@example.com"), null));
+    contacts.put(EntityInformation.ContactPersonType.technical,
+        new EntityInformation.ContactPerson("Company", "Kalle", "Kula", List.of("kalle@example.com"), null));
+    contacts.put(EntityInformation.ContactPersonType.security,
+        new EntityInformation.ContactPerson(null, null, null, List.of("security@example.com"), null));
 
     final EntityDescriptor ed = descriptor(new AuthnServerConfigurer().baseUrl(BASE_URL),
         new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN),
         m -> m
-            .uiInfo(new IdpMetadataElements.UiInfo(Map.of("en", "Test IdP"), Map.of("sv", "Test-IdP"), List.of(
-                new IdpMetadataElements.Logo(null, "/images/logo.svg", 100, 100, null),
-                new IdpMetadataElements.Logo("https://cdn.example.com/logo.png", null, 50, 50, "en"))))
-            .organization(new IdpMetadataElements.Organization(Map.of("en", "Org"), Map.of("en", "The Org"),
+            .uiInfo(new EntityInformation.UiInfo(Map.of("en", "Test IdP"), Map.of("sv", "Test-IdP"), List.of(
+                new EntityInformation.Logo(null, "/images/logo.svg", 100, 100, null),
+                new EntityInformation.Logo("https://cdn.example.com/logo.png", null, 50, 50, "en"))))
+            .organization(new EntityInformation.Organization(Map.of("en", "Org"), Map.of("en", "The Org"),
                 Map.of("en", "https://www.example.com"), "556677-8899"))
             .contactPersons(contacts)
             .requestedPrincipalSelection(List.of("urn:oid:1.2.752.29.4.13")));
@@ -302,6 +306,59 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
     assertThat(cps.get(0).getGivenName().getValue()).isEqualTo("Kalle");
     assertThat(cps.get(1).getUnknownAttributes().get(new QName("http://refeds.org/metadata", "contactType")))
         .isEqualTo("http://refeds.org/metadata/contactType/security");
+  }
+
+  @Test
+  void sharedEntityInformationGivesTheSameMetadataAsTheSamlValues() throws Exception {
+    final EntityInformation information = sampleInformation();
+
+    final EntityDescriptor fromSaml = descriptor(new AuthnServerConfigurer().baseUrl(BASE_URL),
+        new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN),
+        m -> m.uiInfo(information.uiInfo()).organization(information.organization())
+            .contactPersons(information.contactPersons()));
+    final EntityDescriptor fromShared = descriptor(
+        new AuthnServerConfigurer().baseUrl(BASE_URL).entityInformation(information),
+        new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN), m -> {});
+
+    assertThat(xml(uiInfo(fromShared))).isEqualTo(xml(uiInfo(fromSaml)));
+    assertThat(xml(fromShared.getOrganization())).isEqualTo(xml(fromSaml.getOrganization()));
+    assertThat(fromShared.getContactPersons().stream().map(Saml2IdpMetadataEndpointConfigurerTest::xml).toList())
+        .isEqualTo(fromSaml.getContactPersons().stream().map(Saml2IdpMetadataEndpointConfigurerTest::xml).toList());
+  }
+
+  @Test
+  void theSamlValuesOverrideTheSharedEntityInformation() throws Exception {
+    final Map<EntityInformation.ContactPersonType, EntityInformation.ContactPerson> contacts =
+        new LinkedHashMap<>();
+    contacts.put(EntityInformation.ContactPersonType.support,
+        new EntityInformation.ContactPerson(null, "Saml", null, List.of("saml-support@example.com"), null));
+
+    final EntityDescriptor ed = descriptor(
+        new AuthnServerConfigurer().baseUrl(BASE_URL).entityInformation(sampleInformation()),
+        new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN),
+        m -> m.uiInfo(new EntityInformation.UiInfo(Map.of("en", "SAML IdP"), null, null))
+            .organization(new EntityInformation.Organization(null, null, null, "5569876543"))
+            .contactPersons(contacts));
+
+    final UIInfo uiInfo = uiInfo(ed);
+    assertThat(uiInfo.getDisplayNames()).extracting(n -> n.getValue()).containsExactly("SAML IdP");
+    assertThat(uiInfo.getDescriptions()).extracting(n -> n.getValue()).containsExactly("Delad");
+    assertThat(uiInfo.getLogos()).hasSize(1);
+    assertThat(ed.getOrganization().getOrganizationNames().getFirst().getValue()).isEqualTo("Shared Org");
+    assertThat(EntityDescriptorUtils.getMetadataExtension(ed.getOrganization().getExtensions(),
+        OrganizationNumber.class).getValue()).isEqualTo("5569876543");
+    assertThat(ed.getContactPersons()).extracting(ContactPerson::getType)
+        .containsExactly(ContactPersonTypeEnumeration.TECHNICAL, ContactPersonTypeEnumeration.SUPPORT);
+    assertThat(ed.getContactPersons().get(1).getGivenName().getValue()).isEqualTo("Saml");
+  }
+
+  @Test
+  void anInvalidSharedLogoIsRejected() {
+    final EntityInformation information = new EntityInformation(new EntityInformation.UiInfo(null, null,
+        List.of(new EntityInformation.Logo(null, null, 10, 10, null))), null, null);
+    assertThatIllegalArgumentException().isThrownBy(() -> descriptor(
+        new AuthnServerConfigurer().baseUrl(BASE_URL).entityInformation(information),
+        new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN), m -> {}));
   }
 
   @Test
@@ -379,7 +436,7 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
     final EntityDescriptor ed = descriptor(new AuthnServerConfigurer().baseUrl(BASE_URL),
         new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN),
         m -> m.template(new ClassPathResource("metadata/idp-template.xml"))
-            .uiInfo(new IdpMetadataElements.UiInfo(Map.of("en", "Configured IdP"), null, null)));
+            .uiInfo(new EntityInformation.UiInfo(Map.of("en", "Configured IdP"), null, null)));
 
     assertThat(ed.getEntityID()).isEqualTo(BASE_URL);
     assertThat(ed.getOrganization().getOrganizationNames().getFirst().getValue()).isEqualTo("Template Org");
@@ -411,8 +468,8 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
         new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN).hokPostAuthnEndpoint("hok")));
     assertThatIllegalArgumentException().isThrownBy(() -> init(
         new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN).idpMetadataEndpoint(
-            m -> m.uiInfo(new IdpMetadataElements.UiInfo(null, null,
-                List.of(new IdpMetadataElements.Logo("https://a", "/b", null, null, null)))))));
+            m -> m.uiInfo(new EntityInformation.UiInfo(null, null,
+                List.of(new EntityInformation.Logo("https://a", "/b", null, null, null)))))));
     assertThatIllegalArgumentException().isThrownBy(() -> init(
         new Saml2IdpConfigurer().defaultCredential(TestCredentials.SIGN).idpMetadataEndpoint(
             m -> m.validityPeriod(Duration.ZERO))));
@@ -452,6 +509,35 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
     });
     server.protocol(saml.metadataResolver(mock(MetadataResolver.class))).init(mock(HttpSecurity.class));
     return metadata[0].createEntityDescriptorContainer();
+  }
+
+  private static EntityInformation sampleInformation() {
+    final Map<EntityInformation.ContactPersonType, EntityInformation.ContactPerson> contacts =
+        new LinkedHashMap<>();
+    contacts.put(EntityInformation.ContactPersonType.technical,
+        new EntityInformation.ContactPerson("Company", "Kalle", "Kula", List.of("kalle@example.com"), null));
+    contacts.put(EntityInformation.ContactPersonType.support,
+        new EntityInformation.ContactPerson(null, null, null, List.of("support@example.com"), List.of("+4611")));
+    return new EntityInformation(
+        new EntityInformation.UiInfo(Map.of("sv", "Delad IdP"), Map.of("sv", "Delad"),
+            List.of(new EntityInformation.Logo(null, "/images/logo.svg", 100, 100, null))),
+        new EntityInformation.Organization(Map.of("en", "Shared Org"), Map.of("en", "Shared"),
+            Map.of("en", "https://www.example.com"), "5561234567"),
+        contacts);
+  }
+
+  private static UIInfo uiInfo(final EntityDescriptor ed) {
+    return EntityDescriptorUtils.getMetadataExtension(
+        ed.getIDPSSODescriptor(SAMLConstants.SAML20P_NS).getExtensions(), UIInfo.class);
+  }
+
+  private static String xml(final XMLObject object) {
+    try {
+      return SerializeSupport.nodeToString(XMLObjectSupport.marshall(object));
+    }
+    catch (final Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   private static List<String> attributeValues(final EntityAttributes attributes, final String name) {

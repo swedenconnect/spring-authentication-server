@@ -15,6 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
+import java.util.Collection;
+
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -47,6 +49,14 @@ public interface FederationCache {
    * @param record the entry
    */
   void put(final @NonNull CachedClientRecord record);
+
+  /**
+   * Gets the valid entries of the cache. It is used by the background jobs that go through the cached clients, such
+   * as the {@link TrustMarkStatusChecker}.
+   *
+   * @return the valid entries
+   */
+  @NonNull Collection<CachedClientRecord> getEntries();
 
   /**
    * Removes the entry for a client.

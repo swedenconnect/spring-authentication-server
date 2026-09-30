@@ -52,6 +52,7 @@ import se.swedenconnect.spring.authnserver.authentication.provider.SwedenConnect
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.SessionBasedRedirectAuthenticationRepository;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.UserRedirectAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
 import se.swedenconnect.spring.authnserver.registry.DefaultClientRegistry;
@@ -128,6 +129,9 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /** The shared clock skew. */
   private Duration clockSkew = DEFAULT_CLOCK_SKEW;
+
+  /** The shared descriptive information about the server and its organization. */
+  private EntityInformation entityInformation = EntityInformation.empty();
 
   /** Whether user messages are supported. */
   private boolean supportsUserMessage = false;
@@ -247,6 +251,27 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    */
   public @NonNull SsoPolicy getSsoPolicy() {
     return this.ssoPolicy;
+  }
+
+  /**
+   * Assigns the shared descriptive information about the server and its organization, published by every protocol. A
+   * protocol may override any part of it, see {@link EntityInformation#overriddenBy(EntityInformation)}.
+   *
+   * @param entityInformation the information, or {@code null} for none
+   * @return this configurer
+   */
+  public @NonNull AuthnServerConfigurer entityInformation(final @Nullable EntityInformation entityInformation) {
+    this.entityInformation = entityInformation != null ? entityInformation : EntityInformation.empty();
+    return this;
+  }
+
+  /**
+   * Gets the shared descriptive information about the server and its organization.
+   *
+   * @return the information, which may be empty
+   */
+  public @NonNull EntityInformation getEntityInformation() {
+    return this.entityInformation;
   }
 
   /**

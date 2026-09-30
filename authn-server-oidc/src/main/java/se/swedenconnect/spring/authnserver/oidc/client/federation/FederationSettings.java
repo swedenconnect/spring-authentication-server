@@ -29,8 +29,8 @@ import com.nimbusds.jose.jwk.JWKSet;
  * What the OpenID Provider needs to know about the federation it is part of in order to resolve clients and to ask
  * for trust marks.
  * <p>
- * Only what the client registry needs is held here. The settings for joining the federation, such as the entity
- * configuration of the OpenID Provider itself, come later.
+ * Only what the client registry needs is held here. The settings for the OpenID Provider's own membership of the
+ * federation, its entity configuration and its trust marks, are held by the OpenID Provider configuration.
  * </p>
  *
  * @param trustAnchor the trust anchor that clients are resolved against
@@ -169,8 +169,11 @@ public record FederationSettings(
    * @param endpoint the trust mark endpoint of the issuer
    * @param keys the federation keys of the issuer, or {@code null} when the issuer is the trust anchor and the trust
    *          anchor keys are used
+   * @param statusEndpoint the trust mark status endpoint of the issuer, or {@code null} if the status of its trust
+   *          marks is not checked
    */
-  public record TrustMarkIssuer(@NonNull String entityId, @NonNull URI endpoint, @Nullable JWKSet keys) {
+  public record TrustMarkIssuer(@NonNull String entityId, @NonNull URI endpoint, @Nullable JWKSet keys,
+      @Nullable URI statusEndpoint) {
 
     /**
      * Constructor.
@@ -178,12 +181,24 @@ public record FederationSettings(
      * @param entityId the entity identifier of the issuer
      * @param endpoint the trust mark endpoint of the issuer
      * @param keys the federation keys of the issuer, or {@code null}
+     * @param statusEndpoint the trust mark status endpoint of the issuer, or {@code null}
      */
     public TrustMarkIssuer {
       Objects.requireNonNull(endpoint, "endpoint must not be null");
       if (!StringUtils.hasText(entityId)) {
         throw new IllegalArgumentException("entityId must be set and not empty");
       }
+    }
+
+    /**
+     * Constructor for an issuer whose trust marks are not status checked.
+     *
+     * @param entityId the entity identifier of the issuer
+     * @param endpoint the trust mark endpoint of the issuer
+     * @param keys the federation keys of the issuer, or {@code null}
+     */
+    public TrustMarkIssuer(final @NonNull String entityId, final @NonNull URI endpoint, final @Nullable JWKSet keys) {
+      this(entityId, endpoint, keys, null);
     }
 
   }

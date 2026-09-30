@@ -408,6 +408,32 @@ class AuthnServerAutoConfigurationTest {
   }
 
   @Test
+  void theSharedEntityInformationIsPublishedInTheSamlMetadataAndTheSamlValuesWin() {
+    this.runner.withPropertyValues(SAML)
+        .withPropertyValues(
+            "authn-server.entity-information.ui-info.display-names.sv=Delad IdP",
+            "authn-server.entity-information.ui-info.descriptions.sv=Beskrivning",
+            "authn-server.entity-information.organization.names.en=Shared Org",
+            "authn-server.entity-information.organization.number=5561234567",
+            "authn-server.entity-information.contact-persons.technical.email-addresses[0]=tech@example.com",
+            "authn-server.entity-information.contact-persons.support.email-addresses[0]=support@example.com",
+            "authn-server.saml.metadata.ui-info.display-names.en=SAML IdP",
+            "authn-server.saml.metadata.contact-persons.support.email-addresses[0]=saml-support@example.com")
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final EntityDescriptor ed = parse(get(context, "/saml2/metadata"));
+          final UIInfo uiInfo = EntityDescriptorUtils.getMetadataExtension(
+              ed.getIDPSSODescriptor(SAMLConstants.SAML20P_NS).getExtensions(), UIInfo.class);
+          assertThat(uiInfo.getDisplayNames()).extracting(n -> n.getValue()).containsExactly("SAML IdP");
+          assertThat(uiInfo.getDescriptions()).extracting(n -> n.getValue()).containsExactly("Beskrivning");
+          assertThat(ed.getOrganization().getOrganizationNames().getFirst().getValue()).isEqualTo("Shared Org");
+          assertThat(ed.getContactPersons()).hasSize(2);
+          assertThat(ed.getContactPersons().get(1).getEmailAddresses().getFirst().getURI())
+              .isEqualTo("saml-support@example.com");
+        });
+  }
+
+  @Test
   void aCredentialBeanReplacesTheProperty() throws Exception {
     final PkiCredential metadataCredential;
     try (final InputStream is = new ClassPathResource("credentials/idp-credentials.p12").getInputStream()) {

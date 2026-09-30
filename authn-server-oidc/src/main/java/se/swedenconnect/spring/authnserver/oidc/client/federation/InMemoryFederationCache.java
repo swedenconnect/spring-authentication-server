@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,6 +75,13 @@ public class InMemoryFederationCache implements FederationCache {
   public void put(final @NonNull CachedClientRecord record) {
     Objects.requireNonNull(record, "record must not be null");
     this.entries.put(record.clientId(), record);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @NonNull Collection<CachedClientRecord> getEntries() {
+    final Instant now = this.clock.instant();
+    return this.entries.values().stream().filter(r -> !r.isExpired(now)).toList();
   }
 
   /** {@inheritDoc} */

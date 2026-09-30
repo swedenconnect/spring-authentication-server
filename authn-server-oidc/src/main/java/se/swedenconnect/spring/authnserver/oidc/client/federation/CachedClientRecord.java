@@ -35,8 +35,7 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @param clientId the {@code client_id} of the client
  * @param metadata the client metadata, or {@code null} when the resolver does not know the client
  * @param trustMarkTypes the trust mark types of the resolve response
- * @param onDemandTrustMarks the trust marks that have been asked for on demand, as the type and when it is no longer
- *          valid
+ * @param onDemandTrustMarks the trust marks that have been asked for on demand, keyed by type
  * @param expiresAt when the entry is no longer valid
  * @author Martin Lindström
  */
@@ -44,7 +43,7 @@ public record CachedClientRecord(
     @NonNull String clientId,
     @Nullable OIDCClientMetadata metadata,
     @NonNull Set<String> trustMarkTypes,
-    @NonNull Map<String, Instant> onDemandTrustMarks,
+    @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
     @NonNull Instant expiresAt) {
 
   /**
@@ -133,8 +132,8 @@ public record CachedClientRecord(
       return this.trustMarkTypes;
     }
     final Set<String> marks = new LinkedHashSet<>(this.trustMarkTypes);
-    this.onDemandTrustMarks.forEach((type, expiresAt) -> {
-      if (now.isBefore(expiresAt)) {
+    this.onDemandTrustMarks.forEach((type, mark) -> {
+      if (mark.isValid(now)) {
         marks.add(type);
       }
     });
@@ -151,12 +150,51 @@ public record CachedClientRecord(
    */
   public @NonNull CachedClientRecord withTrustMark(
       final @NonNull String type, final @Nullable Instant trustMarkExpiresAt) {
-    Objects.requireNonNull(type, "type must not be null");
-    final Instant expiry = trustMarkExpiresAt == null || this.expiresAt.isBefore(trustMarkExpiresAt)
+    return this.withTrustMark(new TrustMarkRequester.TrustMark(type, trustMarkExpiresAt));
+  }
+
+  /**
+   * Creates a copy of the entry where a trust mark that was asked for on demand has been added. It is kept until the
+   * earlier of the trust mark's expiry and the entry's own expiry.
+   *
+   * @param trustMark the trust mark
+   * @return a {@link CachedClientRecord}
+   */
+  public @NonNull CachedClientRecord withTrustMark(final TrustMarkRequester.@NonNull TrustMark trustMark) {
+    Objects.requireNonNull(trustMark, "trustMark must not be null");
+    final Instant expiry = trustMark.expiresAt() == null || this.expiresAt.isBefore(trustMark.expiresAt())
         ? this.expiresAt
-        : trustMarkExpiresAt;
-    final Map<String, Instant> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
-    marks.put(type, expiry);
+        : trustMark.expiresAt();
+    return this.withTrustMark(
+        new OnDemandTrustMark(trustMark.type(), trustMark.trustMark(), trustMark.expiresAt(), expiry));
+  }
+
+  /**
+   * Creates a copy of the entry where a trust mark that was asked for on demand has been added or replaced.
+   *
+   * @param trustMark the trust mark
+   * @return a {@link CachedClientRecord}
+   */
+  private @NonNull CachedClientRecord withTrustMark(final @NonNull OnDemandTrustMark trustMark) {
+    final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
+    marks.put(trustMark.type(), trustMark);
+    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt);
+  }
+
+  /**
+   * Creates a copy of the entry where a trust mark that was asked for on demand has been removed, for example because
+   * its issuer has withdrawn it.
+   *
+   * @param type the trust mark type
+   * @return a {@link CachedClientRecord}
+   */
+  public @NonNull CachedClientRecord withoutTrustMark(final @NonNull String type) {
+    Objects.requireNonNull(type, "type must not be null");
+    if (!this.onDemandTrustMarks.containsKey(type)) {
+      return this;
+    }
+    final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
+    marks.remove(type);
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt);
   }
 
@@ -174,9 +212,11 @@ public record CachedClientRecord(
       return this;
     }
     CachedClientRecord result = this;
-    for (final Map.Entry<String, Instant> mark : earlier.onDemandTrustMarks().entrySet()) {
-      if (now.isBefore(mark.getValue()) && !this.trustMarkTypes.contains(mark.getKey())) {
-        result = result.withTrustMark(mark.getKey(), mark.getValue());
+    for (final OnDemandTrustMark mark : earlier.onDemandTrustMarks().values()) {
+      if (mark.isValid(now) && !this.trustMarkTypes.contains(mark.type())) {
+        final Instant expiry = this.expiresAt.isBefore(mark.validUntil()) ? this.expiresAt : mark.validUntil();
+        result = result.withTrustMark(
+            new OnDemandTrustMark(mark.type(), mark.trustMark(), mark.trustMarkExpiresAt(), expiry));
       }
     }
     return result;

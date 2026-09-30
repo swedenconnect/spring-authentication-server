@@ -15,10 +15,15 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.text.ParseException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.jspecify.annotations.NonNull;
@@ -26,21 +31,29 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
+import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
 import se.swedenconnect.security.credential.factory.PkiCredentialFactory;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConfigurerFactory;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
+import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
+import se.swedenconnect.spring.authnserver.oidc.federation.TrustMarkSource;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
+import se.swedenconnect.spring.authnserver.oidc.keys.FederationKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.ScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.subject.SubjectGeneratorFactory;
@@ -57,6 +70,10 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
  * acceptance rules of the properties are added to the server's {@link ConfigurableRequesterAcceptance}. A
  * {@link ScopeRegistry}, an {@link OidcAttributeMapping} or a {@link SubjectGeneratorFactory} bean replaces the
  * default one.
+ * </p>
+ * <p>
+ * When OpenID Federation is enabled, the trust marks of the OpenID Provider are kept by a {@link ProviderTrustMarks}
+ * bean, created from the properties unless the application declares one.
  * </p>
  *
  * @author Martin Lindström
@@ -76,6 +93,7 @@ public class OidcAutoConfiguration {
    * @param scopeRegistry a scope registry, if declared as a bean
    * @param attributeMapping an attribute mapping, if declared as a bean
    * @param subjectGeneratorFactory a subject generator factory, if declared as a bean
+   * @param providerTrustMarks the trust marks of the OpenID Provider, when federation is enabled
    * @return an {@link AuthnServerProtocolConfigurerFactory}
    */
   @Bean
@@ -84,14 +102,50 @@ public class OidcAutoConfiguration {
       final PkiCredentialFactory credentialFactory,
       final ObjectProvider<ScopeRegistry> scopeRegistry,
       final ObjectProvider<OidcAttributeMapping> attributeMapping,
-      final ObjectProvider<SubjectGeneratorFactory> subjectGeneratorFactory) {
+      final ObjectProvider<SubjectGeneratorFactory> subjectGeneratorFactory,
+      final ObjectProvider<ProviderTrustMarks> providerTrustMarks) {
 
-    return server -> createConfigurer(server, properties)
-        .signingKeys(loadSigningKeys(properties.getKeys().getSigning(), credentialFactory))
-        .decryptionKeys(loadDecryptionKeys(properties.getKeys().getDecryption(), credentialFactory))
-        .scopeRegistry(scopeRegistry.getIfUnique())
-        .attributeMapping(attributeMapping.getIfUnique())
-        .subjectGeneratorFactory(subjectGeneratorFactory.getIfUnique());
+    return server -> {
+      final List<FederationKey> federationKeys =
+          loadFederationKeys(properties.getFederation().getKeys(), credentialFactory);
+      return createConfigurer(server, properties)
+          .signingKeys(loadSigningKeys(properties.getKeys().getSigning(), credentialFactory))
+          .decryptionKeys(loadDecryptionKeys(properties.getKeys().getDecryption(), credentialFactory))
+          .scopeRegistry(scopeRegistry.getIfUnique())
+          .attributeMapping(attributeMapping.getIfUnique())
+          .subjectGeneratorFactory(subjectGeneratorFactory.getIfUnique())
+          .federation(f -> f
+              .keys(federationKeys)
+              .providerTrustMarks(providerTrustMarks.getIfUnique()));
+    };
+  }
+
+  /**
+   * Creates the object that keeps the trust marks of the OpenID Provider, when OpenID Federation is enabled. It is a
+   * bean so that the state of the trust marks can be read, for example by a health check.
+   *
+   * @param properties the OIDC properties
+   * @param shared the shared properties, giving the base URL
+   * @return a {@link ProviderTrustMarks}
+   * @throws IOException if the keys of a trust mark issuer cannot be read
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(prefix = OidcConfigurationProperties.PREFIX + ".federation", name = "enabled",
+      havingValue = "true")
+  ProviderTrustMarks oidcProviderTrustMarks(final OidcConfigurationProperties properties,
+      final AuthnServerConfigurationProperties shared) throws IOException {
+    final String entityId = properties.getIssuer() != null ? properties.getIssuer() : shared.getBaseUrl();
+    if (entityId == null) {
+      throw new IllegalArgumentException("Missing base URL - assign " + AuthnServerConfigurationProperties.PREFIX
+          + ".base-url");
+    }
+    final OidcConfigurationProperties.FederationProperties federation = properties.getFederation();
+    return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()),
+        new HttpFederationClient(),
+        federation.getTrustMarkCacheDirectory() != null ? federation.getTrustMarkCacheDirectory().toPath() : null,
+        Optional.ofNullable(federation.getTrustMarkRetryInterval()).orElse(ProviderTrustMarks.DEFAULT_RETRY_INTERVAL),
+        Clock.systemUTC());
   }
 
   /**
@@ -175,7 +229,84 @@ public class OidcAutoConfiguration {
       configurer.discoveryEndpoint(d -> d.additionalParameters(parameters));
     }
     applyRequesterAcceptance(server, properties.getRequesterAcceptance());
+
+    final EntityInformation information = properties.getEntityInformation().toEntityInformation();
+    if (!information.isEmpty()) {
+      configurer.entityInformation(information);
+    }
+    configurer.entityMetadata(properties.getEntityInformation().toEntityMetadata());
+
+    final OidcConfigurationProperties.FederationProperties federation = properties.getFederation();
+    configurer.federation(f -> {
+      f.enabled(federation.isEnabled());
+      f.authorityHints(federation.getAuthorityHints());
+      if (federation.getEntityConfigurationLifetime() != null) {
+        f.entityConfigurationLifetime(federation.getEntityConfigurationLifetime());
+      }
+      if (federation.getAdditionalParameters() != null) {
+        final Map<String, Object> parameters = new LinkedHashMap<>();
+        federation.getAdditionalParameters().forEach((name, value) -> parameters.put(name, toParameterValue(value)));
+        f.additionalParameters(parameters);
+      }
+    });
     return configurer;
+  }
+
+  /**
+   * Loads the federation keys.
+   *
+   * @param properties the key properties
+   * @param credentialFactory the credential factory
+   * @return the federation keys, or {@code null} if none are configured
+   * @throws Exception for errors loading a credential
+   */
+  static @Nullable List<FederationKey> loadFederationKeys(
+      final @Nullable List<OidcConfigurationProperties.FederationKeyProperties> properties,
+      final @NonNull PkiCredentialFactory credentialFactory) throws Exception {
+    if (properties == null) {
+      return null;
+    }
+    final List<FederationKey> keys = new ArrayList<>();
+    for (int i = 0; i < properties.size(); i++) {
+      final OidcConfigurationProperties.FederationKeyProperties key = properties.get(i);
+      if (key.getCredential() == null) {
+        throw new IllegalArgumentException(
+            "Missing credential for %s.federation.keys[%d]".formatted(OidcConfigurationProperties.PREFIX, i));
+      }
+      keys.add(new FederationKey(credentialFactory.createCredential(key.getCredential()), key.getState()));
+    }
+    return keys;
+  }
+
+  /**
+   * Creates the trust mark sources of the properties, reading the keys of each issuer.
+   *
+   * @param properties the trust mark properties
+   * @return the trust mark sources
+   * @throws IOException if the keys of an issuer cannot be read
+   */
+  static @NonNull List<TrustMarkSource> loadTrustMarkSources(
+      final @Nullable List<OidcConfigurationProperties.TrustMarkProperties> properties) throws IOException {
+    if (properties == null) {
+      return List.of();
+    }
+    final List<TrustMarkSource> sources = new ArrayList<>();
+    for (int i = 0; i < properties.size(); i++) {
+      final OidcConfigurationProperties.TrustMarkProperties p = properties.get(i);
+      final String name = "%s.federation.trust-marks[%d]".formatted(OidcConfigurationProperties.PREFIX, i);
+      if (p.getType() == null || p.getIssuer() == null || p.getEndpoint() == null || p.getJwks() == null) {
+        throw new IllegalArgumentException("%s must have type, issuer, endpoint and jwks".formatted(name));
+      }
+      final JWKSet keys;
+      try (final InputStream is = p.getJwks().getInputStream()) {
+        keys = JWKSet.load(is);
+      }
+      catch (final ParseException e) {
+        throw new IllegalArgumentException("%s.jwks is not a valid JWK Set - %s".formatted(name, e.getMessage()), e);
+      }
+      sources.add(new TrustMarkSource(p.getType(), p.getIssuer(), p.getEndpoint(), keys));
+    }
+    return sources;
   }
 
   /**

@@ -159,7 +159,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
     if (trustMark == null) {
       return this.toRecord(entry);
     }
-    entry = entry.withTrustMark(trustMark.type(), trustMark.expiresAt());
+    entry = entry.withTrustMark(trustMark);
     this.cache.put(entry);
     return this.toRecord(entry);
   }

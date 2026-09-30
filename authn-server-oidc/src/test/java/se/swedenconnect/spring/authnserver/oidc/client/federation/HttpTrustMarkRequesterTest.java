@@ -56,6 +56,7 @@ class HttpTrustMarkRequesterTest extends FederationTestSupport {
     assertThat(trustMark).isNotNull();
     assertThat(trustMark.type()).isEqualTo(MARK_ONE);
     assertThat(trustMark.expiresAt()).isEqualTo(expiresAt);
+    assertThat(trustMark.trustMark()).isEqualTo(client.trustMarkResponse.serialize());
     assertThat(client.lastTrustMarkRequest.subject().getValue()).isEqualTo(CLIENT_ID);
     assertThat(client.lastTrustMarkRequest.trustMarkType().getValue()).isEqualTo(MARK_ONE);
     assertThat(client.lastTrustMarkRequest.trustMarkIssuer().getValue()).isEqualTo(TRUST_MARK_ISSUER);

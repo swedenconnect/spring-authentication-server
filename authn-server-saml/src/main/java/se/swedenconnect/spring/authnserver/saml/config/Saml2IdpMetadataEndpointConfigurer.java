@@ -83,7 +83,8 @@ import se.swedenconnect.opensaml.sweid.saml2.metadata.ext.OrganizationNumber;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.opensaml.OpenSamlCredential;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
-import se.swedenconnect.spring.authnserver.saml.config.IdpMetadataElements.ContactPersonType;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation.ContactPersonType;
 import se.swedenconnect.spring.authnserver.saml.web.Saml2IdpMetadataEndpointFilter;
 
 /**
@@ -93,6 +94,11 @@ import se.swedenconnect.spring.authnserver.saml.web.Saml2IdpMetadataEndpointFilt
  * endpoints, the credentials and whether signed requests are wanted. The assurance certification and entity category
  * attributes are the authentication context URIs and entity categories of the authentication providers. A template
  * may be given, and the values here are then added to it or replace what it holds.
+ * </p>
+ * <p>
+ * The UI information, the organization and the contact persons are taken from the shared
+ * {@link EntityInformation} of the server. The values assigned here override the shared values, see
+ * {@link EntityInformation#overriddenBy(EntityInformation)}.
  * </p>
  *
  * @author Martin Lindström
@@ -136,16 +142,16 @@ public class Saml2IdpMetadataEndpointConfigurer {
   private List<IdpMetadataElements.EncryptionMethod> encryptionMethods;
 
   /** The UI information. */
-  private IdpMetadataElements.UiInfo uiInfo;
+  private EntityInformation.UiInfo uiInfo;
 
   /** The attribute names for the RequestedPrincipalSelection extension. */
   private List<String> requestedPrincipalSelection;
 
   /** The organisation. */
-  private IdpMetadataElements.Organization organization;
+  private EntityInformation.Organization organization;
 
   /** The contact persons. */
-  private Map<ContactPersonType, IdpMetadataElements.ContactPerson> contactPersons;
+  private Map<ContactPersonType, EntityInformation.ContactPerson> contactPersons;
 
   /** For customizing the metadata once it has been built. */
   private Customizer<EntityDescriptor> entityDescriptorCustomizer = Customizer.withDefaults();
@@ -255,12 +261,13 @@ public class Saml2IdpMetadataEndpointConfigurer {
   }
 
   /**
-   * Assigns the {@code mdui:UIInfo} element. When assigned, it replaces that of the template.
+   * Assigns the {@code mdui:UIInfo} element. The values assigned override those of the shared entity information.
+   * When the resulting element holds anything, it replaces that of the template.
    *
    * @param uiInfo the UI information, or {@code null}
    * @return this configurer
    */
-  public @NonNull Saml2IdpMetadataEndpointConfigurer uiInfo(final IdpMetadataElements.@Nullable UiInfo uiInfo) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer uiInfo(final EntityInformation.@Nullable UiInfo uiInfo) {
     this.uiInfo = uiInfo;
     return this;
   }
@@ -278,25 +285,26 @@ public class Saml2IdpMetadataEndpointConfigurer {
   }
 
   /**
-   * Assigns the {@code md:Organization} element.
+   * Assigns the {@code md:Organization} element. The values assigned override those of the shared entity information.
    *
    * @param organization the organisation, or {@code null}
    * @return this configurer
    */
   public @NonNull Saml2IdpMetadataEndpointConfigurer organization(
-      final IdpMetadataElements.@Nullable Organization organization) {
+      final EntityInformation.@Nullable Organization organization) {
     this.organization = organization;
     return this;
   }
 
   /**
-   * Assigns the {@code md:ContactPerson} elements.
+   * Assigns the {@code md:ContactPerson} elements. A contact person assigned here replaces the contact person of the
+   * same type of the shared entity information.
    *
    * @param contactPersons the contact persons, keyed by type, or {@code null}
    * @return this configurer
    */
   public @NonNull Saml2IdpMetadataEndpointConfigurer contactPersons(
-      final @Nullable Map<ContactPersonType, IdpMetadataElements.ContactPerson> contactPersons) {
+      final @Nullable Map<ContactPersonType, EntityInformation.ContactPerson> contactPersons) {
     this.contactPersons = contactPersons;
     return this;
   }
@@ -323,8 +331,9 @@ public class Saml2IdpMetadataEndpointConfigurer {
     if (this.validityPeriod.isNegative() || this.validityPeriod.isZero()) {
       throw new IllegalArgumentException("SAML metadata validity period must be positive");
     }
-    if (this.uiInfo != null && this.uiInfo.logotypes() != null) {
-      for (final IdpMetadataElements.Logo logo : this.uiInfo.logotypes()) {
+    final EntityInformation.UiInfo effectiveUiInfo = this.getEntityInformation().uiInfo();
+    if (effectiveUiInfo != null && effectiveUiInfo.logotypes() != null) {
+      for (final EntityInformation.Logo logo : effectiveUiInfo.logotypes()) {
         if ((logo.url() == null) == (logo.path() == null)) {
           throw new IllegalArgumentException("A SAML metadata logotype must have exactly one of url and path");
         }
@@ -344,6 +353,17 @@ public class Saml2IdpMetadataEndpointConfigurer {
         new Saml2IdpMetadataEndpointFilter(this.createEntityDescriptorContainer(), this.requestMatcher);
     http.addFilterBefore(this.samlConfigurer.postProcessObject(filter),
         AbstractPreAuthenticatedProcessingFilter.class);
+  }
+
+  /**
+   * Gets the descriptive information that the metadata publishes: the shared entity information of the server with
+   * the values of this configurer applied as overrides.
+   *
+   * @return the entity information
+   */
+  @NonNull EntityInformation getEntityInformation() {
+    return this.samlConfigurer.getServer().getEntityInformation()
+        .overriddenBy(new EntityInformation(this.uiInfo, this.organization, this.contactPersons));
   }
 
   /**
@@ -387,6 +407,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
   private @NonNull EntityDescriptorBuilder buildEntityDescriptor() {
     final Saml2IdpConfigurer saml = this.samlConfigurer;
     final Collection<UserAuthenticationProvider> providers = saml.getServer().getAuthenticationProviders();
+    final EntityInformation entityInformation = this.getEntityInformation();
 
     try {
       final EntityDescriptorBuilder builder;
@@ -469,7 +490,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
       final Extensions roleExtensions = Optional.ofNullable(descBuilder.object().getExtensions())
           .orElseGet(() -> (Extensions) XMLObjectSupport.buildXMLObject(Extensions.DEFAULT_ELEMENT_NAME));
 
-      final UIInfo uiInfoElement = this.buildUiInfo();
+      final UIInfo uiInfoElement = this.buildUiInfo(entityInformation.uiInfo());
       if (uiInfoElement != null) {
         roleExtensions.getUnknownXMLObjects().removeIf(o -> UIInfo.class.isAssignableFrom(o.getClass()));
         roleExtensions.getUnknownXMLObjects().add(uiInfoElement);
@@ -547,16 +568,17 @@ public class Saml2IdpMetadataEndpointConfigurer {
 
       // Organization
       //
-      if (this.organization != null) {
+      final EntityInformation.Organization organization = entityInformation.organization();
+      if (organization != null) {
         final OrganizationBuilder b = OrganizationBuilder.builder();
-        b.organizationNames(toLocalizedStrings(this.organization.names()));
-        b.organizationDisplayNames(toLocalizedStrings(this.organization.displayNames()));
-        b.organizationURLs(toLocalizedStrings(this.organization.urls()));
+        b.organizationNames(toLocalizedStrings(organization.names()));
+        b.organizationDisplayNames(toLocalizedStrings(organization.displayNames()));
+        b.organizationURLs(toLocalizedStrings(organization.urls()));
 
-        if (StringUtils.hasText(this.organization.number())) {
+        if (StringUtils.hasText(organization.number())) {
           final OrganizationNumber number =
               (OrganizationNumber) XMLObjectSupport.buildXMLObject(OrganizationNumber.DEFAULT_ELEMENT_NAME);
-          number.setValue(this.organization.number());
+          number.setValue(organization.number());
 
           final Extensions orgext = (Extensions) XMLObjectSupport.buildXMLObject(Extensions.DEFAULT_ELEMENT_NAME);
           orgext.getUnknownXMLObjects().add(number);
@@ -569,8 +591,8 @@ public class Saml2IdpMetadataEndpointConfigurer {
 
       // ContactPerson:s
       //
-      if (this.contactPersons != null) {
-        builder.contactPersons(this.contactPersons.entrySet().stream()
+      if (entityInformation.contactPersons() != null) {
+        builder.contactPersons(entityInformation.contactPersons().entrySet().stream()
             .map(e -> toContactPerson(e.getKey(), e.getValue()))
             .toList());
       }
@@ -680,21 +702,21 @@ public class Saml2IdpMetadataEndpointConfigurer {
   /**
    * Builds an {@link UIInfo} element.
    *
+   * @param uiInfo the UI information, or {@code null}
    * @return an {@link UIInfo} element or {@code null}
    */
-  private @Nullable UIInfo buildUiInfo() {
-    if (this.uiInfo == null) {
+  private @Nullable UIInfo buildUiInfo(final EntityInformation.@Nullable UiInfo uiInfo) {
+    if (uiInfo == null) {
       return null;
     }
+    final String baseUrl = Objects.requireNonNull(this.samlConfigurer.getServer().getBaseUrl());
     final UIInfoBuilder uiBuilder = UIInfoBuilder.builder();
-    uiBuilder.displayNames(toLocalizedStrings(this.uiInfo.displayNames()));
-    uiBuilder.descriptions(toLocalizedStrings(this.uiInfo.descriptions()));
-    uiBuilder.logos(Optional.ofNullable(this.uiInfo.logotypes())
+    uiBuilder.displayNames(toLocalizedStrings(uiInfo.displayNames()));
+    uiBuilder.descriptions(toLocalizedStrings(uiInfo.descriptions()));
+    uiBuilder.logos(Optional.ofNullable(uiInfo.logotypes())
         .map(l -> l.stream()
             .map(logo -> LogoBuilder.builder()
-                .url(logo.path() != null
-                    ? this.samlConfigurer.getServer().getBaseUrl() + logo.path()
-                    : logo.url())
+                .url(logo.getUrl(baseUrl))
                 .language(logo.languageTag())
                 .height(logo.height())
                 .width(logo.width())
@@ -727,7 +749,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @return a {@link ContactPerson}
    */
   private static @NonNull ContactPerson toContactPerson(final @NonNull ContactPersonType type,
-      final IdpMetadataElements.@NonNull ContactPerson contactPerson) {
+      final EntityInformation.@NonNull ContactPerson contactPerson) {
 
     final ContactPerson cp = ContactPersonBuilder.builder()
         .type(toOpenSamlEnum(type))

@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.oidc.config;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -40,6 +41,7 @@ import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.config.AbstractProtocolConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
 import se.swedenconnect.spring.authnserver.oidc.attributes.requested.OidcRequestedAttributeResolver;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.ClientKeyResolver;
@@ -48,6 +50,7 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetch
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationConverter;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
+import se.swedenconnect.spring.authnserver.oidc.federation.OidcEntityMetadata;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
@@ -110,6 +113,10 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  * {@code /oidc/token} by default. The OpenID Connect attribute producers and release voters come before the shared
  * ones. The access token gives the client the UserInfo claims at the UserInfo endpoint, {@code /oidc/userinfo} by
  * default, see {@link UserInfoRequestProcessor}.
+ * </p>
+ * <p>
+ * The OpenID Provider may be a member of an OpenID Federation, see {@link #federation(Customizer)}. The descriptive
+ * parameters of its metadata come from the shared entity information of the server, see {@link #getEntityMetadata()}.
  * </p>
  *
  * @author Martin Lindström
@@ -214,6 +221,15 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** The discovery endpoint configurer. */
   private final OidcDiscoveryEndpointConfigurer discoveryEndpointConfigurer =
       new OidcDiscoveryEndpointConfigurer(this);
+
+  /** The OpenID Federation configurer. */
+  private final OidcFederationConfigurer federationConfigurer = new OidcFederationConfigurer(this);
+
+  /** Overrides of the shared entity information, or {@code null}. */
+  private EntityInformation entityInformation;
+
+  /** Values of the descriptive metadata parameters, overriding those taken from the entity information. */
+  private OidcEntityMetadata entityMetadata;
 
   /** The keys, created at initialization. */
   private OidcKeys keys;
@@ -730,6 +746,63 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
+   * Customizes the OpenID Provider as a member of an OpenID Federation, see {@link OidcFederationConfigurer}.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer federation(final @NonNull Customizer<OidcFederationConfigurer> customizer) {
+    customizer.customize(this.federationConfigurer);
+    return this;
+  }
+
+  /**
+   * Gets the OpenID Federation configurer.
+   *
+   * @return the federation configurer
+   */
+  public @NonNull OidcFederationConfigurer getFederation() {
+    return this.federationConfigurer;
+  }
+
+  /**
+   * Assigns overrides of the shared entity information of the server for OpenID Connect. The values assigned here
+   * replace the shared values, see {@link EntityInformation#overriddenBy(EntityInformation)}.
+   *
+   * @param entityInformation the overrides, or {@code null}
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer entityInformation(final @Nullable EntityInformation entityInformation) {
+    this.entityInformation = entityInformation;
+    return this;
+  }
+
+  /**
+   * Assigns values of the descriptive metadata parameters, such as {@code logo_uri} or {@code contacts}. A value
+   * assigned here replaces the value that is otherwise taken from the entity information.
+   *
+   * @param entityMetadata the values, or {@code null}
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer entityMetadata(final @Nullable OidcEntityMetadata entityMetadata) {
+    this.entityMetadata = entityMetadata;
+    return this;
+  }
+
+  /**
+   * Gets the descriptive metadata parameters of the OpenID Provider: the shared entity information of the server, with
+   * the OpenID Connect overrides applied, mapped as described in {@link OidcEntityMetadata#from(EntityInformation,
+   * String)}, and then the assigned parameter values applied.
+   *
+   * @return the descriptive metadata parameters
+   */
+  public @NonNull OidcEntityMetadata getEntityMetadata() {
+    final EntityInformation information = this.getServer().getEntityInformation().overriddenBy(this.entityInformation);
+    return OidcEntityMetadata.from(information, Objects.requireNonNull(this.getServer().getBaseUrl()))
+        .overriddenBy(this.entityMetadata);
+  }
+
+  /**
    * Gets the path of the discovery endpoint relative to the application: the part of the issuer after the base URL,
    * followed by {@value OidcDiscoveryEndpointConfigurer#WELL_KNOWN_PATH}.
    *
@@ -808,8 +881,14 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
         PathPatternRequestMatcher.pathPattern(HttpMethod.GET, this.getEndpointPath(this.userInfoEndpoint)),
         PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.userInfoEndpoint)));
     this.discoveryEndpointConfigurer.init();
-    this.requestMatcher = new OrRequestMatcher(this.jwksRequestMatcher, this.authorizationRequestMatcher,
-        this.tokenRequestMatcher, this.userInfoRequestMatcher, this.discoveryEndpointConfigurer.getRequestMatcher());
+    this.federationConfigurer.init();
+    final List<RequestMatcher> matchers = new ArrayList<>(List.of(this.jwksRequestMatcher,
+        this.authorizationRequestMatcher, this.tokenRequestMatcher, this.userInfoRequestMatcher,
+        this.discoveryEndpointConfigurer.getRequestMatcher()));
+    if (this.federationConfigurer.getRequestMatcher() != null) {
+      matchers.add(this.federationConfigurer.getRequestMatcher());
+    }
+    this.requestMatcher = new OrRequestMatcher(matchers);
 
     final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
     this.clientKeyResolver =
@@ -841,6 +920,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     http.addFilterBefore(this.postProcess(new OidcJwksEndpointFilter(this.keys, this.jwksRequestMatcher)),
         AbstractPreAuthenticatedProcessingFilter.class);
     this.discoveryEndpointConfigurer.configure(http);
+    this.federationConfigurer.configure(http,
+        this.discoveryEndpointConfigurer.getProviderMetadata().toJSONObject());
 
     final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
     final AuthnServerConfigurer server = this.getServer();

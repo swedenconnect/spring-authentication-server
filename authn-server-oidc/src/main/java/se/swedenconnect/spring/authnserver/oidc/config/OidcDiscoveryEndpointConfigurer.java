@@ -110,6 +110,9 @@ public class OidcDiscoveryEndpointConfigurer {
   /** The request matcher for the discovery endpoint. */
   private RequestMatcher requestMatcher;
 
+  /** The built document, created the first time it is needed. */
+  private OIDCProviderMetadata providerMetadata;
+
   /**
    * Constructor.
    *
@@ -161,7 +164,7 @@ public class OidcDiscoveryEndpointConfigurer {
    */
   void configure(final @NonNull HttpSecurity http) {
     final OidcDiscoveryEndpointFilter filter =
-        new OidcDiscoveryEndpointFilter(this.createProviderMetadata(), this.getRequestMatcher());
+        new OidcDiscoveryEndpointFilter(this.getProviderMetadata(), this.getRequestMatcher());
     http.addFilterBefore(this.oidcConfigurer.postProcessObject(filter),
         AbstractPreAuthenticatedProcessingFilter.class);
   }
@@ -184,6 +187,19 @@ public class OidcDiscoveryEndpointConfigurer {
    */
   @NonNull RequestMatcher getRequestMatcher() {
     return Objects.requireNonNull(this.requestMatcher, "The configurer has not been initialized");
+  }
+
+  /**
+   * Gets the discovery document, as it is after the additional parameters and the customizer have been applied. It is
+   * built once.
+   *
+   * @return the OpenID Provider metadata
+   */
+  @NonNull OIDCProviderMetadata getProviderMetadata() {
+    if (this.providerMetadata == null) {
+      this.providerMetadata = this.createProviderMetadata();
+    }
+    return this.providerMetadata;
   }
 
   /**

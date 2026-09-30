@@ -30,7 +30,8 @@ import se.swedenconnect.security.credential.config.properties.PkiCredentialConfi
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SsoProperties;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SubjectIdentifierProperties;
-import se.swedenconnect.spring.authnserver.saml.config.IdpMetadataElements.ContactPersonType;
+import se.swedenconnect.spring.authnserver.autoconfigure.EntityInformationProperties;
+import se.swedenconnect.spring.authnserver.entity.EntityInformation.ContactPersonType;
 
 /**
  * Configuration properties for the SAML Identity Provider.
@@ -1266,9 +1267,9 @@ public class SamlConfigurationProperties {
     private List<EncryptionMethod> encryptionMethods;
 
     /**
-     * The mdui:UIInfo element.
+     * The mdui:UIInfo element. The values assigned override those of authn-server.entity-information.ui-info.
      */
-    private UiInfo uiInfo;
+    private EntityInformationProperties.UiInfo uiInfo;
 
     /**
      * Attribute names to include in the RequestedPrincipalSelection metadata extension.
@@ -1276,14 +1277,15 @@ public class SamlConfigurationProperties {
     private List<String> requestedPrincipalSelection;
 
     /**
-     * The md:Organization element.
+     * The md:Organization element. The values assigned override those of authn-server.entity-information.organization.
      */
-    private Organization organization;
+    private EntityInformationProperties.Organization organization;
 
     /**
-     * The md:ContactPerson elements.
+     * The md:ContactPerson elements. A contact person assigned here replaces the one of the same type under
+     * authn-server.entity-information.contact-persons.
      */
-    private Map<ContactPersonType, ContactPerson> contactPersons;
+    private Map<ContactPersonType, EntityInformationProperties.ContactPerson> contactPersons;
 
     /**
      * Gets the metadata template.
@@ -1434,7 +1436,7 @@ public class SamlConfigurationProperties {
      *
      * @return the UI information
      */
-    public @Nullable UiInfo getUiInfo() {
+    public EntityInformationProperties.@Nullable UiInfo getUiInfo() {
       return this.uiInfo;
     }
 
@@ -1443,7 +1445,7 @@ public class SamlConfigurationProperties {
      *
      * @param uiInfo the UI information
      */
-    public void setUiInfo(final @Nullable UiInfo uiInfo) {
+    public void setUiInfo(final EntityInformationProperties.@Nullable UiInfo uiInfo) {
       this.uiInfo = uiInfo;
     }
 
@@ -1470,7 +1472,7 @@ public class SamlConfigurationProperties {
      *
      * @return the organisation
      */
-    public @Nullable Organization getOrganization() {
+    public EntityInformationProperties.@Nullable Organization getOrganization() {
       return this.organization;
     }
 
@@ -1479,7 +1481,7 @@ public class SamlConfigurationProperties {
      *
      * @param organization the organisation
      */
-    public void setOrganization(final @Nullable Organization organization) {
+    public void setOrganization(final EntityInformationProperties.@Nullable Organization organization) {
       this.organization = organization;
     }
 
@@ -1488,7 +1490,7 @@ public class SamlConfigurationProperties {
      *
      * @return the contact persons
      */
-    public @Nullable Map<ContactPersonType, ContactPerson> getContactPersons() {
+    public @Nullable Map<ContactPersonType, EntityInformationProperties.ContactPerson> getContactPersons() {
       return this.contactPersons;
     }
 
@@ -1497,7 +1499,8 @@ public class SamlConfigurationProperties {
      *
      * @param contactPersons the contact persons
      */
-    public void setContactPersons(final @Nullable Map<ContactPersonType, ContactPerson> contactPersons) {
+    public void setContactPersons(
+        final @Nullable Map<ContactPersonType, EntityInformationProperties.ContactPerson> contactPersons) {
       this.contactPersons = contactPersons;
     }
 
@@ -1671,421 +1674,6 @@ public class SamlConfigurationProperties {
        */
       public void setDigestMethod(final @Nullable String digestMethod) {
         this.digestMethod = digestMethod;
-      }
-    }
-
-    /**
-     * The mdui:UIInfo element.
-     */
-    public static class UiInfo {
-
-      /**
-       * Display names, keyed by language tag.
-       */
-      private Map<String, String> displayNames;
-
-      /**
-       * Descriptions, keyed by language tag.
-       */
-      private Map<String, String> descriptions;
-
-      /**
-       * Logotypes.
-       */
-      private List<Logo> logotypes;
-
-      /**
-       * Gets the display names.
-       *
-       * @return the display names
-       */
-      public @Nullable Map<String, String> getDisplayNames() {
-        return this.displayNames;
-      }
-
-      /**
-       * Assigns the display names.
-       *
-       * @param displayNames the display names
-       */
-      public void setDisplayNames(final @Nullable Map<String, String> displayNames) {
-        this.displayNames = displayNames;
-      }
-
-      /**
-       * Gets the descriptions.
-       *
-       * @return the descriptions
-       */
-      public @Nullable Map<String, String> getDescriptions() {
-        return this.descriptions;
-      }
-
-      /**
-       * Assigns the descriptions.
-       *
-       * @param descriptions the descriptions
-       */
-      public void setDescriptions(final @Nullable Map<String, String> descriptions) {
-        this.descriptions = descriptions;
-      }
-
-      /**
-       * Gets the logotypes.
-       *
-       * @return the logotypes
-       */
-      public @Nullable List<Logo> getLogotypes() {
-        return this.logotypes;
-      }
-
-      /**
-       * Assigns the logotypes.
-       *
-       * @param logotypes the logotypes
-       */
-      public void setLogotypes(final @Nullable List<Logo> logotypes) {
-        this.logotypes = logotypes;
-      }
-
-      /**
-       * An mdui:Logo element.
-       */
-      public static class Logo {
-
-        /**
-         * The logotype URL. Mutually exclusive with path.
-         */
-        private String url;
-
-        /**
-         * The logotype path, relative to the base URL. Mutually exclusive with url.
-         */
-        private String path;
-
-        /**
-         * The height in pixels.
-         */
-        private Integer height;
-
-        /**
-         * The width in pixels.
-         */
-        private Integer width;
-
-        /**
-         * The language tag.
-         */
-        private String languageTag;
-
-        /**
-         * Gets the logotype URL.
-         *
-         * @return the logotype URL
-         */
-        public @Nullable String getUrl() {
-          return this.url;
-        }
-
-        /**
-         * Assigns the logotype URL.
-         *
-         * @param url the logotype URL
-         */
-        public void setUrl(final @Nullable String url) {
-          this.url = url;
-        }
-
-        /**
-         * Gets the logotype path.
-         *
-         * @return the logotype path
-         */
-        public @Nullable String getPath() {
-          return this.path;
-        }
-
-        /**
-         * Assigns the logotype path.
-         *
-         * @param path the logotype path
-         */
-        public void setPath(final @Nullable String path) {
-          this.path = path;
-        }
-
-        /**
-         * Gets the height.
-         *
-         * @return the height
-         */
-        public @Nullable Integer getHeight() {
-          return this.height;
-        }
-
-        /**
-         * Assigns the height.
-         *
-         * @param height the height
-         */
-        public void setHeight(final @Nullable Integer height) {
-          this.height = height;
-        }
-
-        /**
-         * Gets the width.
-         *
-         * @return the width
-         */
-        public @Nullable Integer getWidth() {
-          return this.width;
-        }
-
-        /**
-         * Assigns the width.
-         *
-         * @param width the width
-         */
-        public void setWidth(final @Nullable Integer width) {
-          this.width = width;
-        }
-
-        /**
-         * Gets the language tag.
-         *
-         * @return the language tag
-         */
-        public @Nullable String getLanguageTag() {
-          return this.languageTag;
-        }
-
-        /**
-         * Assigns the language tag.
-         *
-         * @param languageTag the language tag
-         */
-        public void setLanguageTag(final @Nullable String languageTag) {
-          this.languageTag = languageTag;
-        }
-      }
-    }
-
-    /**
-     * The md:Organization element.
-     */
-    public static class Organization {
-
-      /**
-       * OrganizationName elements, keyed by language tag.
-       */
-      private Map<String, String> names;
-
-      /**
-       * OrganizationDisplayName elements, keyed by language tag.
-       */
-      private Map<String, String> displayNames;
-
-      /**
-       * OrganizationURL elements, keyed by language tag.
-       */
-      private Map<String, String> urls;
-
-      /**
-       * The organisation number, published as mdorgext:OrganizationNumber.
-       */
-      private String number;
-
-      /**
-       * Gets the organisation names.
-       *
-       * @return the organisation names
-       */
-      public @Nullable Map<String, String> getNames() {
-        return this.names;
-      }
-
-      /**
-       * Assigns the organisation names.
-       *
-       * @param names the organisation names
-       */
-      public void setNames(final @Nullable Map<String, String> names) {
-        this.names = names;
-      }
-
-      /**
-       * Gets the organisation display names.
-       *
-       * @return the organisation display names
-       */
-      public @Nullable Map<String, String> getDisplayNames() {
-        return this.displayNames;
-      }
-
-      /**
-       * Assigns the organisation display names.
-       *
-       * @param displayNames the organisation display names
-       */
-      public void setDisplayNames(final @Nullable Map<String, String> displayNames) {
-        this.displayNames = displayNames;
-      }
-
-      /**
-       * Gets the organisation URLs.
-       *
-       * @return the organisation URLs
-       */
-      public @Nullable Map<String, String> getUrls() {
-        return this.urls;
-      }
-
-      /**
-       * Assigns the organisation URLs.
-       *
-       * @param urls the organisation URLs
-       */
-      public void setUrls(final @Nullable Map<String, String> urls) {
-        this.urls = urls;
-      }
-
-      /**
-       * Gets the organisation number.
-       *
-       * @return the organisation number
-       */
-      public @Nullable String getNumber() {
-        return this.number;
-      }
-
-      /**
-       * Assigns the organisation number.
-       *
-       * @param number the organisation number
-       */
-      public void setNumber(final @Nullable String number) {
-        this.number = number;
-      }
-    }
-
-    /**
-     * An md:ContactPerson element.
-     */
-    public static class ContactPerson {
-
-      /**
-       * The Company element.
-       */
-      private String company;
-
-      /**
-       * The GivenName element.
-       */
-      private String givenName;
-
-      /**
-       * The SurName element.
-       */
-      private String surname;
-
-      /**
-       * The EmailAddress elements.
-       */
-      private List<String> emailAddresses;
-
-      /**
-       * The TelephoneNumber elements.
-       */
-      private List<String> telephoneNumbers;
-
-      /**
-       * Gets the company.
-       *
-       * @return the company
-       */
-      public @Nullable String getCompany() {
-        return this.company;
-      }
-
-      /**
-       * Assigns the company.
-       *
-       * @param company the company
-       */
-      public void setCompany(final @Nullable String company) {
-        this.company = company;
-      }
-
-      /**
-       * Gets the given name.
-       *
-       * @return the given name
-       */
-      public @Nullable String getGivenName() {
-        return this.givenName;
-      }
-
-      /**
-       * Assigns the given name.
-       *
-       * @param givenName the given name
-       */
-      public void setGivenName(final @Nullable String givenName) {
-        this.givenName = givenName;
-      }
-
-      /**
-       * Gets the surname.
-       *
-       * @return the surname
-       */
-      public @Nullable String getSurname() {
-        return this.surname;
-      }
-
-      /**
-       * Assigns the surname.
-       *
-       * @param surname the surname
-       */
-      public void setSurname(final @Nullable String surname) {
-        this.surname = surname;
-      }
-
-      /**
-       * Gets the e-mail addresses.
-       *
-       * @return the e-mail addresses
-       */
-      public @Nullable List<String> getEmailAddresses() {
-        return this.emailAddresses;
-      }
-
-      /**
-       * Assigns the e-mail addresses.
-       *
-       * @param emailAddresses the e-mail addresses
-       */
-      public void setEmailAddresses(final @Nullable List<String> emailAddresses) {
-        this.emailAddresses = emailAddresses;
-      }
-
-      /**
-       * Gets the telephone numbers.
-       *
-       * @return the telephone numbers
-       */
-      public @Nullable List<String> getTelephoneNumbers() {
-        return this.telephoneNumbers;
-      }
-
-      /**
-       * Assigns the telephone numbers.
-       *
-       * @param telephoneNumbers the telephone numbers
-       */
-      public void setTelephoneNumbers(final @Nullable List<String> telephoneNumbers) {
-        this.telephoneNumbers = telephoneNumbers;
       }
     }
   }

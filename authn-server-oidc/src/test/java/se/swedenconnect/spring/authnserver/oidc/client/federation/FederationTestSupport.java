@@ -170,6 +170,25 @@ abstract class FederationTestSupport {
   }
 
   /**
+   * Creates a signed trust mark status response.
+   *
+   * @param key the key to sign with
+   * @param issuer the entity identifier of the issuer
+   * @param trustMark the trust mark that the response is about
+   * @param status the status
+   * @return a {@link SignedJWT}
+   */
+  static SignedJWT trustMarkStatus(final ECKey key, final String issuer, final String trustMark,
+      final String status) {
+    return sign(key, TrustMarkStatusChecker.TRUST_MARK_STATUS_RESPONSE_TYPE, new JWTClaimsSet.Builder()
+        .issuer(issuer)
+        .issueTime(new Date())
+        .claim("trust_mark", trustMark)
+        .claim("status", status)
+        .build());
+  }
+
+  /**
    * Signs a JWT.
    *
    * @param key the key to sign with
@@ -215,6 +234,15 @@ abstract class FederationTestSupport {
     /** The last trust mark request. */
     TrustMarkRequest lastTrustMarkRequest;
 
+    /** What the trust mark status call answers with. */
+    SignedJWT trustMarkStatusResponse;
+
+    /** What the trust mark status call fails with, or {@code null} if it does not fail. */
+    RuntimeException trustMarkStatusFailure;
+
+    /** The trust mark status requests made. */
+    final List<FederationRequest<FederationTrustMarkStatusRequest>> trustMarkStatusRequests = new ArrayList<>();
+
     @Override
     public SignedJWT resolve(final FederationRequest<ResolveRequest> request) {
       this.resolveCalls++;
@@ -251,7 +279,11 @@ abstract class FederationTestSupport {
 
     @Override
     public TrustMarkStatusResponse trustMarkStatus(final FederationRequest<FederationTrustMarkStatusRequest> request) {
-      throw new UnsupportedOperationException();
+      this.trustMarkStatusRequests.add(request);
+      if (this.trustMarkStatusFailure != null) {
+        throw this.trustMarkStatusFailure;
+      }
+      return new TrustMarkStatusResponse(this.trustMarkStatusResponse, false);
     }
 
   }

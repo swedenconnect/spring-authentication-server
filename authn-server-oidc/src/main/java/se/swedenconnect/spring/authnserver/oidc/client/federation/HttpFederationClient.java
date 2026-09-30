@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
@@ -46,13 +47,14 @@ import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMar
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
- * A {@link FederationClient} that makes the two federation calls that the client registry needs over HTTP: the
- * resolve request of
- * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.3">OpenID Federation 1.0, Section 8.3</a>
- * and the trust mark request of Section 8.6.
+ * A {@link FederationClient} that makes the federation calls that the OpenID Provider needs over HTTP: the resolve
+ * request of
+ * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.3">OpenID Federation 1.0, Section 8.3</a>,
+ * the trust mark status request of Section 8.4 and the trust mark request of Section 8.6.
  * <p>
  * The endpoint of a call is taken from the federation entity metadata of the request, under
- * {@value #FEDERATION_RESOLVE_ENDPOINT} and {@value #FEDERATION_TRUST_MARK_ENDPOINT}.
+ * {@value #FEDERATION_RESOLVE_ENDPOINT}, {@value #FEDERATION_TRUST_MARK_STATUS_ENDPOINT} and
+ * {@value #FEDERATION_TRUST_MARK_ENDPOINT}.
  * </p>
  * <p>
  * The other calls of the interface are not made by the client registry and are not implemented.
@@ -70,6 +72,9 @@ public class HttpFederationClient implements FederationClient {
 
   /** The federation entity metadata parameter holding the trust mark endpoint. */
   public static final String FEDERATION_TRUST_MARK_ENDPOINT = "federation_trust_mark_endpoint";
+
+  /** The federation entity metadata parameter holding the trust mark status endpoint. */
+  public static final String FEDERATION_TRUST_MARK_STATUS_ENDPOINT = "federation_trust_mark_status_endpoint";
 
   /** The HTTP client. */
   private final RestClient restClient;
@@ -100,7 +105,8 @@ public class HttpFederationClient implements FederationClient {
     if (StringUtils.hasText(parameters.type())) {
       appendParameter(query, "entity_type", parameters.type());
     }
-    return this.get(endpoint(request, FEDERATION_RESOLVE_ENDPOINT), query.toString(), "resolve");
+    final String endpoint = endpoint(request, FEDERATION_RESOLVE_ENDPOINT);
+    return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint, "resolve");
   }
 
   /** {@inheritDoc} */
@@ -110,26 +116,49 @@ public class HttpFederationClient implements FederationClient {
     final StringBuilder query = new StringBuilder();
     appendParameter(query, "trust_mark_type", parameters.trustMarkType().getValue());
     appendParameter(query, "sub", parameters.subject().getValue());
-    return this.get(endpoint(request, FEDERATION_TRUST_MARK_ENDPOINT), query.toString(), "trust mark");
+    final String endpoint = endpoint(request, FEDERATION_TRUST_MARK_ENDPOINT);
+    return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint, "trust mark");
+  }
+
+  /**
+   * Makes the trust mark status request of OpenID Federation 1.0, Section 8.4: an HTTP POST of the trust mark to the
+   * status endpoint of the issuer. The signed status response is returned as it is, without being verified.
+   *
+   * @param request the request
+   * @return the status response
+   * @throws ClientRegistryException if the call fails, or the endpoint does not answer with a signed JWT
+   */
+  @Override
+  public @NonNull TrustMarkStatusResponse trustMarkStatus(
+      final @NonNull FederationRequest<FederationTrustMarkStatusRequest> request) {
+    final String endpoint = endpoint(request, FEDERATION_TRUST_MARK_STATUS_ENDPOINT);
+    final StringBuilder body = new StringBuilder();
+    appendParameter(body, "trust_mark", request.parameters().trustMarkJwt());
+    final SignedJWT response = this.call(this.restClient.post()
+        .uri(URI.create(endpoint))
+        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+        .body(body.toString()), endpoint, "trust mark status");
+    if (response == null) {
+      throw new ClientRegistryException("The trust mark status endpoint %s answered 404".formatted(endpoint));
+    }
+    return new TrustMarkStatusResponse(response, false);
   }
 
   /**
    * Makes the call and parses the response as a signed JWT.
    *
-   * @param endpoint the endpoint to call
-   * @param query the query string, without the leading question mark
-   * @param what what is asked for, used in error messages
+   * @param spec the prepared request
+   * @param endpoint the endpoint that is called, used in messages
+   * @param what what is asked for, used in messages
    * @return a {@link SignedJWT}, or {@code null} if the endpoint answered that it has nothing
    * @throws ClientRegistryException if the call fails
    */
-  private @Nullable SignedJWT get(final @NonNull String endpoint, final @NonNull String query,
-      final @NonNull String what) throws ClientRegistryException {
+  private @Nullable SignedJWT call(final RestClient.@NonNull RequestHeadersSpec<?> spec,
+      final @NonNull String endpoint, final @NonNull String what) throws ClientRegistryException {
 
-    final URI uri = URI.create("%s%c%s".formatted(endpoint, endpoint.indexOf('?') >= 0 ? '&' : '?', query));
-    log.trace("Making {} request to {}", what, uri);
+    log.trace("Making {} request to {}", what, endpoint);
     try {
-      return this.restClient.get()
-          .uri(uri)
+      return spec
           .exchange((clientRequest, clientResponse) -> {
             final HttpStatusCode status = clientResponse.getStatusCode();
             if (status.value() == 404) {
@@ -161,6 +190,17 @@ public class HttpFederationClient implements FederationClient {
       throw new ClientRegistryException(
           "Failed to make %s request to %s - %s".formatted(what, endpoint, e.getMessage()), e);
     }
+  }
+
+  /**
+   * Creates the URI of a GET request.
+   *
+   * @param endpoint the endpoint
+   * @param query the query string, without the leading question mark
+   * @return the URI
+   */
+  private static @NonNull URI toUri(final @NonNull String endpoint, final @NonNull String query) {
+    return URI.create("%s%c%s".formatted(endpoint, endpoint.indexOf('?') >= 0 ? '&' : '?', query));
   }
 
   /**
@@ -218,13 +258,6 @@ public class HttpFederationClient implements FederationClient {
   @Override
   public @NonNull List<String> trustMarkedListing(final FederationRequest<TrustMarkListingRequest> request) {
     throw new UnsupportedOperationException("The trust marked listing call is not implemented");
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public @NonNull TrustMarkStatusResponse trustMarkStatus(
-      final FederationRequest<FederationTrustMarkStatusRequest> request) {
-    throw new UnsupportedOperationException("The trust mark status call is not implemented");
   }
 
 }

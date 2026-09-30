@@ -15,6 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
+import java.io.File;
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -22,11 +24,15 @@ import java.util.Map;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.core.io.Resource;
 
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SsoProperties;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SubjectIdentifierProperties;
+import se.swedenconnect.spring.authnserver.autoconfigure.EntityInformationProperties;
+import se.swedenconnect.spring.authnserver.oidc.federation.OidcEntityMetadata;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
+import se.swedenconnect.spring.authnserver.oidc.keys.FederationKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 
@@ -132,6 +138,17 @@ public class OidcConfigurationProperties {
    * The rules for which clients are accepted. Without rules, every client that the client registry knows is accepted.
    */
   private final RequesterAcceptanceProperties requesterAcceptance = new RequesterAcceptanceProperties();
+
+  /**
+   * The descriptive information for OpenID Connect. The values assigned override those of
+   * authn-server.entity-information, and the OIDC metadata parameters may be given directly.
+   */
+  private final OidcEntityInformationProperties entityInformation = new OidcEntityInformationProperties();
+
+  /**
+   * The OpenID Provider as a member of an OpenID Federation.
+   */
+  private final FederationProperties federation = new FederationProperties();
 
   /**
    * Tells whether the OpenID Provider is enabled.
@@ -383,6 +400,549 @@ public class OidcConfigurationProperties {
    */
   public @NonNull RequesterAcceptanceProperties getRequesterAcceptance() {
     return this.requesterAcceptance;
+  }
+
+  /**
+   * Gets the entity information properties.
+   *
+   * @return the entity information properties
+   */
+  public @NonNull OidcEntityInformationProperties getEntityInformation() {
+    return this.entityInformation;
+  }
+
+  /**
+   * Gets the federation properties.
+   *
+   * @return the federation properties
+   */
+  public @NonNull FederationProperties getFederation() {
+    return this.federation;
+  }
+
+  /**
+   * The descriptive information for OpenID Connect: overrides of the shared information, and values of the OIDC
+   * metadata parameters that replace what is otherwise taken from the information.
+   */
+  public static class OidcEntityInformationProperties extends EntityInformationProperties {
+
+    /**
+     * The display_name parameter, keyed by language tag. Defaults to the UI display names.
+     */
+    private Map<String, String> displayName;
+
+    /**
+     * The description parameter, keyed by language tag. Defaults to the UI descriptions.
+     */
+    private Map<String, String> description;
+
+    /**
+     * The organization_name parameter, keyed by language tag. Defaults to the organization names.
+     */
+    private Map<String, String> organizationName;
+
+    /**
+     * The organization_uri parameter. Defaults to the first organization URL.
+     */
+    private String organizationUri;
+
+    /**
+     * The organization_identifier parameter. Defaults to urn:glue:iso6523:0007 followed by the organization number, when
+     * it is ten digits.
+     */
+    private String organizationIdentifier;
+
+    /**
+     * The logo_uri parameter. Defaults to the first logo without a language, or else the first logo.
+     */
+    private String logoUri;
+
+    /**
+     * The contacts parameter. Defaults to the e-mail addresses of the technical and support contact persons.
+     */
+    private List<String> contacts;
+
+    /**
+     * Gets the display names.
+     *
+     * @return the display names
+     */
+    public @Nullable Map<String, String> getDisplayName() {
+      return this.displayName;
+    }
+
+    /**
+     * Assigns the display names.
+     *
+     * @param displayName the display names
+     */
+    public void setDisplayName(final @Nullable Map<String, String> displayName) {
+      this.displayName = displayName;
+    }
+
+    /**
+     * Gets the descriptions.
+     *
+     * @return the descriptions
+     */
+    public @Nullable Map<String, String> getDescription() {
+      return this.description;
+    }
+
+    /**
+     * Assigns the descriptions.
+     *
+     * @param description the descriptions
+     */
+    public void setDescription(final @Nullable Map<String, String> description) {
+      this.description = description;
+    }
+
+    /**
+     * Gets the organization names.
+     *
+     * @return the organization names
+     */
+    public @Nullable Map<String, String> getOrganizationName() {
+      return this.organizationName;
+    }
+
+    /**
+     * Assigns the organization names.
+     *
+     * @param organizationName the organization names
+     */
+    public void setOrganizationName(final @Nullable Map<String, String> organizationName) {
+      this.organizationName = organizationName;
+    }
+
+    /**
+     * Gets the organization URI.
+     *
+     * @return the organization URI
+     */
+    public @Nullable String getOrganizationUri() {
+      return this.organizationUri;
+    }
+
+    /**
+     * Assigns the organization URI.
+     *
+     * @param organizationUri the organization URI
+     */
+    public void setOrganizationUri(final @Nullable String organizationUri) {
+      this.organizationUri = organizationUri;
+    }
+
+    /**
+     * Gets the organization identifier.
+     *
+     * @return the organization identifier
+     */
+    public @Nullable String getOrganizationIdentifier() {
+      return this.organizationIdentifier;
+    }
+
+    /**
+     * Assigns the organization identifier.
+     *
+     * @param organizationIdentifier the organization identifier
+     */
+    public void setOrganizationIdentifier(final @Nullable String organizationIdentifier) {
+      this.organizationIdentifier = organizationIdentifier;
+    }
+
+    /**
+     * Gets the logo URI.
+     *
+     * @return the logo URI
+     */
+    public @Nullable String getLogoUri() {
+      return this.logoUri;
+    }
+
+    /**
+     * Assigns the logo URI.
+     *
+     * @param logoUri the logo URI
+     */
+    public void setLogoUri(final @Nullable String logoUri) {
+      this.logoUri = logoUri;
+    }
+
+    /**
+     * Gets the contacts.
+     *
+     * @return the contacts
+     */
+    public @Nullable List<String> getContacts() {
+      return this.contacts;
+    }
+
+    /**
+     * Assigns the contacts.
+     *
+     * @param contacts the contacts
+     */
+    public void setContacts(final @Nullable List<String> contacts) {
+      this.contacts = contacts;
+    }
+
+    /**
+     * Creates the OIDC metadata parameter values of the properties.
+     *
+     * @return an {@link OidcEntityMetadata}
+     */
+    public @NonNull OidcEntityMetadata toEntityMetadata() {
+      return new OidcEntityMetadata(this.displayName, this.description, this.organizationName, this.organizationUri,
+          this.organizationIdentifier, this.logoUri, this.contacts);
+    }
+  }
+
+  /**
+   * The OpenID Provider as a member of an OpenID Federation.
+   */
+  public static class FederationProperties {
+
+    /**
+     * Whether the OpenID Provider is a member of an OpenID Federation and publishes an entity configuration. Defaults
+     * to false.
+     */
+    private boolean enabled = false;
+
+    /**
+     * The entity identifiers of the immediate superiors of the OpenID Provider. At least one is required when
+     * federation is enabled.
+     */
+    private List<String> authorityHints;
+
+    /**
+     * The federation keys, that the entity configuration is signed with. At least one active key is required when
+     * federation is enabled.
+     */
+    private List<FederationKeyProperties> keys;
+
+    /**
+     * The lifetime of the entity configuration. Defaults to 1 day.
+     */
+    private Duration entityConfigurationLifetime;
+
+    /**
+     * Parameters applied to the entity configuration, for example trust_anchor_hints. A metadata entry is merged into
+     * the metadata per entity type and parameter.
+     */
+    private Map<String, Object> additionalParameters;
+
+    /**
+     * The trust marks of the OpenID Provider, one per trust mark type.
+     */
+    private List<TrustMarkProperties> trustMarks;
+
+    /**
+     * A directory where fetched trust marks are stored, so that they are available after a restart. Without it,
+     * nothing is stored.
+     */
+    private File trustMarkCacheDirectory;
+
+    /**
+     * The interval between two attempts to fetch a trust mark after a failure. Defaults to 5 minutes.
+     */
+    private Duration trustMarkRetryInterval;
+
+    /**
+     * Tells whether federation is enabled.
+     *
+     * @return whether federation is enabled
+     */
+    public boolean isEnabled() {
+      return this.enabled;
+    }
+
+    /**
+     * Assigns whether federation is enabled.
+     *
+     * @param enabled whether federation is enabled
+     */
+    public void setEnabled(final boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    /**
+     * Gets the authority hints.
+     *
+     * @return the authority hints
+     */
+    public @Nullable List<String> getAuthorityHints() {
+      return this.authorityHints;
+    }
+
+    /**
+     * Assigns the authority hints.
+     *
+     * @param authorityHints the authority hints
+     */
+    public void setAuthorityHints(final @Nullable List<String> authorityHints) {
+      this.authorityHints = authorityHints;
+    }
+
+    /**
+     * Gets the federation keys.
+     *
+     * @return the federation keys
+     */
+    public @Nullable List<FederationKeyProperties> getKeys() {
+      return this.keys;
+    }
+
+    /**
+     * Assigns the federation keys.
+     *
+     * @param keys the federation keys
+     */
+    public void setKeys(final @Nullable List<FederationKeyProperties> keys) {
+      this.keys = keys;
+    }
+
+    /**
+     * Gets the lifetime of the entity configuration.
+     *
+     * @return the lifetime, or {@code null} for the default
+     */
+    public @Nullable Duration getEntityConfigurationLifetime() {
+      return this.entityConfigurationLifetime;
+    }
+
+    /**
+     * Assigns the lifetime of the entity configuration.
+     *
+     * @param entityConfigurationLifetime the lifetime
+     */
+    public void setEntityConfigurationLifetime(final @Nullable Duration entityConfigurationLifetime) {
+      this.entityConfigurationLifetime = entityConfigurationLifetime;
+    }
+
+    /**
+     * Gets the additional parameters.
+     *
+     * @return the additional parameters
+     */
+    public @Nullable Map<String, Object> getAdditionalParameters() {
+      return this.additionalParameters;
+    }
+
+    /**
+     * Assigns the additional parameters.
+     *
+     * @param additionalParameters the additional parameters
+     */
+    public void setAdditionalParameters(final @Nullable Map<String, Object> additionalParameters) {
+      this.additionalParameters = additionalParameters;
+    }
+
+    /**
+     * Gets the trust marks.
+     *
+     * @return the trust marks
+     */
+    public @Nullable List<TrustMarkProperties> getTrustMarks() {
+      return this.trustMarks;
+    }
+
+    /**
+     * Assigns the trust marks.
+     *
+     * @param trustMarks the trust marks
+     */
+    public void setTrustMarks(final @Nullable List<TrustMarkProperties> trustMarks) {
+      this.trustMarks = trustMarks;
+    }
+
+    /**
+     * Gets the trust mark cache directory.
+     *
+     * @return the directory, or {@code null}
+     */
+    public @Nullable File getTrustMarkCacheDirectory() {
+      return this.trustMarkCacheDirectory;
+    }
+
+    /**
+     * Assigns the trust mark cache directory.
+     *
+     * @param trustMarkCacheDirectory the directory
+     */
+    public void setTrustMarkCacheDirectory(final @Nullable File trustMarkCacheDirectory) {
+      this.trustMarkCacheDirectory = trustMarkCacheDirectory;
+    }
+
+    /**
+     * Gets the trust mark retry interval.
+     *
+     * @return the interval, or {@code null} for the default
+     */
+    public @Nullable Duration getTrustMarkRetryInterval() {
+      return this.trustMarkRetryInterval;
+    }
+
+    /**
+     * Assigns the trust mark retry interval.
+     *
+     * @param trustMarkRetryInterval the interval
+     */
+    public void setTrustMarkRetryInterval(final @Nullable Duration trustMarkRetryInterval) {
+      this.trustMarkRetryInterval = trustMarkRetryInterval;
+    }
+  }
+
+  /**
+   * A federation key.
+   */
+  public static class FederationKeyProperties {
+
+    /**
+     * The credential holding the key.
+     */
+    private PkiCredentialConfigurationProperties credential;
+
+    /**
+     * The state of the key: active, it is published and used, or future, it is published but not used. Defaults to
+     * active.
+     */
+    private FederationKey.State state = FederationKey.State.ACTIVE;
+
+    /**
+     * Gets the credential.
+     *
+     * @return the credential
+     */
+    public @Nullable PkiCredentialConfigurationProperties getCredential() {
+      return this.credential;
+    }
+
+    /**
+     * Assigns the credential.
+     *
+     * @param credential the credential
+     */
+    public void setCredential(final @Nullable PkiCredentialConfigurationProperties credential) {
+      this.credential = credential;
+    }
+
+    /**
+     * Gets the state.
+     *
+     * @return the state
+     */
+    public FederationKey.@NonNull State getState() {
+      return this.state;
+    }
+
+    /**
+     * Assigns the state.
+     *
+     * @param state the state
+     */
+    public void setState(final FederationKey.@NonNull State state) {
+      this.state = state;
+    }
+  }
+
+  /**
+   * A trust mark of the OpenID Provider and where it is fetched.
+   */
+  public static class TrustMarkProperties {
+
+    /**
+     * The trust mark type.
+     */
+    private String type;
+
+    /**
+     * The entity identifier of the trust mark issuer.
+     */
+    private String issuer;
+
+    /**
+     * The trust mark endpoint of the issuer.
+     */
+    private URI endpoint;
+
+    /**
+     * A JWK Set document holding the federation keys of the issuer, that the trust mark is verified with.
+     */
+    private Resource jwks;
+
+    /**
+     * Gets the trust mark type.
+     *
+     * @return the trust mark type
+     */
+    public @Nullable String getType() {
+      return this.type;
+    }
+
+    /**
+     * Assigns the trust mark type.
+     *
+     * @param type the trust mark type
+     */
+    public void setType(final @Nullable String type) {
+      this.type = type;
+    }
+
+    /**
+     * Gets the issuer.
+     *
+     * @return the issuer
+     */
+    public @Nullable String getIssuer() {
+      return this.issuer;
+    }
+
+    /**
+     * Assigns the issuer.
+     *
+     * @param issuer the issuer
+     */
+    public void setIssuer(final @Nullable String issuer) {
+      this.issuer = issuer;
+    }
+
+    /**
+     * Gets the trust mark endpoint.
+     *
+     * @return the endpoint
+     */
+    public @Nullable URI getEndpoint() {
+      return this.endpoint;
+    }
+
+    /**
+     * Assigns the trust mark endpoint.
+     *
+     * @param endpoint the endpoint
+     */
+    public void setEndpoint(final @Nullable URI endpoint) {
+      this.endpoint = endpoint;
+    }
+
+    /**
+     * Gets the JWK Set of the issuer.
+     *
+     * @return the JWK Set resource
+     */
+    public @Nullable Resource getJwks() {
+      return this.jwks;
+    }
+
+    /**
+     * Assigns the JWK Set of the issuer.
+     *
+     * @param jwks the JWK Set resource
+     */
+    public void setJwks(final @Nullable Resource jwks) {
+      this.jwks = jwks;
+    }
   }
 
   /**

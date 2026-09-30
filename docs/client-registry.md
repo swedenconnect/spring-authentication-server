@@ -208,7 +208,8 @@ identifier. It is put together from a [`FederationResolver`][FederationResolver]
 FederationSettings federation = new FederationSettings(
     new FederationSettings.TrustAnchor(trustAnchorEntityId, trustAnchorKeys),
     new FederationSettings.Resolver(resolverEntityId, resolveEndpoint, resolverKeys),
-    Map.of(trustMarkType, new FederationSettings.TrustMarkIssuer(issuerEntityId, trustMarkEndpoint, issuerKeys)));
+    Map.of(trustMarkType, new FederationSettings.TrustMarkIssuer(issuerEntityId, trustMarkEndpoint, issuerKeys,
+        trustMarkStatusEndpoint)));
 
 FederationClientBackend backend = new FederationClientBackend(
     new HttpFederationResolver(federation),
@@ -282,8 +283,38 @@ if (record != null && record.hasMark(trustMarkType)) {
 - A trust mark obtained this way is added to the client's cached record and kept until the earlier of the trust
   mark's expiry and the record's expiry. Later requests from the same client need no call to the issuer, and a
   refresh of the record carries the trust mark over while it is still valid.
+- A trust mark without `exp`, or with a long one, stays trusted after the issuer has withdrawn it, unless its status is
+  checked, see [Checking the status of trust marks](#trust-mark-status-checks).
 
 For SAML, asking for a mark never finds anything. It gives the requester's record unchanged.
+
+<a name="trust-mark-status-checks"></a>
+### Checking the status of trust marks
+
+[`TrustMarkStatusChecker`][TrustMarkStatusChecker] is a background job that asks the issuer whether the trust marks
+obtained on demand are still valid, at the issuer's trust mark status endpoint (OpenID Federation 1.0, Section 8.4).
+It runs at a configurable interval, one hour by default:
+
+```java
+TrustMarkStatusChecker checker = new TrustMarkStatusChecker(cache, federation, new HttpFederationClient(),
+    Duration.ofHours(1), Clock.systemUTC());
+checker.start();
+```
+
+- A trust mark is checked when it has no `exp`, or when its `exp` is later than the next check. A trust mark that
+  expires before the next check is not checked; it expires as before.
+- The status endpoint of an issuer is configured together with the issuer, as `statusEndpoint` of
+  `FederationSettings.TrustMarkIssuer`. The trust marks of an issuer without a status endpoint are not checked.
+- The status response is verified with the keys of the issuer, and must be about the trust mark that was sent.
+- A trust mark that the issuer reports as anything but `active`, such as `revoked` or `expired`, is removed from the
+  client's cached record. A client that needs it for the [required marks](#requester-acceptance) is then treated as not
+  holding it on its next request: the trust mark is asked for again, and when the issuer no longer issues it, the
+  client is rejected with the same error response as any client that lacks a required mark.
+- A status endpoint that cannot be reached, or a response that does not verify, leaves the trust mark in place. It is
+  logged at `WARN`, and the trust mark is checked again at the next run.
+
+The trust marks of the resolve response are not checked by the job. The resolver has checked them, and they are held
+no longer than the resolve response is valid.
 
 <a name="requester-acceptance"></a>
 ## Deciding which requesters may use the server
@@ -369,6 +400,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [RepositoryClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/RepositoryClientBackend.java
 [SamlMetadataBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/SamlMetadataBackend.java
 [TrustMarkRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/TrustMarkRequester.java
+[TrustMarkStatusChecker]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/TrustMarkStatusChecker.java
 [WhitelistRequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/WhitelistRequesterPredicate.java
 
 -----

@@ -47,7 +47,7 @@ The Spring Boot starters:
 
 - [The client registry](client-registry.html) - How the server finds out about a requester: the protocol-neutral
   record and its marks, the SAML metadata sources, the three OpenID Connect backends, and resolving clients through
-  OpenID Federation with caching and trust marks on demand.
+  OpenID Federation with caching, trust marks on demand and trust mark status checks.
 
 - [The SAML Identity Provider](saml-identity-provider.html) - How a request flows from the Service Provider through
   the authentication to the response: how requests are processed, how the provider is chosen, single sign-on and its
@@ -56,12 +56,13 @@ The Spring Boot starters:
 
 - [The OpenID Provider](openid-provider.html) - Where the discovery document and the keys are published, how the
   signing and decryption keys are configured and rolled over, how the signing key for a client is chosen, how the
-  scopes, claims and authentication contexts are worked out from the authentication providers, and how to extend the
-  discovery document.
+  scopes, claims and authentication contexts are worked out from the authentication providers, how to extend the
+  discovery document, and how the OpenID Provider joins an OpenID Federation: its entity configuration, federation
+  keys, trust marks and descriptive metadata.
 
-- [Configuration](configuration.html) - The properties of the auto-configuration, the URL layout of the server,
-  adjusting the configuration in code, using the configurers without Spring Boot, and migrating the configuration of
-  an Identity Provider built on saml-identity-provider.
+- [Configuration](configuration.html) - The properties of the auto-configuration, the URL layout of the server, the
+  entity information that every protocol publishes, adjusting the configuration in code, using the configurers without
+  Spring Boot, and migrating the configuration of an Identity Provider built on saml-identity-provider.
 
 - [Release Notes](release-notes.html)
 

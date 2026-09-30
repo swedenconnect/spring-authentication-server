@@ -16,6 +16,7 @@ how the server is set up without Spring Boot.
 - [Shared settings](#shared-settings)
     - [Single sign-on](#single-sign-on)
     - [Subject identifiers](#subject-identifiers)
+    - [Entity information](#entity-information)
 - [The SAML Identity Provider](#the-saml-identity-provider)
     - [Credentials](#credentials)
     - [Endpoints](#endpoints)
@@ -32,6 +33,8 @@ how the server is set up without Spring Boot.
     - [The token endpoint and tokens](#oidc-token-endpoint)
     - [Scopes and claims](#oidc-scopes-and-claims)
     - [The discovery document](#oidc-discovery)
+    - [Entity information for OpenID Connect](#oidc-entity-information)
+    - [OpenID Federation](#oidc-federation)
 - [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
 - [Using the configurers without Spring Boot](#using-the-configurers-without-spring-boot)
 - [Migrating from saml-identity-provider](#migrating-from-saml-identity-provider)
@@ -128,8 +131,8 @@ A protocol may also place some endpoints directly under the base URL. The OpenID
 document, which is published at the issuer followed by `/.well-known/openid-configuration`. The issuer defaults to the
 base URL, so the document is found at `https://idp.example.com/auth/.well-known/openid-configuration`. An issuer with a
 path, which must begin with the base URL, moves the document along with it, see
-[The OpenID Provider](openid-provider.html#where-things-are-published). The OpenID Federation entity configuration
-will be placed in the same way.
+[The OpenID Provider](openid-provider.html#where-things-are-published). The OpenID Federation entity configuration,
+at the issuer followed by `/.well-known/openid-federation`, is placed in the same way.
 
 The SAML entity ID defaults to the base URL. In a server that offers both protocols, the SAML entity ID and the OpenID
 Connect issuer may thereby be the same URL. That is fine, since they are identifiers in different protocols. Assign
@@ -153,6 +156,7 @@ wins over the shared one.
 | `authn-server.clock-skew` | The time that clocks of other parties may differ from the server clock. | 30 seconds | Yes |
 | `authn-server.supports-user-message` | Whether the server can display a user message sent by the requester. For SAML, see the [User Message Extension](https://docs.swedenconnect.se/technical-framework/updates/18_-_User_Message_Extension_in_SAML_Authentication_Requests.html). | `false` | Yes |
 | `authn-server.subject-identifier.*` | How subject identifiers are computed, see [Subject identifiers](#subject-identifiers). | See below | Yes |
+| `authn-server.entity-information.*` | The names, logos and contact persons that every protocol publishes, see [Entity information](#entity-information). | - | Yes |
 | `authn-server.authn-flow-max-age` | How long the server waits for the user to come back from an authentication module that has pages of its own. Applied to the session-based storage of every redirect provider. | 30 minutes | No |
 
 <a name="single-sign-on"></a>
@@ -197,6 +201,62 @@ The SAML `NameID` and the OpenID Connect `sub` are computed from the user identi
 | :--- | :--- | :--- |
 | `secret` | The secret that takes part in the computation. The UTF-8 bytes of the string are used. Assigning a secret is strongly recommended. | None |
 | `hash-algorithm` | The JCE name of the hash algorithm. | `SHA-256` |
+
+<a name="entity-information"></a>
+### Entity information
+
+The descriptive information about the service and its organization is given once, under
+`authn-server.entity-information`, and published by every protocol: in the SAML metadata, and in the `openid_provider`
+metadata of the OpenID Federation entity configuration.
+
+| Property | Description |
+| :--- | :--- |
+| `ui-info.display-names` | The name of the service, as shown to users, keyed by language tag. |
+| `ui-info.descriptions` | A short description of the service, keyed by language tag. |
+| `ui-info.logotypes[]` | The logos. Each has `height`, `width`, an optional `language-tag`, and either `url` or `path`. A `path` is relative to the base URL. |
+| `organization.names` | The names of the organization, keyed by language tag. |
+| `organization.display-names` | The display names of the organization, keyed by language tag. |
+| `organization.urls` | The web pages of the organization, keyed by language tag. |
+| `organization.number` | The organization number. |
+| `contact-persons.*` | The contact persons, keyed by type: `technical`, `support`, `administrative`, `billing`, `other` or `security`. Each has `company`, `given-name`, `surname`, `email-addresses[]` and `telephone-numbers[]`. |
+
+```yaml
+authn-server:
+  entity-information:
+    ui-info:
+      display-names:
+        sv: Exempel-IdP
+        en: Example Identity Provider
+      logotypes:
+        - path: /images/logo.svg
+          height: 256
+          width: 256
+    organization:
+      names:
+        sv: Exempel AB
+        en: Example Ltd
+      urls:
+        sv: https://www.example.se
+      number: "5561234567"
+    contact-persons:
+      technical:
+        email-addresses:
+          - operations@example.com
+      support:
+        email-addresses:
+          - support@example.com
+```
+
+A protocol may override any part of it, in the same way as the [single sign-on settings](#single-sign-on): the SAML
+values are given under `authn-server.saml.metadata`, see [The IdP metadata](#the-idp-metadata), and the OpenID Connect
+values under `authn-server.oidc.entity-information`, see
+[Entity information for OpenID Connect](#oidc-entity-information). A protocol value replaces the shared value it
+corresponds to: each of the display names, the descriptions, the logos, the organization names, display names, URLs
+and number is replaced as a whole, and a contact person replaces the shared contact person of the same type while the
+other shared contact persons are kept.
+
+How the information is published is described in [The IdP metadata](#the-idp-metadata) for SAML, and in
+[Descriptive metadata](openid-provider.html#descriptive-metadata) for OpenID Connect.
 
 <a name="the-saml-identity-provider"></a>
 ## The SAML Identity Provider
@@ -344,10 +404,10 @@ The rest is given under `authn-server.saml.metadata`:
 | `signing-methods[].*` | The `alg:SigningMethod` elements, each with `algorithm` and optionally `min-key-size` and `max-key-size`. | - |
 | `include-signing-methods-under-role` | Whether the `alg:SigningMethod` elements are placed under the `IDPSSODescriptor` instead of under the `EntityDescriptor`. | `false` |
 | `encryption-methods[].*` | The `md:EncryptionMethod` elements of the encryption key, see below. They must match the encryption key. | - |
-| `ui-info.*` | The `mdui:UIInfo` element, see below. | - |
+| `ui-info.*` | The `mdui:UIInfo` element, see below. | `authn-server.entity-information.ui-info.*` |
 | `requested-principal-selection[]` | Attribute names for the `psc:RequestedPrincipalSelection` extension. | - |
-| `organization.*` | The `md:Organization` element, see below. | - |
-| `contact-persons.*` | The `md:ContactPerson` elements, keyed by type: `technical`, `support`, `administrative`, `billing`, `other` or `security`. A `security` contact is published as `other` with the REFEDS security contact type. Each has `company`, `given-name`, `surname`, `email-addresses[]` and `telephone-numbers[]`. | - |
+| `organization.*` | The `md:Organization` element, see below. | `authn-server.entity-information.organization.*` |
+| `contact-persons.*` | The `md:ContactPerson` elements, keyed by type: `technical`, `support`, `administrative`, `billing`, `other` or `security`. A `security` contact is published as `other` with the REFEDS security contact type. Each has `company`, `given-name`, `surname`, `email-addresses[]` and `telephone-numbers[]`. | `authn-server.entity-information.contact-persons.*` |
 
 An encryption method has:
 
@@ -358,11 +418,12 @@ An encryption method has:
 | `oaep-params` | The OAEP parameters, in Base64. |
 | `digest-method` | The digest algorithm URI, for key transport algorithms that need one. |
 
-The `ui-info` element has `display-names` and `descriptions`, both keyed by language tag, and `logotypes[]`. A logotype
-has `height`, `width`, an optional `language-tag`, and either `url` or `path`. A `path` is relative to the base URL.
+`ui-info`, `organization` and `contact-persons` have the shape of the [shared entity information](#entity-information),
+and override it for SAML. Values that are not given here are taken from `authn-server.entity-information`, so the
+information is normally given only there. The organization number is published as `mdorgext:OrganizationNumber`.
 
-The `organization` element has `names`, `display-names` and `urls`, all keyed by language tag, and an optional
-`number`, which is published as `mdorgext:OrganizationNumber`.
+In the following example, SAML gets a display name of its own and a security contact on top of the shared contact
+persons, and takes everything else from the shared information:
 
 ```yaml
 authn-server:
@@ -370,23 +431,9 @@ authn-server:
     metadata:
       ui-info:
         display-names:
-          en: Example Identity Provider
-          sv: Exempel-IdP
-        logotypes:
-          - path: /images/logo.svg
-            height: 256
-            width: 256
-      organization:
-        names:
-          en: Example Organization
-        display-names:
-          en: Example
-        urls:
-          en: https://www.example.com
+          en: Example Identity Provider (SAML)
+          sv: Exempel-IdP (SAML)
       contact-persons:
-        technical:
-          email-addresses:
-            - operations@example.com
         security:
           email-addresses:
             - security@example.com
@@ -527,6 +574,8 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `claims[]` | Claims supported on top of those of the authentication providers, see [Scopes and claims](#oidc-scopes-and-claims). | - |
 | `ui-locales[]` | The languages of the user interface, as language tags, published as `ui_locales_supported`. The Sweden Connect federation requires `sv` and `en`. | - |
 | `discovery.*` | The discovery document, see [The discovery document](#oidc-discovery). | - |
+| `entity-information.*` | The entity information for OpenID Connect, see [Entity information for OpenID Connect](#oidc-entity-information). | `authn-server.entity-information.*` |
+| `federation.*` | The OpenID Provider as a member of an OpenID Federation, see [OpenID Federation](#oidc-federation). | Not enabled |
 
 The values are checked when the filter chain is built, and the application does not start if a required value is
 missing or a value is invalid.
@@ -705,6 +754,75 @@ authn-server:
 A customizer set in an [adapter](#adjusting-the-configuration-in-code) changes the built document, see
 [Extending the document](openid-provider.html#extending-the-document).
 
+<a name="oidc-entity-information"></a>
+### Entity information for OpenID Connect
+
+The [shared entity information](#entity-information) is overridden for OpenID Connect under
+`authn-server.oidc.entity-information`, with `ui-info`, `organization` and `contact-persons` in the same shape. The
+descriptive parameters of the OpenID Provider metadata are worked out from the result, see
+[Descriptive metadata](openid-provider.html#descriptive-metadata), and each of them may also be given directly:
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `display-name` | `display_name`, keyed by language tag. | The UI display names |
+| `description` | `description`, keyed by language tag. | The UI descriptions |
+| `organization-name` | `organization_name`, keyed by language tag. | The organization names |
+| `organization-uri` | `organization_uri`. | The first organization URL |
+| `organization-identifier` | `organization_identifier`. | Derived from a ten-digit organization number |
+| `logo-uri` | `logo_uri`. | The first logo without a language, or else the first logo |
+| `contacts[]` | `contacts`. | The e-mail addresses of the technical and support contact persons |
+
+```yaml
+authn-server:
+  oidc:
+    entity-information:
+      logo-uri: https://cdn.example.com/op-logo.svg
+      contacts:
+        - op-support@example.com
+```
+
+<a name="oidc-federation"></a>
+### OpenID Federation
+
+The OpenID Provider as a member of an OpenID Federation is configured under `authn-server.oidc.federation`, see
+[OpenID Federation](openid-provider.html#openid-federation).
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `enabled` | Whether the OpenID Provider publishes an entity configuration. | `false` |
+| `authority-hints[]` | The entity identifiers of the immediate superiors. At least one is required when federation is enabled. | - |
+| `keys[]` | The federation keys, each with a `credential` and a `state`, `active` or `future`. At least one active key is required when federation is enabled. | - |
+| `entity-configuration-lifetime` | The lifetime of the entity configuration. | 1 day |
+| `additional-parameters.*` | Parameters applied to the entity configuration only, as a map of name to value, for example `trust_anchor_hints`. A `metadata` entry is merged into the metadata per entity type and parameter. | - |
+| `trust-marks[]` | The trust marks of the OpenID Provider, each with `type`, `issuer` (the entity identifier of the issuer), `endpoint` (its trust mark endpoint) and `jwks` (the location of a JWK Set document with the federation keys of the issuer). | - |
+| `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. | Nothing is stored |
+| `trust-mark-retry-interval` | How long to wait before a failed attempt to fetch a trust mark is made again. | 5 minutes |
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      enabled: true
+      authority-hints:
+        - https://fed.swedenconnect.se/intermediate
+      keys:
+        - credential:
+            bundle: federation-2026
+        - credential:
+            bundle: federation-2027
+          state: future
+      trust-marks:
+        - type: https://id.swedenconnect.se/loa/loa3
+          issuer: https://fed.swedenconnect.se/tmi-loa
+          endpoint: https://fed.swedenconnect.se/tmi-loa/trust_mark
+          jwks: file:/opt/config/tmi-loa-jwks.json
+      trust-mark-cache-directory: /var/op/trust-marks
+```
+
+When federation is enabled, the application does not start without federation keys and authority hints, or when the
+[descriptive metadata](openid-provider.html#descriptive-metadata) has no e-mail address in `contacts` or no HTTPS
+`logo_uri`.
+
 <a name="adjusting-the-configuration-in-code"></a>
 ## Adjusting the configuration in code
 
@@ -797,6 +915,9 @@ to `true`.
 | `saml.idp.endpoints.hok-post-authn` | `authn-server.saml.endpoints.hok-post-authn` | Relative to the SAML path. |
 | `saml.idp.endpoints.metadata` | `authn-server.saml.endpoints.metadata` | Relative to the SAML path, so `/saml2/metadata` becomes `/metadata`. |
 | `saml.idp.metadata.*` | `authn-server.saml.metadata.*` | The metadata is now always published. |
+| `saml.idp.metadata.ui-info.*` | `authn-server.entity-information.ui-info.*` | Shared, so that the OpenID Provider publishes the same information. `authn-server.saml.metadata.ui-info.*` still works, for SAML only. |
+| `saml.idp.metadata.organization.*` | `authn-server.entity-information.organization.*` | Shared. `authn-server.saml.metadata.organization.*` still works, for SAML only. |
+| `saml.idp.metadata.contact-persons.*` | `authn-server.entity-information.contact-persons.*` | Shared. `authn-server.saml.metadata.contact-persons.*` still works, for SAML only. |
 | `saml.idp.metadata-providers[]` | `authn-server.saml.metadata-providers[]` | The same properties. |
 | `saml.idp.max-message-age` | `authn-server.saml.max-message-age` | |
 | `saml.idp.authn-context.*` | `authn-server.saml.authn-context.*` | |

@@ -10,8 +10,8 @@ This page describes the OpenID Provider: where it publishes its discovery docume
 configured and rolled over, how the key that a message to a client is signed with is chosen, how the offered scopes,
 the supported claims and the authentication contexts are worked out from the authentication providers, how
 authentication requests are processed, how the code flow completes with the authorization code, the token endpoint,
-the ID token and the UserInfo endpoint, and how to extend the discovery document. The properties are described in
-[Configuration](configuration.html#the-openid-provider).
+the ID token and the UserInfo endpoint, how to extend the discovery document, and how the OpenID Provider joins an
+OpenID Federation. The properties are described in [Configuration](configuration.html#the-openid-provider).
 
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
@@ -43,6 +43,13 @@ Source links in this guide point to the `main` branch of the
     - [Where codes and tokens are kept](#where-codes-and-tokens-are-kept)
 - [The discovery document](#the-discovery-document)
     - [Extending the document](#extending-the-document)
+- [OpenID Federation](#openid-federation)
+    - [Joining a federation](#joining-a-federation)
+    - [Federation keys](#federation-keys)
+    - [The entity configuration](#the-entity-configuration)
+    - [Descriptive metadata](#descriptive-metadata)
+    - [The trust marks of the OpenID Provider](#the-trust-marks-of-the-openid-provider)
+    - [Changing the entity configuration](#changing-the-entity-configuration)
 
 <a name="where-things-are-published"></a>
 ## Where things are published
@@ -59,12 +66,14 @@ OIDC path, `/oidc` by default, see [URL layout](configuration.html#url-layout). 
 | Authorization endpoint | `https://op.example.com/oidc/authorize` |
 | Token endpoint | `https://op.example.com/oidc/token` |
 | UserInfo endpoint | `https://op.example.com/oidc/userinfo` |
+| OpenID Federation entity configuration, when [federation](#openid-federation) is enabled | `https://op.example.com/.well-known/openid-federation` |
 
 The discovery document is always published at the issuer followed by `/.well-known/openid-configuration`, as OpenID
-Connect Discovery, Section 4, requires. It is therefore not under the OIDC path. An issuer with a path moves the
-document along with it: with the issuer `https://op.example.com/op1`, the document is published at
-`https://op.example.com/op1/.well-known/openid-configuration`. The issuer must be the base URL or begin with it, since
-the server can only serve paths under the base URL.
+Connect Discovery, Section 4, requires, and the entity configuration at the issuer followed by
+`/.well-known/openid-federation`, as OpenID Federation 1.0, Section 9, requires. They are therefore not under the OIDC
+path. An issuer with a path moves both documents along with it: with the issuer `https://op.example.com/op1`, the
+discovery document is published at `https://op.example.com/op1/.well-known/openid-configuration`. The issuer must be
+the base URL or begin with it, since the server can only serve paths under the base URL.
 
 <a name="keys"></a>
 ## Keys
@@ -788,14 +797,245 @@ AuthnServerConfigurerAdapter discoveryAdjustments() {
 }
 ```
 
+A change that should appear in the discovery document belongs here, also when the OpenID Provider is a member of an
+OpenID Federation: the entity configuration is built from the discovery document, so both documents get the change.
+See [Changing the entity configuration](#changing-the-entity-configuration).
+
+<a name="openid-federation"></a>
+## OpenID Federation
+
+The OpenID Provider can be a member of an [OpenID Federation](https://openid.net/specs/openid-federation-1_0.html),
+such as the Sweden Connect federation, where an OpenID Provider is registered from its published entity
+configuration. This section is about the OpenID Provider's own membership. Clients resolved through a federation are
+described in [The federation backend](client-registry.html#the-federation-backend).
+
+<a name="joining-a-federation"></a>
+### Joining a federation
+
+Federation is off by default. To join a federation, enable it, and give the federation keys and the authority hints:
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      enabled: true
+      authority-hints:
+        - https://fed.swedenconnect.se/intermediate
+      keys:
+        - credential:
+            bundle: federation-2026
+```
+
+- The **entity identifier** is the issuer.
+- The **authority hints** are the entity identifiers of the immediate superiors of the OpenID Provider in the
+  federation, the intermediate entities or trust anchors it is registered with. At least one is required, since the
+  OpenID Provider is a leaf entity (OpenID Federation 1.0, Section 3.1.2).
+- The **federation keys** sign the entity configuration, see [Federation keys](#federation-keys).
+
+The application does not start when federation is enabled and the keys or the authority hints are missing. It does
+not start either when the [descriptive metadata](#descriptive-metadata) lacks what the Sweden Connect federation
+requires: at least one e-mail address in `contacts`, and a `logo_uri` that is an HTTPS URL.
+
+All properties are listed in [Configuration](configuration.html#oidc-federation). In code, the same settings are made
+with `OidcProviderConfigurer.federation(...)`, see [`OidcFederationConfigurer`][OidcFederationConfigurer].
+
+<a name="federation-keys"></a>
+### Federation keys
+
+The federation keys are separate from the OpenID Connect signing keys, as OpenID Federation 1.0, Section 3.1.1,
+recommends. They are configured as a list, like the [signing keys](#signing-keys), and a key is:
+
+- **active**: published in the `jwks` of the entity configuration and used for signing, or
+- **future**: published but never used.
+
+The first active key signs the entity configuration. The key requirements and the key IDs follow the same rules as for
+the OpenID Connect keys, see [Key requirements and key IDs](#key-requirements-and-key-ids). The signing algorithm is
+`RS256` for an RSA key and the `ES` algorithm of the curve for an EC key, which is what both the Swedish OpenID
+Federation profile, Section 6, and Sweden Connect Security Requirements, Section 3, allow.
+
+A federation key is rolled over in the same way as a signing key, following Section 4 of the security requirements:
+
+1. Add the new key as `future`. It is published in the entity configuration but not used.
+2. Wait at least as long as the lifetime of the entity configuration, so that every party that has cached the old
+   entity configuration has fetched a new one.
+3. Make the new key `active` and remove the old key.
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      keys:
+        - credential:
+            bundle: federation-2026
+        - credential:
+            bundle: federation-2027
+          state: future
+```
+
+<a name="the-entity-configuration"></a>
+### The entity configuration
+
+The entity configuration is a signed JWT with the type `entity-statement+jwt`, served with the content type
+`application/entity-statement+jwt`. It holds, following OpenID Federation 1.0, Section 3:
+
+| Claim | Value |
+| :--- | :--- |
+| `iss` and `sub` | The entity identifier, which is the issuer. |
+| `iat` and `exp` | When it was signed, and when it expires. The lifetime is 1 day by default, `authn-server.oidc.federation.entity-configuration-lifetime`. |
+| `jwks` | The federation keys, active and future. |
+| `authority_hints` | The configured authority hints. |
+| `trust_marks` | The trust marks of the OpenID Provider, when it has any, see [The trust marks of the OpenID Provider](#the-trust-marks-of-the-openid-provider). |
+| `metadata` | The `openid_provider` metadata only. The OpenID Provider is a leaf entity, and never publishes `federation_entity` metadata (Swedish OpenID Federation profile, Section 2.2). |
+
+The `openid_provider` metadata is the [discovery document](#the-discovery-document), as it is after the additional
+parameters and the customizer of the discovery document have been applied, with these parameters added unless the
+discovery document already has them:
+
+- the [descriptive metadata](#descriptive-metadata), such as `display_name#sv`, `organization_name#sv`, `logo_uri` and
+  `contacts`,
+- `client_registration_types_supported` with the value `automatic`, since clients are resolved through the
+  federation.
+
+**How it is kept fresh.** The signed entity configuration is kept in memory and served from there. Each time it is
+asked for, the OpenID Provider checks whether it is still fresh, and builds and signs it again only when needed:
+
+- when three quarters of its lifetime have passed, so that a new version is published well before the old one expires,
+  as Section 2.4.1 of the Swedish OpenID Federation profile requires, and
+- when its content has changed: a trust mark has been renewed, added or has expired, or a federation key has changed
+  state.
+
+The OpenID Connect keys are part of the discovery document. They, like the federation keys, are read at startup, so a
+change of key state takes effect when the application is restarted, and the entity configuration is then built anew.
+
+<a name="descriptive-metadata"></a>
+### Descriptive metadata
+
+The descriptive information about the service and its organization is given once for all protocols, under
+`authn-server.entity-information`, see [Entity information](configuration.html#entity-information). The same values
+are then published in the SAML metadata and in the OpenID Provider metadata, and a protocol may override any of them.
+
+The information is mapped to the parameters of
+[Sweden Connect OpenID Connect Metadata Requirements](https://docs.swedenconnect.se/federation/oidc-metadata-requirements.html),
+Section 3:
+
+| Parameter | Taken from |
+| :--- | :--- |
+| `display_name` | The UI display names, one parameter per language, such as `display_name#sv` and `display_name#en`. |
+| `description` | The UI descriptions, one parameter per language. |
+| `organization_name` | The organization names, one parameter per language. |
+| `organization_uri` | The first organization URL. |
+| `organization_identifier` | `urn:glue:iso6523:0007:<number>` when the organization number is ten digits, and otherwise left out. |
+| `logo_uri` | The first logo without a language, or else the first logo. A logo given as a path is relative to the base URL. |
+| `contacts` | The e-mail addresses of the technical and support contact persons, without duplicates. A `mailto:` prefix is removed. |
+
+Each parameter may also be given directly under `authn-server.oidc.entity-information`, which wins over the mapped
+value, see [Entity information for OpenID Connect](configuration.html#oidc-entity-information). In code, the overrides
+are `OidcProviderConfigurer.entityInformation(...)` and `OidcProviderConfigurer.entityMetadata(...)`, and the resulting
+values are given by `OidcProviderConfigurer.getEntityMetadata()`, see [`OidcEntityMetadata`][OidcEntityMetadata].
+
+The parameters are published in the entity configuration and not in the discovery document. When the discovery
+document holds one of them, for example set by its customizer, the value of the discovery document is used in both
+documents, so that they never disagree.
+
+<a name="the-trust-marks-of-the-openid-provider"></a>
+### The trust marks of the OpenID Provider
+
+The trust marks that the OpenID Provider holds, such as the level of assurance trust marks of the Sweden Connect
+federation, are published in its entity configuration. They are configured per trust mark type, separately from the
+trust marks that are required of clients, since the OpenID Provider may hold other marks than those it requires:
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      trust-marks:
+        - type: https://id.swedenconnect.se/loa/loa3
+          issuer: https://fed.swedenconnect.se/tmi-loa
+          endpoint: https://fed.swedenconnect.se/tmi-loa/trust_mark
+          jwks: file:/opt/config/tmi-loa-jwks.json
+      trust-mark-cache-directory: /var/op/trust-marks
+```
+
+Each trust mark is fetched from the trust mark endpoint of its issuer (OpenID Federation 1.0, Section 8.6) when the
+application starts, and again when three quarters of its lifetime have passed. A trust mark without `exp` is kept as
+it is and never fetched again.
+
+**The check.** A fetched trust mark is only published when it passes the check: its signature is verified with the
+configured keys of the issuer (`jwks`), `typ` must be `trust-mark+jwt`, `iss` must be the issuer, `sub` must be the
+entity identifier of the OpenID Provider, `trust_mark_type` must be the configured type, and it must not have expired.
+The trust chain of the issuer is not validated.
+
+**Failures.** A trust mark that cannot be fetched, or that fails the check, never stops the OpenID Provider, at startup
+or later:
+
+- The failure is logged as an error, and a new attempt is made after the retry interval, 5 minutes by default,
+  `authn-server.oidc.federation.trust-mark-retry-interval`.
+- The current trust mark, if there is one, is still published until it expires.
+- At startup without a trust mark, the entity configuration is published without it, and gets it once it has been
+  fetched.
+
+The state of each trust mark type, whether a valid trust mark is published and whether the latest attempt failed, is
+recorded in [`ProviderTrustMarks`][ProviderTrustMarks]. With Spring Boot it is a bean, so that a health check can read
+it with `getStates()`.
+
+**The cache directory.** When `trust-mark-cache-directory` is set, every accepted trust mark is written there, and the
+stored trust marks are read at startup. This means that the OpenID Provider publishes its trust marks at once after a
+restart, also when an issuer cannot be reached. A stored trust mark that has expired, or that fails the check, is not
+used. Without a cache directory nothing is stored.
+
+<a name="changing-the-entity-configuration"></a>
+### Changing the entity configuration
+
+There are two ways to change what the OpenID Provider publishes, and they differ in which documents they reach:
+
+- **The discovery document**, `authn-server.oidc.discovery.additional-parameters` and the discovery customizer, see
+  [Extending the document](#extending-the-document). The entity configuration is built from the discovery document, so
+  a change made here reaches **both** documents. A change that only concerns the OpenID Provider metadata belongs
+  here.
+- **The entity configuration**, `authn-server.oidc.federation.additional-parameters` and the entity configuration
+  customizer. They are applied last and reach **only** the entity configuration. Use them for the claims of the
+  entity statement, such as `trust_anchor_hints`, and for metadata that only makes sense in a federation.
+
+The additional parameters of the entity configuration are set as claims. A `metadata` parameter is merged into the
+metadata, per entity type and parameter:
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      additional-parameters:
+        trust_anchor_hints:
+          - https://fed.swedenconnect.se/trust-anchor
+```
+
+The customizer gets the claims as a mutable map, where `metadata` and its `openid_provider` entry are mutable maps
+too, and may change anything but `iss`, `sub`, `iat` and `exp`, which the OpenID Provider sets. It runs each time the
+entity configuration is built. Publishing `federation_entity` metadata stops the application from starting.
+
+```java
+@Bean
+AuthnServerConfigurerAdapter entityConfigurationAdjustments() {
+  return (http, configurer) -> configurer.protocol(OidcProviderConfigurer.class, oidc -> oidc
+      .federation(federation -> federation.entityConfigurationCustomizer(claims -> {
+        @SuppressWarnings("unchecked")
+        final Map<String, Object> op =
+            (Map<String, Object>) ((Map<String, Object>) claims.get("metadata")).get("openid_provider");
+        op.put("https://example.com/federation-only", true);
+      })));
+}
+```
+
 [AccessTokenStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/AccessTokenStore.java
 [AuthorizationCodeStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/AuthorizationCodeStore.java
 [ClientAssertionReplayCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/ClientAssertionReplayCache.java
+[OidcEntityMetadata]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/federation/OidcEntityMetadata.java
+[OidcFederationConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/config/OidcFederationConfigurer.java
 [OidcAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authentication/OidcAuthenticationRequirements.java
 [OidcAuthnRequestAuthenticationConverter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationConverter.java
 [OidcAuthnRequestAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationProvider.java
 [OidcAuthnRequestData]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestData.java
 [OidcUnrecoverableError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcUnrecoverableError.java
+[ProviderTrustMarks]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/federation/ProviderTrustMarks.java
 [SigningKeySelector]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/keys/SigningKeySelector.java
 [SupportedScopesAndClaims]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/scope/SupportedScopesAndClaims.java
 [UserInfoRequestProcessor]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/userinfo/UserInfoRequestProcessor.java

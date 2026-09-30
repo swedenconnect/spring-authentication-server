@@ -175,7 +175,7 @@ class FederationClientBackendTest extends FederationTestSupport {
 
     fixture.backend.requestMark(CLIENT_ID, MARK_TWO);
 
-    assertThat(fixture.cache.get(CLIENT_ID).onDemandTrustMarks().get(MARK_TWO))
+    assertThat(fixture.cache.get(CLIENT_ID).onDemandTrustMarks().get(MARK_TWO).validUntil())
         .isEqualTo(fixture.cache.get(CLIENT_ID).expiresAt());
   }
 
