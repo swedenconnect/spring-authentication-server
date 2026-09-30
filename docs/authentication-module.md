@@ -357,6 +357,10 @@ provider.getSsoVoters().add((previous, requirements, requester, contexts) ->
         : SsoDecision.deny(SsoDenialReason.NOT_ALLOWED));
 ```
 
+Voters that apply to every provider are better added to the server configuration, either to the shared list, for all
+protocols, or to the list of one protocol. They are asked after the provider's own voters, see
+[Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
+
 A refusal always states its reason, an [`SsoDenialReason`][SsoDenialReason]. That matters for a passive request, see
 below.
 
@@ -469,8 +473,10 @@ public class MyAuthenticationProvider extends AbstractUserRedirectAuthentication
 Everything the base class does around an authentication still happens, and it happens before the user is sent
 anywhere: the authentication contexts are filtered, single sign-on is decided, and a passive request that cannot be
 answered fails. Only when the user really has to authenticate is a
-[`RedirectForAuthenticationToken`][RedirectForAuthenticationToken] returned instead of a result. Registering the two
-paths with Spring Security is the auto-configuration's job.
+[`RedirectForAuthenticationToken`][RedirectForAuthenticationToken] returned instead of a result. The server's filter
+chain serves the two paths: the authentication path is open to everyone, and the resume path is where the flow
+continues, in the protocol that the requester used. See
+[The SAML Identity Provider](saml-identity-provider.html#modules-with-pages-of-their-own).
 
 `createUserAuthentication` is the counterpart of `authenticate`. It is called when the user comes back, and it turns
 what the controller delivered into the result. A controller that already delivers a `UserAuthentication` has nothing to
@@ -570,7 +576,12 @@ controller delivers.
 A [`PostAuthenticationProcessor`][PostAuthenticationProcessor] runs on the result before it becomes an assertion or a
 set of tokens, and asserts that the authentication delivered what the request needed. It may also change the result.
 
-One is installed: it fails a result where a sign message had to be shown but was not. An application adds its own:
+The processors of the server configuration run on every result. By default the shared list holds
+`SwedenConnectPostAuthenticationProcessor`, which fails a result where a sign message had to be shown but was not. How
+to add processors for all protocols or for one of them is described in
+[Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
+
+A provider may also have processors of its own, which run before those of the server configuration:
 
 ```java
 provider.getPostAuthenticationProcessors().add(authentication -> {

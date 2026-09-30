@@ -28,6 +28,7 @@ import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.user
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -375,6 +376,8 @@ class AbstractUserAuthenticationProviderTest {
   @Test
   void aSignMessageThatHadToBeShownButWasNotFailsTheRequest() {
     final TestProvider provider = new TestProvider();
+    provider.setServerPostAuthenticationProcessors(AuthenticationProtocol.SAML,
+        List.of(new SwedenConnectPostAuthenticationProcessor()));
     final AuthenticationRequirements requirements = requirements(LOA3);
     requirements.setSignMessage(GenericSignMessage.ofText("sv", "Jag godkanner"));
 
@@ -385,6 +388,52 @@ class AbstractUserAuthenticationProviderTest {
 
     provider.displaySignMessage = true;
     assertThat(provider.authenticateUser(token(requirements))).isNotNull();
+  }
+
+  @Test
+  void noPostProcessingIsInstalledInTheProviderItself() {
+    final TestProvider provider = new TestProvider();
+    assertThat(provider.getPostAuthenticationProcessors()).isEmpty();
+    final AuthenticationRequirements requirements = requirements(LOA3);
+    requirements.setSignMessage(GenericSignMessage.ofText("sv", "Jag godkanner"));
+    assertThat(provider.authenticateUser(token(requirements))).isNotNull();
+  }
+
+  @Test
+  void theProvidersOwnProcessorsRunBeforeThoseOfTheServerForTheRequestersProtocol() {
+    final TestProvider provider = new TestProvider();
+    final List<String> order = new ArrayList<>();
+    provider.getPostAuthenticationProcessors().add(a -> order.add("provider"));
+    provider.setServerPostAuthenticationProcessors(AuthenticationProtocol.SAML,
+        List.of(a -> order.add("saml-1"), a -> order.add("saml-2")));
+    provider.setServerPostAuthenticationProcessors(AuthenticationProtocol.OIDC, List.of(a -> order.add("oidc")));
+
+    provider.authenticateUser(token(requirements(LOA3)));
+    assertThat(order).containsExactly("provider", "saml-1", "saml-2");
+  }
+
+  @Test
+  void theServerSsoVotersAreAskedAfterTheProvidersOwnForTheRequestersProtocol() {
+    final TestProvider provider = new TestProvider();
+    final List<String> order = new ArrayList<>();
+    provider.getSsoVoters().add((p, r, q, c) -> {
+      order.add("provider");
+      return SsoDecision.abstain();
+    });
+    provider.setServerSsoVoters(AuthenticationProtocol.SAML, List.of((p, r, q, c) -> {
+      order.add("saml");
+      return SsoDecision.deny(SsoDenialReason.NOT_ALLOWED);
+    }));
+    provider.setServerSsoVoters(AuthenticationProtocol.OIDC, List.of((p, r, q, c) -> {
+      order.add("oidc");
+      return SsoDecision.abstain();
+    }));
+
+    final UserAuthenticationInputToken token = token(requirements(LOA3));
+    token.setPreviousAuthentication(authentication(user(), SP, REQUESTED));
+    assertThat(provider.authenticateUser(token)).isNotSameAs(token.getPreviousAuthentication());
+    assertThat(provider.authenticateCalls).isOne();
+    assertThat(order).containsExactly("provider", "saml");
   }
 
   @Test

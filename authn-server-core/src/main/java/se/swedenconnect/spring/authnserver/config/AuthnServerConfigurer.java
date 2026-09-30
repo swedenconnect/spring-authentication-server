@@ -36,14 +36,22 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.ExceptionTranslationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import se.swedenconnect.spring.authnserver.attributes.release.AttributeProducer;
+import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseVoter;
+import se.swedenconnect.spring.authnserver.attributes.release.IncludeAllAttributeReleaseVoter;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.authentication.provider.AbstractUserAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.authentication.provider.PostAuthenticationProcessor;
+import se.swedenconnect.spring.authnserver.authentication.provider.SwedenConnectPostAuthenticationProcessor;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.SessionBasedRedirectAuthenticationRepository;
+import se.swedenconnect.spring.authnserver.authentication.provider.redirect.UserRedirectAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
 import se.swedenconnect.spring.authnserver.registry.DefaultClientRegistry;
@@ -51,7 +59,11 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
+import se.swedenconnect.spring.authnserver.sso.SsoVoter;
 import se.swedenconnect.spring.authnserver.subject.AbstractSubjectIdentifierGenerator;
+import se.swedenconnect.spring.authnserver.web.ResumedAuthenticationHandler;
+import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
+import se.swedenconnect.spring.authnserver.web.UserAuthenticationResumeFilter;
 
 /**
  * The configurer for the whole authentication server. It holds the values that are common to all protocols, and the
@@ -60,6 +72,15 @@ import se.swedenconnect.spring.authnserver.subject.AbstractSubjectIdentifierGene
  * <p>
  * Some of the shared values may be overridden by a protocol, see {@link AbstractProtocolConfigurer}. A protocol value,
  * when assigned, wins over the shared one.
+ * </p>
+ * <p>
+ * The attribute producers, the attribute release voters, the single sign-on voters and the post-authentication
+ * processors are each a shared list here plus a list on each protocol configurer. For a request, the entries of the
+ * protocol come first, followed by the shared ones. An entry that applies to all protocols belongs in the shared list.
+ * </p>
+ * <p>
+ * The chain also serves the authentication paths and the resume paths of the redirect providers. The resume paths are
+ * handled once for the whole server, and the flow continues in the protocol that the authentication was started for.
  * </p>
  * <p>
  * Every value is checked when the filter chain is built. Without Spring Boot, set up the chain like this:
@@ -138,8 +159,28 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   /** The requester acceptance check. */
   private RequesterAcceptance requesterAcceptance;
 
+  /** The shared attribute producers. */
+  private final List<AttributeProducer> attributeProducers = new ArrayList<>();
+
+  /** The shared attribute release voters. */
+  private final List<AttributeReleaseVoter> attributeReleaseVoters =
+      new ArrayList<>(List.of(new IncludeAllAttributeReleaseVoter()));
+
+  /** The shared single sign-on voters. */
+  private final List<SsoVoter> ssoVoters = new ArrayList<>();
+
+  /** The shared post-authentication processors. */
+  private final List<PostAuthenticationProcessor> postAuthenticationProcessors =
+      new ArrayList<>(List.of(new SwedenConnectPostAuthenticationProcessor()));
+
   /** The matcher for the endpoints of all protocols, assigned when the configurer is initialized. */
   private RequestMatcher endpointsMatcher;
+
+  /** The matcher for the authentication paths of the redirect providers, assigned when initialized. */
+  private RequestMatcher authnPathsMatcher;
+
+  /** The user authentication flow, assigned when the configurer is initialized. */
+  private UserAuthenticationFlow userAuthenticationFlow;
 
   /**
    * Applies the configurer to the supplied {@link HttpSecurity} object, and makes the filter chain match the endpoints
@@ -158,7 +199,9 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
     final RequestMatcher endpointsMatcher = configurer.getEndpointsMatcher();
     http
         .securityMatcher(endpointsMatcher)
-        .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+        .authorizeHttpRequests(authorize -> authorize
+            .requestMatchers(configurer.getAuthnPathsMatcher()).permitAll()
+            .anyRequest().authenticated())
         .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
         .securityContext(securityContext -> securityContext.requireExplicitSave(false))
         .with(configurer, Customizer.withDefaults());
@@ -406,6 +449,93 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   }
 
   /**
+   * Customizes the shared attribute producers. They run after the producers of the protocol, and the first producer to
+   * release an attribute wins. The list is empty by default.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer attributeProducers(
+      final @Nonnull Customizer<List<AttributeProducer>> customizer) {
+    customizer.customize(this.attributeProducers);
+    return this;
+  }
+
+  /**
+   * Gets the shared attribute producers. The list may be modified.
+   *
+   * @return the attribute producers
+   */
+  public @Nonnull List<AttributeProducer> getAttributeProducers() {
+    return this.attributeProducers;
+  }
+
+  /**
+   * Customizes the shared attribute release voters. They are asked after the voters of the protocol. The default is an
+   * {@link IncludeAllAttributeReleaseVoter}.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer attributeReleaseVoters(
+      final @Nonnull Customizer<List<AttributeReleaseVoter>> customizer) {
+    customizer.customize(this.attributeReleaseVoters);
+    return this;
+  }
+
+  /**
+   * Gets the shared attribute release voters. The list may be modified.
+   *
+   * @return the attribute release voters
+   */
+  public @Nonnull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
+    return this.attributeReleaseVoters;
+  }
+
+  /**
+   * Customizes the shared single sign-on voters. They are asked after the provider's own voters and the voters of the
+   * protocol. The list is empty by default.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer ssoVoters(final @Nonnull Customizer<List<SsoVoter>> customizer) {
+    customizer.customize(this.ssoVoters);
+    return this;
+  }
+
+  /**
+   * Gets the shared single sign-on voters. The list may be modified.
+   *
+   * @return the single sign-on voters
+   */
+  public @Nonnull List<SsoVoter> getSsoVoters() {
+    return this.ssoVoters;
+  }
+
+  /**
+   * Customizes the shared post-authentication processors. They run after the provider's own processors and the
+   * processors of the protocol. The default is a {@link SwedenConnectPostAuthenticationProcessor}.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer postAuthenticationProcessors(
+      final @Nonnull Customizer<List<PostAuthenticationProcessor>> customizer) {
+    customizer.customize(this.postAuthenticationProcessors);
+    return this;
+  }
+
+  /**
+   * Gets the shared post-authentication processors. The list may be modified.
+   *
+   * @return the post-authentication processors
+   */
+  public @Nonnull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
+    return this.postAuthenticationProcessors;
+  }
+
+  /**
    * Registers the configurer of a protocol. A protocol is offered by the server only when its configurer has been
    * registered. A configurer of the same type replaces a previously registered one.
    *
@@ -478,23 +608,68 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
     };
   }
 
+  /**
+   * Gets a {@link RequestMatcher} for the authentication paths of the redirect providers, which are open to everyone.
+   * It may be obtained before the configurer has been initialized, but it may only be used after that.
+   *
+   * @return a request matcher
+   */
+  public @Nonnull RequestMatcher getAuthnPathsMatcher() {
+    return request -> {
+      if (this.authnPathsMatcher == null) {
+        throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
+      }
+      return this.authnPathsMatcher.matches(request);
+    };
+  }
+
+  /**
+   * Gets the flow that hands processed requests to the authentication providers. Available once the configurer has
+   * been initialized.
+   *
+   * @return the user authentication flow
+   * @throws IllegalStateException if the configurer has not been initialized
+   */
+  public @Nonnull UserAuthenticationFlow getUserAuthenticationFlow() {
+    if (this.userAuthenticationFlow == null) {
+      throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
+    }
+    return this.userAuthenticationFlow;
+  }
+
   /** {@inheritDoc} */
   @Override
   public void init(final @Nonnull HttpSecurity http) {
     this.validate();
+    this.userAuthenticationFlow = new UserAuthenticationFlow(this.authenticationProviders);
 
     final List<RequestMatcher> matchers = new ArrayList<>();
     for (final AbstractProtocolConfigurer<?> protocol : this.protocols.values()) {
       protocol.doInit(http);
       matchers.add(protocol.getRequestMatcher());
     }
+    final List<RequestMatcher> authnPathMatchers = new ArrayList<>();
+    for (final UserRedirectAuthenticationProvider provider : this.userAuthenticationFlow.getRedirectProviders()) {
+      authnPathMatchers.add(PathPatternRequestMatcher.pathPattern(provider.getAuthnPath()));
+      matchers.add(PathPatternRequestMatcher.pathPattern(provider.getResumeAuthnPath()));
+      if (provider.getFlowRepository() instanceof final SessionBasedRedirectAuthenticationRepository repository) {
+        repository.setMaxAge(this.authnFlowMaxAge);
+      }
+    }
+    matchers.addAll(authnPathMatchers);
+    this.authnPathsMatcher = authnPathMatchers.isEmpty() ? request -> false : new OrRequestMatcher(authnPathMatchers);
     this.endpointsMatcher = matchers.isEmpty() ? request -> false : new OrRequestMatcher(matchers);
     this.activeClientRegistry = this.createClientRegistry();
 
     for (final UserAuthenticationProvider provider : this.authenticationProviders) {
       if (provider instanceof final AbstractUserAuthenticationProvider p) {
         p.setServerSsoPolicy(this.ssoPolicy);
-        this.protocols.values().forEach(c -> p.setServerSsoPolicy(c.getProtocol(), c.getProtocolSsoPolicy()));
+        for (final AbstractProtocolConfigurer<?> c : this.protocols.values()) {
+          p.setServerSsoPolicy(c.getProtocol(), c.getProtocolSsoPolicy());
+          p.setServerSsoVoters(c.getProtocol(), combine(c.getSsoVoters(), this.ssoVoters));
+          p.setServerPostAuthenticationProcessors(c.getProtocol(),
+              combine(c.getPostAuthenticationProcessors(), this.postAuthenticationProcessors));
+        }
       }
     }
     if (this.protocols.isEmpty()) {
@@ -506,6 +681,31 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   @Override
   public void configure(final @Nonnull HttpSecurity http) {
     this.protocols.values().forEach(p -> p.configure(http));
+
+    final List<ResumedAuthenticationHandler> handlers = this.protocols.values().stream()
+        .map(AbstractProtocolConfigurer::getResumedAuthenticationHandler)
+        .filter(Objects::nonNull)
+        .toList();
+    final List<UserRedirectAuthenticationProvider> redirectProviders =
+        this.getUserAuthenticationFlow().getRedirectProviders();
+    if (!redirectProviders.isEmpty()) {
+      http.addFilterAfter(this.postProcess(new UserAuthenticationResumeFilter(redirectProviders, handlers)),
+          ExceptionTranslationFilter.class);
+    }
+  }
+
+  /**
+   * Combines the entries of a protocol with the shared ones, the protocol's first.
+   *
+   * @param protocolEntries the entries of the protocol
+   * @param sharedEntries the shared entries
+   * @param <E> the type of the entries
+   * @return a new list
+   */
+  static @Nonnull <E> List<E> combine(final @Nonnull List<E> protocolEntries, final @Nonnull List<E> sharedEntries) {
+    final List<E> combined = new ArrayList<>(protocolEntries);
+    combined.addAll(sharedEntries);
+    return combined;
   }
 
   /**

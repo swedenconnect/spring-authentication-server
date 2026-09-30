@@ -37,6 +37,7 @@ import jakarta.annotation.Nonnull;
 import jakarta.servlet.Filter;
 
 import java.nio.charset.StandardCharsets;
+import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -240,8 +241,35 @@ class Saml2AuthnRequestProcessingTest extends OpenSamlTestBase {
     final RequestHttpObject<AuthnRequest> request = generate(knownSpMetadata,
         idpMetadata("/saml2/hok/redirect/authn", "/saml2/post/authn"), SP_CREDENTIAL, REDIRECT_BINDING, r -> {});
 
-    final UserAuthenticationInputToken token = this.process(request);
-    assertThat(((Saml2AuthnRequestData) token.getProtocolRequestData()).holderOfKey()).isTrue();
+    final MockHttpServletRequest httpRequest = toHttpRequest(request);
+    httpRequest.setAttribute(Saml2AuthnRequestAuthenticationConverter.CLIENT_CERTIFICATE_ATTRIBUTE,
+        new X509Certificate[] { OTHER_CREDENTIAL.getCertificate() });
+    this.send(httpRequest);
+    assertThat(RESULT.get()).isNotNull();
+    final Saml2AuthnRequestData data = (Saml2AuthnRequestData) RESULT.get().getProtocolRequestData();
+    assertThat(data.holderOfKey()).isTrue();
+    assertThat(data.holderOfKeyCertificate()).isEqualTo(OTHER_CREDENTIAL.getCertificate());
+  }
+
+  @Test
+  void aHolderOfKeyRequestWithoutAClientCertificateGetsAnErrorResponse() throws Exception {
+    this.start(spMetadata(sp -> {}), c -> {});
+    final RequestHttpObject<AuthnRequest> request = generate(knownSpMetadata,
+        idpMetadata("/saml2/hok/redirect/authn", "/saml2/post/authn"), SP_CREDENTIAL, REDIRECT_BINDING, r -> {});
+    assertErrorResponse(this.send(toHttpRequest(request)), request, StatusCode.RESPONDER, StatusCode.AUTHN_FAILED);
+  }
+
+  @Test
+  void aClientCertificateOnAnOrdinaryEndpointIsIgnored() throws Exception {
+    this.start(spMetadata(sp -> {}), c -> {});
+    final MockHttpServletRequest httpRequest =
+        toHttpRequest(generate(knownSpMetadata, idp(), SP_CREDENTIAL, REDIRECT_BINDING, r -> {}));
+    httpRequest.setAttribute(Saml2AuthnRequestAuthenticationConverter.CLIENT_CERTIFICATE_ATTRIBUTE,
+        new X509Certificate[] { OTHER_CREDENTIAL.getCertificate() });
+    this.send(httpRequest);
+    final Saml2AuthnRequestData data = (Saml2AuthnRequestData) RESULT.get().getProtocolRequestData();
+    assertThat(data.holderOfKey()).isFalse();
+    assertThat(data.holderOfKeyCertificate()).isNull();
   }
 
   @Test

@@ -18,6 +18,7 @@ package se.swedenconnect.spring.authnserver.saml.authnrequest;
 import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -72,6 +73,9 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
 
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(Saml2AuthnRequestAuthenticationConverter.class);
+
+  /** The request attribute holding the certificates that the client presented in the TLS handshake. */
+  public static final String CLIENT_CERTIFICATE_ATTRIBUTE = "jakarta.servlet.request.X509Certificate";
 
   /** The default maximum age of a received message, 3 minutes. */
   public static final Duration DEFAULT_MAX_MESSAGE_AGE = Duration.ofMinutes(3);
@@ -163,6 +167,11 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
         SAMLBindingSupport.getRelayState(msgContext), bindingUri, this.holderOfKeyMatcher.matches(request));
     token.setMessageContext(msgContext);
     token.setHttpServletRequest(request);
+    if (token.isHolderOfKey()
+        && request.getAttribute(CLIENT_CERTIFICATE_ATTRIBUTE) instanceof final X509Certificate[] certificates
+        && certificates.length > 0) {
+      token.setClientCertificate(certificates[0]);
+    }
 
     final SAMLProtocolContext protocolContext = new SAMLProtocolContext();
     protocolContext.setProtocol(SAMLConstants.SAML20P_NS);

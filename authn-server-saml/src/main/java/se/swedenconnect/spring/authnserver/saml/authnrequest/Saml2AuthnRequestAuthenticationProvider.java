@@ -67,8 +67,9 @@ import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseAttributes
  * Validates a decoded authentication request and turns it into the protocol-neutral authentication requirements.
  * <p>
  * In this order: the replay check, the assertion consumer service, the signature, the check that assertions can be
- * encrypted, the requester acceptance, the {@code NameIDPolicy}, and finally the authentication requirements with the
- * requested attributes, the requested authentication contexts and the extensions.
+ * encrypted, the client certificate of a Holder-of-key request, the requester acceptance, the {@code NameIDPolicy},
+ * and finally the authentication requirements with the requested attributes, the requested authentication contexts
+ * and the extensions.
  * </p>
  * <p>
  * Failures before the assertion consumer service has been established are unrecoverable. Once it has been
@@ -193,6 +194,15 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
     this.signatureValidator.validate(token);
     this.encryptCapabilitiesValidator.validate(token);
 
+    // A Holder-of-key assertion is bound to the certificate of the TLS handshake ...
+    //
+    if (token.isHolderOfKey() && token.getClientCertificate() == null) {
+      log.info("No client certificate was presented on the Holder-of-key endpoint [{}]", token.getLogString());
+      throw new SamlErrorStatusException(SamlErrorStatus.HOLDER_OF_KEY_NO_CERTIFICATE,
+          SamlErrorStatus.HOLDER_OF_KEY_NO_CERTIFICATE_MESSAGE_CODE,
+          "No client certificate was presented on the Holder-of-key endpoint");
+    }
+
     // Is the Service Provider accepted?
     //
     final boolean accepted;
@@ -221,7 +231,7 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
 
     final Saml2AuthnRequestData requestData = new Saml2AuthnRequestData(
         new SerializableOpenSamlObject<>(token.getAuthnRequest()),
-        responseAttributes, token.isHolderOfKey(), nameIdGenerator);
+        responseAttributes, token.isHolderOfKey(), nameIdGenerator, token.getClientCertificate());
 
     // The OpenSAML context and the HTTP request are no longer needed ...
     //

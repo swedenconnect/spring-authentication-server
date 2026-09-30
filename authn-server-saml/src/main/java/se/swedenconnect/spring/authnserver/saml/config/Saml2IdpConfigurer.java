@@ -39,12 +39,18 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.opensaml.saml2.response.replay.MessageReplayChecker;
 import se.swedenconnect.opensaml.saml2.response.replay.MessageReplayCheckerImpl;
+import se.swedenconnect.opensaml.sweid.saml2.signservice.SADFactory;
 import se.swedenconnect.security.credential.PkiCredential;
+import se.swedenconnect.security.credential.opensaml.OpenSamlCredential;
+import se.swedenconnect.spring.authnserver.attributes.release.AttributeProducer;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.config.AbstractProtocolConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
+import se.swedenconnect.spring.authnserver.saml.attributes.SamlAttributeMapping;
+import se.swedenconnect.spring.authnserver.saml.attributes.release.SwedenConnectAttributeProducer;
+import se.swedenconnect.spring.authnserver.saml.attributes.release.SwedenConnectAttributeReleaseVoter;
 import se.swedenconnect.spring.authnserver.saml.attributes.requested.SamlRequestedAttributeResolver;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.AuthnContextResolver;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.DefaultSignMessageExtractor;
@@ -60,10 +66,16 @@ import se.swedenconnect.spring.authnserver.saml.metadata.MetadataSource;
 import se.swedenconnect.spring.authnserver.saml.metadata.SamlMetadataBackend;
 import se.swedenconnect.spring.authnserver.saml.nameid.DefaultNameIDGeneratorFactory;
 import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
+import se.swedenconnect.spring.authnserver.saml.response.Saml2AssertionBuilder;
 import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseBuilder;
 import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseSender;
+import se.swedenconnect.spring.authnserver.saml.response.Saml2UserAuthenticationResponder;
 import se.swedenconnect.spring.authnserver.saml.web.Saml2AuthnRequestProcessingFilter;
 import se.swedenconnect.spring.authnserver.saml.web.Saml2ErrorResponseProcessingFilter;
+import se.swedenconnect.spring.authnserver.saml.web.Saml2ResumedAuthenticationHandler;
+import se.swedenconnect.spring.authnserver.saml.web.Saml2UserAuthenticationProcessingFilter;
+import se.swedenconnect.spring.authnserver.web.ResumedAuthenticationHandler;
+import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
 
 /**
  * The protocol configurer for the SAML Identity Provider. Register it with the {@link AuthnServerConfigurer}.
@@ -80,6 +92,11 @@ import se.swedenconnect.spring.authnserver.saml.web.Saml2ErrorResponseProcessing
  * The Service Providers are found in the client registry. The configurer contributes a SAML metadata backend when
  * metadata sources or a metadata resolver have been assigned, and a SAML backend is required unless the client
  * registry has been assigned to the {@link AuthnServerConfigurer}.
+ * </p>
+ * <p>
+ * The SAML attribute producers default to a {@link SwedenConnectAttributeProducer}, and the SAML attribute release
+ * voters to a {@link SwedenConnectAttributeReleaseVoter}. Together with the shared defaults of the
+ * {@link AuthnServerConfigurer}, this gives the release rules of the Swedish eID Framework.
  * </p>
  *
  * @author Martin Lindström
@@ -159,6 +176,15 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
   /** Whether assertions are encrypted. */
   private boolean encryptAssertions = true;
 
+  /** How long an assertion is valid after it was issued. */
+  private Duration assertionNotOnOrAfter = Saml2AssertionBuilder.DEFAULT_NOT_ON_OR_AFTER;
+
+  /** How long before it was issued an assertion is valid. */
+  private Duration assertionNotBefore = Saml2AssertionBuilder.DEFAULT_NOT_BEFORE;
+
+  /** The mapping between generic attributes and SAML attributes. */
+  private SamlAttributeMapping attributeMapping;
+
   /** The mapping for minimum comparison of requested authentication contexts. */
   private Map<String, List<String>> authnContextMinimumMapping;
 
@@ -209,11 +235,16 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
   /** The matcher for the SAML endpoints. */
   private RequestMatcher requestMatcher;
 
+  /** Continues the SAML flow on the resume paths, created when the configurer is applied. */
+  private ResumedAuthenticationHandler resumedAuthenticationHandler;
+
   /**
    * Constructor.
    */
   public Saml2IdpConfigurer() {
     super(DEFAULT_PATH);
+    this.getAttributeProducers().add(new SwedenConnectAttributeProducer());
+    this.getAttributeReleaseVoters().add(new SwedenConnectAttributeReleaseVoter());
   }
 
   /** {@inheritDoc} */
@@ -578,6 +609,74 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
   }
 
   /**
+   * Assigns how long an assertion is valid after it was issued, which gives {@code NotOnOrAfter} of the conditions and
+   * of the subject confirmation. Defaults to {@link Saml2AssertionBuilder#DEFAULT_NOT_ON_OR_AFTER}.
+   *
+   * @param notOnOrAfter the duration
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer assertionNotOnOrAfter(final @Nonnull Duration notOnOrAfter) {
+    this.assertionNotOnOrAfter = Objects.requireNonNull(notOnOrAfter, "notOnOrAfter must not be null");
+    return this;
+  }
+
+  /**
+   * Assigns how long before it was issued an assertion is valid, which gives {@code NotBefore} of the conditions.
+   * Defaults to {@link Saml2AssertionBuilder#DEFAULT_NOT_BEFORE}.
+   *
+   * @param notBefore the duration
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer assertionNotBefore(final @Nonnull Duration notBefore) {
+    this.assertionNotBefore = Objects.requireNonNull(notBefore, "notBefore must not be null");
+    return this;
+  }
+
+  /**
+   * Gets how long an assertion is valid after it was issued.
+   *
+   * @return the duration
+   */
+  public @Nonnull Duration getAssertionNotOnOrAfter() {
+    return this.assertionNotOnOrAfter;
+  }
+
+  /**
+   * Gets how long before it was issued an assertion is valid.
+   *
+   * @return the duration
+   */
+  public @Nonnull Duration getAssertionNotBefore() {
+    return this.assertionNotBefore;
+  }
+
+  /**
+   * Assigns the mapping between generic attributes and SAML attributes, used when the released attributes are put in
+   * the assertion and when the requested attributes are worked out. Defaults to a {@link SamlAttributeMapping} with
+   * the built-in mappers.
+   *
+   * @param attributeMapping the mapping, or {@code null} for the default
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer attributeMapping(final @Nullable SamlAttributeMapping attributeMapping) {
+    this.attributeMapping = attributeMapping;
+    return this;
+  }
+
+  /**
+   * Gets the mapping between generic attributes and SAML attributes: the assigned one, or one with the built-in
+   * mappers. The default is created once.
+   *
+   * @return the mapping
+   */
+  public @Nonnull SamlAttributeMapping getAttributeMapping() {
+    if (this.attributeMapping == null) {
+      this.attributeMapping = new SamlAttributeMapping();
+    }
+    return this.attributeMapping;
+  }
+
+  /**
    * Assigns the mappings for the {@code minimum}, {@code better} and {@code maximum} comparisons of requested
    * authentication contexts, see {@link AuthnContextResolver}. A comparison without a mapping is not supported.
    *
@@ -766,6 +865,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
     if (components.getResponsePage() != null) {
       responseSender.setResponsePage(components.getResponsePage());
     }
+    responseBuilder.setEncryptAssertions(this.encryptAssertions);
     final Saml2ErrorResponseProcessingFilter errorFilter =
         new Saml2ErrorResponseProcessingFilter(this.authnRequestMatcher, responseBuilder, responseSender);
     http.addFilterAfter(this.postProcess(errorFilter), ExceptionTranslationFilter.class);
@@ -790,7 +890,8 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
         server.getRequesterAcceptance(),
         this.activeNameIdGeneratorFactory,
         Objects.requireNonNullElseGet(components.getRequestedAttributeResolver(),
-            () -> new SamlRequestedAttributeResolver(this.getDeclaredEntityCategories())),
+            () -> new SamlRequestedAttributeResolver(this.getAttributeMapping(),
+                SamlRequestedAttributeResolver.getDefaultProcessors(this.getDeclaredEntityCategories()))),
         authnContextResolver,
         Objects.requireNonNullElseGet(components.getSignMessageExtractor(),
             () -> new DefaultSignMessageExtractor(this.getEntityId(), this.getDecryptionCredentials())),
@@ -802,6 +903,36 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
       processingFilter.setSuccessHandler(components.getSuccessHandler());
     }
     http.addFilterAfter(this.postProcess(processingFilter), Saml2ErrorResponseProcessingFilter.class);
+
+    // User authentication and response ...
+    //
+    for (final AttributeProducer producer : this.getAttributeProducers()) {
+      if (producer instanceof final SwedenConnectAttributeProducer scProducer && scProducer.getSadFactory() == null) {
+        scProducer.setSadFactory(new SADFactory(this.getEntityId(),
+            new OpenSamlCredential(Objects.requireNonNull(this.getSignCredential()))));
+      }
+    }
+    final Saml2AssertionBuilder assertionBuilder = new Saml2AssertionBuilder(this.getEntityId(),
+        Objects.requireNonNull(this.getSignCredential()), this.createAttributeReleaseManager(),
+        this.getAttributeMapping());
+    assertionBuilder.setNotOnOrAfter(this.assertionNotOnOrAfter);
+    assertionBuilder.setNotBefore(this.assertionNotBefore);
+    assertionBuilder.setAssertionCustomizer(components.getAssertionCustomizer());
+
+    final UserAuthenticationFlow flow = server.getUserAuthenticationFlow();
+    final Saml2UserAuthenticationResponder responder =
+        new Saml2UserAuthenticationResponder(assertionBuilder, responseBuilder, responseSender, flow);
+    final Saml2UserAuthenticationProcessingFilter userAuthenticationFilter =
+        new Saml2UserAuthenticationProcessingFilter(this.authnRequestMatcher, flow, responder);
+    http.addFilterAfter(this.postProcess(userAuthenticationFilter), Saml2AuthnRequestProcessingFilter.class);
+
+    this.resumedAuthenticationHandler = new Saml2ResumedAuthenticationHandler(flow, responder);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected @Nullable ResumedAuthenticationHandler getResumedAuthenticationHandler() {
+    return this.resumedAuthenticationHandler;
   }
 
   /** {@inheritDoc} */
@@ -938,6 +1069,12 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
     }
     if (this.maxMessageAge.isNegative() || this.maxMessageAge.isZero()) {
       throw new IllegalArgumentException("SAML maximum message age must be positive");
+    }
+    if (this.assertionNotOnOrAfter.isNegative() || this.assertionNotOnOrAfter.isZero()) {
+      throw new IllegalArgumentException("SAML assertion not-after duration must be positive");
+    }
+    if (this.assertionNotBefore.isNegative()) {
+      throw new IllegalArgumentException("SAML assertion not-before duration must not be negative");
     }
     if (this.replayExpiration.isNegative() || this.replayExpiration.isZero()) {
       throw new IllegalArgumentException("SAML replay expiration must be positive");

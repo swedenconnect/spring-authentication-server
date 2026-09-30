@@ -43,6 +43,7 @@ import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationUse;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
+import se.swedenconnect.spring.authnserver.authentication.provider.SwedenConnectPostAuthenticationProcessor;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
@@ -194,6 +195,8 @@ class AbstractUserRedirectAuthenticationProviderTest {
   @Test
   void theResumedResultRunsThroughThePostAuthenticationProcessing() {
     final TestProvider provider = new TestProvider();
+    provider.setServerPostAuthenticationProcessors(AuthenticationProtocol.SAML,
+        List.of(new SwedenConnectPostAuthenticationProcessor()));
     final AuthenticationRequirements requirements = requirements(LOA3);
     requirements.setSignMessage(GenericSignMessage.ofText("sv", "Jag godkanner"));
     final RedirectForAuthenticationToken redirectToken =

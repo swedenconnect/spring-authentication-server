@@ -16,9 +16,11 @@
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.security.cert.X509Certificate;
 import java.util.Objects;
 
 import org.opensaml.saml.saml2.core.AuthnRequest;
@@ -38,11 +40,14 @@ import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseAttributes
  * @param responseAttributes where and how the response is sent
  * @param holderOfKey whether the request was received on a Holder-of-key endpoint
  * @param nameIdGenerator the generator for the {@code NameID} of the assertion
+ * @param holderOfKeyCertificate the certificate that the client presented on the Holder-of-key endpoint, which the
+ *     Holder-of-key subject confirmation is built from. {@code null} when the request was not a Holder-of-key request
  * @author Martin Lindström
  */
 public record Saml2AuthnRequestData(@Nonnull SerializableOpenSamlObject<AuthnRequest> authnRequest,
     @Nonnull Saml2ResponseAttributes responseAttributes, boolean holderOfKey,
-    @Nonnull NameIDGenerator nameIdGenerator) implements Serializable {
+    @Nonnull NameIDGenerator nameIdGenerator, @Nullable X509Certificate holderOfKeyCertificate)
+    implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -54,11 +59,19 @@ public record Saml2AuthnRequestData(@Nonnull SerializableOpenSamlObject<AuthnReq
    * @param responseAttributes where and how the response is sent
    * @param holderOfKey whether the request was received on a Holder-of-key endpoint
    * @param nameIdGenerator the generator for the {@code NameID} of the assertion
+   * @param holderOfKeyCertificate the client certificate for the Holder-of-key subject confirmation, required for a
+   *     Holder-of-key request and ignored otherwise
    */
   public Saml2AuthnRequestData {
     Objects.requireNonNull(authnRequest, "authnRequest must not be null");
     Objects.requireNonNull(responseAttributes, "responseAttributes must not be null");
     Objects.requireNonNull(nameIdGenerator, "nameIdGenerator must not be null");
+    if (holderOfKey) {
+      Objects.requireNonNull(holderOfKeyCertificate, "holderOfKeyCertificate must be set for Holder-of-key");
+    }
+    else {
+      holderOfKeyCertificate = null;
+    }
   }
 
   /**

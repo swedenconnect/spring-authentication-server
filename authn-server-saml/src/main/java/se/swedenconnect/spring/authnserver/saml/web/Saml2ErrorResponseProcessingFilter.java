@@ -34,7 +34,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
-import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatus;
 import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatusException;
 import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseAttributes;
 import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseBuilder;
@@ -104,8 +103,7 @@ public class Saml2ErrorResponseProcessingFilter extends OncePerRequestFilter {
           this.throwableAnalyzer.getFirstThrowableOfType(SamlErrorStatusException.class, causeChain);
       if (samlError == null && this.throwableAnalyzer.getFirstThrowableOfType(
           AuthenticationErrorException.class, causeChain) instanceof final AuthenticationErrorException authnError) {
-        samlError = new SamlErrorStatusException(SamlErrorStatus.of(authnError.getError()),
-            authnError.getMessageCode(), authnError.getDescription(), authnError);
+        samlError = SamlErrorStatusException.of(authnError);
       }
       if (samlError == null) {
         throw e;

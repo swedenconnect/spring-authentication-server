@@ -484,6 +484,52 @@ public class SamlConfigurationProperties {
     public void setEncrypt(final boolean encrypt) {
       this.encrypt = encrypt;
     }
+
+    /**
+     * How long an assertion is valid after it was issued ("not on or after"). Defaults to 5 minutes.
+     */
+    private Duration notAfter;
+
+    /**
+     * How long before it was issued an assertion is valid ("not before"). Defaults to 10 seconds.
+     */
+    private Duration notBefore;
+
+    /**
+     * Gets how long an assertion is valid after it was issued.
+     *
+     * @return the duration, or {@code null} for the default
+     */
+    public @Nullable Duration getNotAfter() {
+      return this.notAfter;
+    }
+
+    /**
+     * Assigns how long an assertion is valid after it was issued.
+     *
+     * @param notAfter the duration
+     */
+    public void setNotAfter(final @Nullable Duration notAfter) {
+      this.notAfter = notAfter;
+    }
+
+    /**
+     * Gets how long before it was issued an assertion is valid.
+     *
+     * @return the duration, or {@code null} for the default
+     */
+    public @Nullable Duration getNotBefore() {
+      return this.notBefore;
+    }
+
+    /**
+     * Assigns how long before it was issued an assertion is valid.
+     *
+     * @param notBefore the duration
+     */
+    public void setNotBefore(final @Nullable Duration notBefore) {
+      this.notBefore = notBefore;
+    }
   }
 
   /**

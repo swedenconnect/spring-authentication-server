@@ -22,15 +22,20 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 
+import net.shibboleth.shared.component.ComponentInitializationException;
 import net.shibboleth.shared.security.IdentifierGenerationStrategy;
 import net.shibboleth.shared.security.impl.RandomIdentifierGenerationStrategy;
 import org.opensaml.core.xml.util.XMLObjectSupport;
+import org.opensaml.saml.saml2.core.Assertion;
+import org.opensaml.saml.saml2.core.EncryptedAssertion;
 import org.opensaml.saml.saml2.core.Issuer;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.Status;
 import org.opensaml.saml.saml2.core.StatusCode;
 import org.opensaml.saml.saml2.core.StatusMessage;
 import org.opensaml.xmlsec.SecurityConfigurationSupport;
+import org.opensaml.xmlsec.encryption.EncryptedData;
+import org.opensaml.xmlsec.encryption.support.EncryptionException;
 import org.opensaml.xmlsec.signature.support.SignatureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +43,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.security.config.Customizer;
 import org.springframework.util.StringUtils;
 
+import se.swedenconnect.opensaml.xmlsec.encryption.support.SAMLObjectEncrypter;
 import se.swedenconnect.opensaml.xmlsec.signature.support.SAMLObjectSigner;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.opensaml.OpenSamlCredential;
@@ -46,7 +52,8 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatusException;
 
 /**
- * Builds and signs SAML responses.
+ * Builds and signs SAML responses: a success response carrying the assertion, encrypted for the Service Provider when
+ * assertions are to be encrypted, and error responses.
  *
  * @author Martin Lindström
  */
@@ -66,6 +73,12 @@ public class Saml2ResponseBuilder {
 
   /** Generates message IDs. */
   private IdentifierGenerationStrategy idGenerator = new RandomIdentifierGenerationStrategy();
+
+  /** Whether assertions are encrypted. */
+  private boolean encryptAssertions = false;
+
+  /** Encrypts assertions, created when assertions are to be encrypted. */
+  private SAMLObjectEncrypter encrypter;
 
   /** For resolving status messages, may be {@code null}. */
   private MessageSource messageSource;
@@ -117,6 +130,60 @@ public class Saml2ResponseBuilder {
     this.responseCustomizer.customize(response);
     this.signResponse(response, responseAttributes);
     return response;
+  }
+
+  /**
+   * Builds a signed success response holding the assertion. When assertions are encrypted, the assertion is encrypted
+   * for the Service Provider, with a key and the algorithms from its metadata.
+   *
+   * @param responseAttributes where and how the response is sent
+   * @param assertion the assertion
+   * @return a signed {@link Response}
+   * @throws UnrecoverableErrorException if the response cannot be built, encrypted or signed
+   */
+  public @Nonnull Response buildResponse(final @Nonnull Saml2ResponseAttributes responseAttributes,
+      final @Nonnull Assertion assertion) throws UnrecoverableErrorException {
+
+    final Status status = (Status) XMLObjectSupport.buildXMLObject(Status.DEFAULT_ELEMENT_NAME);
+    final StatusCode statusCode = (StatusCode) XMLObjectSupport.buildXMLObject(StatusCode.DEFAULT_ELEMENT_NAME);
+    statusCode.setValue(StatusCode.SUCCESS);
+    status.setStatusCode(statusCode);
+
+    final Response response = this.createResponse(responseAttributes, status);
+    if (this.encryptAssertions) {
+      response.getEncryptedAssertions().add(this.encryptAssertion(assertion, responseAttributes));
+    }
+    else {
+      response.getAssertions().add(assertion);
+    }
+    this.responseCustomizer.customize(response);
+    this.signResponse(response, responseAttributes);
+    return response;
+  }
+
+  /**
+   * Encrypts the assertion for the Service Provider.
+   *
+   * @param assertion the assertion
+   * @param responseAttributes where and how the response is sent
+   * @return an {@link EncryptedAssertion}
+   * @throws UnrecoverableErrorException if the assertion cannot be encrypted
+   */
+  protected @Nonnull EncryptedAssertion encryptAssertion(final @Nonnull Assertion assertion,
+      final @Nonnull Saml2ResponseAttributes responseAttributes) throws UnrecoverableErrorException {
+    try {
+      final EncryptedData encryptedData = this.getEncrypter().encrypt(assertion,
+          new SAMLObjectEncrypter.Peer(responseAttributes.getPeerMetadata()));
+      final EncryptedAssertion encryptedAssertion =
+          (EncryptedAssertion) XMLObjectSupport.buildXMLObject(EncryptedAssertion.DEFAULT_ELEMENT_NAME);
+      encryptedAssertion.setEncryptedData(encryptedData);
+      return encryptedAssertion;
+    }
+    catch (final EncryptionException e) {
+      log.error("Failed to encrypt Assertion - {} [entity-id: '{}', authn-request: '{}']", e.getMessage(),
+          responseAttributes.getEntityId(), responseAttributes.inResponseTo(), e);
+      throw new UnrecoverableErrorException(CommonUnrecoverableError.INTERNAL, "Failed to encrypt Assertion", e);
+    }
   }
 
   /**
@@ -178,6 +245,32 @@ public class Saml2ResponseBuilder {
       }
     }
     return error.getDescription();
+  }
+
+  /**
+   * Assigns whether assertions are encrypted. Defaults to {@code false}.
+   *
+   * @param encryptAssertions whether assertions are encrypted
+   */
+  public void setEncryptAssertions(final boolean encryptAssertions) {
+    this.encryptAssertions = encryptAssertions;
+  }
+
+  /**
+   * Gets the encrypter, creating it the first time.
+   *
+   * @return the encrypter
+   */
+  private @Nonnull SAMLObjectEncrypter getEncrypter() {
+    if (this.encrypter == null) {
+      try {
+        this.encrypter = new SAMLObjectEncrypter();
+      }
+      catch (final ComponentInitializationException e) {
+        throw new UnrecoverableErrorException(CommonUnrecoverableError.INTERNAL, "Failed to initialize encrypter", e);
+      }
+    }
+    return this.encrypter;
   }
 
   /**

@@ -19,15 +19,24 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import se.swedenconnect.spring.authnserver.attributes.release.AttributeProducer;
+import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseManager;
+import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseVoter;
+import se.swedenconnect.spring.authnserver.attributes.release.DefaultAttributeReleaseManager;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.authentication.provider.PostAuthenticationProcessor;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
+import se.swedenconnect.spring.authnserver.sso.SsoVoter;
+import se.swedenconnect.spring.authnserver.web.ResumedAuthenticationHandler;
 
 /**
  * Base class for the configurer of one protocol, such as the SAML Identity Provider or the OpenID Provider. A protocol
@@ -41,6 +50,11 @@ import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
  * An endpoint is normally given relative to the protocol path, and its URL is the base URL, the protocol path and the
  * endpoint. A protocol that needs an endpoint directly under the base URL uses
  * {@link AuthnServerConfigurer#getBaseUrl()} for it.
+ * </p>
+ * <p>
+ * The configurer also holds the protocol's own attribute producers, attribute release voters, single sign-on voters
+ * and post-authentication processors. For a request made with the protocol, they come before the shared ones of the
+ * {@link AuthnServerConfigurer}.
  * </p>
  *
  * @param <T> the type of the configurer
@@ -68,6 +82,18 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
 
   /** The protocol's subject identifier hash algorithm, or {@code null} to use the shared one. */
   private String subjectIdentifierHashAlgorithm;
+
+  /** The protocol's attribute producers. */
+  private final List<AttributeProducer> attributeProducers = new ArrayList<>();
+
+  /** The protocol's attribute release voters. */
+  private final List<AttributeReleaseVoter> attributeReleaseVoters = new ArrayList<>();
+
+  /** The protocol's single sign-on voters. */
+  private final List<SsoVoter> ssoVoters = new ArrayList<>();
+
+  /** The protocol's post-authentication processors. */
+  private final List<PostAuthenticationProcessor> postAuthenticationProcessors = new ArrayList<>();
 
   /**
    * Constructor.
@@ -210,6 +236,118 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
     return this.subjectIdentifierHashAlgorithm != null
         ? this.subjectIdentifierHashAlgorithm
         : this.getServer().getSubjectIdentifierHashAlgorithm();
+  }
+
+  /**
+   * Customizes the protocol's attribute producers. They run before the shared producers, and the first producer to
+   * release an attribute wins.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull T attributeProducers(final @Nonnull Customizer<List<AttributeProducer>> customizer) {
+    customizer.customize(this.attributeProducers);
+    return this.self();
+  }
+
+  /**
+   * Gets the protocol's attribute producers. The list may be modified.
+   *
+   * @return the attribute producers
+   */
+  public @Nonnull List<AttributeProducer> getAttributeProducers() {
+    return this.attributeProducers;
+  }
+
+  /**
+   * Customizes the protocol's attribute release voters. They are asked before the shared voters.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull T attributeReleaseVoters(final @Nonnull Customizer<List<AttributeReleaseVoter>> customizer) {
+    customizer.customize(this.attributeReleaseVoters);
+    return this.self();
+  }
+
+  /**
+   * Gets the protocol's attribute release voters. The list may be modified.
+   *
+   * @return the attribute release voters
+   */
+  public @Nonnull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
+    return this.attributeReleaseVoters;
+  }
+
+  /**
+   * Customizes the protocol's single sign-on voters. They are asked after the provider's own voters and before the
+   * shared voters.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull T ssoVoters(final @Nonnull Customizer<List<SsoVoter>> customizer) {
+    customizer.customize(this.ssoVoters);
+    return this.self();
+  }
+
+  /**
+   * Gets the protocol's single sign-on voters. The list may be modified.
+   *
+   * @return the single sign-on voters
+   */
+  public @Nonnull List<SsoVoter> getSsoVoters() {
+    return this.ssoVoters;
+  }
+
+  /**
+   * Customizes the protocol's post-authentication processors. They run after the provider's own processors and before
+   * the shared processors.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull T postAuthenticationProcessors(
+      final @Nonnull Customizer<List<PostAuthenticationProcessor>> customizer) {
+    customizer.customize(this.postAuthenticationProcessors);
+    return this.self();
+  }
+
+  /**
+   * Gets the protocol's post-authentication processors. The list may be modified.
+   *
+   * @return the post-authentication processors
+   */
+  public @Nonnull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
+    return this.postAuthenticationProcessors;
+  }
+
+  /**
+   * Creates the {@link AttributeReleaseManager} for requests made with the protocol: the protocol's producers and
+   * voters, followed by the shared ones.
+   *
+   * @return an {@link AttributeReleaseManager}
+   * @throws IllegalArgumentException if there is no attribute producer at all
+   */
+  protected @Nonnull AttributeReleaseManager createAttributeReleaseManager() {
+    final List<AttributeProducer> producers =
+        AuthnServerConfigurer.combine(this.attributeProducers, this.getServer().getAttributeProducers());
+    if (producers.isEmpty()) {
+      throw new IllegalArgumentException("No attribute producer for %s - add one to the %s or the shared list"
+          .formatted(this.getProtocol(), this.getProtocol()));
+    }
+    return new DefaultAttributeReleaseManager(producers,
+        AuthnServerConfigurer.combine(this.attributeReleaseVoters, this.getServer().getAttributeReleaseVoters()));
+  }
+
+  /**
+   * Gets the handler that continues the protocol's flow when the user comes back from a module's own pages. Invoked
+   * after {@link #configure(HttpSecurity)}. The default is none.
+   *
+   * @return the handler, or {@code null} if the protocol does not handle resumed authentications
+   */
+  protected @Nullable ResumedAuthenticationHandler getResumedAuthenticationHandler() {
+    return null;
   }
 
   /**

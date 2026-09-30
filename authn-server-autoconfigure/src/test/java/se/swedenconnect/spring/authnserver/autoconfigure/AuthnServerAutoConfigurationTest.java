@@ -298,6 +298,8 @@ class AuthnServerAutoConfigurationTest {
         .withPropertyValues(
             "authn-server.saml.max-message-age=PT1M",
             "authn-server.saml.assertions.encrypt=false",
+            "authn-server.saml.assertions.not-after=PT10M",
+            "authn-server.saml.assertions.not-before=PT30S",
             "authn-server.saml.replay.expiration=PT10M",
             "authn-server.saml.replay.context=my-context",
             "authn-server.saml.authn-context.minimum-mappings.[http://id.elegnamnden.se/loa/1.0/loa3]"
@@ -309,6 +311,8 @@ class AuthnServerAutoConfigurationTest {
               CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(Saml2IdpConfigurer.class);
           assertThat(saml.getMaxMessageAge()).isEqualTo(Duration.ofMinutes(1));
           assertThat(saml.isEncryptAssertions()).isFalse();
+          assertThat(saml.getAssertionNotOnOrAfter()).isEqualTo(Duration.ofMinutes(10));
+          assertThat(saml.getAssertionNotBefore()).isEqualTo(Duration.ofSeconds(30));
         });
   }
 

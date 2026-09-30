@@ -89,6 +89,16 @@ public record SamlErrorStatus(@Nonnull String statusCode, @Nonnull String subSta
   public static final String ENCRYPT_NOT_POSSIBLE_MESSAGE_CODE = "authn-server.error.saml.no-encrypt-capabilities";
 
   /**
+   * The status reported when a request is received on a Holder-of-key endpoint without a client certificate. The
+   * Holder-of-Key Web Browser SSO Profile requires an error, but does not say which.
+   */
+  public static final SamlErrorStatus HOLDER_OF_KEY_NO_CERTIFICATE =
+      new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED);
+
+  /** The message code for {@link #HOLDER_OF_KEY_NO_CERTIFICATE}. */
+  public static final String HOLDER_OF_KEY_NO_CERTIFICATE_MESSAGE_CODE = "authn-server.error.saml.hok-no-certificate";
+
+  /**
    * Constructor.
    *
    * @param statusCode the main status code

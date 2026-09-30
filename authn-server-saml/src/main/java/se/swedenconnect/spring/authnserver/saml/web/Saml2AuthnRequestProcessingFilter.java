@@ -27,8 +27,6 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -43,8 +41,10 @@ import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAu
  * {@link Saml2AuthnRequestAuthenticationProvider}.
  * <p>
  * The result, a {@link se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken
- * UserAuthenticationInputToken}, is handed to an {@link AuthenticationSuccessHandler}. The default handler puts it in
- * the security context and continues the filter chain.
+ * UserAuthenticationInputToken}, is handed to an {@link AuthenticationSuccessHandler}. Without a handler, it is put
+ * in the request attribute {@link #INPUT_TOKEN_ATTRIBUTE} and the filter chain continues, so that
+ * {@link Saml2UserAuthenticationProcessingFilter} authenticates the user. The security context is left alone, since
+ * it holds the authentication that may be reused for single sign-on.
  * </p>
  *
  * @author Martin Lindström
@@ -53,6 +53,10 @@ public class Saml2AuthnRequestProcessingFilter extends OncePerRequestFilter {
 
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(Saml2AuthnRequestProcessingFilter.class);
+
+  /** The name of the request attribute that holds the processed request. */
+  public static final String INPUT_TOKEN_ATTRIBUTE =
+      Saml2AuthnRequestProcessingFilter.class.getPackageName() + ".UserAuthenticationInputToken";
 
   /** The matcher for the authentication endpoints. */
   private final RequestMatcher requestMatcher;
@@ -99,9 +103,7 @@ public class Saml2AuthnRequestProcessingFilter extends OncePerRequestFilter {
       this.successHandler.onAuthenticationSuccess(request, response, result);
       return;
     }
-    final SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-    securityContext.setAuthentication(result);
-    SecurityContextHolder.setContext(securityContext);
+    request.setAttribute(INPUT_TOKEN_ATTRIBUTE, result);
     filterChain.doFilter(request, response);
   }
 

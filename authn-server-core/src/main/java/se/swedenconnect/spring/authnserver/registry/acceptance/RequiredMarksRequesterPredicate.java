@@ -18,6 +18,8 @@ package se.swedenconnect.spring.authnserver.registry.acceptance;
 import jakarta.annotation.Nonnull;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -66,7 +68,7 @@ public class RequiredMarksRequesterPredicate implements RequesterPredicate {
       final @Nonnull Collection<? extends Collection<String>> groups) {
     this.protocol = Objects.requireNonNull(protocol, "protocol must not be null");
     this.groups = Objects.requireNonNull(groups, "groups must not be null").stream()
-        .map(Set::copyOf)
+        .map(g -> Collections.unmodifiableSet(new LinkedHashSet<>(g)))
         .toList();
     if (this.groups.stream().anyMatch(Set::isEmpty)) {
       throw new IllegalArgumentException("A group of required marks must not be empty");

@@ -124,7 +124,7 @@ wins over the shared one.
 | `authn-server.clock-skew` | The time that clocks of other parties may differ from the server clock. | 30 seconds | Yes |
 | `authn-server.supports-user-message` | Whether the server can display a user message sent by the requester. For SAML, see the [User Message Extension](https://docs.swedenconnect.se/technical-framework/updates/18_-_User_Message_Extension_in_SAML_Authentication_Requests.html). | `false` | Yes |
 | `authn-server.subject-identifier.*` | How subject identifiers are computed, see [Subject identifiers](#subject-identifiers). | See below | Yes |
-| `authn-server.authn-flow-max-age` | How long the server waits for the user to come back from an authentication module that has pages of its own. | 30 minutes | No |
+| `authn-server.authn-flow-max-age` | How long the server waits for the user to come back from an authentication module that has pages of its own. Applied to the session-based storage of every redirect provider. | 30 minutes | No |
 
 <a name="single-sign-on"></a>
 ### Single sign-on
@@ -191,6 +191,8 @@ The SAML properties are placed under `authn-server.saml`.
 | `metadata-providers[].*` | The sources of Service Provider metadata, see [Service Provider metadata](#sp-metadata). | Required |
 | `max-message-age` | The maximum age of a received authentication request. | 3 minutes |
 | `assertions.encrypt` | Whether assertions are encrypted, see [Request processing](#request-processing). | `true` |
+| `assertions.not-after` | How long an assertion is valid after it was issued. Gives `NotOnOrAfter` of the conditions and of the subject confirmation. Must be positive. | 5 minutes |
+| `assertions.not-before` | How long before it was issued an assertion is valid. Gives `NotBefore` of the conditions. | 10 seconds |
 | `authn-context.*` | How requested authentication contexts are resolved, see [Request processing](#request-processing). | Exact comparison only |
 | `replay.*` | The protection against replayed requests, see [Replay protection](#replay-protection). | See below |
 | `requester-acceptance.*` | Which Service Providers may use the Identity Provider, see [Requester acceptance](#requester-acceptance). | Every Service Provider |
@@ -495,6 +497,11 @@ AuthnServerConfigurerAdapter samlAdjustments() {
 
 The values are checked when the filter chain is built, after all adapters have been invoked.
 
+The attribute producers, the attribute release voters, the single sign-on voters and the post-authentication
+processors are also adjusted in an adapter, in the shared lists of the `AuthnServerConfigurer` or in the lists of a
+protocol configurer. How the lists work is described in
+[The SAML Identity Provider](saml-identity-provider.html#producers-voters-and-processors).
+
 <a name="using-the-configurers-without-spring-boot"></a>
 ## Using the configurers without Spring Boot
 
@@ -554,14 +561,15 @@ to `true`.
 | `saml.idp.max-message-age` | `authn-server.saml.max-message-age` | |
 | `saml.idp.authn-context.*` | `authn-server.saml.authn-context.*` | |
 | `saml.idp.assertions.encrypt` | `authn-server.saml.assertions.encrypt` | |
+| `saml.idp.assertions.not-after` | `authn-server.saml.assertions.not-after` | |
+| `saml.idp.assertions.not-before` | `authn-server.saml.assertions.not-before` | |
 | `saml.idp.replay.*` | `authn-server.saml.replay.*` | Only `memory` is supported as `type` for now, see [Replay protection](#replay-protection). |
 
 Endpoints that were moved away from `/saml2` are set up by changing `authn-server.saml.path`, if they share a prefix,
 or by giving each endpoint relative to an empty SAML path.
 
 The properties below are not yet available. They will be added, with the same structure, together with the features
-they configure: `saml.idp.assertions.not-before`, `saml.idp.assertions.not-after`, `saml.idp.session.*` and
-`saml.idp.audit.*`.
+they configure: `saml.idp.session.*` and `saml.idp.audit.*`.
 
 `Saml2ServiceProviderFilter` is replaced by [requester acceptance](#requester-acceptance), which works for both
 protocols. A filter bean becomes a `RequesterPredicate` for SAML, added in an adapter; a predicate reads the Service
@@ -574,6 +582,13 @@ saml-identity-provider library answered with `Responder` / `AuthnFailed`.
 the shared configurer instead of the SAML one. `configurer.protocol(Saml2IdpConfigurer.class, saml -> ...)` reaches
 the SAML configurer. The settings object, `IdentityProviderSettings`, no longer exists; each value is a method on its
 configurer.
+
+The lists of `Saml2UserAuthenticationConfigurer` move to the configurers. `attributeProducers`,
+`attributeReleaseVoters` and `postAuthenticationProcessors` exist both on the `AuthnServerConfigurer`, for entries that
+apply to all protocols, and on the `Saml2IdpConfigurer`, for SAML only. Single sign-on voters, which could only be
+added to a provider before, have the same two lists. `assertionCustomizer` moves to `Saml2IdpConfigurer.authnRequestProcessor(...)`, and
+the resume paths of the redirect providers no longer need to be registered, see
+[The SAML Identity Provider](saml-identity-provider.html#modules-with-pages-of-their-own).
 
 [AuthnServerConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/config/AuthnServerConfigurer.java
 [AuthnServerConfigurerAdapter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/config/AuthnServerConfigurerAdapter.java

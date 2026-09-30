@@ -20,6 +20,7 @@ import jakarta.annotation.Nullable;
 
 import java.util.Objects;
 
+import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Response;
 import org.springframework.context.MessageSource;
 import org.springframework.security.config.Customizer;
@@ -32,8 +33,8 @@ import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.Assertio
 import se.swedenconnect.spring.authnserver.saml.response.ResponsePage;
 
 /**
- * Configurer for the components that process SAML authentication requests and send error responses. Each component
- * has a default, built from the values of the {@link Saml2IdpConfigurer}; assign one here to replace it.
+ * Configurer for the components that process SAML authentication requests and send responses. Each component has a
+ * default, built from the values of the {@link Saml2IdpConfigurer}; assign one here to replace it.
  *
  * @author Martin Lindström
  */
@@ -59,6 +60,9 @@ public class Saml2AuthnRequestProcessorConfigurer {
 
   /** The customizer for responses. */
   private Customizer<Response> responseCustomizer;
+
+  /** The customizer for assertions. */
+  private Customizer<Assertion> assertionCustomizer;
 
   /** The handler of processed requests. */
   private AuthenticationSuccessHandler successHandler;
@@ -219,10 +223,31 @@ public class Saml2AuthnRequestProcessorConfigurer {
   }
 
   /**
+   * Assigns a customizer that gets each assertion when it has been built, before it is signed and encrypted.
+   *
+   * @param assertionCustomizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull Saml2AuthnRequestProcessorConfigurer assertionCustomizer(
+      final @Nullable Customizer<Assertion> assertionCustomizer) {
+    this.assertionCustomizer = assertionCustomizer;
+    return this;
+  }
+
+  /**
+   * Gets the assertion customizer.
+   *
+   * @return the customizer, or {@code null}
+   */
+  public @Nullable Customizer<Assertion> getAssertionCustomizer() {
+    return this.assertionCustomizer;
+  }
+
+  /**
    * Assigns the handler of processed requests, which gets the
    * {@link se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken
-   * UserAuthenticationInputToken}. Without one, the token is put in the security context and the filter chain
-   * continues.
+   * UserAuthenticationInputToken}. Without one, the filter chain continues and the user is authenticated. A handler
+   * replaces the authentication of the user, and is meant for tests and special cases.
    *
    * @param successHandler the handler
    * @return this configurer

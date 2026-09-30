@@ -252,6 +252,11 @@ Every released attribute is then put to the voters, in order:
 A manager created without voters uses `IncludeAllAttributeReleaseVoter`, which keeps everything the producers
 released.
 
+The server creates the manager for each protocol from the producers and voters of the configuration: the protocol's
+own followed by the shared ones. For SAML the defaults are `SwedenConnectAttributeProducer` and
+`SwedenConnectAttributeReleaseVoter`, followed by the shared `IncludeAllAttributeReleaseVoter`, see
+[Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
+
 ### The built-in producers
 
 `DefaultAttributeProducer` releases the user attributes that are among the requested attributes of the authentication

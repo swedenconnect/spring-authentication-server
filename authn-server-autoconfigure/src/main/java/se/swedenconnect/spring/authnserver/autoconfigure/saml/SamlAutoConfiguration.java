@@ -175,6 +175,12 @@ public class SamlAutoConfiguration {
       configurer.maxMessageAge(properties.getMaxMessageAge());
     }
     configurer.encryptAssertions(properties.getAssertions().isEncrypt());
+    if (properties.getAssertions().getNotAfter() != null) {
+      configurer.assertionNotOnOrAfter(properties.getAssertions().getNotAfter());
+    }
+    if (properties.getAssertions().getNotBefore() != null) {
+      configurer.assertionNotBefore(properties.getAssertions().getNotBefore());
+    }
     configurer.authnContextMappings(properties.getAuthnContext().getMinimumMappings(),
         properties.getAuthnContext().getBetterMappings(), properties.getAuthnContext().getMaximumMappings());
 

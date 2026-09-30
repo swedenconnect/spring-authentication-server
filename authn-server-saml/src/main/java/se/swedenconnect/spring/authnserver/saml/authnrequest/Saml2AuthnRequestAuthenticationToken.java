@@ -20,6 +20,7 @@ import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.Serial;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -58,6 +59,9 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
 
   /** Whether the request was received on a Holder-of-key endpoint. */
   private final boolean holderOfKey;
+
+  /** The certificate that the client presented in the TLS handshake, for Holder-of-key. */
+  private X509Certificate clientCertificate;
 
   /** The metadata of the Service Provider. */
   private SerializableOpenSamlObject<EntityDescriptor> peerMetadata;
@@ -150,6 +154,25 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    */
   public boolean isHolderOfKey() {
     return this.holderOfKey;
+  }
+
+  /**
+   * Gets the certificate that the client presented in the TLS handshake. It is only read for a request received on a
+   * Holder-of-key endpoint.
+   *
+   * @return the client certificate, or {@code null} if none was presented
+   */
+  public @Nullable X509Certificate getClientCertificate() {
+    return this.clientCertificate;
+  }
+
+  /**
+   * Assigns the certificate that the client presented in the TLS handshake.
+   *
+   * @param clientCertificate the client certificate
+   */
+  public void setClientCertificate(final @Nullable X509Certificate clientCertificate) {
+    this.clientCertificate = clientCertificate;
   }
 
   /**

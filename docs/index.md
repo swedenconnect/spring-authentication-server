@@ -49,9 +49,10 @@ The Spring Boot starters:
   record and its marks, the SAML metadata sources, the three OpenID Connect backends, and resolving clients through
   OpenID Federation with caching and trust marks on demand.
 
-- [The SAML Identity Provider](saml-identity-provider.html) - How authentication requests are received and processed,
-  which failures are answered to the Service Provider and which end at the Identity Provider, and how to replace
-  the processing components.
+- [The SAML Identity Provider](saml-identity-provider.html) - How a request flows from the Service Provider through
+  the authentication to the response: how requests are processed, how the provider is chosen, single sign-on and its
+  policies, modules with pages of their own, the producers, voters and processors and their order, what the response
+  holds, which failures are answered to the Service Provider, and how to replace the processing components.
 
 - [Configuration](configuration.html) - The properties of the auto-configuration, the URL layout of the server,
   adjusting the configuration in code, using the configurers without Spring Boot, and migrating the configuration of

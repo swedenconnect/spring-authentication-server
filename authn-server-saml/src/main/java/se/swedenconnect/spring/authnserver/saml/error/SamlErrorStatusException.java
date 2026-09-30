@@ -25,6 +25,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.security.core.AuthenticationException;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
+import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 
 /**
  * Thrown when the processing of a SAML request fails in a way that is reported back to the Service Provider as a
@@ -77,6 +78,17 @@ public class SamlErrorStatusException extends AuthenticationException {
     }
     this.status = Objects.requireNonNull(status, "status must not be null");
     this.statusMessageCode = Objects.requireNonNull(statusMessageCode, "statusMessageCode must not be null");
+  }
+
+  /**
+   * Creates the exception that reports an error of the authentication step to the Service Provider.
+   *
+   * @param error the error of the authentication step
+   * @return a {@link SamlErrorStatusException}
+   */
+  public static @Nonnull SamlErrorStatusException of(final @Nonnull AuthenticationErrorException error) {
+    return new SamlErrorStatusException(SamlErrorStatus.of(error.getError()), error.getMessageCode(),
+        error.getDescription(), error);
   }
 
   /**

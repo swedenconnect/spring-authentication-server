@@ -63,8 +63,13 @@ import se.swedenconnect.spring.authnserver.sso.SsoVoter;
  * </ol>
  * <p>
  * The result, whether it comes from single sign-on or from a new authentication, is given the requirements and the
- * protocol data of the request, its use is recorded, and the installed {@link PostAuthenticationProcessor}s are run on
- * it.
+ * protocol data of the request, its use is recorded, and the {@link PostAuthenticationProcessor}s are run on it.
+ * </p>
+ * <p>
+ * The single sign-on voters and the post-authentication processors are the provider's own, followed by those that the
+ * server configuration assigns for the protocol of the requester, see
+ * {@link #setServerSsoVoters(AuthenticationProtocol, List)} and
+ * {@link #setServerPostAuthenticationProcessors(AuthenticationProtocol, List)}.
  * </p>
  *
  * @author Martin Lindström
@@ -77,8 +82,16 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   /** The voters that decide single sign-on, asked in order. */
   private final List<SsoVoter> ssoVoters;
 
-  /** The processing that runs on a result. */
+  /** The provider's own processing that runs on a result. */
   private final List<PostAuthenticationProcessor> postAuthenticationProcessors;
+
+  /** The single sign-on voters of the server configuration, per protocol, asked after the provider's own. */
+  private final Map<AuthenticationProtocol, List<SsoVoter>> serverSsoVoters =
+      new EnumMap<>(AuthenticationProtocol.class);
+
+  /** The post-authentication processors of the server configuration, per protocol, run after the provider's own. */
+  private final Map<AuthenticationProtocol, List<PostAuthenticationProcessor>> serverPostAuthenticationProcessors =
+      new EnumMap<>(AuthenticationProtocol.class);
 
   /** The server default single sign-on policy. */
   private SsoPolicy serverSsoPolicy = SsoPolicy.defaultPolicy();
@@ -91,7 +104,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   private SsoPolicy ssoPolicy;
 
   /**
-   * Constructor installing the built-in single sign-on voters and post-authentication processing.
+   * Constructor installing the built-in single sign-on voters.
    */
   protected AbstractUserAuthenticationProvider() {
     this.ssoVoters = new ArrayList<>();
@@ -100,7 +113,6 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
     this.ssoVoters.add(new AuthnContextSsoVoter());
     this.ssoVoters.add(new RequestedAttributesSsoVoter());
     this.postAuthenticationProcessors = new ArrayList<>();
-    this.postAuthenticationProcessors.add(new SwedenConnectPostAuthenticationProcessor());
   }
 
   /** {@inheritDoc} */
@@ -155,7 +167,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * Decides whether the previous authentication may be reused.
    * <p>
    * The rules that always apply are checked first, and no policy or voter can turn them off. After that the voters are
-   * asked in order: one denial ends it, and at least one {@link SsoDecision#allow()} is needed.
+   * asked in order, the provider's own first and then those of the server configuration for the requester's protocol:
+   * one denial ends it, and at least one {@link SsoDecision#allow()} is needed.
    * </p>
    *
    * @param token what the provider is given
@@ -188,7 +201,9 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
     }
 
     boolean allowed = false;
-    for (final SsoVoter voter : this.ssoVoters) {
+    final List<SsoVoter> voters = new ArrayList<>(this.ssoVoters);
+    voters.addAll(this.serverSsoVoters.getOrDefault(token.getRequester().protocol(), List.of()));
+    for (final SsoVoter voter : voters) {
       final SsoDecision vote = voter.vote(previous, requirements, token.getRequester(), authnContextUris);
       if (vote.isDenied()) {
         return vote;
@@ -219,8 +234,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   }
 
   /**
-   * Gets the voters that decide single sign-on. The list is modifiable, so that an application can add voters of its
-   * own or remove a built-in one.
+   * Gets the provider's own voters that decide single sign-on. The list is modifiable, so that an application can add
+   * voters of its own or remove a built-in one. They are asked before the voters of the server configuration.
    *
    * @return the voters, in the order they are asked
    */
@@ -229,8 +244,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   }
 
   /**
-   * Gets the processing that runs on a result. The list is modifiable, so that an application can add processing of its
-   * own or remove a built-in one.
+   * Gets the provider's own processing that runs on a result. The list is modifiable and empty by default. The
+   * processors run before those of the server configuration.
    *
    * @return the processors, in the order they are run
    */
@@ -298,6 +313,32 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   }
 
   /**
+   * Assigns the single sign-on voters of the server configuration for one protocol. They are asked after the provider's
+   * own voters, for requests made with that protocol.
+   *
+   * @param protocol the protocol
+   * @param voters the voters, or {@code null} for none
+   */
+  public void setServerSsoVoters(final @Nonnull AuthenticationProtocol protocol,
+      final @Nullable List<SsoVoter> voters) {
+    Objects.requireNonNull(protocol, "protocol must not be null");
+    this.serverSsoVoters.put(protocol, voters != null ? List.copyOf(voters) : List.of());
+  }
+
+  /**
+   * Assigns the post-authentication processors of the server configuration for one protocol. They run after the
+   * provider's own processors, for requests made with that protocol.
+   *
+   * @param protocol the protocol
+   * @param processors the processors, or {@code null} for none
+   */
+  public void setServerPostAuthenticationProcessors(final @Nonnull AuthenticationProtocol protocol,
+      final @Nullable List<PostAuthenticationProcessor> processors) {
+    Objects.requireNonNull(protocol, "protocol must not be null");
+    this.serverPostAuthenticationProcessors.put(protocol, processors != null ? List.copyOf(processors) : List.of());
+  }
+
+  /**
    * Gives the result what the rest of the server needs, records its use, and runs the post-authentication processing.
    *
    * @param authentication the result
@@ -312,7 +353,10 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
         token.getRequestId(), token.getAuthnRequirements().getRequestedAttributes().stream()
             .map(GenericRequestedAttribute::getIdentifier)
             .toList());
-    new DelegatingPostAuthenticationProcessor(this.postAuthenticationProcessors).process(authentication);
+    final List<PostAuthenticationProcessor> processors = new ArrayList<>(this.postAuthenticationProcessors);
+    processors.addAll(
+        this.serverPostAuthenticationProcessors.getOrDefault(token.getRequester().protocol(), List.of()));
+    new DelegatingPostAuthenticationProcessor(processors).process(authentication);
   }
 
   /**
