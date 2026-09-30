@@ -25,6 +25,7 @@ import jakarta.annotation.Nonnull;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -34,8 +35,14 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.authentication.provider.AbstractUserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
+import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
 import se.swedenconnect.spring.authnserver.subject.AbstractSubjectIdentifierGenerator;
 
@@ -322,6 +329,82 @@ class AuthnServerConfigurerTest {
   @Test
   void anUnregisteredProtocolConfigurerHasNoServer() {
     assertThatIllegalStateException().isThrownBy(() -> new TestProtocolConfigurer().getServer());
+  }
+
+  @Test
+  void theClientRegistryIsBuiltFromTheBackends() throws Exception {
+    final RequesterRecord record = new RequesterRecord(
+        new Requester(AuthenticationProtocol.SAML, "https://sp"), List.of(), List.of(), Set.of(), "md");
+    final AuthnServerConfigurer configurer = new AuthnServerConfigurer().baseUrl(BASE_URL)
+        .clientRegistryBackend(backend(record));
+    assertThatIllegalStateException().isThrownBy(configurer::getClientRegistry);
+
+    configurer.init(mock(HttpSecurity.class));
+    assertThat(configurer.getClientRegistry().lookup(AuthenticationProtocol.SAML, "https://sp")).isSameAs(record);
+    assertThat(configurer.getClientRegistry().lookup(AuthenticationProtocol.SAML, "https://other")).isNull();
+  }
+
+  @Test
+  void anAssignedClientRegistryIsUsed() {
+    final ClientRegistry registry = mock(ClientRegistry.class);
+    final AuthnServerConfigurer configurer = new AuthnServerConfigurer().baseUrl(BASE_URL)
+        .clientRegistry(registry)
+        .protocol(new BackendRequiringProtocolConfigurer());
+    configurer.init(mock(HttpSecurity.class));
+    assertThat(configurer.getClientRegistry()).isSameAs(registry);
+  }
+
+  @Test
+  void aProtocolThatNeedsABackendFailsWithoutOne() {
+    final AuthnServerConfigurer configurer = new AuthnServerConfigurer().baseUrl(BASE_URL)
+        .protocol(new BackendRequiringProtocolConfigurer());
+    assertThatIllegalArgumentException().isThrownBy(() -> configurer.init(mock(HttpSecurity.class)))
+        .withMessageContaining("No client registry backend for SAML requesters");
+
+    configurer.clientRegistryBackend(backend(null));
+    configurer.init(mock(HttpSecurity.class));
+  }
+
+  @Test
+  void theRequesterAcceptanceDefaultsToAcceptAll() {
+    final AuthnServerConfigurer configurer = new AuthnServerConfigurer();
+    assertThat(configurer.getRequesterAcceptance()).isSameAs(RequesterAcceptance.acceptAll());
+
+    final ConfigurableRequesterAcceptance configurable = configurer.configurableRequesterAcceptance();
+    assertThat(configurer.configurableRequesterAcceptance()).isSameAs(configurable);
+    assertThat(configurer.getRequesterAcceptance()).isSameAs(configurable);
+
+    configurer.requesterAcceptance((record, registry) -> false);
+    assertThatIllegalStateException().isThrownBy(configurer::configurableRequesterAcceptance);
+  }
+
+  /** A protocol configurer that needs a client registry backend. */
+  static class BackendRequiringProtocolConfigurer extends TestProtocolConfigurer {
+
+    @Override
+    protected boolean requiresClientRegistryBackend() {
+      return true;
+    }
+  }
+
+  private static ClientRegistryBackend backend(final RequesterRecord record) {
+    return new ClientRegistryBackend() {
+
+      @Override
+      public @Nonnull String getName() {
+        return "test";
+      }
+
+      @Override
+      public @Nonnull AuthenticationProtocol getProtocol() {
+        return AuthenticationProtocol.SAML;
+      }
+
+      @Override
+      public RequesterRecord lookup(final @Nonnull String identifier) {
+        return record != null && record.getIdentifier().equals(identifier) ? record : null;
+      }
+    };
   }
 
   private static MockHttpServletRequest request(final String path) {

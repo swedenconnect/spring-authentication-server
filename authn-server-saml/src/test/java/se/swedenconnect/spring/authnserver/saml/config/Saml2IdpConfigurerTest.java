@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.saml.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import jakarta.servlet.Filter;
 
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.common.xml.SAMLConstants;
+import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.saml.saml2.metadata.EntityDescriptor;
 import org.opensaml.saml.saml2.metadata.SingleSignOnService;
 import org.springframework.context.annotation.Bean;
@@ -66,7 +68,8 @@ class Saml2IdpConfigurerTest extends OpenSamlTestBase {
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
           .baseUrl(BASE_URL)
           .protocol(new Saml2IdpConfigurer()
-              .defaultCredential(TestCredentials.SIGN));
+              .defaultCredential(TestCredentials.SIGN)
+              .metadataResolver(mock(MetadataResolver.class)));
       AuthnServerConfigurer.applyDefaultSecurity(http, configurer);
       customizer.accept(configurer);
       return http.build();

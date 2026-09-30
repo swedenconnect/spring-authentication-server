@@ -22,6 +22,7 @@ import java.security.cert.X509Certificate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.opensaml.storage.ReplayCache;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -29,18 +30,26 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.ssl.SslBundles;
+import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
 import se.swedenconnect.opensaml.OpenSAMLInitializer;
 import se.swedenconnect.opensaml.OpenSAMLSecurityDefaultsConfig;
 import se.swedenconnect.opensaml.OpenSAMLSecurityExtensionConfig;
+import se.swedenconnect.opensaml.saml2.response.replay.MessageReplayChecker;
 import se.swedenconnect.opensaml.sweid.xmlsec.config.SwedishEidSecurityConfiguration;
 import se.swedenconnect.security.credential.PkiCredential;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConfigurerFactory;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
+import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequesterPredicate;
 import se.swedenconnect.spring.authnserver.saml.config.IdpMetadataElements;
 import se.swedenconnect.spring.authnserver.saml.config.Saml2IdpConfigurer;
+import se.swedenconnect.spring.authnserver.saml.metadata.MetadataSource;
 import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
 
 /**
@@ -48,7 +57,9 @@ import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
  * {@code authn-server.saml.enabled} is {@code true}.
  * <p>
  * It initializes OpenSAML, loads the credentials, and declares the factory that creates the
- * {@link Saml2IdpConfigurer} from the {@link SamlConfigurationProperties}.
+ * {@link Saml2IdpConfigurer} from the {@link SamlConfigurationProperties}. The requester acceptance rules of the
+ * properties are added to the server's {@link ConfigurableRequesterAcceptance}. A {@code ReplayCache} or a
+ * {@code MessageReplayChecker} bean replaces the in-memory replay protection.
  * </p>
  *
  * @author Martin Lindström
@@ -60,6 +71,9 @@ import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
 @EnableConfigurationProperties(SamlConfigurationProperties.class)
 @Import(SamlCredentialConfiguration.class)
 public class SamlAutoConfiguration {
+
+  /** The supported replay cache type. */
+  private static final String REPLAY_TYPE_MEMORY = "memory";
 
   /**
    * Initializes OpenSAML, which the SAML support needs.
@@ -88,6 +102,10 @@ public class SamlAutoConfiguration {
    * @param previousEncryptCredential the previous encryption credential
    * @param metadataSignCredential the metadata signing credential
    * @param nameIdGeneratorFactory the NameID generator factory, if declared as a bean
+   * @param sslBundles the SSL bundles, for HTTPS metadata sources
+   * @param messageSource the message source, for status messages
+   * @param replayCache a replay cache, if declared as a bean
+   * @param messageReplayChecker a replay checker, if declared as a bean
    * @return an {@link AuthnServerProtocolConfigurerFactory}
    */
   @Bean
@@ -103,9 +121,18 @@ public class SamlAutoConfiguration {
       final ObjectProvider<PkiCredential> previousEncryptCredential,
       @Qualifier(SamlCredentialConfiguration.METADATA_SIGN_CREDENTIAL)
       final ObjectProvider<PkiCredential> metadataSignCredential,
-      final ObjectProvider<NameIDGeneratorFactory> nameIdGeneratorFactory) {
+      final ObjectProvider<NameIDGeneratorFactory> nameIdGeneratorFactory,
+      final ObjectProvider<SslBundles> sslBundles,
+      final ObjectProvider<MessageSource> messageSource,
+      final ObjectProvider<ReplayCache> replayCache,
+      final ObjectProvider<MessageReplayChecker> messageReplayChecker) {
 
     return server -> createConfigurer(server, properties)
+        .sslBundles(sslBundles.getIfAvailable())
+        .replayCache(replayCache.getIfUnique())
+        .authnRequestProcessor(c -> c
+            .messageSource(messageSource.getIfAvailable())
+            .messageReplayChecker(messageReplayChecker.getIfUnique()))
         .defaultCredential(defaultCredential.getIfAvailable())
         .signCredential(signCredential.getIfAvailable())
         .futureSignCertificate(futureSignCertificate.getIfAvailable())
@@ -143,6 +170,32 @@ public class SamlAutoConfiguration {
     configurer.supportsUserMessage(properties.getSupportsUserMessage());
     configurer.subjectIdentifierSecret(properties.getSubjectIdentifier().getSecretBytes());
     configurer.subjectIdentifierHashAlgorithm(properties.getSubjectIdentifier().getHashAlgorithm());
+
+    if (properties.getMaxMessageAge() != null) {
+      configurer.maxMessageAge(properties.getMaxMessageAge());
+    }
+    configurer.encryptAssertions(properties.getAssertions().isEncrypt());
+    configurer.authnContextMappings(properties.getAuthnContext().getMinimumMappings(),
+        properties.getAuthnContext().getBetterMappings(), properties.getAuthnContext().getMaximumMappings());
+
+    final SamlConfigurationProperties.ReplayProperties replay = properties.getReplay();
+    if (replay.getType() != null && !REPLAY_TYPE_MEMORY.equalsIgnoreCase(replay.getType())) {
+      throw new IllegalArgumentException("Invalid value for %s.replay.type: '%s' - the supported value is '%s'"
+          .formatted(SamlConfigurationProperties.PREFIX, replay.getType(), REPLAY_TYPE_MEMORY));
+    }
+    if (replay.getExpiration() != null) {
+      configurer.replayExpiration(replay.getExpiration());
+    }
+    if (replay.getContext() != null) {
+      configurer.replayContext(replay.getContext());
+    }
+
+    if (properties.getMetadataProviders() != null) {
+      configurer.metadataSources(properties.getMetadataProviders().stream()
+          .map(SamlAutoConfiguration::toMetadataSource)
+          .toList());
+    }
+    applyRequesterAcceptance(server, properties.getRequesterAcceptance());
 
     final SamlConfigurationProperties.EndpointProperties endpoints = properties.getEndpoints();
     if (endpoints.getRedirectAuthn() != null) {
@@ -197,6 +250,65 @@ public class SamlAutoConfiguration {
       }
     });
     return configurer;
+  }
+
+  /**
+   * Adds the requester acceptance rules of the properties to the server's configurable requester acceptance. Nothing is
+   * done when no rule is assigned.
+   *
+   * @param server the shared configurer
+   * @param properties the requester acceptance properties
+   */
+  private static void applyRequesterAcceptance(final @Nonnull AuthnServerConfigurer server,
+      final @Nonnull SamlConfigurationProperties.RequesterAcceptanceProperties properties) {
+
+    final boolean hasWhitelist = properties.getWhitelist() != null && !properties.getWhitelist().isEmpty();
+    final boolean hasMarks = properties.getRequiredMarks() != null && !properties.getRequiredMarks().isEmpty();
+    if (!hasWhitelist && !hasMarks && properties.getMode() == null) {
+      return;
+    }
+    final ConfigurableRequesterAcceptance acceptance = server.configurableRequesterAcceptance();
+    if (properties.getMode() != null) {
+      acceptance.mode(AuthenticationProtocol.SAML, properties.getMode());
+    }
+    if (hasWhitelist) {
+      acceptance.addPredicate(new WhitelistRequesterPredicate(AuthenticationProtocol.SAML, properties.getWhitelist()));
+    }
+    if (hasMarks) {
+      acceptance.addPredicate(
+          new RequiredMarksRequesterPredicate(AuthenticationProtocol.SAML, properties.getRequiredMarks()));
+    }
+  }
+
+  /**
+   * Maps the properties of a metadata provider.
+   *
+   * @param properties the properties
+   * @return a {@link MetadataSource}
+   */
+  private static @Nonnull MetadataSource toMetadataSource(
+      final @Nonnull SamlConfigurationProperties.MetadataProviderProperties properties) {
+    if (properties.getLocation() == null) {
+      throw new IllegalArgumentException(
+          "Missing location for %s.metadata-providers[]".formatted(SamlConfigurationProperties.PREFIX));
+    }
+    MetadataSource.HttpProxy proxy = null;
+    if (properties.getHttpProxy() != null) {
+      final SamlConfigurationProperties.MetadataProviderProperties.HttpProxy p = properties.getHttpProxy();
+      if (p.getHost() == null || p.getPort() == null) {
+        throw new IllegalArgumentException("Invalid HTTP proxy configuration for metadata source "
+            + properties.getLocation() + " - host and port must be assigned");
+      }
+      proxy = new MetadataSource.HttpProxy(p.getHost(), p.getPort(), p.getUserName(), p.getPassword());
+    }
+    return MetadataSource.builder(properties.getLocation())
+        .httpsTrustBundle(properties.getHttpsTrustBundle())
+        .skipHostnameVerification(properties.isSkipHostnameVerification())
+        .backupLocation(properties.getBackupLocation())
+        .mdq(properties.isMdq())
+        .validationCertificate(properties.getValidationCertificate())
+        .httpProxy(proxy)
+        .build();
   }
 
   /**

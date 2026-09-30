@@ -18,6 +18,7 @@ package se.swedenconnect.spring.authnserver.autoconfigure.saml;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
+import java.io.File;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.io.Resource;
 
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SsoProperties;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SubjectIdentifierProperties;
 import se.swedenconnect.spring.authnserver.saml.config.IdpMetadataElements.ContactPersonType;
@@ -102,6 +104,37 @@ public class SamlConfigurationProperties {
    * The metadata that the Identity Provider publishes.
    */
   private final MetadataProperties metadata = new MetadataProperties();
+
+  /**
+   * The maximum age of a received authentication request. Defaults to 3 minutes.
+   */
+  private Duration maxMessageAge;
+
+  /**
+   * How requested authentication contexts with other comparison methods than exact are resolved.
+   */
+  private final AuthnContextProperties authnContext = new AuthnContextProperties();
+
+  /**
+   * Assertion settings.
+   */
+  private final AssertionProperties assertions = new AssertionProperties();
+
+  /**
+   * The protection against replayed authentication requests.
+   */
+  private final ReplayProperties replay = new ReplayProperties();
+
+  /**
+   * The sources of Service Provider metadata.
+   */
+  private List<MetadataProviderProperties> metadataProviders;
+
+  /**
+   * Which Service Providers may use the Identity Provider. When nothing is assigned, every Service Provider is
+   * accepted.
+   */
+  private final RequesterAcceptanceProperties requesterAcceptance = new RequesterAcceptanceProperties();
 
   /**
    * Gets whether the SAML Identity Provider is enabled.
@@ -272,6 +305,603 @@ public class SamlConfigurationProperties {
    */
   public @Nonnull MetadataProperties getMetadata() {
     return this.metadata;
+  }
+
+  /**
+   * Gets the maximum message age.
+   *
+   * @return the maximum message age
+   */
+  public @Nullable Duration getMaxMessageAge() {
+    return this.maxMessageAge;
+  }
+
+  /**
+   * Assigns the maximum message age.
+   *
+   * @param maxMessageAge the maximum message age
+   */
+  public void setMaxMessageAge(final @Nullable Duration maxMessageAge) {
+    this.maxMessageAge = maxMessageAge;
+  }
+
+  /**
+   * Gets the authentication context properties.
+   *
+   * @return the authentication context properties
+   */
+  public @Nonnull AuthnContextProperties getAuthnContext() {
+    return this.authnContext;
+  }
+
+  /**
+   * Gets the assertion properties.
+   *
+   * @return the assertion properties
+   */
+  public @Nonnull AssertionProperties getAssertions() {
+    return this.assertions;
+  }
+
+  /**
+   * Gets the replay properties.
+   *
+   * @return the replay properties
+   */
+  public @Nonnull ReplayProperties getReplay() {
+    return this.replay;
+  }
+
+  /**
+   * Gets the metadata providers.
+   *
+   * @return the metadata providers
+   */
+  public @Nullable List<MetadataProviderProperties> getMetadataProviders() {
+    return this.metadataProviders;
+  }
+
+  /**
+   * Assigns the metadata providers.
+   *
+   * @param metadataProviders the metadata providers
+   */
+  public void setMetadataProviders(final @Nullable List<MetadataProviderProperties> metadataProviders) {
+    this.metadataProviders = metadataProviders;
+  }
+
+  /**
+   * Gets the requester acceptance properties.
+   *
+   * @return the requester acceptance properties
+   */
+  public @Nonnull RequesterAcceptanceProperties getRequesterAcceptance() {
+    return this.requesterAcceptance;
+  }
+
+  /**
+   * Configuration properties for resolving requested authentication contexts.
+   */
+  public static class AuthnContextProperties {
+
+    /**
+     * Maps each URI to the URIs that it means for minimum comparison. Minimum comparison is not supported unless
+     * assigned.
+     */
+    private Map<String, List<String>> minimumMappings;
+
+    /**
+     * Maps each URI to the URIs that it means for better comparison. Better comparison is not supported unless
+     * assigned.
+     */
+    private Map<String, List<String>> betterMappings;
+
+    /**
+     * Maps each URI to the URIs that it means for maximum comparison. Maximum comparison is not supported unless
+     * assigned.
+     */
+    private Map<String, List<String>> maximumMappings;
+
+    /**
+     * Gets the minimum mappings.
+     *
+     * @return the minimum mappings
+     */
+    public @Nullable Map<String, List<String>> getMinimumMappings() {
+      return this.minimumMappings;
+    }
+
+    /**
+     * Assigns the minimum mappings.
+     *
+     * @param minimumMappings the minimum mappings
+     */
+    public void setMinimumMappings(final @Nullable Map<String, List<String>> minimumMappings) {
+      this.minimumMappings = minimumMappings;
+    }
+
+    /**
+     * Gets the better mappings.
+     *
+     * @return the better mappings
+     */
+    public @Nullable Map<String, List<String>> getBetterMappings() {
+      return this.betterMappings;
+    }
+
+    /**
+     * Assigns the better mappings.
+     *
+     * @param betterMappings the better mappings
+     */
+    public void setBetterMappings(final @Nullable Map<String, List<String>> betterMappings) {
+      this.betterMappings = betterMappings;
+    }
+
+    /**
+     * Gets the maximum mappings.
+     *
+     * @return the maximum mappings
+     */
+    public @Nullable Map<String, List<String>> getMaximumMappings() {
+      return this.maximumMappings;
+    }
+
+    /**
+     * Assigns the maximum mappings.
+     *
+     * @param maximumMappings the maximum mappings
+     */
+    public void setMaximumMappings(final @Nullable Map<String, List<String>> maximumMappings) {
+      this.maximumMappings = maximumMappings;
+    }
+  }
+
+  /**
+   * Configuration properties for assertions.
+   */
+  public static class AssertionProperties {
+
+    /**
+     * Whether assertions are encrypted. Defaults to true.
+     */
+    private boolean encrypt = true;
+
+    /**
+     * Gets whether assertions are encrypted.
+     *
+     * @return whether assertions are encrypted
+     */
+    public boolean isEncrypt() {
+      return this.encrypt;
+    }
+
+    /**
+     * Assigns whether assertions are encrypted.
+     *
+     * @param encrypt whether assertions are encrypted
+     */
+    public void setEncrypt(final boolean encrypt) {
+      this.encrypt = encrypt;
+    }
+  }
+
+  /**
+   * Configuration properties for the replay protection.
+   */
+  public static class ReplayProperties {
+
+    /**
+     * The type of replay cache. The supported value is "memory". Defaults to "memory".
+     */
+    private String type;
+
+    /**
+     * For how long the IDs of received requests are kept. Defaults to 5 minutes.
+     */
+    private Duration expiration;
+
+    /**
+     * The context under which the IDs are stored. Defaults to "idp-replay-checker".
+     */
+    private String context;
+
+    /**
+     * Gets the replay cache type.
+     *
+     * @return the replay cache type
+     */
+    public @Nullable String getType() {
+      return this.type;
+    }
+
+    /**
+     * Assigns the replay cache type.
+     *
+     * @param type the replay cache type
+     */
+    public void setType(final @Nullable String type) {
+      this.type = type;
+    }
+
+    /**
+     * Gets the expiration time.
+     *
+     * @return the expiration time
+     */
+    public @Nullable Duration getExpiration() {
+      return this.expiration;
+    }
+
+    /**
+     * Assigns the expiration time.
+     *
+     * @param expiration the expiration time
+     */
+    public void setExpiration(final @Nullable Duration expiration) {
+      this.expiration = expiration;
+    }
+
+    /**
+     * Gets the replay cache context.
+     *
+     * @return the replay cache context
+     */
+    public @Nullable String getContext() {
+      return this.context;
+    }
+
+    /**
+     * Assigns the replay cache context.
+     *
+     * @param context the replay cache context
+     */
+    public void setContext(final @Nullable String context) {
+      this.context = context;
+    }
+  }
+
+  /**
+   * Configuration properties for a source of Service Provider metadata.
+   */
+  public static class MetadataProviderProperties {
+
+    /**
+     * The location of the metadata. A URL, a file or a classpath resource.
+     */
+    private Resource location;
+
+    /**
+     * For an HTTPS location, the name of the SSL bundle that gives the trusted certificates. Defaults to the Java
+     * trust store.
+     */
+    private String httpsTrustBundle;
+
+    /**
+     * For an HTTPS location, whether hostname verification is skipped. For testing only.
+     */
+    private boolean skipHostnameVerification = false;
+
+    /**
+     * For a URL location, where downloaded metadata is backed up. For MDQ, a directory.
+     */
+    private File backupLocation;
+
+    /**
+     * For a URL location, whether the MDQ protocol is used.
+     */
+    private boolean mdq = false;
+
+    /**
+     * The certificate that the metadata is validated with.
+     */
+    private X509Certificate validationCertificate;
+
+    /**
+     * For a URL location, an HTTP proxy.
+     */
+    private HttpProxy httpProxy;
+
+    /**
+     * Gets the location.
+     *
+     * @return the location
+     */
+    public @Nullable Resource getLocation() {
+      return this.location;
+    }
+
+    /**
+     * Assigns the location.
+     *
+     * @param location the location
+     */
+    public void setLocation(final @Nullable Resource location) {
+      this.location = location;
+    }
+
+    /**
+     * Gets the HTTPS trust bundle.
+     *
+     * @return the HTTPS trust bundle
+     */
+    public @Nullable String getHttpsTrustBundle() {
+      return this.httpsTrustBundle;
+    }
+
+    /**
+     * Assigns the HTTPS trust bundle.
+     *
+     * @param httpsTrustBundle the HTTPS trust bundle
+     */
+    public void setHttpsTrustBundle(final @Nullable String httpsTrustBundle) {
+      this.httpsTrustBundle = httpsTrustBundle;
+    }
+
+    /**
+     * Gets whether hostname verification is skipped.
+     *
+     * @return whether hostname verification is skipped
+     */
+    public boolean isSkipHostnameVerification() {
+      return this.skipHostnameVerification;
+    }
+
+    /**
+     * Assigns whether hostname verification is skipped.
+     *
+     * @param skipHostnameVerification whether hostname verification is skipped
+     */
+    public void setSkipHostnameVerification(final boolean skipHostnameVerification) {
+      this.skipHostnameVerification = skipHostnameVerification;
+    }
+
+    /**
+     * Gets the backup location.
+     *
+     * @return the backup location
+     */
+    public @Nullable File getBackupLocation() {
+      return this.backupLocation;
+    }
+
+    /**
+     * Assigns the backup location.
+     *
+     * @param backupLocation the backup location
+     */
+    public void setBackupLocation(final @Nullable File backupLocation) {
+      this.backupLocation = backupLocation;
+    }
+
+    /**
+     * Gets whether MDQ is used.
+     *
+     * @return whether MDQ is used
+     */
+    public boolean isMdq() {
+      return this.mdq;
+    }
+
+    /**
+     * Assigns whether MDQ is used.
+     *
+     * @param mdq whether MDQ is used
+     */
+    public void setMdq(final boolean mdq) {
+      this.mdq = mdq;
+    }
+
+    /**
+     * Gets the validation certificate.
+     *
+     * @return the validation certificate
+     */
+    public @Nullable X509Certificate getValidationCertificate() {
+      return this.validationCertificate;
+    }
+
+    /**
+     * Assigns the validation certificate.
+     *
+     * @param validationCertificate the validation certificate
+     */
+    public void setValidationCertificate(final @Nullable X509Certificate validationCertificate) {
+      this.validationCertificate = validationCertificate;
+    }
+
+    /**
+     * Gets the HTTP proxy.
+     *
+     * @return the HTTP proxy
+     */
+    public @Nullable HttpProxy getHttpProxy() {
+      return this.httpProxy;
+    }
+
+    /**
+     * Assigns the HTTP proxy.
+     *
+     * @param httpProxy the HTTP proxy
+     */
+    public void setHttpProxy(final @Nullable HttpProxy httpProxy) {
+      this.httpProxy = httpProxy;
+    }
+
+    /**
+     * Configuration properties for an HTTP proxy.
+     */
+    public static class HttpProxy {
+
+      /**
+       * The proxy host.
+       */
+      private String host;
+
+      /**
+       * The proxy port.
+       */
+      private Integer port;
+
+      /**
+       * The proxy user name.
+       */
+      private String userName;
+
+      /**
+       * The proxy password.
+       */
+      private String password;
+
+      /**
+       * Gets the proxy host.
+       *
+       * @return the proxy host
+       */
+      public @Nullable String getHost() {
+        return this.host;
+      }
+
+      /**
+       * Assigns the proxy host.
+       *
+       * @param host the proxy host
+       */
+      public void setHost(final @Nullable String host) {
+        this.host = host;
+      }
+
+      /**
+       * Gets the proxy port.
+       *
+       * @return the proxy port
+       */
+      public @Nullable Integer getPort() {
+        return this.port;
+      }
+
+      /**
+       * Assigns the proxy port.
+       *
+       * @param port the proxy port
+       */
+      public void setPort(final @Nullable Integer port) {
+        this.port = port;
+      }
+
+      /**
+       * Gets the proxy user name.
+       *
+       * @return the proxy user name
+       */
+      public @Nullable String getUserName() {
+        return this.userName;
+      }
+
+      /**
+       * Assigns the proxy user name.
+       *
+       * @param userName the proxy user name
+       */
+      public void setUserName(final @Nullable String userName) {
+        this.userName = userName;
+      }
+
+      /**
+       * Gets the proxy password.
+       *
+       * @return the proxy password
+       */
+      public @Nullable String getPassword() {
+        return this.password;
+      }
+
+      /**
+       * Assigns the proxy password.
+       *
+       * @param password the proxy password
+       */
+      public void setPassword(final @Nullable String password) {
+        this.password = password;
+      }
+    }
+  }
+
+  /**
+   * Configuration properties for requester acceptance.
+   */
+  public static class RequesterAcceptanceProperties {
+
+    /**
+     * How the rules are combined: ALL (every rule must accept) or ANY (one accepting rule is enough). Defaults to
+     * ALL.
+     */
+    private ConfigurableRequesterAcceptance.Mode mode;
+
+    /**
+     * The entityIDs of the accepted Service Providers.
+     */
+    private List<String> whitelist;
+
+    /**
+     * Groups of entity categories. Every group must be satisfied, and a group is satisfied by any one of its entity
+     * categories.
+     */
+    private List<List<String>> requiredMarks;
+
+    /**
+     * Gets the combination mode.
+     *
+     * @return the combination mode
+     */
+    public @Nullable ConfigurableRequesterAcceptance.Mode getMode() {
+      return this.mode;
+    }
+
+    /**
+     * Assigns the combination mode.
+     *
+     * @param mode the combination mode
+     */
+    public void setMode(final @Nullable ConfigurableRequesterAcceptance.Mode mode) {
+      this.mode = mode;
+    }
+
+    /**
+     * Gets the whitelist.
+     *
+     * @return the whitelist
+     */
+    public @Nullable List<String> getWhitelist() {
+      return this.whitelist;
+    }
+
+    /**
+     * Assigns the whitelist.
+     *
+     * @param whitelist the whitelist
+     */
+    public void setWhitelist(final @Nullable List<String> whitelist) {
+      this.whitelist = whitelist;
+    }
+
+    /**
+     * Gets the required mark groups.
+     *
+     * @return the required mark groups
+     */
+    public @Nullable List<List<String>> getRequiredMarks() {
+      return this.requiredMarks;
+    }
+
+    /**
+     * Assigns the required mark groups.
+     *
+     * @param requiredMarks the required mark groups
+     */
+    public void setRequiredMarks(final @Nullable List<List<String>> requiredMarks) {
+      this.requiredMarks = requiredMarks;
+    }
   }
 
   /**

@@ -50,7 +50,7 @@ class SamlErrorStatusTest {
     assertThat(SamlErrorStatus.of(AuthenticationError.NO_AUTHN_CONTEXT))
         .isEqualTo(new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.NO_AUTHN_CONTEXT));
     assertThat(SamlErrorStatus.of(AuthenticationError.NOT_AUTHORIZED))
-        .isEqualTo(new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED));
+        .isEqualTo(new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.REQUEST_DENIED));
   }
 
   @Test

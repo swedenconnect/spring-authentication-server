@@ -154,6 +154,9 @@ name found is the one used. Logotypes come from `mdui:UIInfo`. The marks are the
 Provider declares. The organisation number comes from the `mdorgext:OrganizationNumber` extension of
 `md:Organization`; a Service Provider without `md:Organization`, or without the extension, has none.
 
+The SAML configurer creates this backend from the metadata sources it is given, and with Spring Boot the sources are
+set with the `authn-server.saml.metadata-providers` properties, see [Configuration](configuration.html#sp-metadata).
+
 ## OpenID Connect: three backends
 
 The OpenID Connect side has three backends. They are asked in a configured order, and the default order is
@@ -278,10 +281,67 @@ if (record != null && record.hasMark(trustMarkType)) {
 
 For SAML, asking for a mark never finds anything. It gives the requester's record unchanged.
 
+<a name="requester-acceptance"></a>
+## Deciding which requesters may use the server
+
+Knowing a requester is not the same as accepting it. Once the requester has been found in the registry and its
+request has been verified, a [`RequesterAcceptance`][RequesterAcceptance] check decides whether it may use the server.
+A requester that is not accepted gets the error `NOT_AUTHORIZED`, answered to the requester as an error response. For
+SAML that is the status `Responder` / `RequestDenied`.
+
+The check sees the requester's record: the protocol-neutral part and the protocol metadata. Two implementations are
+supplied:
+
+- **Accept all**, `RequesterAcceptance.acceptAll()`. It is the default when nothing is configured.
+- **Configurable**, [`ConfigurableRequesterAcceptance`][ConfigurableRequesterAcceptance], which holds a set of
+  [`RequesterPredicate`][RequesterPredicate]s.
+
+Every predicate belongs to one protocol, and only the predicates of the requester's protocol are evaluated, so a rule
+for SAML Service Providers never affects an OpenID Connect client. Per protocol, the predicates are combined in one of
+two modes: `ALL`, the default, where every predicate must accept the requester, or `ANY`, where one accepting predicate
+is enough. A protocol with no predicates accepts every requester.
+
+Two predicates are built in:
+
+- [`WhitelistRequesterPredicate`][WhitelistRequesterPredicate] accepts the requesters of a list of identities: SAML
+  entityIDs or OpenID Connect `client_id`s.
+- [`RequiredMarksRequesterPredicate`][RequiredMarksRequesterPredicate] requires marks, given as groups. Every group must
+  be satisfied, and a group is satisfied by any one of its marks, so `[[A, B], [C]]` means "A or B, and C". When a
+  group is not satisfied by the record, the predicate asks the registry for the missing marks, see
+  [Trust marks on demand](#trust-marks-on-demand), and evaluates the updated record before rejecting. For SAML nothing
+  is obtained this way, so the Service Provider metadata decides.
+
+With Spring Boot, the configurable check is set up from properties under each protocol's prefix, for SAML
+`authn-server.saml.requester-acceptance.*`, see [Configuration](configuration.html#requester-acceptance).
+
+A predicate of your own is added with an adapter. A predicate that reads protocol metadata gets it from the record in
+its own type:
+
+```java
+@Bean
+AuthnServerConfigurerAdapter onlySwedishOrganisations() {
+  return (http, configurer) -> configurer.configurableRequesterAcceptance().addPredicate(new RequesterPredicate() {
+
+    @Override
+    public AuthenticationProtocol getProtocol() {
+      return AuthenticationProtocol.SAML;
+    }
+
+    @Override
+    public boolean test(final RequesterRecord record, final ClientRegistry registry) {
+      return record.organizationNumber() != null;
+    }
+  });
+}
+```
+
+To replace the check altogether, assign another implementation with `configurer.requesterAcceptance(...)`.
+
 [ClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistry.java
 [ClientRegistryBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistryBackend.java
 [ClientRegistryException]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistryException.java
 [ClientRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ClientRepository.java
+[ConfigurableRequesterAcceptance]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/ConfigurableRequesterAcceptance.java
 [ConfigurationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ConfigurationClientBackend.java
 [DefaultClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/DefaultClientRegistry.java
 [FederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCache.java
@@ -296,10 +356,14 @@ For SAML, asking for a mark never finds anything. It gives the requester's recor
 [MetadataSource]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/MetadataSource.java
 [OidcClientRecord]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/OidcClientRecord.java
 [Requester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/Requester.java
+[RequesterAcceptance]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequesterAcceptance.java
+[RequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequesterPredicate.java
+[RequiredMarksRequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequiredMarksRequesterPredicate.java
 [RequesterRecord]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/RequesterRecord.java
 [RepositoryClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/RepositoryClientBackend.java
 [SamlMetadataBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/SamlMetadataBackend.java
 [TrustMarkRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/TrustMarkRequester.java
+[WhitelistRequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/WhitelistRequesterPredicate.java
 
 -----
 

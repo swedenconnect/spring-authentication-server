@@ -41,7 +41,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
     "authn-server.saml.credentials.default-credential.jks.store.password=secret",
     "authn-server.saml.credentials.default-credential.jks.store.type=PKCS12",
     "authn-server.saml.credentials.default-credential.jks.key.alias=sign",
-    "authn-server.saml.credentials.default-credential.jks.key.key-password=secret"
+    "authn-server.saml.credentials.default-credential.jks.key.key-password=secret",
+    "authn-server.saml.metadata-providers[0].location=classpath:metadata/sp-metadata.xml"
 })
 class StarterTest {
 

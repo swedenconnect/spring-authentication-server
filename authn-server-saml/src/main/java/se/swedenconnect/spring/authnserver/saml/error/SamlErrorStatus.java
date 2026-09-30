@@ -57,6 +57,37 @@ public record SamlErrorStatus(@Nonnull String statusCode, @Nonnull String subSta
   public static final SamlErrorStatus INVALID_NAMEID_POLICY =
       new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.INVALID_NAMEID_POLICY);
 
+  /** The status reported for an authentication request that is invalid or asks for something unsupported. */
+  public static final SamlErrorStatus INVALID_REQUEST =
+      new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.REQUEST_UNSUPPORTED);
+
+  /** The message code for {@link #INVALID_REQUEST}. */
+  public static final String INVALID_REQUEST_MESSAGE_CODE = "authn-server.error.saml.invalid-request";
+
+  /** The status reported for a {@code SignMessage} that cannot be decrypted or holds nothing to display. */
+  public static final SamlErrorStatus SIGN_MESSAGE_ERROR =
+      new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.REQUEST_UNSUPPORTED);
+
+  /** The message code for {@link #SIGN_MESSAGE_ERROR}. */
+  public static final String SIGN_MESSAGE_ERROR_MESSAGE_CODE = "authn-server.error.saml.sign-message";
+
+  /** The status reported for a {@code UserMessage} with a MIME type that is not supported. */
+  public static final SamlErrorStatus INVALID_USER_MESSAGE =
+      new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.REQUEST_UNSUPPORTED);
+
+  /** The message code for {@link #INVALID_USER_MESSAGE}. */
+  public static final String INVALID_USER_MESSAGE_MESSAGE_CODE = "authn-server.error.saml.invalid-user-message";
+
+  /**
+   * The status reported when assertions are to be encrypted, but the Service Provider metadata has no key to encrypt
+   * them for.
+   */
+  public static final SamlErrorStatus ENCRYPT_NOT_POSSIBLE =
+      new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.REQUEST_DENIED);
+
+  /** The message code for {@link #ENCRYPT_NOT_POSSIBLE}. */
+  public static final String ENCRYPT_NOT_POSSIBLE_MESSAGE_CODE = "authn-server.error.saml.no-encrypt-capabilities";
+
   /**
    * Constructor.
    *
@@ -81,8 +112,9 @@ public record SamlErrorStatus(@Nonnull String statusCode, @Nonnull String subSta
   public static @Nonnull SamlErrorStatus of(final @Nonnull AuthenticationError error) {
     Objects.requireNonNull(error, "error must not be null");
     return switch (error) {
-      case AUTHN_FAILED, SIGN_MESSAGE_NOT_DISPLAYED, NOT_AUTHORIZED ->
+      case AUTHN_FAILED, SIGN_MESSAGE_NOT_DISPLAYED ->
           new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED);
+      case NOT_AUTHORIZED -> new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.REQUEST_DENIED);
       case CANCEL -> new SamlErrorStatus(StatusCode.RESPONDER, CANCEL);
       case FRAUD -> new SamlErrorStatus(StatusCode.RESPONDER, FRAUD);
       case POSSIBLE_FRAUD -> new SamlErrorStatus(StatusCode.RESPONDER, POSSIBLE_FRAUD);

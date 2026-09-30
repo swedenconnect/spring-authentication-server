@@ -66,6 +66,13 @@ import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlCredentialConf
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
 import se.swedenconnect.spring.authnserver.saml.config.Saml2IdpConfigurer;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
+import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterPredicate;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
+import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequesterPredicate;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
 
 /**
@@ -79,6 +86,8 @@ class AuthnServerAutoConfigurationTest {
 
   private static final String CREDENTIALS = "authn-server.saml.credentials.";
 
+  private static final String SP_ONE = "https://sp-one.example.com";
+
   private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
       .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
           ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, AuthnServerAutoConfiguration.class));
@@ -90,7 +99,8 @@ class AuthnServerAutoConfigurationTest {
       CREDENTIALS + "default-credential.jks.store.password=secret",
       CREDENTIALS + "default-credential.jks.store.type=PKCS12",
       CREDENTIALS + "default-credential.jks.key.alias=sign",
-      CREDENTIALS + "default-credential.jks.key.key-password=secret"
+      CREDENTIALS + "default-credential.jks.key.key-password=secret",
+      "authn-server.saml.metadata-providers[0].location=classpath:metadata/sp-metadata.xml"
   };
 
   /** A provider for checking the single sign-on policies. */
@@ -128,6 +138,27 @@ class AuthnServerAutoConfigurationTest {
     @Order(10)
     AuthnServerConfigurerAdapter captureAdapter() {
       return (http, configurer) -> CONFIGURER.set(configurer);
+    }
+  }
+
+  /** Adds a predicate that rejects every SAML requester, through an adapter. */
+  @Configuration
+  static class PredicateConfiguration {
+
+    @Bean
+    AuthnServerConfigurerAdapter predicateAdapter() {
+      return (http, configurer) -> configurer.configurableRequesterAcceptance().addPredicate(new RequesterPredicate() {
+
+        @Override
+        public @Nonnull AuthenticationProtocol getProtocol() {
+          return AuthenticationProtocol.SAML;
+        }
+
+        @Override
+        public boolean test(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry) {
+          return false;
+        }
+      });
     }
   }
 
@@ -182,6 +213,103 @@ class AuthnServerAutoConfigurationTest {
     this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.saml.enabled=true")
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("Missing SAML signing credential"));
+
+    final String[] withoutMetadata = java.util.Arrays.copyOf(SAML, SAML.length - 1);
+    this.runner.withPropertyValues(withoutMetadata)
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause().hasMessageContaining("No client registry backend for SAML requesters"));
+  }
+
+  @Test
+  void theSpMetadataSourcesAreWiredIntoTheClientRegistry() {
+    this.runner.withPropertyValues(SAML)
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final AuthnServerConfigurer configurer = CaptureConfiguration.CONFIGURER.get();
+          assertThat(configurer.getClientRegistry().lookup(AuthenticationProtocol.SAML, SP_ONE)).isNotNull();
+          assertThat(configurer.getClientRegistry().lookup(AuthenticationProtocol.SAML, "https://unknown")).isNull();
+        });
+  }
+
+  @Test
+  void withoutAcceptancePropertiesEverySpIsAccepted() {
+    this.runner.withPropertyValues(SAML)
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          final AuthnServerConfigurer configurer = CaptureConfiguration.CONFIGURER.get();
+          assertThat(configurer.getRequesterAcceptance()).isSameAs(RequesterAcceptance.acceptAll());
+        });
+  }
+
+  @Test
+  void theAcceptancePropertiesGiveTheSamlPredicates() {
+    this.runner.withPropertyValues(SAML)
+        .withPropertyValues(
+            "authn-server.saml.requester-acceptance.mode=ANY",
+            "authn-server.saml.requester-acceptance.whitelist[0]=https://other.example.com",
+            "authn-server.saml.requester-acceptance.required-marks[0][0]="
+                + "http://id.elegnamnden.se/ec/1.0/eidas-naturalperson",
+            "authn-server.saml.requester-acceptance.required-marks[0][1]=http://id.elegnamnden.se/ec/1.0/loa4-pnr")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final AuthnServerConfigurer configurer = CaptureConfiguration.CONFIGURER.get();
+          final ConfigurableRequesterAcceptance acceptance = configurer.configurableRequesterAcceptance();
+          assertThat(acceptance.getMode(AuthenticationProtocol.SAML))
+              .isEqualTo(ConfigurableRequesterAcceptance.Mode.ANY);
+          assertThat(acceptance.getPredicates()).hasSize(2);
+          assertThat(acceptance.getPredicates().get(0)).isInstanceOfSatisfying(WhitelistRequesterPredicate.class,
+              p -> assertThat(p.getIdentifiers()).containsExactly("https://other.example.com"));
+          assertThat(acceptance.getPredicates().get(1)).isInstanceOfSatisfying(RequiredMarksRequesterPredicate.class,
+              p -> assertThat(p.getGroups()).hasSize(1));
+
+          final RequesterRecord record =
+              configurer.getClientRegistry().lookup(AuthenticationProtocol.SAML, SP_ONE);
+          assertThat(acceptance.isAccepted(record, configurer.getClientRegistry())).isFalse();
+        });
+  }
+
+  @Test
+  void aCustomPredicateAddedThroughAnAdapterTakesEffect() {
+    this.runner.withPropertyValues(SAML)
+        .withUserConfiguration(CaptureConfiguration.class, PredicateConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final AuthnServerConfigurer configurer = CaptureConfiguration.CONFIGURER.get();
+          final RequesterRecord record =
+              configurer.getClientRegistry().lookup(AuthenticationProtocol.SAML, SP_ONE);
+          assertThat(configurer.getRequesterAcceptance().isAccepted(record, configurer.getClientRegistry()))
+              .isFalse();
+        });
+  }
+
+  @Test
+  void anUnsupportedReplayTypeFailsStartup() {
+    this.runner.withPropertyValues(SAML)
+        .withPropertyValues("authn-server.saml.replay.type=redis")
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause().hasMessageContaining("authn-server.saml.replay.type"));
+  }
+
+  @Test
+  void theRequestProcessingPropertiesAreApplied() {
+    this.runner.withPropertyValues(SAML)
+        .withPropertyValues(
+            "authn-server.saml.max-message-age=PT1M",
+            "authn-server.saml.assertions.encrypt=false",
+            "authn-server.saml.replay.expiration=PT10M",
+            "authn-server.saml.replay.context=my-context",
+            "authn-server.saml.authn-context.minimum-mappings.[http://id.elegnamnden.se/loa/1.0/loa3]"
+                + "=http://id.elegnamnden.se/loa/1.0/loa3,http://id.elegnamnden.se/loa/1.0/loa4")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final Saml2IdpConfigurer saml =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(Saml2IdpConfigurer.class);
+          assertThat(saml.getMaxMessageAge()).isEqualTo(Duration.ofMinutes(1));
+          assertThat(saml.isEncryptAssertions()).isFalse();
+        });
   }
 
   @Test

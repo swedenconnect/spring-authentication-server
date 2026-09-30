@@ -34,6 +34,7 @@ import javax.xml.namespace.QName;
 
 import org.junit.jupiter.api.Test;
 import org.opensaml.saml.common.xml.SAMLConstants;
+import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.saml.ext.saml2alg.DigestMethod;
 import org.opensaml.saml.ext.saml2alg.SigningMethod;
 import org.opensaml.saml.ext.saml2mdattr.EntityAttributes;
@@ -433,7 +434,8 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
   }
 
   private static void init(final Saml2IdpConfigurer saml) {
-    new AuthnServerConfigurer().baseUrl(BASE_URL).protocol(saml).init(mock(HttpSecurity.class));
+    new AuthnServerConfigurer().baseUrl(BASE_URL).protocol(saml.metadataResolver(mock(MetadataResolver.class)))
+        .init(mock(HttpSecurity.class));
   }
 
   private static EntityDescriptor descriptor(final AuthnServerConfigurer server, final Saml2IdpConfigurer saml,
@@ -449,7 +451,7 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
       customizer.accept(m);
       metadata[0] = m;
     });
-    server.protocol(saml).init(mock(HttpSecurity.class));
+    server.protocol(saml.metadataResolver(mock(MetadataResolver.class))).init(mock(HttpSecurity.class));
     return metadata[0].createEntityDescriptorContainer();
   }
 

@@ -39,9 +39,17 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.authentication.provider.AbstractUserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.SessionBasedRedirectAuthenticationRepository;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
+import se.swedenconnect.spring.authnserver.registry.DefaultClientRegistry;
+import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
 import se.swedenconnect.spring.authnserver.subject.AbstractSubjectIdentifierGenerator;
 
@@ -77,6 +85,20 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   /** The default clock skew, 30 seconds. */
   public static final Duration DEFAULT_CLOCK_SKEW = Duration.ofSeconds(30);
 
+  /** A client registry that knows no requesters, for a server without any backends. */
+  private static final ClientRegistry EMPTY_CLIENT_REGISTRY = new ClientRegistry() {
+
+    @Override
+    public @Nullable RequesterRecord lookup(final @Nonnull Requester requester) {
+      return null;
+    }
+
+    @Override
+    public @Nullable RequesterRecord requestMark(final @Nonnull Requester requester, final @Nonnull String mark) {
+      return null;
+    }
+  };
+
   /** The base URL: protocol, host and context path. */
   private String baseUrl;
 
@@ -103,6 +125,18 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /** The protocol configurers, keyed by their type. */
   private final Map<Class<?>, AbstractProtocolConfigurer<?>> protocols = new LinkedHashMap<>();
+
+  /** The client registry, if assigned by the application. */
+  private ClientRegistry clientRegistry;
+
+  /** Client registry backends added by the application, on top of those of the protocol configurers. */
+  private final List<ClientRegistryBackend> clientRegistryBackends = new ArrayList<>();
+
+  /** The client registry that is used, assigned when the configurer is initialized. */
+  private ClientRegistry activeClientRegistry;
+
+  /** The requester acceptance check. */
+  private RequesterAcceptance requesterAcceptance;
 
   /** The matcher for the endpoints of all protocols, assigned when the configurer is initialized. */
   private RequestMatcher endpointsMatcher;
@@ -276,6 +310,82 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   }
 
   /**
+   * Assigns the client registry. When not assigned, a {@link DefaultClientRegistry} is created from the backends of
+   * the protocol configurers and those added with {@link #clientRegistryBackend(ClientRegistryBackend)}.
+   *
+   * @param clientRegistry the client registry, or {@code null} to create the default
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer clientRegistry(final @Nullable ClientRegistry clientRegistry) {
+    this.clientRegistry = clientRegistry;
+    return this;
+  }
+
+  /**
+   * Adds a client registry backend. The backends added here are asked before those of the protocol configurers. Not
+   * used if a client registry has been assigned with {@link #clientRegistry(ClientRegistry)}.
+   *
+   * @param backend the backend
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer clientRegistryBackend(final @Nonnull ClientRegistryBackend backend) {
+    this.clientRegistryBackends.add(Objects.requireNonNull(backend, "backend must not be null"));
+    return this;
+  }
+
+  /**
+   * Gets the client registry that the server uses. Available once the configurer has been initialized.
+   *
+   * @return the client registry
+   * @throws IllegalStateException if the configurer has not been initialized
+   */
+  public @Nonnull ClientRegistry getClientRegistry() {
+    if (this.activeClientRegistry == null) {
+      throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
+    }
+    return this.activeClientRegistry;
+  }
+
+  /**
+   * Assigns the check that decides whether a requester may use the server. When not assigned, every requester is
+   * accepted.
+   *
+   * @param requesterAcceptance the check, or {@code null} to accept every requester
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer requesterAcceptance(final @Nullable RequesterAcceptance requesterAcceptance) {
+    this.requesterAcceptance = requesterAcceptance;
+    return this;
+  }
+
+  /**
+   * Gets the check that decides whether a requester may use the server.
+   *
+   * @return the requester acceptance check
+   */
+  public @Nonnull RequesterAcceptance getRequesterAcceptance() {
+    return this.requesterAcceptance != null ? this.requesterAcceptance : RequesterAcceptance.acceptAll();
+  }
+
+  /**
+   * Gets the {@link ConfigurableRequesterAcceptance}, for adding predicates. If no check has been assigned, a
+   * {@link ConfigurableRequesterAcceptance} is created and assigned.
+   *
+   * @return the configurable requester acceptance
+   * @throws IllegalStateException if another kind of check has been assigned
+   */
+  public @Nonnull ConfigurableRequesterAcceptance configurableRequesterAcceptance() {
+    if (this.requesterAcceptance == null) {
+      this.requesterAcceptance = new ConfigurableRequesterAcceptance();
+    }
+    if (this.requesterAcceptance instanceof final ConfigurableRequesterAcceptance configurable) {
+      return configurable;
+    }
+    throw new IllegalStateException("The requester acceptance check is a "
+        + this.requesterAcceptance.getClass().getSimpleName() + ", not a ConfigurableRequesterAcceptance");
+  }
+
+  /**
    * Adds an authentication provider.
    *
    * @param provider the provider
@@ -379,6 +489,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
       matchers.add(protocol.getRequestMatcher());
     }
     this.endpointsMatcher = matchers.isEmpty() ? request -> false : new OrRequestMatcher(matchers);
+    this.activeClientRegistry = this.createClientRegistry();
 
     for (final UserAuthenticationProvider provider : this.authenticationProviders) {
       if (provider instanceof final AbstractUserAuthenticationProvider p) {
@@ -395,6 +506,29 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   @Override
   public void configure(final @Nonnull HttpSecurity http) {
     this.protocols.values().forEach(p -> p.configure(http));
+  }
+
+  /**
+   * Creates the client registry, unless one has been assigned, and checks that every protocol that needs a backend
+   * has one.
+   *
+   * @return the client registry
+   */
+  private @Nonnull ClientRegistry createClientRegistry() {
+    if (this.clientRegistry != null) {
+      return this.clientRegistry;
+    }
+    final List<ClientRegistryBackend> backends = new ArrayList<>(this.clientRegistryBackends);
+    this.protocols.values().forEach(p -> backends.addAll(p.getClientRegistryBackends()));
+
+    for (final AbstractProtocolConfigurer<?> protocol : this.protocols.values()) {
+      final AuthenticationProtocol type = protocol.getProtocol();
+      if (protocol.requiresClientRegistryBackend() && backends.stream().noneMatch(b -> b.getProtocol() == type)) {
+        throw new IllegalArgumentException("No client registry backend for %s requesters - %s"
+            .formatted(type, protocol.getMissingClientRegistryBackendHint()));
+      }
+    }
+    return backends.isEmpty() ? EMPTY_CLIENT_REGISTRY : new DefaultClientRegistry(backends);
   }
 
   /**

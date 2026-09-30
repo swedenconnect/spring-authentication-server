@@ -19,22 +19,51 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
+import org.opensaml.saml.metadata.resolver.MetadataResolver;
+import org.opensaml.storage.ReplayCache;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.access.ExceptionTranslationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import se.swedenconnect.opensaml.saml2.response.replay.MessageReplayChecker;
+import se.swedenconnect.opensaml.saml2.response.replay.MessageReplayCheckerImpl;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.config.AbstractProtocolConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
+import se.swedenconnect.spring.authnserver.saml.attributes.requested.SamlRequestedAttributeResolver;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.AuthnContextResolver;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.DefaultSignMessageExtractor;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAuthenticationConverter;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.AssertionConsumerServiceValidator;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.AuthnRequestEncryptCapabilitiesValidator;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.AuthnRequestReplayValidator;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.AuthnRequestSignatureValidator;
+import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.replay.InMemoryReplayCache;
+import se.swedenconnect.spring.authnserver.saml.metadata.MetadataProviderFactory;
+import se.swedenconnect.spring.authnserver.saml.metadata.MetadataSource;
+import se.swedenconnect.spring.authnserver.saml.metadata.SamlMetadataBackend;
+import se.swedenconnect.spring.authnserver.saml.nameid.DefaultNameIDGeneratorFactory;
 import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
+import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseBuilder;
+import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseSender;
+import se.swedenconnect.spring.authnserver.saml.web.Saml2AuthnRequestProcessingFilter;
+import se.swedenconnect.spring.authnserver.saml.web.Saml2ErrorResponseProcessingFilter;
 
 /**
  * The protocol configurer for the SAML Identity Provider. Register it with the {@link AuthnServerConfigurer}.
@@ -46,6 +75,11 @@ import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
  * The entity ID defaults to the base URL. A signing credential and an encryption credential are required. Each of them
  * falls back to the default credential when not assigned. The metadata signing credential falls back to the default
  * credential, and without either the metadata is not signed.
+ * </p>
+ * <p>
+ * The Service Providers are found in the client registry. The configurer contributes a SAML metadata backend when
+ * metadata sources or a metadata resolver have been assigned, and a SAML backend is required unless the client
+ * registry has been assigned to the {@link AuthnServerConfigurer}.
  * </p>
  *
  * @author Martin Lindström
@@ -63,6 +97,16 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** The default endpoint for publishing the IdP metadata, {@value}. */
   public static final String DEFAULT_METADATA_ENDPOINT = "/metadata";
+
+  /** The default maximum age of a received message, 3 minutes. */
+  public static final Duration DEFAULT_MAX_MESSAGE_AGE =
+      Saml2AuthnRequestAuthenticationConverter.DEFAULT_MAX_MESSAGE_AGE;
+
+  /** The default time that the IDs of received requests are kept for the replay check, 5 minutes. */
+  public static final Duration DEFAULT_REPLAY_EXPIRATION = Duration.ofMinutes(5);
+
+  /** The default context name of the replay cache, {@value}. */
+  public static final String DEFAULT_REPLAY_CONTEXT = "idp-replay-checker";
 
   /** The SAML entity ID. */
   private String entityId;
@@ -108,6 +152,55 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** The factory for NameID generators, used for the NameID formats in the metadata. */
   private NameIDGeneratorFactory nameIdGeneratorFactory;
+
+  /** The maximum age of a received message. */
+  private Duration maxMessageAge = DEFAULT_MAX_MESSAGE_AGE;
+
+  /** Whether assertions are encrypted. */
+  private boolean encryptAssertions = true;
+
+  /** The mapping for minimum comparison of requested authentication contexts. */
+  private Map<String, List<String>> authnContextMinimumMapping;
+
+  /** The mapping for better comparison of requested authentication contexts. */
+  private Map<String, List<String>> authnContextBetterMapping;
+
+  /** The mapping for maximum comparison of requested authentication contexts. */
+  private Map<String, List<String>> authnContextMaximumMapping;
+
+  /** The replay cache. */
+  private ReplayCache replayCache;
+
+  /** How long the IDs of received requests are kept for the replay check. */
+  private Duration replayExpiration = DEFAULT_REPLAY_EXPIRATION;
+
+  /** The context name of the replay cache. */
+  private String replayContext = DEFAULT_REPLAY_CONTEXT;
+
+  /** The SP metadata sources. */
+  private List<MetadataSource> metadataSources;
+
+  /** The SP metadata resolver. */
+  private MetadataResolver metadataResolver;
+
+  /** The SSL bundles for HTTPS metadata sources. */
+  private SslBundles sslBundles;
+
+  /** The configurer for the request processing components. */
+  private final Saml2AuthnRequestProcessorConfigurer authnRequestProcessorConfigurer =
+      new Saml2AuthnRequestProcessorConfigurer();
+
+  /** The SP metadata backend, created at initialization. */
+  private SamlMetadataBackend metadataBackend;
+
+  /** The NameID generator factory that is used, assigned at initialization. */
+  private NameIDGeneratorFactory activeNameIdGeneratorFactory;
+
+  /** The matcher for the authentication endpoints. */
+  private RequestMatcher authnRequestMatcher;
+
+  /** The matcher for the Holder-of-key authentication endpoints. */
+  private RequestMatcher holderOfKeyMatcher;
 
   /** The metadata endpoint configurer. */
   private final Saml2IdpMetadataEndpointConfigurer metadataEndpointConfigurer =
@@ -421,8 +514,9 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
   }
 
   /**
-   * Assigns the factory for {@code NameID} generators. Its supported formats are declared in the metadata. Without a
-   * factory, the persistent and transient formats are declared.
+   * Assigns the factory for {@code NameID} generators. It checks the {@code NameIDPolicy} of each request, and its
+   * supported formats are declared in the metadata. Without a factory, a {@link DefaultNameIDGeneratorFactory} with the
+   * subject identifier secret and hash algorithm is used.
    *
    * @param nameIdGeneratorFactory the factory
    * @return this configurer
@@ -440,6 +534,148 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    */
   public @Nullable NameIDGeneratorFactory getNameIdGeneratorFactory() {
     return this.nameIdGeneratorFactory;
+  }
+
+  /**
+   * Assigns the maximum age of a received authentication request. Defaults to {@link #DEFAULT_MAX_MESSAGE_AGE}.
+   *
+   * @param maxMessageAge the maximum age
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer maxMessageAge(final @Nonnull Duration maxMessageAge) {
+    this.maxMessageAge = Objects.requireNonNull(maxMessageAge, "maxMessageAge must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the maximum age of a received authentication request.
+   *
+   * @return the maximum age
+   */
+  public @Nonnull Duration getMaxMessageAge() {
+    return this.maxMessageAge;
+  }
+
+  /**
+   * Assigns whether assertions are encrypted. Defaults to {@code true}. When they are, a request from a Service
+   * Provider whose metadata has no encryption key is rejected.
+   *
+   * @param encryptAssertions whether assertions are encrypted
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer encryptAssertions(final boolean encryptAssertions) {
+    this.encryptAssertions = encryptAssertions;
+    return this;
+  }
+
+  /**
+   * Tells whether assertions are encrypted.
+   *
+   * @return {@code true} if assertions are encrypted and {@code false} otherwise
+   */
+  public boolean isEncryptAssertions() {
+    return this.encryptAssertions;
+  }
+
+  /**
+   * Assigns the mappings for the {@code minimum}, {@code better} and {@code maximum} comparisons of requested
+   * authentication contexts, see {@link AuthnContextResolver}. A comparison without a mapping is not supported.
+   *
+   * @param minimumMapping the mapping for minimum comparison, or {@code null}
+   * @param betterMapping the mapping for better comparison, or {@code null}
+   * @param maximumMapping the mapping for maximum comparison, or {@code null}
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer authnContextMappings(final @Nullable Map<String, List<String>> minimumMapping,
+      final @Nullable Map<String, List<String>> betterMapping,
+      final @Nullable Map<String, List<String>> maximumMapping) {
+    this.authnContextMinimumMapping = minimumMapping;
+    this.authnContextBetterMapping = betterMapping;
+    this.authnContextMaximumMapping = maximumMapping;
+    return this;
+  }
+
+  /**
+   * Assigns the store for the replay check. The default is an {@link InMemoryReplayCache}, which only protects the
+   * node it runs on.
+   *
+   * @param replayCache the replay cache
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer replayCache(final @Nullable ReplayCache replayCache) {
+    this.replayCache = replayCache;
+    return this;
+  }
+
+  /**
+   * Assigns how long the IDs of received requests are kept for the replay check. Defaults to
+   * {@link #DEFAULT_REPLAY_EXPIRATION}.
+   *
+   * @param replayExpiration the expiration time
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer replayExpiration(final @Nonnull Duration replayExpiration) {
+    this.replayExpiration = Objects.requireNonNull(replayExpiration, "replayExpiration must not be null");
+    return this;
+  }
+
+  /**
+   * Assigns the context name under which the replay cache stores the IDs. Defaults to
+   * {@value #DEFAULT_REPLAY_CONTEXT}.
+   *
+   * @param replayContext the context name
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer replayContext(final @Nonnull String replayContext) {
+    this.replayContext = Objects.requireNonNull(replayContext, "replayContext must not be null");
+    return this;
+  }
+
+  /**
+   * Assigns the sources of Service Provider metadata. A SAML metadata backend for the client registry is created from
+   * them.
+   *
+   * @param metadataSources the metadata sources
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer metadataSources(final @Nullable List<MetadataSource> metadataSources) {
+    this.metadataSources = metadataSources;
+    return this;
+  }
+
+  /**
+   * Assigns the SSL bundles that HTTPS metadata sources refer to.
+   *
+   * @param sslBundles the SSL bundles
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer sslBundles(final @Nullable SslBundles sslBundles) {
+    this.sslBundles = sslBundles;
+    return this;
+  }
+
+  /**
+   * Assigns a metadata resolver for Service Provider metadata, as an alternative to
+   * {@link #metadataSources(List)}. A SAML metadata backend for the client registry is created from it.
+   *
+   * @param metadataResolver the metadata resolver
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer metadataResolver(final @Nullable MetadataResolver metadataResolver) {
+    this.metadataResolver = metadataResolver;
+    return this;
+  }
+
+  /**
+   * Customizes the components that process authentication requests and send error responses.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull Saml2IdpConfigurer authnRequestProcessor(
+      final @Nonnull Customizer<Saml2AuthnRequestProcessorConfigurer> customizer) {
+    customizer.customize(this.authnRequestProcessorConfigurer);
+    return this;
   }
 
   /**
@@ -469,29 +705,176 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
   protected void init(final @Nonnull HttpSecurity http) {
     this.validate();
 
-    final List<RequestMatcher> matchers = new ArrayList<>();
-    matchers.add(PathPatternRequestMatcher.pathPattern(
+    final List<RequestMatcher> authnMatchers = new ArrayList<>();
+    authnMatchers.add(PathPatternRequestMatcher.pathPattern(
         HttpMethod.GET, this.getEndpointPath(this.redirectAuthnEndpoint)));
-    matchers.add(PathPatternRequestMatcher.pathPattern(
+    authnMatchers.add(PathPatternRequestMatcher.pathPattern(
         HttpMethod.POST, this.getEndpointPath(this.postAuthnEndpoint)));
+    final List<RequestMatcher> hokMatchers = new ArrayList<>();
     if (this.hokRedirectAuthnEndpoint != null) {
-      matchers.add(PathPatternRequestMatcher.pathPattern(
+      hokMatchers.add(PathPatternRequestMatcher.pathPattern(
           HttpMethod.GET, this.getEndpointPath(this.hokRedirectAuthnEndpoint)));
     }
     if (this.hokPostAuthnEndpoint != null) {
-      matchers.add(PathPatternRequestMatcher.pathPattern(
+      hokMatchers.add(PathPatternRequestMatcher.pathPattern(
           HttpMethod.POST, this.getEndpointPath(this.hokPostAuthnEndpoint)));
     }
-    this.metadataEndpointConfigurer.init();
-    matchers.add(this.metadataEndpointConfigurer.getRequestMatcher());
+    authnMatchers.addAll(hokMatchers);
+    this.authnRequestMatcher = new OrRequestMatcher(authnMatchers);
+    this.holderOfKeyMatcher = hokMatchers.isEmpty() ? request -> false : new OrRequestMatcher(hokMatchers);
 
-    this.requestMatcher = new OrRequestMatcher(matchers);
+    this.metadataEndpointConfigurer.init();
+    this.requestMatcher = new OrRequestMatcher(this.authnRequestMatcher,
+        this.metadataEndpointConfigurer.getRequestMatcher());
+
+    if (this.metadataResolver != null) {
+      this.metadataBackend = new SamlMetadataBackend(this.metadataResolver);
+    }
+    else if (this.metadataSources != null && !this.metadataSources.isEmpty()) {
+      this.metadataBackend = new SamlMetadataBackend(
+          MetadataProviderFactory.createMetadataResolver(this.metadataSources, this.sslBundles));
+    }
+
+    if (this.nameIdGeneratorFactory != null) {
+      this.activeNameIdGeneratorFactory = this.nameIdGeneratorFactory;
+    }
+    else {
+      final DefaultNameIDGeneratorFactory factory = new DefaultNameIDGeneratorFactory(this.getEntityId());
+      factory.setSecret(this.getSubjectIdentifierSecret());
+      factory.setHashAlgorithm(this.getSubjectIdentifierHashAlgorithm());
+      this.activeNameIdGeneratorFactory = factory;
+    }
   }
 
   /** {@inheritDoc} */
   @Override
   protected void configure(final @Nonnull HttpSecurity http) {
     this.metadataEndpointConfigurer.configure(http);
+
+    final Saml2AuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
+    final AuthnServerConfigurer server = this.getServer();
+
+    // Error responses ...
+    //
+    final Saml2ResponseBuilder responseBuilder =
+        new Saml2ResponseBuilder(this.getEntityId(), Objects.requireNonNull(this.getSignCredential()));
+    responseBuilder.setMessageSource(components.getMessageSource());
+    if (components.getResponseCustomizer() != null) {
+      responseBuilder.setResponseCustomizer(components.getResponseCustomizer());
+    }
+    final Saml2ResponseSender responseSender = new Saml2ResponseSender();
+    if (components.getResponsePage() != null) {
+      responseSender.setResponsePage(components.getResponsePage());
+    }
+    final Saml2ErrorResponseProcessingFilter errorFilter =
+        new Saml2ErrorResponseProcessingFilter(this.authnRequestMatcher, responseBuilder, responseSender);
+    http.addFilterAfter(this.postProcess(errorFilter), ExceptionTranslationFilter.class);
+
+    // Request processing ...
+    //
+    final Saml2AuthnRequestAuthenticationConverter converter = new Saml2AuthnRequestAuthenticationConverter(
+        server.getClientRegistry(), this.holderOfKeyMatcher, this.getClockSkew(), this.maxMessageAge);
+
+    final AuthnContextResolver authnContextResolver = new AuthnContextResolver();
+    authnContextResolver.setMinimumMapping(this.authnContextMinimumMapping);
+    authnContextResolver.setBetterMapping(this.authnContextBetterMapping);
+    authnContextResolver.setMaximumMapping(this.authnContextMaximumMapping);
+
+    final Saml2AuthnRequestAuthenticationProvider provider = new Saml2AuthnRequestAuthenticationProvider(
+        new AuthnRequestReplayValidator(this.getMessageReplayChecker()),
+        Objects.requireNonNullElseGet(components.getAssertionConsumerServiceValidator(),
+            AssertionConsumerServiceValidator::new),
+        new AuthnRequestSignatureValidator(this.requiresSignedRequests),
+        new AuthnRequestEncryptCapabilitiesValidator(this.encryptAssertions),
+        server.getClientRegistry(),
+        server.getRequesterAcceptance(),
+        this.activeNameIdGeneratorFactory,
+        Objects.requireNonNullElseGet(components.getRequestedAttributeResolver(),
+            () -> new SamlRequestedAttributeResolver(this.getDeclaredEntityCategories())),
+        authnContextResolver,
+        Objects.requireNonNullElseGet(components.getSignMessageExtractor(),
+            () -> new DefaultSignMessageExtractor(this.getEntityId(), this.getDecryptionCredentials())),
+        this.isSupportsUserMessage());
+
+    final Saml2AuthnRequestProcessingFilter processingFilter =
+        new Saml2AuthnRequestProcessingFilter(this.authnRequestMatcher, converter, provider);
+    if (components.getSuccessHandler() != null) {
+      processingFilter.setSuccessHandler(components.getSuccessHandler());
+    }
+    http.addFilterAfter(this.postProcess(processingFilter), Saml2ErrorResponseProcessingFilter.class);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected @Nonnull List<ClientRegistryBackend> getClientRegistryBackends() {
+    return this.metadataBackend != null ? List.of(this.metadataBackend) : List.of();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected boolean requiresClientRegistryBackend() {
+    return true;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected @Nonnull String getMissingClientRegistryBackendHint() {
+    return "assign SP metadata sources (authn-server.saml.metadata-providers) or a metadata resolver";
+  }
+
+  /**
+   * Gets the NameID generator factory that is used: the assigned one, or a {@link DefaultNameIDGeneratorFactory}.
+   * Available after initialization.
+   *
+   * @return the factory
+   */
+  @Nonnull
+  NameIDGeneratorFactory getActiveNameIdGeneratorFactory() {
+    return Objects.requireNonNull(this.activeNameIdGeneratorFactory, "The configurer has not been initialized");
+  }
+
+  /**
+   * Gets the replay checker: the assigned one, or one built from the replay cache and the replay values.
+   *
+   * @return the replay checker
+   */
+  private @Nonnull MessageReplayChecker getMessageReplayChecker() {
+    if (this.authnRequestProcessorConfigurer.getMessageReplayChecker() != null) {
+      return this.authnRequestProcessorConfigurer.getMessageReplayChecker();
+    }
+    final MessageReplayCheckerImpl checker = new MessageReplayCheckerImpl(
+        this.replayCache != null ? this.replayCache : new InMemoryReplayCache(), this.replayContext);
+    checker.setReplayCacheExpiration(this.replayExpiration.toMillis());
+    return checker;
+  }
+
+  /**
+   * Gets the entity categories that the authentication providers declare.
+   *
+   * @return the entity categories
+   */
+  private @Nonnull List<String> getDeclaredEntityCategories() {
+    return this.getServer().getAuthenticationProviders().stream()
+        .map(UserAuthenticationProvider::getEntityCategories)
+        .flatMap(Collection::stream)
+        .distinct()
+        .toList();
+  }
+
+  /**
+   * Gets the credentials for decrypting encrypted messages: the encryption credential, and the previous one.
+   *
+   * @return the decryption credentials
+   */
+  private @Nonnull List<PkiCredential> getDecryptionCredentials() {
+    final List<PkiCredential> credentials = new ArrayList<>();
+    if (this.getEncryptCredential() != null) {
+      credentials.add(this.getEncryptCredential());
+      if (this.previousEncryptCredential != null) {
+        credentials.add(this.previousEncryptCredential);
+      }
+    }
+    return credentials;
   }
 
   /** {@inheritDoc} */
@@ -553,6 +936,12 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
           + "default credential (authn-server.saml.credentials.encrypt or "
           + "authn-server.saml.credentials.default-credential)");
     }
+    if (this.maxMessageAge.isNegative() || this.maxMessageAge.isZero()) {
+      throw new IllegalArgumentException("SAML maximum message age must be positive");
+    }
+    if (this.replayExpiration.isNegative() || this.replayExpiration.isZero()) {
+      throw new IllegalArgumentException("SAML replay expiration must be positive");
+    }
     assertEndpoint(this.redirectAuthnEndpoint, "redirect authn");
     assertEndpoint(this.postAuthnEndpoint, "post authn");
     assertEndpoint(this.metadataEndpoint, "metadata");
@@ -572,7 +961,8 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    */
   private static void assertEndpoint(final @Nonnull String endpoint, final @Nonnull String name) {
     if (!endpoint.startsWith("/")) {
-      throw new IllegalArgumentException("Invalid SAML %s endpoint '%s' - it must begin with /".formatted(name, endpoint));
+      throw new IllegalArgumentException(
+          "Invalid SAML %s endpoint '%s' - it must begin with /".formatted(name, endpoint));
     }
   }
 

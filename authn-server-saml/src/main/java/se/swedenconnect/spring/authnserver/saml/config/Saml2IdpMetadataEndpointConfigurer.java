@@ -39,7 +39,6 @@ import org.opensaml.saml.ext.saml2alg.DigestMethod;
 import org.opensaml.saml.ext.saml2alg.SigningMethod;
 import org.opensaml.saml.ext.saml2mdattr.EntityAttributes;
 import org.opensaml.saml.ext.saml2mdui.UIInfo;
-import org.opensaml.saml.saml2.core.NameID;
 import org.opensaml.saml.saml2.metadata.ContactPerson;
 import org.opensaml.saml.saml2.metadata.ContactPersonTypeEnumeration;
 import org.opensaml.saml.saml2.metadata.EncryptionMethod;
@@ -514,10 +513,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
 
       // NameID formats
       //
-      final List<String> nameIdFormats = saml.getNameIdGeneratorFactory() != null
-          ? saml.getNameIdGeneratorFactory().getSupportedFormats()
-          : List.of(NameID.PERSISTENT, NameID.TRANSIENT);
-      descBuilder.nameIDFormats(nameIdFormats);
+      descBuilder.nameIDFormats(saml.getActiveNameIdGeneratorFactory().getSupportedFormats());
 
       final List<SingleSignOnService> ssoServices = new ArrayList<>();
       ssoServices.add(SingleSignOnServiceBuilder.builder()

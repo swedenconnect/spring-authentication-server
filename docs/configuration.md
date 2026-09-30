@@ -20,6 +20,10 @@ how the server is set up without Spring Boot.
     - [Credentials](#credentials)
     - [Endpoints](#endpoints)
     - [The IdP metadata](#the-idp-metadata)
+    - [Service Provider metadata](#sp-metadata)
+    - [Request processing](#request-processing)
+    - [Replay protection](#replay-protection)
+    - [Requester acceptance](#requester-acceptance)
 - [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
 - [Using the configurers without Spring Boot](#using-the-configurers-without-spring-boot)
 - [Migrating from saml-identity-provider](#migrating-from-saml-identity-provider)
@@ -42,7 +46,7 @@ Include one of the starters:
 ```
 
 A single-protocol starter never pulls in the other protocol. The smallest working SAML Identity Provider needs a base
-URL and a credential:
+URL, a credential and a source of Service Provider metadata:
 
 ```yaml
 authn-server:
@@ -52,6 +56,10 @@ authn-server:
     credentials:
       default-credential:
         bundle: idp-credential
+    metadata-providers:
+      - location: https://md.swedenconnect.se/role/sp.xml
+        validation-certificate: file:/opt/config/metadata-signing.crt
+        backup-location: /var/idp/sp-metadata-backup.xml
 ```
 
 With this, the IdP metadata is published at `https://idp.example.com/saml2/metadata`. The authentication modules are
@@ -180,6 +188,12 @@ The SAML properties are placed under `authn-server.saml`.
 | `credentials.*` | The credentials, see [Credentials](#credentials). | Required |
 | `endpoints.*` | The endpoints, see [Endpoints](#endpoints). | See below |
 | `metadata.*` | The IdP metadata, see [The IdP metadata](#the-idp-metadata). | See below |
+| `metadata-providers[].*` | The sources of Service Provider metadata, see [Service Provider metadata](#sp-metadata). | Required |
+| `max-message-age` | The maximum age of a received authentication request. | 3 minutes |
+| `assertions.encrypt` | Whether assertions are encrypted, see [Request processing](#request-processing). | `true` |
+| `authn-context.*` | How requested authentication contexts are resolved, see [Request processing](#request-processing). | Exact comparison only |
+| `replay.*` | The protection against replayed requests, see [Replay protection](#replay-protection). | See below |
+| `requester-acceptance.*` | Which Service Providers may use the Identity Provider, see [Requester acceptance](#requester-acceptance). | Every Service Provider |
 
 The values are checked when the filter chain is built, and the application does not start if a required value is
 missing or a value is invalid.
@@ -355,6 +369,107 @@ configurer.protocol(Saml2IdpConfigurer.class, saml -> saml.idpMetadataEndpoint(
     metadata -> metadata.entityDescriptorCustomizer(ed -> { ... })));
 ```
 
+<a name="sp-metadata"></a>
+### Service Provider metadata
+
+The Identity Provider finds the Service Providers in the [client registry](client-registry.html). The metadata sources
+given here become the SAML backend of the registry, see [SAML: metadata sources](client-registry.html#saml-metadata-sources) for how each
+kind of source is read. A SAML Identity Provider needs at least one source, unless the application assigns a client
+registry or a SAML backend of its own in an [adapter](#adjusting-the-configuration-in-code).
+
+Each entry of `authn-server.saml.metadata-providers[]` has:
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `location` | The location of the metadata: a URL, a file or a classpath resource. | Required |
+| `https-trust-bundle` | For an HTTPS location, the name of a [Spring SSL bundle](https://spring.io/blog/2023/06/07/securing-spring-boot-applications-with-ssl) that gives the trusted certificates. | The Java trust store |
+| `skip-hostname-verification` | For an HTTPS location, whether hostname verification is skipped. For testing only. | `false` |
+| `backup-location` | For a URL location, where downloaded metadata is backed up, so that the server can start when the source cannot be reached. A file, or a directory for MDQ. Strongly recommended. | - |
+| `mdq` | For a URL location, whether the [MDQ protocol](https://www.ietf.org/id/draft-young-md-query-17.html) is used. | `false` |
+| `validation-certificate` | The certificate that the metadata signature is validated with. A resource or the PEM encoding of the certificate. Strongly recommended for a URL location. | - |
+| `http-proxy.*` | For a URL location, an HTTP proxy: `host`, `port`, and optionally `user-name` and `password`. | - |
+
+Several sources are combined into one, searched in the order they are given.
+
+<a name="request-processing"></a>
+### Request processing
+
+How the Identity Provider processes an authentication request, and which failures are answered to the Service
+Provider, is described in [The SAML Identity Provider](saml-identity-provider.html). These properties affect it:
+
+- `requires-signed-requests`: whether every request must be signed. A request must also be signed if the Service
+  Provider metadata states `AuthnRequestsSigned`.
+- `max-message-age` and `clock-skew`: how old a request may be, and how much the clocks may differ.
+- `assertions.encrypt`: whether assertions are encrypted. When they are, a request from a Service Provider whose
+  metadata has no encryption key is answered with `Requester` / `RequestDenied`.
+- `supports-user-message`: when user messages are supported, a `UserMessage` with a MIME type that is not supported
+  is answered with an error. When they are not, such a message is ignored.
+- `subject-identifier.*`: the secret and hash algorithm of the `NameID` generator, which also checks the
+  `NameIDPolicy` of the request.
+
+The `exact` comparison of a `RequestedAuthnContext` is always supported. The `minimum`, `better` and `maximum`
+comparisons are supported when a mapping is given under `authn-server.saml.authn-context`: `minimum-mappings`,
+`better-mappings` and `maximum-mappings`. Each maps a requested URI to the URIs it means for that comparison. The keys
+must be given within brackets, since they are URLs:
+
+```yaml
+authn-server:
+  saml:
+    authn-context:
+      minimum-mappings:
+        "[http://id.elegnamnden.se/loa/1.0/loa2]":
+          - http://id.elegnamnden.se/loa/1.0/loa2
+          - http://id.elegnamnden.se/loa/1.0/loa3
+          - http://id.elegnamnden.se/loa/1.0/loa4
+        "[http://id.elegnamnden.se/loa/1.0/loa3]":
+          - http://id.elegnamnden.se/loa/1.0/loa3
+          - http://id.elegnamnden.se/loa/1.0/loa4
+```
+
+A request with a comparison that has no mapping, or a URI that has none, is answered with `Requester` /
+`RequestUnsupported`.
+
+<a name="replay-protection"></a>
+### Replay protection
+
+The ID of every received request is kept for a while, and a request with an ID that has already been seen is rejected.
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `replay.type` | The type of store. The supported value is `memory`. | `memory` |
+| `replay.expiration` | For how long the IDs are kept. | 5 minutes |
+| `replay.context` | The context under which the IDs are stored. | `idp-replay-checker` |
+
+:raised_hand: The in-memory store only protects the node it runs on. A deployment with several nodes has no shared
+replay protection until a shared store is configured. A Redis store will come with the support for Redis. Until then,
+a shared store is added by declaring an OpenSAML `ReplayCache` bean, or a whole `MessageReplayChecker` bean, which
+replace the in-memory store.
+
+<a name="requester-acceptance"></a>
+### Requester acceptance
+
+By default, every Service Provider that is found in the metadata may use the Identity Provider. The rules under
+`authn-server.saml.requester-acceptance` restrict that. How the rules work, and how to add a rule of your own, is
+described in [The client registry](client-registry.html#requester-acceptance).
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `whitelist[]` | The entityIDs of the accepted Service Providers. | - |
+| `required-marks[][]` | Groups of entity categories. Every group must be satisfied, and a group is satisfied by any one of its entity categories. | - |
+| `mode` | How the rules are combined: `ALL`, every rule must accept, or `ANY`, one accepting rule is enough. | `ALL` |
+
+```yaml
+authn-server:
+  saml:
+    requester-acceptance:
+      required-marks:
+        - - http://id.elegnamnden.se/ec/1.0/loa3-pnr
+          - http://id.elegnamnden.se/ec/1.0/loa4-pnr
+        - - http://id.swedenconnect.se/general-ec/1.0/secure-authenticator-binding
+```
+
+A Service Provider that is not accepted gets an error response with the status `Responder` / `RequestDenied`.
+
 <a name="adjusting-the-configuration-in-code"></a>
 ## Adjusting the configuration in code
 
@@ -435,13 +550,25 @@ to `true`.
 | `saml.idp.endpoints.hok-post-authn` | `authn-server.saml.endpoints.hok-post-authn` | Relative to the SAML path. |
 | `saml.idp.endpoints.metadata` | `authn-server.saml.endpoints.metadata` | Relative to the SAML path, so `/saml2/metadata` becomes `/metadata`. |
 | `saml.idp.metadata.*` | `authn-server.saml.metadata.*` | The metadata is now always published. |
+| `saml.idp.metadata-providers[]` | `authn-server.saml.metadata-providers[]` | The same properties. |
+| `saml.idp.max-message-age` | `authn-server.saml.max-message-age` | |
+| `saml.idp.authn-context.*` | `authn-server.saml.authn-context.*` | |
+| `saml.idp.assertions.encrypt` | `authn-server.saml.assertions.encrypt` | |
+| `saml.idp.replay.*` | `authn-server.saml.replay.*` | Only `memory` is supported as `type` for now, see [Replay protection](#replay-protection). |
 
 Endpoints that were moved away from `/saml2` are set up by changing `authn-server.saml.path`, if they share a prefix,
 or by giving each endpoint relative to an empty SAML path.
 
 The properties below are not yet available. They will be added, with the same structure, together with the features
-they configure: `saml.idp.max-message-age`, `saml.idp.authn-context.*`, `saml.idp.assertions.*`,
-`saml.idp.metadata-providers[]`, `saml.idp.replay.*`, `saml.idp.session.*` and `saml.idp.audit.*`.
+they configure: `saml.idp.assertions.not-before`, `saml.idp.assertions.not-after`, `saml.idp.session.*` and
+`saml.idp.audit.*`.
+
+`Saml2ServiceProviderFilter` is replaced by [requester acceptance](#requester-acceptance), which works for both
+protocols. A filter bean becomes a `RequesterPredicate` for SAML, added in an adapter; a predicate reads the Service
+Provider metadata with `record.getProtocolMetadata(EntityDescriptor.class)`.
+
+:raised_hand: A Service Provider that is not accepted now gets the status `Responder` / `RequestDenied`. The
+saml-identity-provider library answered with `Responder` / `AuthnFailed`.
 
 `Saml2IdpConfigurerAdapter` is replaced by [`AuthnServerConfigurerAdapter`][AuthnServerConfigurerAdapter], which gets
 the shared configurer instead of the SAML one. `configurer.protocol(Saml2IdpConfigurer.class, saml -> ...)` reaches

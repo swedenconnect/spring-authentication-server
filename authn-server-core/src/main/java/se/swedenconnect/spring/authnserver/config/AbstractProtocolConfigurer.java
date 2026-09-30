@@ -19,12 +19,14 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
 
 /**
@@ -265,6 +267,35 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @return a request matcher
    */
   protected abstract @Nonnull RequestMatcher getRequestMatcher();
+
+  /**
+   * Gets the client registry backends that the protocol contributes. Invoked after {@link #init(HttpSecurity)}. The
+   * default is none.
+   *
+   * @return the backends
+   */
+  protected @Nonnull List<ClientRegistryBackend> getClientRegistryBackends() {
+    return List.of();
+  }
+
+  /**
+   * Tells whether the protocol needs at least one client registry backend for its requesters. The default is
+   * {@code false}.
+   *
+   * @return {@code true} if a backend is needed and {@code false} otherwise
+   */
+  protected boolean requiresClientRegistryBackend() {
+    return false;
+  }
+
+  /**
+   * Gets a hint for the error message when a required client registry backend is missing.
+   *
+   * @return a hint telling how to configure a backend
+   */
+  protected @Nonnull String getMissingClientRegistryBackendHint() {
+    return "add a client registry backend";
+  }
 
   /**
    * Post processes an object created by the configurer, such as a filter.

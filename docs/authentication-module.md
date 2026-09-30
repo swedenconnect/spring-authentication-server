@@ -401,7 +401,7 @@ These are the errors and how they reach the requester:
 | `UNKNOWN_PRINCIPAL` | `Requester` / `UnknownPrincipal` | `access_denied` |
 | `PASSIVE_NOT_POSSIBLE` | `Requester` / `NoPassive` | `login_required` or `interaction_required` |
 | `NO_AUTHN_CONTEXT` | `Requester` / `NoAuthnContext` | `unmet_authentication_requirements` |
-| `NOT_AUTHORIZED` | `Responder` / `AuthnFailed` | `unauthorized_client` |
+| `NOT_AUTHORIZED` | `Responder` / `RequestDenied` | `unauthorized_client` |
 
 The three Sweden Connect status codes are `http://id.elegnamnden.se/status/1.0/` followed by `cancel`, `fraud` or
 `possibleFraud`. They are second-level codes under `Responder`, as the Deployment Profile, Section 6.4, requires. A
