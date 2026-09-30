@@ -25,6 +25,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -32,6 +34,7 @@ import org.springframework.boot.test.context.assertj.AssertableWebApplicationCon
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -50,12 +53,18 @@ import se.oidc.nimbus.claims.ParameterConstants;
 import se.swedenconnect.security.credential.spring.autoconfigure.ConvertersAutoConfiguration;
 import se.swedenconnect.security.credential.spring.autoconfigure.SpringCredentialBundlesAutoConfiguration;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerAutoConfiguration;
 import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration;
+import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
+import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequesterPredicate;
 
 /**
  * Tests for {@link OidcAutoConfiguration}.
@@ -105,6 +114,19 @@ class OidcAutoConfigurationTest {
           throw new UnsupportedOperationException();
         }
       };
+    }
+  }
+
+  /** Captures the configurer. */
+  @Configuration
+  static class CaptureConfiguration {
+
+    static final AtomicReference<AuthnServerConfigurer> CONFIGURER = new AtomicReference<>();
+
+    @Bean
+    @Order(10)
+    AuthnServerConfigurerAdapter captureAdapter() {
+      return (http, configurer) -> CONFIGURER.set(configurer);
     }
   }
 
@@ -212,7 +234,7 @@ class OidcAutoConfigurationTest {
         .withPropertyValues("authn-server.oidc.scopes=email,phone",
             "authn-server.oidc.claims=https://example.com/claim/employee",
             "authn-server.oidc.discovery.additional-parameters.service_documentation=https://op.example.com/docs",
-            "authn-server.oidc.discovery.additional-parameters.claims_parameter_supported=true",
+            "authn-server.oidc.discovery.additional-parameters.frontchannel_logout_supported=true",
             "authn-server.oidc.discovery.additional-parameters.example_list[0]=a",
             "authn-server.oidc.discovery.additional-parameters.example_list[1]=b")
         .withUserConfiguration(CustomizerConfiguration.class)
@@ -223,7 +245,7 @@ class OidcAutoConfigurationTest {
           assertThat(metadata.getScopes().toStringList()).containsExactly("openid", "email", "phone");
           assertThat(metadata.getClaims()).contains("https://example.com/claim/employee", "email", "phone_number");
           assertThat(metadata.getServiceDocsURI()).isEqualTo(URI.create("https://op.example.com/docs"));
-          assertThat(metadata.supportsClaimsParam()).isTrue();
+          assertThat(metadata.supportsFrontChannelLogout()).isTrue();
           assertThat(metadata.getCustomParameters().get("example_list"))
               .isEqualTo(List.of("a", "b"));
           assertThat(metadata.getCustomParameters().get("https://example.com/disco/custom")).isEqualTo("x");
@@ -235,6 +257,80 @@ class OidcAutoConfigurationTest {
     this.runner.withPropertyValues(signingKey(0, "rsa-short", "active", false))
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("at least 2048 bits"));
+  }
+
+  @Test
+  void theAuthorizationRequestPropertiesAreApplied() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.endpoints.authorization=/authz",
+            "authn-server.oidc.authorization-request.require-pkce=true",
+            "authn-server.oidc.authorization-request.require-signed-request-object=true",
+            "authn-server.oidc.authorization-request.require-state=false")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final OidcProviderConfigurer oidc =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class);
+          assertThat(oidc.isRequirePkce()).isTrue();
+          assertThat(oidc.isRequireSignedRequestObject()).isTrue();
+          assertThat(oidc.isRequireState()).isFalse();
+
+          final OIDCProviderMetadata metadata =
+              OIDCProviderMetadata.parse(get(context, DISCOVERY).getContentAsString());
+          assertThat(metadata.getAuthorizationEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/authz"));
+          assertThat(metadata.getRequestObjectJWSAlgs()).extracting(JWSAlgorithm::getName).doesNotContain("none");
+
+          final SecurityFilterChain chain = context.getBean(SecurityFilterChain.class);
+          assertThat(chain.matches(request("GET", "/oidc/authz"))).isTrue();
+          assertThat(chain.matches(request("POST", "/oidc/authz"))).isTrue();
+        });
+  }
+
+  @Test
+  void theAuthorizationRequestDefaultsApply() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final OidcProviderConfigurer oidc =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class);
+          assertThat(oidc.isRequirePkce()).isFalse();
+          assertThat(oidc.isRequireSignedRequestObject()).isFalse();
+          assertThat(oidc.isRequireState()).isTrue();
+          assertThat(CaptureConfiguration.CONFIGURER.get().getRequesterAcceptance())
+              .isSameAs(RequesterAcceptance.acceptAll());
+          final OIDCProviderMetadata metadata =
+              OIDCProviderMetadata.parse(get(context, DISCOVERY).getContentAsString());
+          assertThat(metadata.getAuthorizationEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/authorize"));
+          assertThat(metadata.getRequestObjectJWSAlgs()).extracting(JWSAlgorithm::getName).contains("none");
+        });
+  }
+
+  @Test
+  void theAcceptancePropertiesGiveTheOidcPredicates() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues(
+            "authn-server.oidc.requester-acceptance.mode=ANY",
+            "authn-server.oidc.requester-acceptance.whitelist[0]=https://rp.example.com",
+            "authn-server.oidc.requester-acceptance.required-marks[0][0]=https://tm.example.com/a",
+            "authn-server.oidc.requester-acceptance.required-marks[0][1]=https://tm.example.com/b")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final ConfigurableRequesterAcceptance acceptance =
+              CaptureConfiguration.CONFIGURER.get().configurableRequesterAcceptance();
+          assertThat(acceptance.getMode(AuthenticationProtocol.OIDC))
+              .isEqualTo(ConfigurableRequesterAcceptance.Mode.ANY);
+          assertThat(acceptance.getMode(AuthenticationProtocol.SAML))
+              .isEqualTo(ConfigurableRequesterAcceptance.Mode.ALL);
+          assertThat(acceptance.getPredicates()).hasSize(2)
+              .allMatch(p -> p.getProtocol() == AuthenticationProtocol.OIDC);
+          assertThat(acceptance.getPredicates().get(0)).isInstanceOfSatisfying(WhitelistRequesterPredicate.class,
+              p -> assertThat(p.getIdentifiers()).containsExactly("https://rp.example.com"));
+          assertThat(acceptance.getPredicates().get(1)).isInstanceOfSatisfying(RequiredMarksRequesterPredicate.class,
+              p -> assertThat(p.getGroups()).containsExactly(
+                  Set.of("https://tm.example.com/a", "https://tm.example.com/b")));
+        });
   }
 
   @Test

@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
 import se.swedenconnect.security.credential.factory.PkiCredentialFactory;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConfigurerFactory;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
@@ -41,13 +42,17 @@ import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.ScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.subject.SubjectGeneratorFactory;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
+import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequesterPredicate;
 
 /**
  * Autoconfiguration for the OpenID Provider. Active when the OIDC module is on the classpath and
  * {@code authn-server.oidc.enabled} is {@code true}.
  * <p>
  * It declares the factory that creates the {@link OidcProviderConfigurer} from the
- * {@link OidcConfigurationProperties}, loading the keys through the credentials-support library. A
+ * {@link OidcConfigurationProperties}, loading the keys through the credentials-support library. The requester
+ * acceptance rules of the properties are added to the server's {@link ConfigurableRequesterAcceptance}. A
  * {@link ScopeRegistry}, an {@link OidcAttributeMapping} or a {@link SubjectGeneratorFactory} bean replaces the
  * default one.
  * </p>
@@ -115,6 +120,20 @@ public class OidcAutoConfiguration {
     if (properties.getEndpoints().getJwks() != null) {
       configurer.jwksEndpoint(properties.getEndpoints().getJwks());
     }
+    if (properties.getEndpoints().getAuthorization() != null) {
+      configurer.authorizationEndpoint(properties.getEndpoints().getAuthorization());
+    }
+    final OidcConfigurationProperties.AuthorizationRequestProperties authorizationRequest =
+        properties.getAuthorizationRequest();
+    if (authorizationRequest.getRequirePkce() != null) {
+      configurer.requirePkce(authorizationRequest.getRequirePkce());
+    }
+    if (authorizationRequest.getRequireSignedRequestObject() != null) {
+      configurer.requireSignedRequestObject(authorizationRequest.getRequireSignedRequestObject());
+    }
+    if (authorizationRequest.getRequireState() != null) {
+      configurer.requireState(authorizationRequest.getRequireState());
+    }
     if (properties.getSignUserInfo() != null) {
       configurer.signUserInfo(properties.getSignUserInfo());
     }
@@ -128,7 +147,36 @@ public class OidcAutoConfiguration {
       additionalParameters.forEach((name, value) -> parameters.put(name, toParameterValue(value)));
       configurer.discoveryEndpoint(d -> d.additionalParameters(parameters));
     }
+    applyRequesterAcceptance(server, properties.getRequesterAcceptance());
     return configurer;
+  }
+
+  /**
+   * Adds the requester acceptance rules of the properties to the server's configurable requester acceptance. Nothing is
+   * done when no rule is assigned.
+   *
+   * @param server the shared configurer
+   * @param properties the requester acceptance properties
+   */
+  private static void applyRequesterAcceptance(final @Nonnull AuthnServerConfigurer server,
+      final @Nonnull OidcConfigurationProperties.RequesterAcceptanceProperties properties) {
+
+    final boolean hasWhitelist = properties.getWhitelist() != null && !properties.getWhitelist().isEmpty();
+    final boolean hasMarks = properties.getRequiredMarks() != null && !properties.getRequiredMarks().isEmpty();
+    if (!hasWhitelist && !hasMarks && properties.getMode() == null) {
+      return;
+    }
+    final ConfigurableRequesterAcceptance acceptance = server.configurableRequesterAcceptance();
+    if (properties.getMode() != null) {
+      acceptance.mode(AuthenticationProtocol.OIDC, properties.getMode());
+    }
+    if (hasWhitelist) {
+      acceptance.addPredicate(new WhitelistRequesterPredicate(AuthenticationProtocol.OIDC, properties.getWhitelist()));
+    }
+    if (hasMarks) {
+      acceptance.addPredicate(
+          new RequiredMarksRequesterPredicate(AuthenticationProtocol.OIDC, properties.getRequiredMarks()));
+    }
   }
 
   /**

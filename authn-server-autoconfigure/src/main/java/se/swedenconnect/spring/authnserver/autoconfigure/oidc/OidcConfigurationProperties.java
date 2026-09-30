@@ -29,6 +29,7 @@ import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfiguratio
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties.SubjectIdentifierProperties;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
+import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 
 /**
  * Configuration properties for the OpenID Provider.
@@ -111,6 +112,16 @@ public class OidcConfigurationProperties {
    * The discovery document.
    */
   private final DiscoveryProperties discovery = new DiscoveryProperties();
+
+  /**
+   * The processing of authentication requests.
+   */
+  private final AuthorizationRequestProperties authorizationRequest = new AuthorizationRequestProperties();
+
+  /**
+   * The rules for which clients are accepted. Without rules, every client that the client registry knows is accepted.
+   */
+  private final RequesterAcceptanceProperties requesterAcceptance = new RequesterAcceptanceProperties();
 
   /**
    * Tells whether the OpenID Provider is enabled.
@@ -320,6 +331,24 @@ public class OidcConfigurationProperties {
   }
 
   /**
+   * Gets the properties for the processing of authentication requests.
+   *
+   * @return the authorization request properties
+   */
+  public @Nonnull AuthorizationRequestProperties getAuthorizationRequest() {
+    return this.authorizationRequest;
+  }
+
+  /**
+   * Gets the requester acceptance properties.
+   *
+   * @return the requester acceptance properties
+   */
+  public @Nonnull RequesterAcceptanceProperties getRequesterAcceptance() {
+    return this.requesterAcceptance;
+  }
+
+  /**
    * The keys of the OpenID Provider.
    */
   public static class KeyProperties {
@@ -512,6 +541,29 @@ public class OidcConfigurationProperties {
     private String jwks;
 
     /**
+     * Where authentication requests are received. Defaults to /authorize.
+     */
+    private String authorization;
+
+    /**
+     * Gets the authorization endpoint.
+     *
+     * @return the authorization endpoint
+     */
+    public @Nullable String getAuthorization() {
+      return this.authorization;
+    }
+
+    /**
+     * Assigns the authorization endpoint.
+     *
+     * @param authorization the authorization endpoint
+     */
+    public void setAuthorization(final @Nullable String authorization) {
+      this.authorization = authorization;
+    }
+
+    /**
      * Gets the JWKS endpoint.
      *
      * @return the JWKS endpoint
@@ -557,6 +609,161 @@ public class OidcConfigurationProperties {
      */
     public void setAdditionalParameters(final @Nullable Map<String, Object> additionalParameters) {
       this.additionalParameters = additionalParameters;
+    }
+  }
+
+  /**
+   * The processing of authentication requests.
+   */
+  public static class AuthorizationRequestProperties {
+
+    /**
+     * Whether PKCE is required for all clients. Defaults to false, which means that PKCE is required for public
+     * clients only. The plain method is never accepted.
+     */
+    private Boolean requirePkce;
+
+    /**
+     * Whether request objects must be signed. Defaults to false, which means that an unsigned request object is
+     * accepted unless the client has registered request_object_signing_alg.
+     */
+    private Boolean requireSignedRequestObject;
+
+    /**
+     * Whether authentication requests must carry state. Defaults to true.
+     */
+    private Boolean requireState;
+
+    /**
+     * Gets whether PKCE is required for all clients.
+     *
+     * @return whether PKCE is required for all clients, or {@code null} for the default
+     */
+    public @Nullable Boolean getRequirePkce() {
+      return this.requirePkce;
+    }
+
+    /**
+     * Assigns whether PKCE is required for all clients.
+     *
+     * @param requirePkce whether PKCE is required for all clients
+     */
+    public void setRequirePkce(final @Nullable Boolean requirePkce) {
+      this.requirePkce = requirePkce;
+    }
+
+    /**
+     * Gets whether request objects must be signed.
+     *
+     * @return whether request objects must be signed, or {@code null} for the default
+     */
+    public @Nullable Boolean getRequireSignedRequestObject() {
+      return this.requireSignedRequestObject;
+    }
+
+    /**
+     * Assigns whether request objects must be signed.
+     *
+     * @param requireSignedRequestObject whether request objects must be signed
+     */
+    public void setRequireSignedRequestObject(final @Nullable Boolean requireSignedRequestObject) {
+      this.requireSignedRequestObject = requireSignedRequestObject;
+    }
+
+    /**
+     * Gets whether authentication requests must carry state.
+     *
+     * @return whether state is required, or {@code null} for the default
+     */
+    public @Nullable Boolean getRequireState() {
+      return this.requireState;
+    }
+
+    /**
+     * Assigns whether authentication requests must carry state.
+     *
+     * @param requireState whether state is required
+     */
+    public void setRequireState(final @Nullable Boolean requireState) {
+      this.requireState = requireState;
+    }
+  }
+
+  /**
+   * Configuration properties for requester acceptance.
+   */
+  public static class RequesterAcceptanceProperties {
+
+    /**
+     * How the rules are combined: ALL (every rule must accept) or ANY (one accepting rule is enough). Defaults to
+     * ALL.
+     */
+    private ConfigurableRequesterAcceptance.Mode mode;
+
+    /**
+     * The client_ids of the accepted clients.
+     */
+    private List<String> whitelist;
+
+    /**
+     * Groups of trust mark types. Every group must be satisfied, and a group is satisfied by any one of its trust mark
+     * types. A trust mark that the client lacks is requested through the client registry before the client is
+     * rejected.
+     */
+    private List<List<String>> requiredMarks;
+
+    /**
+     * Gets the combination mode.
+     *
+     * @return the combination mode
+     */
+    public @Nullable ConfigurableRequesterAcceptance.Mode getMode() {
+      return this.mode;
+    }
+
+    /**
+     * Assigns the combination mode.
+     *
+     * @param mode the combination mode
+     */
+    public void setMode(final @Nullable ConfigurableRequesterAcceptance.Mode mode) {
+      this.mode = mode;
+    }
+
+    /**
+     * Gets the whitelist.
+     *
+     * @return the whitelist
+     */
+    public @Nullable List<String> getWhitelist() {
+      return this.whitelist;
+    }
+
+    /**
+     * Assigns the whitelist.
+     *
+     * @param whitelist the whitelist
+     */
+    public void setWhitelist(final @Nullable List<String> whitelist) {
+      this.whitelist = whitelist;
+    }
+
+    /**
+     * Gets the required mark groups.
+     *
+     * @return the required mark groups
+     */
+    public @Nullable List<List<String>> getRequiredMarks() {
+      return this.requiredMarks;
+    }
+
+    /**
+     * Assigns the required mark groups.
+     *
+     * @param requiredMarks the required mark groups
+     */
+    public void setRequiredMarks(final @Nullable List<List<String>> requiredMarks) {
+      this.requiredMarks = requiredMarks;
     }
   }
 

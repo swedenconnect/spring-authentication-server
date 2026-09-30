@@ -18,6 +18,7 @@ package se.swedenconnect.spring.authnserver.oidc.config;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -26,33 +27,45 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.access.ExceptionTranslationFilter;
 import org.springframework.security.web.authentication.preauth.AbstractPreAuthenticatedProcessingFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.config.AbstractProtocolConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
+import se.swedenconnect.spring.authnserver.oidc.attributes.requested.OidcRequestedAttributeResolver;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.DefaultClientKeyResolver;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetcher;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationConverter;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKeySelector;
+import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseSender;
 import se.swedenconnect.spring.authnserver.oidc.scope.DefaultScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.scope.ScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.scope.SupportedScopesAndClaims;
 import se.swedenconnect.spring.authnserver.oidc.subject.DefaultSubjectGeneratorFactory;
 import se.swedenconnect.spring.authnserver.oidc.subject.SubjectGeneratorFactory;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcAuthnRequestProcessingFilter;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcErrorResponseProcessingFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcJwksEndpointFilter;
 
 /**
  * The protocol configurer for the OpenID Provider. Register it with the {@link AuthnServerConfigurer}.
  * <p>
  * The endpoints are given relative to the OIDC path, which defaults to {@value #DEFAULT_PATH}, so the JWKS is
- * published at {@code /oidc/jwks} by default. The issuer defaults to the base URL, and the discovery document is
- * published at the issuer followed by {@value OidcDiscoveryEndpointConfigurer#WELL_KNOWN_PATH}, see
- * {@link OidcDiscoveryEndpointConfigurer}. The issuer must be the base URL or begin with it.
+ * published at {@code /oidc/jwks} and the authorization endpoint is {@code /oidc/authorize} by default. The issuer
+ * defaults to the base URL, and the discovery document is published at the issuer followed by
+ * {@value OidcDiscoveryEndpointConfigurer#WELL_KNOWN_PATH}, see {@link OidcDiscoveryEndpointConfigurer}. The issuer
+ * must be the base URL or begin with it.
  * </p>
  * <p>
  * At least one active signing key is required, since ID tokens are always signed. See {@link OidcKeys} for the rules
@@ -62,6 +75,12 @@ import se.swedenconnect.spring.authnserver.oidc.web.OidcJwksEndpointFilter;
  * The offered scopes and the supported claims are worked out from the authentication providers, see
  * {@link SupportedScopesAndClaims}. Configured scopes replace the derived ones, and configured claims are added to
  * those of the providers.
+ * </p>
+ * <p>
+ * Authentication requests are received on the authorization endpoint, with GET or POST, and processed by
+ * {@link OidcAuthnRequestAuthenticationConverter} and {@link OidcAuthnRequestAuthenticationProvider}. The clients are
+ * found in the client registry. The settings for PKCE, signed request objects and {@code state} are held here, and
+ * the processing components can be replaced with {@link #authnRequestProcessor(Customizer)}.
  * </p>
  *
  * @author Martin Lindström
@@ -77,11 +96,26 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** The default endpoint for publishing the JWKS, {@value}. */
   public static final String DEFAULT_JWKS_ENDPOINT = "/jwks";
 
+  /** The default authorization endpoint, {@value}. */
+  public static final String DEFAULT_AUTHORIZATION_ENDPOINT = "/authorize";
+
   /** The issuer. */
   private String issuer;
 
   /** The JWKS endpoint. */
   private String jwksEndpoint = DEFAULT_JWKS_ENDPOINT;
+
+  /** The authorization endpoint. */
+  private String authorizationEndpoint = DEFAULT_AUTHORIZATION_ENDPOINT;
+
+  /** Whether PKCE is required for all clients. */
+  private boolean requirePkce = false;
+
+  /** Whether request objects must be signed. */
+  private boolean requireSignedRequestObject = false;
+
+  /** Whether {@code state} is required. */
+  private boolean requireState = true;
 
   /** The signing keys. */
   private List<SigningKey> signingKeys;
@@ -110,6 +144,10 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** The UI locales. */
   private List<String> uiLocales;
 
+  /** The configurer for the request processing components. */
+  private final OidcAuthnRequestProcessorConfigurer authnRequestProcessorConfigurer =
+      new OidcAuthnRequestProcessorConfigurer();
+
   /** The discovery endpoint configurer. */
   private final OidcDiscoveryEndpointConfigurer discoveryEndpointConfigurer =
       new OidcDiscoveryEndpointConfigurer(this);
@@ -128,6 +166,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** The matcher for the JWKS endpoint. */
   private RequestMatcher jwksRequestMatcher;
+
+  /** The matcher for the authorization endpoint. */
+  private RequestMatcher authorizationRequestMatcher;
 
   /** The matcher for the OIDC endpoints. */
   private RequestMatcher requestMatcher;
@@ -185,6 +226,104 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    */
   public @Nonnull String getJwksEndpoint() {
     return this.jwksEndpoint;
+  }
+
+  /**
+   * Assigns the authorization endpoint, relative to the OIDC path, where authentication requests are received with GET
+   * and POST. Defaults to {@value #DEFAULT_AUTHORIZATION_ENDPOINT}.
+   *
+   * @param endpoint the endpoint
+   * @return this configurer
+   */
+  public @Nonnull OidcProviderConfigurer authorizationEndpoint(final @Nonnull String endpoint) {
+    this.authorizationEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the authorization endpoint, relative to the OIDC path.
+   *
+   * @return the endpoint
+   */
+  public @Nonnull String getAuthorizationEndpoint() {
+    return this.authorizationEndpoint;
+  }
+
+  /**
+   * Assigns whether PKCE is required for all clients. Defaults to {@code false}, which means that PKCE is required for
+   * public clients (token endpoint authentication method {@code none}) and optional for others. The {@code plain}
+   * method is never accepted.
+   *
+   * @param requirePkce whether PKCE is required for all clients
+   * @return this configurer
+   */
+  public @Nonnull OidcProviderConfigurer requirePkce(final boolean requirePkce) {
+    this.requirePkce = requirePkce;
+    return this;
+  }
+
+  /**
+   * Tells whether PKCE is required for all clients.
+   *
+   * @return {@code true} if PKCE is required for all clients, and {@code false} if only for public clients
+   */
+  public boolean isRequirePkce() {
+    return this.requirePkce;
+  }
+
+  /**
+   * Assigns whether request objects must be signed. Defaults to {@code false}, which means that an unsigned request
+   * object is accepted unless the client has registered {@code request_object_signing_alg}.
+   *
+   * @param requireSignedRequestObject whether request objects must be signed
+   * @return this configurer
+   */
+  public @Nonnull OidcProviderConfigurer requireSignedRequestObject(final boolean requireSignedRequestObject) {
+    this.requireSignedRequestObject = requireSignedRequestObject;
+    return this;
+  }
+
+  /**
+   * Tells whether request objects must be signed.
+   *
+   * @return {@code true} if request objects must be signed and {@code false} otherwise
+   */
+  public boolean isRequireSignedRequestObject() {
+    return this.requireSignedRequestObject;
+  }
+
+  /**
+   * Assigns whether authentication requests must carry {@code state}. Defaults to {@code true}, which means that a
+   * request without {@code state} is rejected with {@code invalid_request}. When {@code false}, such a request is
+   * accepted and its response carries no {@code state}.
+   *
+   * @param requireState whether {@code state} is required
+   * @return this configurer
+   */
+  public @Nonnull OidcProviderConfigurer requireState(final boolean requireState) {
+    this.requireState = requireState;
+    return this;
+  }
+
+  /**
+   * Tells whether authentication requests must carry {@code state}.
+   *
+   * @return {@code true} if {@code state} is required and {@code false} otherwise
+   */
+  public boolean isRequireState() {
+    return this.requireState;
+  }
+
+  /**
+   * Customizes the components that process authentication requests and send responses.
+   *
+   * @param customizer the customizer
+   * @return this configurer
+   */
+  public @Nonnull OidcProviderConfigurer authnRequestProcessor(
+      final @Nonnull Customizer<OidcAuthnRequestProcessorConfigurer> customizer) {
+    customizer.customize(this.authnRequestProcessorConfigurer);
+    return this;
   }
 
   /**
@@ -418,9 +557,12 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
     this.jwksRequestMatcher =
         PathPatternRequestMatcher.pathPattern(HttpMethod.GET, this.getEndpointPath(this.jwksEndpoint));
+    this.authorizationRequestMatcher = new OrRequestMatcher(
+        PathPatternRequestMatcher.pathPattern(HttpMethod.GET, this.getEndpointPath(this.authorizationEndpoint)),
+        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.authorizationEndpoint)));
     this.discoveryEndpointConfigurer.init();
-    this.requestMatcher =
-        new OrRequestMatcher(this.jwksRequestMatcher, this.discoveryEndpointConfigurer.getRequestMatcher());
+    this.requestMatcher = new OrRequestMatcher(this.jwksRequestMatcher, this.authorizationRequestMatcher,
+        this.discoveryEndpointConfigurer.getRequestMatcher());
 
     log.info("OpenID Provider '{}' - signing keys: {}, decryption keys: {}", this.getIssuer(),
         this.keys.getSigningKeys(), this.keys.getDecryptionKeys());
@@ -432,6 +574,58 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     http.addFilterBefore(this.postProcess(new OidcJwksEndpointFilter(this.keys, this.jwksRequestMatcher)),
         AbstractPreAuthenticatedProcessingFilter.class);
     this.discoveryEndpointConfigurer.configure(http);
+
+    final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
+    final AuthnServerConfigurer server = this.getServer();
+
+    // Error responses ...
+    //
+    final OidcResponseSender responseSender = new OidcResponseSender();
+    if (components.getResponsePage() != null) {
+      responseSender.setResponsePage(components.getResponsePage());
+    }
+    final OidcErrorResponseProcessingFilter errorFilter =
+        new OidcErrorResponseProcessingFilter(this.authorizationRequestMatcher, responseSender);
+    http.addFilterAfter(this.postProcess(errorFilter), ExceptionTranslationFilter.class);
+
+    // Request processing ...
+    //
+    final RequestObjectDecoder requestObjectDecoder = new RequestObjectDecoder(this.keys,
+        Objects.requireNonNullElseGet(components.getClientKeyResolver(), DefaultClientKeyResolver::new),
+        this.getIssuer(), this.getEndpointUrl(this.authorizationEndpoint), this.getClockSkew());
+    final OidcAuthnRequestAuthenticationConverter converter = new OidcAuthnRequestAuthenticationConverter(
+        server.getClientRegistry(), requestObjectDecoder,
+        Objects.requireNonNullElseGet(components.getRequestUriFetcher(), HttpRequestUriFetcher::new));
+    final OidcAuthnRequestAuthenticationProvider provider = new OidcAuthnRequestAuthenticationProvider(
+        this.keys, this.getIssuer(), server.getClientRegistry(), server.getRequesterAcceptance(),
+        Objects.requireNonNullElseGet(components.getRequestedAttributeResolver(),
+            () -> new OidcRequestedAttributeResolver(this.getAttributeMapping(), this.getScopeRegistry())),
+        requestObjectDecoder, this.supportedScopesAndClaims.scopes(), this.getSupportedAuthnContextUris());
+    provider.setSupportsUserMessage(this.isSupportsUserMessage());
+    provider.setRequirePkce(this.requirePkce);
+    provider.setRequireSignedRequestObject(this.requireSignedRequestObject);
+    provider.setRequireState(this.requireState);
+
+    final OidcAuthnRequestProcessingFilter processingFilter =
+        new OidcAuthnRequestProcessingFilter(this.authorizationRequestMatcher, converter, provider);
+    if (components.getSuccessHandler() != null) {
+      processingFilter.setSuccessHandler(components.getSuccessHandler());
+    }
+    http.addFilterAfter(this.postProcess(processingFilter), OidcErrorResponseProcessingFilter.class);
+  }
+
+  /**
+   * Gets the authentication context URIs that the authentication providers support.
+   *
+   * @return the authentication context URIs
+   */
+  @Nonnull
+  List<String> getSupportedAuthnContextUris() {
+    return this.getServer().getAuthenticationProviders().stream()
+        .map(UserAuthenticationProvider::getSupportedAuthnContextUris)
+        .flatMap(Collection::stream)
+        .distinct()
+        .toList();
   }
 
   /** {@inheritDoc} */
@@ -483,6 +677,10 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     if (!this.jwksEndpoint.startsWith("/")) {
       throw new IllegalArgumentException(
           "Invalid OIDC jwks endpoint '%s' - it must begin with /".formatted(this.jwksEndpoint));
+    }
+    if (!this.authorizationEndpoint.startsWith("/")) {
+      throw new IllegalArgumentException(
+          "Invalid OIDC authorization endpoint '%s' - it must begin with /".formatted(this.authorizationEndpoint));
     }
   }
 

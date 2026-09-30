@@ -287,7 +287,7 @@ For SAML, asking for a mark never finds anything. It gives the requester's recor
 Knowing a requester is not the same as accepting it. Once the requester has been found in the registry and its
 request has been verified, a [`RequesterAcceptance`][RequesterAcceptance] check decides whether it may use the server.
 A requester that is not accepted gets the error `NOT_AUTHORIZED`, answered to the requester as an error response. For
-SAML that is the status `Responder` / `RequestDenied`.
+SAML that is the status `Responder` / `RequestDenied`, and for OpenID Connect the error `unauthorized_client`.
 
 The check sees the requester's record: the protocol-neutral part and the protocol metadata. Two implementations are
 supplied:
@@ -312,7 +312,9 @@ Two predicates are built in:
   is obtained this way, so the Service Provider metadata decides.
 
 With Spring Boot, the configurable check is set up from properties under each protocol's prefix, for SAML
-`authn-server.saml.requester-acceptance.*`, see [Configuration](configuration.html#requester-acceptance).
+`authn-server.saml.requester-acceptance.*`, see [Configuration](configuration.html#requester-acceptance), and for
+OpenID Connect `authn-server.oidc.requester-acceptance.*`, see
+[Configuration](configuration.html#oidc-requester-acceptance).
 
 A predicate of your own is added with an adapter. A predicate that reads protocol metadata gets it from the record in
 its own type:

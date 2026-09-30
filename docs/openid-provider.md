@@ -8,8 +8,8 @@
 
 This page describes the OpenID Provider: where it publishes its discovery document and its keys, how the keys are
 configured and rolled over, how the key that a message to a client is signed with is chosen, how the offered scopes,
-the supported claims and the authentication contexts are worked out from the authentication providers, and how to
-extend the discovery document. The properties are described in
+the supported claims and the authentication contexts are worked out from the authentication providers, how
+authentication requests are processed, and how to extend the discovery document. The properties are described in
 [Configuration](configuration.html#the-openid-provider).
 
 Source links in this guide point to the `main` branch of the
@@ -23,6 +23,15 @@ Source links in this guide point to the `main` branch of the
     - [Rolling over a key](#rolling-over-a-key)
 - [Choosing the signing key for a client](#choosing-the-signing-key-for-a-client)
 - [Scopes, claims and authentication contexts](#scopes-claims-and-authentication-contexts)
+- [Authentication requests](#authentication-requests)
+    - [How a request is processed](#how-a-request-is-processed)
+    - [Clients](#clients)
+    - [Request objects](#request-objects)
+    - [PKCE, state and response modes](#pkce-state-and-response-modes)
+    - [Which clients are accepted](#which-clients-are-accepted)
+    - [What the request is turned into](#what-the-request-is-turned-into)
+    - [Swedish extensions](#swedish-extensions)
+    - [Failures](#failures)
 - [The discovery document](#the-discovery-document)
     - [Extending the document](#extending-the-document)
 
@@ -38,6 +47,7 @@ OIDC path, `/oidc` by default, see [URL layout](configuration.html#url-layout). 
 | Issuer | `https://op.example.com` |
 | Discovery document | `https://op.example.com/.well-known/openid-configuration` |
 | JWKS | `https://op.example.com/oidc/jwks` |
+| Authorization endpoint | `https://op.example.com/oidc/authorize` |
 
 The discovery document is always published at the issuer followed by `/.well-known/openid-configuration`, as OpenID
 Connect Discovery, Section 4, requires. It is therefore not under the OIDC path. An issuer with a path moves the
@@ -208,6 +218,213 @@ claim of an offered scope is not delivered by any provider.
 **Authentication contexts.** `acr_values_supported` is the union of the authentication context URIs of the providers,
 `getSupportedAuthnContextUris()`. It is not configurable.
 
+<a name="authentication-requests"></a>
+## Authentication requests
+
+Authentication requests are received on the authorization endpoint, with GET or POST. The OpenID Provider follows
+OpenID Connect Core, Section 3.1.2, and the
+[Swedish OpenID Connect Profile](https://www.oidc.se/specifications/swedish-oidc-profile-1_0.html), Section 2. Only the
+authorization code flow is supported, so `response_type` must be `code`.
+
+This page covers the processing of the request, up to the protocol-neutral authentication requirements. Handing the
+request to authentication, the authorization code response and the token endpoint are not yet in place.
+
+<a name="how-a-request-is-processed"></a>
+### How a request is processed
+
+The request is processed in two parts, by
+[`OidcAuthnRequestAuthenticationConverter`][OidcAuthnRequestAuthenticationConverter] and
+[`OidcAuthnRequestAuthenticationProvider`][OidcAuthnRequestAuthenticationProvider].
+
+The first part finds out where a response can be sent:
+
+1. The client is looked up by `client_id` in the [client registry](client-registry.html).
+2. A request object, if the request has one, is fetched and decoded, and its parameters replace those of the request,
+   see [Request objects](#request-objects).
+3. `redirect_uri` must be present and be one of the client's registered redirect URIs, compared as strings.
+4. `response_mode` must be `query`, `form_post` or absent.
+
+From this point, a failure is sent to the redirect URI as an error response, in the requested response mode and with
+the `state` of the request. The second part checks the request and builds the requirements:
+
+1. The parameters are parsed, and `response_type` must be `code`.
+2. `state` must be present, unless that check is turned off.
+3. A request object must be signed if that is required.
+4. The client must be accepted, see [Which clients are accepted](#which-clients-are-accepted).
+5. PKCE is checked.
+6. The authentication requirements are built from the rest of the request.
+
+<a name="clients"></a>
+### Clients
+
+The clients are found in the client registry, through its OpenID Connect backends and in their configured order, see
+[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends). There are no properties for the
+backends yet, so they are added in an [adapter](configuration.html#adjusting-the-configuration-in-code):
+
+```java
+@Bean
+AuthnServerConfigurerAdapter oidcClients(final List<OidcClientRecord> clients) {
+  return (http, configurer) -> configurer.clientRegistryBackend(new ConfigurationClientBackend(clients));
+}
+```
+
+What the OpenID Provider reads from the client metadata when it processes a request:
+
+| Client metadata | Used for |
+| :--- | :--- |
+| `redirect_uris` | The accepted values of `redirect_uri`. |
+| `request_uris` | The only values of `request_uri` that are fetched. |
+| `jwks` or `jwks_uri` | Verifying signed request objects and signature requests. |
+| `request_object_signing_alg` | When set, request objects must be signed with this algorithm. |
+| `token_endpoint_auth_method` | A client with `none` is a public client, and must use PKCE. |
+
+An unknown client and a client registry that fails end at the OpenID Provider, and are logged differently: the first
+at `INFO`, since it is a normal outcome, and the second at `ERROR`, since a dependency is not working.
+
+<a name="request-objects"></a>
+### Request objects
+
+A request object may be passed by value, in `request`, or by reference, in `request_uri`. Its parameters replace
+those of the request with the same name, as OpenID Connect Core, Section 6.3.3, states. `client_id` must still be
+given as a plain parameter.
+
+- **By reference.** A `request_uri` is only fetched when it is one of the client's registered `request_uris`, so a
+  client that has registered none cannot use `request_uri`. A fragment is ignored in the comparison and is not sent.
+  The fetched request object is processed exactly like one passed by value. The default fetcher uses HTTP GET with a
+  timeout of 5 seconds and accepts at most 100 KB. Replace it with
+  `OidcProviderConfigurer.authnRequestProcessor(p -> p.requestUriFetcher(...))`.
+- **Signed.** The signature is verified with the client's keys, from `jwks` or `jwks_uri` in its metadata. The
+  accepted algorithms are `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384` and `ES512`. A signed
+  request object must hold `iss`, which must be the `client_id`, and `aud`, which must be the issuer or the URL of the
+  authorization endpoint.
+- **Encrypted.** An encrypted request object is decrypted with the [decryption keys](#decryption-keys). It may hold a
+  signed request object (signed, then encrypted) or an unsigned one.
+- **Unsigned.** An unsigned request object, `alg` `none`, is accepted by default. It is rejected when
+  `authn-server.oidc.authorization-request.require-signed-request-object` is `true`, and when the client has registered
+  `request_object_signing_alg`. A client that has registered an algorithm must sign with that algorithm.
+
+For every request object, `client_id` and `iss`, when present, must be the `client_id` of the request, and a request
+object whose `exp` has passed, or whose `nbf` has not been reached, is rejected. The clock skew of the OpenID Provider
+applies.
+
+If a request object cannot be fetched or decoded, there may be no redirect URI to answer to, since the request object
+may be what holds it. The error is sent to the client when the plain parameters of the request hold a registered
+redirect URI and a supported response mode, and otherwise ends at the OpenID Provider.
+
+<a name="pkce-state-and-response-modes"></a>
+### PKCE, state and response modes
+
+**PKCE** (RFC 7636) is required for public clients, and optional for other clients. With
+`authn-server.oidc.authorization-request.require-pkce` set to `true` it is required for all clients. The only
+supported method is `S256`. A request with the method `plain`, or with a `code_challenge` and no method, which means
+`plain`, is always rejected.
+
+**`state`** is required by default, as the Swedish OpenID Connect Profile, Section 2.1, requires. A request without it
+is answered with `invalid_request`. With `authn-server.oidc.authorization-request.require-state` set to `false`, such a
+request is accepted, and the response carries no `state`.
+
+**Response modes.** `query`, the default for the code flow, and `form_post` are supported. With `form_post`, the
+response is posted to the client by a page that the browser submits by itself, like the SAML response page. Replace
+the page with `OidcProviderConfigurer.authnRequestProcessor(p -> p.responsePage(...))`. Any other `response_mode`,
+such as `fragment`, is answered with HTTP status 400 and no redirect, as OpenID Connect Core, Section 3.1.2.6, says.
+
+<a name="which-clients-are-accepted"></a>
+### Which clients are accepted
+
+Once the redirect URI is established and the request has been parsed, the
+[requester acceptance](client-registry.html#requester-acceptance) decides whether the client may use the OpenID
+Provider. By default every known client is accepted. The rules for OpenID Connect are set under
+`authn-server.oidc.requester-acceptance`: a whitelist of `client_id`s, and groups of required trust mark types, see
+[Configuration](configuration.html#oidc-requester-acceptance). A trust mark type that the client does not hold is asked
+for through the client registry before the client is rejected, see
+[Trust marks on demand](client-registry.html#trust-marks-on-demand).
+
+A client that is not accepted gets the error `unauthorized_client`.
+
+<a name="what-the-request-is-turned-into"></a>
+### What the request is turned into
+
+The result is the protocol-neutral authentication requirements, as an
+[`OidcAuthenticationRequirements`][OidcAuthenticationRequirements], which adds what only OpenID Connect has.
+
+| Request | Requirement |
+| :--- | :--- |
+| `prompt=login` | Force authentication. |
+| `prompt=none` | Passive authentication. `none` together with another value is `invalid_request`. |
+| `prompt=consent` | Consent required. |
+| `max_age` | The maximum authentication age. `max_age=0` is the same as `prompt=login`. |
+| `scope` | The requested scopes that the OpenID Provider offers. Other scopes are ignored, as OpenID Connect Core says for scopes that are not understood. |
+| `scope` and `claims` | The requested attributes. The offered scopes are expanded into their claims, the `claims` parameter is merged in, and the claims are mapped to generic attributes, see [What a request asks for](attributes.html#what-a-request-asks-for). |
+| `acr_values`, or `acr` in `claims` | The authentication contexts, in the client's order of preference. Values that no authentication provider supports are left out. |
+| `login_hint` | The login hint. |
+| `ui_locales` | The preferred languages of the user interface. |
+| `id_token_hint` | The subject of the ID token. |
+
+**Authentication contexts.** `acr` in the `claims` parameter wins over `acr_values`, and the Swedish profile says a
+client should not send both. When `acr` is requested as essential, and none of its values is supported by an
+authentication provider, the request is answered with `unmet_authentication_requirements`, as the Swedish profile,
+Section 2.2, requires. Values of `acr_values` are voluntary, so if none of them is supported the requirement is left
+empty.
+
+**`id_token_hint`** must be an ID token issued by this OpenID Provider: signed by one of its signing keys, with the
+issuer as `iss`, and with the client in `aud`. An expired token is accepted. Otherwise the request is answered with
+`invalid_request`.
+
+The login hint and the subject of the ID token hint may be personal data, and are never logged.
+
+The data needed to answer the request and issue tokens, such as the redirect URI, `state`, `nonce` and the PKCE code
+challenge, is kept as the protocol request data of the request, an
+[`OidcAuthnRequestData`][OidcAuthnRequestData].
+
+<a name="swedish-extensions"></a>
+### Swedish extensions
+
+The parameters of
+[Authentication Request Parameter Extensions for the Swedish OpenID Connect Profile](https://www.oidc.se/specifications/request-parameter-extensions-1_1.html)
+and the [Signature Extension for OpenID Connect](https://www.oidc.se/specifications/oidc-signature-extension-1_1.html)
+are read, as plain parameters or from a request object.
+
+- **User message**, `https://id.oidc.se/param/userMessage`. Read only when user messages are supported for OpenID
+  Connect, `authn-server.oidc.supports-user-message`, and otherwise ignored. The MIME types `text/plain` and
+  `text/markdown` are supported. An invalid message, or another MIME type, is answered with `invalid_request`.
+- **Authentication provider**, `https://id.oidc.se/param/authnProvider`. Becomes the requested authentication
+  provider.
+- **Signature request**, `https://id.oidc.se/param/signRequest`. Read when the scope `https://id.oidc.se/scope/sign`
+  or `https://id.oidc.se/scope/signApproval` is requested and offered, and otherwise ignored. It must then be present,
+  either as a JWT of its own signed with the client's key, which may also be encrypted, or as a JSON object in a signed
+  request object. `prompt` must hold both `login` and `consent`. For the sign scope, `tbs_data` must be present, and
+  for sign approval only, it must not be. The sign message becomes a sign message that must be shown, with the data
+  to be signed. A signature request that breaks a rule is answered with `invalid_request`.
+
+<a name="failures"></a>
+### Failures
+
+Until the client and the redirect URI are known, there is nowhere safe to send a response. Failures up to that point
+end at the OpenID Provider as an `UnrecoverableErrorException`, with one of the errors of
+[`OidcUnrecoverableError`][OidcUnrecoverableError]. After that point, a failure is sent to the redirect URI as an error
+response, with an `error_description` meant for the client's logs.
+
+| Failure | Outcome |
+| :--- | :--- |
+| `client_id` is missing | Unrecoverable (`INVALID_AUTHN_REQUEST`) |
+| The client is not known | Unrecoverable (`UNKNOWN_CLIENT`) |
+| The client registry fails when the client is looked up | Unrecoverable (`CLIENT_LOOKUP_FAILED`) |
+| `redirect_uri` is missing or not registered | Unrecoverable (`INVALID_REDIRECT_URI`) |
+| `response_mode` is not `query` or `form_post` | HTTP status 400 (`UNSUPPORTED_RESPONSE_MODE`) |
+| The request object cannot be fetched or decoded, and the plain parameters give no redirect URI | Unrecoverable (`INVALID_AUTHN_REQUEST`) |
+| `request_uri` is not registered, or cannot be fetched | `invalid_request_uri` |
+| The request object is invalid, not signed when it must be, or signed with the wrong algorithm | `invalid_request_object` |
+| `response_type` is not `code` | `unsupported_response_type` |
+| A parameter is missing or invalid, such as `scope` without `openid`, `state`, `prompt`, `max_age` or `id_token_hint` | `invalid_request` |
+| PKCE is missing when required, or uses `plain` | `invalid_request` |
+| The client is not accepted | `unauthorized_client` |
+| The client registry fails during the acceptance check | Unrecoverable (`CLIENT_LOOKUP_FAILED`) |
+| None of the essential `acr` values is supported | `unmet_authentication_requirements` |
+| The user message or the signature request is invalid | `invalid_request` |
+
+The errors that the authentication step reports are mapped as described in
+[Errors](authentication-module.html#errors).
+
 <a name="the-discovery-document"></a>
 ## The discovery document
 
@@ -224,7 +441,18 @@ The discovery document holds:
 | `acr_values_supported` | The authentication context URIs of the providers. |
 | `subject_types_supported` | The subject types of the subject generator factory, by default `public` and `pairwise`. |
 | `ui_locales_supported` | The configured UI locales. Left out when none are configured. |
-| `https://id.oidc.se/disco/userMessageSupported` | `true` when user messages are supported for OpenID Connect, see [Authentication Request Parameter Extensions for the Swedish OpenID Connect Profile](https://www.oidc.se/specifications/request-parameter-extensions.html). Left out otherwise. |
+| `authorization_endpoint` | The URL of the authorization endpoint. |
+| `response_types_supported` | `code`. |
+| `response_modes_supported` | `query` and `form_post`. |
+| `claims_parameter_supported` | `true`. |
+| `request_parameter_supported` | `true`. |
+| `request_uri_parameter_supported` | `true`. |
+| `require_request_uri_registration` | `true`. |
+| `request_object_signing_alg_values_supported` | The algorithms that signed request objects are accepted with, and `none` when unsigned request objects are accepted. |
+| `code_challenge_methods_supported` | `S256`. |
+| `https://id.oidc.se/disco/userMessageSupported` | `true` when user messages are supported for OpenID Connect, see [Authentication Request Parameter Extensions for the Swedish OpenID Connect Profile](https://www.oidc.se/specifications/request-parameter-extensions-1_1.html). Left out otherwise. |
+| `https://id.oidc.se/disco/userMessageSupportedMimeTypes` | `text/plain` and `text/markdown`, when user messages are supported. Left out otherwise. |
+| `https://id.oidc.se/disco/authnProviderSupported` | `true`. |
 
 <a name="extending-the-document"></a>
 ### Extending the document
@@ -261,6 +489,11 @@ AuthnServerConfigurerAdapter discoveryAdjustments() {
 }
 ```
 
+[OidcAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authentication/OidcAuthenticationRequirements.java
+[OidcAuthnRequestAuthenticationConverter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationConverter.java
+[OidcAuthnRequestAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationProvider.java
+[OidcAuthnRequestData]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestData.java
+[OidcUnrecoverableError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcUnrecoverableError.java
 [SigningKeySelector]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/keys/SigningKeySelector.java
 [SupportedScopesAndClaims]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/scope/SupportedScopesAndClaims.java
 

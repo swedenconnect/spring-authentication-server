@@ -27,6 +27,8 @@ how the server is set up without Spring Boot.
 - [The OpenID Provider](#the-openid-provider)
     - [Keys](#oidc-keys)
     - [OIDC endpoints](#oidc-endpoints)
+    - [Authorization requests](#oidc-authorization-requests)
+    - [Requester acceptance](#oidc-requester-acceptance)
     - [Scopes and claims](#oidc-scopes-and-claims)
     - [The discovery document](#oidc-discovery)
 - [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
@@ -511,10 +513,12 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `issuer` | The issuer identifier. It must be the base URL, or begin with the base URL followed by a path. The discovery document is published at the issuer followed by `/.well-known/openid-configuration`. | The base URL |
 | `sso.*` | The single sign-on policy for OpenID Connect, see [Single sign-on](#single-sign-on). | `authn-server.sso.*` |
 | `clock-skew` | The clock skew for OpenID Connect. | `authn-server.clock-skew` |
-| `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. | `authn-server.supports-user-message` |
+| `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the `https://id.oidc.se/param/userMessage` parameter is read, and the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. When they are not, the parameter is ignored. | `authn-server.supports-user-message` |
 | `subject-identifier.*` | The subject identifier settings for OpenID Connect. | `authn-server.subject-identifier.*` |
 | `keys.*` | The signing and decryption keys, see [Keys](#oidc-keys). | Required |
 | `endpoints.*` | The endpoints, see [OIDC endpoints](#oidc-endpoints). | See below |
+| `authorization-request.*` | The processing of authentication requests, see [Authorization requests](#oidc-authorization-requests). | See below |
+| `requester-acceptance.*` | Which clients are accepted, see [Requester acceptance](#oidc-requester-acceptance). | Every known client |
 | `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. | `true` |
 | `scopes[]` | The offered scopes, see [Scopes and claims](#oidc-scopes-and-claims). | Derived from the authentication providers |
 | `claims[]` | Claims supported on top of those of the authentication providers, see [Scopes and claims](#oidc-scopes-and-claims). | - |
@@ -567,9 +571,56 @@ The endpoints are given relative to the OIDC path, see [URL layout](#url-layout)
 | Property | Description | Default value |
 | :--- | :--- | :--- |
 | `jwks` | Where the JWKS is published. | `/jwks` |
+| `authorization` | Where authentication requests are received, with GET and POST. | `/authorize` |
 
-With the default OIDC path, the JWKS is published at `/oidc/jwks`. The discovery document is not an endpoint under
-the OIDC path; it follows the issuer.
+With the default OIDC path, the JWKS is published at `/oidc/jwks` and the authorization endpoint is `/oidc/authorize`.
+The discovery document is not an endpoint under the OIDC path; it follows the issuer.
+
+<a name="oidc-authorization-requests"></a>
+### Authorization requests
+
+How the OpenID Provider processes an authentication request, and which failures are sent to the client, is described
+in [The OpenID Provider](openid-provider.html#authentication-requests). These properties, under
+`authn-server.oidc.authorization-request`, affect it:
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `require-pkce` | Whether PKCE is required for all clients. When `false`, it is required for public clients only. The `plain` method is never accepted. | `false` |
+| `require-signed-request-object` | Whether request objects must be signed. When `false`, an unsigned request object is accepted, unless the client has registered `request_object_signing_alg`. The discovery document declares `none` as a request object signing algorithm only when this is `false`. | `false` |
+| `require-state` | Whether authentication requests must carry `state`. When `false`, a request without `state` is accepted, and its response carries no `state`. | `true` |
+
+```yaml
+authn-server:
+  oidc:
+    authorization-request:
+      require-pkce: true
+      require-signed-request-object: true
+```
+
+The clock skew, `authn-server.oidc.clock-skew`, applies to the `exp` and `nbf` of request objects.
+
+<a name="oidc-requester-acceptance"></a>
+### Requester acceptance
+
+By default, every client that the client registry knows may use the OpenID Provider. The rules under
+`authn-server.oidc.requester-acceptance` restrict that, in the same way as for SAML. How the rules work is described in
+[The client registry](client-registry.html#requester-acceptance).
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `whitelist[]` | The `client_id`s of the accepted clients. | - |
+| `required-marks[][]` | Groups of trust mark types. Every group must be satisfied, and a group is satisfied by any one of its trust mark types. A trust mark type that the client does not hold is asked for through the client registry before the client is rejected. | - |
+| `mode` | How the rules are combined: `ALL`, every rule must accept, or `ANY`, one accepting rule is enough. | `ALL` |
+
+```yaml
+authn-server:
+  oidc:
+    requester-acceptance:
+      required-marks:
+        - - https://tm.example.com/public-sector
+```
+
+A client that is not accepted gets the error `unauthorized_client`.
 
 <a name="oidc-scopes-and-claims"></a>
 ### Scopes and claims

@@ -28,7 +28,27 @@ public enum OidcUnrecoverableError implements UnrecoverableError {
 
   /** The client is registered in a way that makes it impossible to answer its request. */
   INVALID_CLIENT_CONFIGURATION("authn-server.error.unrecoverable.oidc.client-configuration",
-      "The client is not correctly registered");
+      "The client is not correctly registered"),
+
+  /** The authentication request lacks {@code client_id}, or cannot be processed before a response can be sent. */
+  INVALID_AUTHN_REQUEST("authn-server.error.unrecoverable.oidc.invalid-request",
+      "The authentication request is invalid and cannot be answered"),
+
+  /** The client is not known. */
+  UNKNOWN_CLIENT("authn-server.error.unrecoverable.oidc.unknown-client",
+      "The client has not been registered at the OpenID Provider"),
+
+  /** The client could not be looked up, since the client registry failed. */
+  CLIENT_LOOKUP_FAILED("authn-server.error.unrecoverable.oidc.client-lookup-failed",
+      "The client could not be looked up"),
+
+  /** The redirect URI is missing, or is not registered for the client. */
+  INVALID_REDIRECT_URI("authn-server.error.unrecoverable.oidc.redirect-uri",
+      "The redirect URI is missing or has not been registered for the client"),
+
+  /** The response mode is not supported. The OpenID Provider answers with HTTP status 400. */
+  UNSUPPORTED_RESPONSE_MODE("authn-server.error.unrecoverable.oidc.response-mode",
+      "The requested response mode is not supported");
 
   /** The message code for resolving the error message. */
   private final String messageCode;

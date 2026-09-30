@@ -19,7 +19,7 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
 import java.net.URI;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,16 +34,21 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import com.nimbusds.langtag.LangTag;
 import com.nimbusds.langtag.LangTagException;
+import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.oauth2.sdk.ParseException;
+import com.nimbusds.oauth2.sdk.ResponseMode;
+import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.Scope;
 import com.nimbusds.oauth2.sdk.id.Issuer;
+import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.openid.connect.sdk.claims.ACR;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 
 import net.minidev.json.JSONObject;
 
 import se.oidc.nimbus.claims.ParameterConstants;
-import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.message.MessageMimeType;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.scope.SupportedScopesAndClaims;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcDiscoveryEndpointFilter;
@@ -54,8 +59,15 @@ import se.swedenconnect.spring.authnserver.oidc.web.OidcDiscoveryEndpointFilter;
  * The document is built from the values of the {@link OidcProviderConfigurer}: the issuer, the JWKS URI, the ID token
  * signing algorithms, which are those of the active signing keys, the request object encryption algorithms, which are
  * those of the active decryption keys, the scopes, the claims, the authentication context URIs of the authentication
- * providers, the subject types, the UI locales, and the user message support parameter of the Swedish OpenID Connect
+ * providers, the subject types, the UI locales, and the user message support parameters of the Swedish OpenID Connect
  * Profile when user messages are supported.
+ * </p>
+ * <p>
+ * For the authorization endpoint, the document holds the endpoint, the response type {@code code}, the response modes
+ * {@code query} and {@code form_post}, support for the {@code claims}, {@code request} and {@code request_uri}
+ * parameters (a {@code request_uri} must be registered), the accepted request object signing algorithms, including
+ * {@code none} only when unsigned request objects are accepted, the PKCE method {@code S256}, and support for the
+ * {@code authnProvider} parameter of the Swedish OpenID Connect Profile.
  * </p>
  * <p>
  * Additional parameters are added to the built document, and may not replace a parameter that the OpenID Provider
@@ -187,12 +199,7 @@ public class OidcDiscoveryEndpointConfigurer {
     metadata.setScopes(new Scope(scopesAndClaims.scopes().toArray(String[]::new)));
     metadata.setClaims(scopesAndClaims.claims());
 
-    final List<ACR> acrs = oidc.getServer().getAuthenticationProviders().stream()
-        .map(UserAuthenticationProvider::getSupportedAuthnContextUris)
-        .flatMap(Collection::stream)
-        .distinct()
-        .map(ACR::new)
-        .toList();
+    final List<ACR> acrs = oidc.getSupportedAuthnContextUris().stream().map(ACR::new).toList();
     if (!acrs.isEmpty()) {
       metadata.setACRs(acrs);
     }
@@ -201,7 +208,27 @@ public class OidcDiscoveryEndpointConfigurer {
     }
     if (oidc.isSupportsUserMessage()) {
       metadata.setCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME, true);
+      metadata.setCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_MIMETYPES_PARAM_NAME,
+          List.of(MessageMimeType.TEXT_PLAIN.getMimeType(), MessageMimeType.TEXT_MARKDOWN.getMimeType()));
     }
+
+    // The authorization endpoint ...
+    //
+    metadata.setAuthorizationEndpointURI(URI.create(oidc.getEndpointUrl(oidc.getAuthorizationEndpoint())));
+    metadata.setResponseTypes(List.of(ResponseType.CODE));
+    metadata.setResponseModes(List.of(ResponseMode.QUERY, ResponseMode.FORM_POST));
+    metadata.setSupportsClaimsParams(true);
+    metadata.setSupportsRequestParam(true);
+    metadata.setSupportsRequestURIParam(true);
+    metadata.setRequiresRequestURIRegistration(true);
+    final List<JWSAlgorithm> requestObjectAlgorithms =
+        new ArrayList<>(RequestObjectDecoder.SUPPORTED_SIGNING_ALGORITHMS);
+    if (!oidc.isRequireSignedRequestObject()) {
+      requestObjectAlgorithms.add(new JWSAlgorithm("none"));
+    }
+    metadata.setRequestObjectJWSAlgs(requestObjectAlgorithms);
+    metadata.setCodeChallengeMethods(List.of(CodeChallengeMethod.S256));
+    metadata.setCustomParameter(ParameterConstants.REQUESTED_PROVIDER_SUPPORTED_PARAM_NAME, true);
 
     final OIDCProviderMetadata result = this.addParameters(metadata);
     this.providerMetadataCustomizer.customize(result);

@@ -28,7 +28,10 @@ import org.junit.jupiter.api.Test;
 import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.langtag.LangTag;
+import com.nimbusds.oauth2.sdk.ResponseMode;
+import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.id.Identifier;
+import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 
@@ -90,7 +93,37 @@ class OidcProviderConfigurerTest {
     assertThat(metadata.getUILocales()).extracting(LangTag::toString).containsExactly("sv", "en");
     assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME)).isNull();
     assertThat(metadata.getUserInfoJWSAlgs()).isNull();
-    assertThat(metadata.getAuthorizationEndpointURI()).isNull();
+    assertThat(metadata.getAuthorizationEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/authorize"));
+    assertThat(metadata.getResponseTypes()).containsExactly(ResponseType.CODE);
+    assertThat(metadata.getResponseModes()).containsExactly(ResponseMode.QUERY, ResponseMode.FORM_POST);
+    assertThat(metadata.supportsClaimsParam()).isTrue();
+    assertThat(metadata.supportsRequestParam()).isTrue();
+    assertThat(metadata.supportsRequestURIParam()).isTrue();
+    assertThat(metadata.requiresRequestURIRegistration()).isTrue();
+    assertThat(metadata.getRequestObjectJWSAlgs()).contains(JWSAlgorithm.RS256, JWSAlgorithm.PS256, JWSAlgorithm.ES256)
+        .extracting(JWSAlgorithm::getName).contains("none");
+    assertThat(metadata.getCodeChallengeMethods()).containsExactly(CodeChallengeMethod.S256);
+    assertThat(metadata.getCustomParameter(ParameterConstants.REQUESTED_PROVIDER_SUPPORTED_PARAM_NAME))
+        .isEqualTo(true);
+  }
+
+  @Test
+  void noneIsNotAdvertisedWhenSignedRequestObjectsAreRequired() {
+    this.oidc.requireSignedRequestObject(true);
+    assertThat(this.build().getRequestObjectJWSAlgs()).extracting(JWSAlgorithm::getName).doesNotContain("none");
+  }
+
+  @Test
+  void theAuthorizationEndpointMayBeChanged() {
+    this.oidc.authorizationEndpoint("/authz");
+    assertThat(this.build().getAuthorizationEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/authz"));
+  }
+
+  @Test
+  void anAuthorizationEndpointWithoutLeadingSlashIsRejected() {
+    this.oidc.authorizationEndpoint("authz");
+    assertThatThrownBy(this::build).isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("authorization endpoint");
   }
 
   @Test
@@ -104,8 +137,10 @@ class OidcProviderConfigurerTest {
   @Test
   void theUserMessageParameterIsAdvertisedWhenUserMessagesAreSupportedForOidc() {
     this.server.supportsUserMessage(true);
-    assertThat(this.build().getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME))
-        .isEqualTo(true);
+    final OIDCProviderMetadata metadata = this.build();
+    assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME)).isEqualTo(true);
+    assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_MIMETYPES_PARAM_NAME))
+        .isEqualTo(List.of("text/plain", "text/markdown"));
   }
 
   @Test
@@ -131,7 +166,7 @@ class OidcProviderConfigurerTest {
     final Map<String, Object> parameters = new LinkedHashMap<>();
     parameters.put("service_documentation", "https://op.example.com/docs");
     parameters.put("https://example.com/disco/feature", List.of("a", "b"));
-    parameters.put("claims_parameter_supported", true);
+    parameters.put("frontchannel_logout_supported", true);
     this.oidc.discoveryEndpoint(d -> d.additionalParameters(parameters)
         .providerMetadataCustomizer(m -> m.setCustomParameter("https://example.com/disco/custom", "value")));
 
@@ -139,7 +174,7 @@ class OidcProviderConfigurerTest {
     final JSONObject json = metadata.toJSONObject();
 
     assertThat(metadata.getServiceDocsURI()).isEqualTo(URI.create("https://op.example.com/docs"));
-    assertThat(metadata.supportsClaimsParam()).isTrue();
+    assertThat(metadata.supportsFrontChannelLogout()).isTrue();
     assertThat(json.get("https://example.com/disco/feature")).isEqualTo(List.of("a", "b"));
     assertThat(json.get("https://example.com/disco/custom")).isEqualTo("value");
     assertThat(metadata.getIssuer().getValue()).isEqualTo(BASE_URL);
