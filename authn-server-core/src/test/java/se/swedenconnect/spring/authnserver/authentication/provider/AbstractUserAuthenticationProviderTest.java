@@ -308,6 +308,30 @@ class AbstractUserAuthenticationProviderTest {
   }
 
   @Test
+  void theProtocolPolicyWinsOverTheServerDefaultAndTheProviderPolicyWinsOverBoth() {
+    final TestProvider provider = new TestProvider();
+    provider.setServerSsoPolicy(SsoPolicy.none());
+    provider.setServerSsoPolicy(AuthenticationProtocol.SAML, SsoPolicy.forSessionLifetime());
+
+    assertThat(provider.getSsoPolicy(AuthenticationProtocol.SAML).getTimeLimit()).isNull();
+    assertThat(provider.getSsoPolicy(AuthenticationProtocol.OIDC).isEnabled()).isFalse();
+
+    final UserAuthentication previous = authentication(user(), SP, REQUESTED);
+    final UserAuthenticationInputToken token = token(requirements(LOA3));
+    token.setPreviousAuthentication(previous);
+    assertThat(provider.authenticateUser(token)).isSameAs(previous);
+
+    final SsoPolicy own = SsoPolicy.none();
+    provider.setSsoPolicy(own);
+    assertThat(provider.getSsoPolicy(AuthenticationProtocol.SAML)).isSameAs(own);
+    assertThat(provider.getSsoPolicy(AuthenticationProtocol.OIDC)).isSameAs(own);
+
+    provider.setSsoPolicy(null);
+    provider.setServerSsoPolicy(AuthenticationProtocol.SAML, null);
+    assertThat(provider.getSsoPolicy(AuthenticationProtocol.SAML).isEnabled()).isFalse();
+  }
+
+  @Test
   void theServerDefaultAppliesWhenTheProviderHasNoPolicyOfItsOwn() {
     final TestProvider provider = new TestProvider();
     provider.setServerSsoPolicy(SsoPolicy.none());

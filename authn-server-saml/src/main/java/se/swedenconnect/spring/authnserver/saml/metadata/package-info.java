@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * SAML metadata: the metadata sources that the Identity Provider reads Service Provider metadata from, and the
- * client registry backend that serves it.
+ * SAML metadata: the metadata sources that the Identity Provider reads Service Provider metadata from, the client
+ * registry backend that serves it, and the message converter for metadata.
  */
 package se.swedenconnect.spring.authnserver.saml.metadata;

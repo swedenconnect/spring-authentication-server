@@ -61,6 +61,16 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
   List<String> getSupportedAuthnContextUris();
 
   /**
+   * Gets the SAML entity categories that the provider declares. The SAML Identity Provider publishes them in its
+   * metadata. Other protocols do not use them. The default is none.
+   *
+   * @return entity category URIs
+   */
+  default @Nonnull List<String> getEntityCategories() {
+    return List.of();
+  }
+
+  /**
    * Authenticates the user.
    * <p>
    * The result is normally a {@link UserAuthentication}. It is {@code null}, and only {@code null}, when the provider

@@ -21,13 +21,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.ext.saml2mdui.UIInfo;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.saml.saml2.metadata.EntityDescriptor;
+import org.opensaml.saml.saml2.metadata.Organization;
 
 import net.shibboleth.shared.resolver.ResolverException;
 import se.swedenconnect.opensaml.saml2.metadata.build.EntityAttributesBuilder;
@@ -38,6 +42,7 @@ import se.swedenconnect.opensaml.saml2.metadata.build.OrganizationBuilder;
 import se.swedenconnect.opensaml.saml2.metadata.build.SPSSODescriptorBuilder;
 import se.swedenconnect.opensaml.saml2.metadata.build.UIInfoBuilder;
 import se.swedenconnect.opensaml.common.utils.LocalizedString;
+import se.swedenconnect.opensaml.sweid.saml2.metadata.ext.OrganizationNumber;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 import se.swedenconnect.spring.authnserver.registry.DisplayName;
@@ -171,6 +176,60 @@ class SamlMetadataBackendTest extends OpenSamlTestBase {
   }
 
   @Test
+  void theOrganisationNumberComesFromTheOrganisationExtension() {
+    assertThat(SamlMetadataBackend.toRecord(withOrganisationNumber("556677-8899")).organizationNumber())
+        .isEqualTo("556677-8899");
+    assertThat(SamlMetadataBackend.toRecord(withOrganisationNumber("5566778899")).organizationNumber())
+        .isEqualTo("5566778899");
+  }
+
+  @Test
+  void theOrganisationNumberIsReadFromParsedMetadata() throws Exception {
+    final String xml = """
+        <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+            xmlns:mdorgext="http://id.swedenconnect.se/authn/1.0/md-org-ext/ns" entityID="https://sp.example.com">
+          <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+            <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                Location="https://sp.example.com/acs" index="0"/>
+          </md:SPSSODescriptor>
+          <md:Organization>
+            <md:Extensions>
+              <mdorgext:OrganizationNumber>556677-8899</mdorgext:OrganizationNumber>
+            </md:Extensions>
+            <md:OrganizationName xml:lang="en">Org</md:OrganizationName>
+            <md:OrganizationDisplayName xml:lang="en">Org</md:OrganizationDisplayName>
+            <md:OrganizationURL xml:lang="en">https://www.example.com</md:OrganizationURL>
+          </md:Organization>
+        </md:EntityDescriptor>""";
+    final EntityDescriptor metadata = (EntityDescriptor) XMLObjectSupport.unmarshallFromInputStream(
+        XMLObjectProviderRegistrySupport.getParserPool(),
+        new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+
+    assertThat(SamlMetadataBackend.toRecord(metadata).organizationNumber()).isEqualTo("556677-8899");
+  }
+
+  @Test
+  void aServiceProviderWithoutOrganisationNumberHasNone() {
+    // No md:Organization
+    assertThat(SamlMetadataBackend.toRecord(EntityDescriptorBuilder.builder()
+        .entityID(ENTITY_ID)
+        .roleDescriptors(SPSSODescriptorBuilder.builder().build())
+        .build()).organizationNumber()).isNull();
+
+    // md:Organization without the extension
+    assertThat(SamlMetadataBackend.toRecord(EntityDescriptorBuilder.builder()
+        .entityID(ENTITY_ID)
+        .roleDescriptors(SPSSODescriptorBuilder.builder().build())
+        .organization(OrganizationBuilder.builder()
+            .organizationNames(new LocalizedString("Org", "en"))
+            .build())
+        .build()).organizationNumber()).isNull();
+
+    // An empty value
+    assertThat(SamlMetadataBackend.toRecord(withOrganisationNumber(" ")).organizationNumber()).isNull();
+  }
+
+  @Test
   void aServiceProviderThatIsNotInTheMetadataIsNotKnown() throws Exception {
     final MetadataResolver resolver = mock(MetadataResolver.class);
     when(resolver.resolveSingle(any())).thenReturn(null);
@@ -201,6 +260,21 @@ class SamlMetadataBackendTest extends OpenSamlTestBase {
 
     assertThat(record).isNotNull();
     assertThat(record.marks()).isEmpty();
+  }
+
+  private static EntityDescriptor withOrganisationNumber(final String number) {
+    final OrganizationNumber organizationNumber =
+        (OrganizationNumber) XMLObjectSupport.buildXMLObject(OrganizationNumber.DEFAULT_ELEMENT_NAME);
+    organizationNumber.setValue(number);
+    final Organization organization = OrganizationBuilder.builder()
+        .organizationNames(new LocalizedString("Org", "en"))
+        .build();
+    organization.setExtensions(ExtensionsBuilder.builder().extension(organizationNumber).build());
+    return EntityDescriptorBuilder.builder()
+        .entityID(ENTITY_ID)
+        .roleDescriptors(SPSSODescriptorBuilder.builder().build())
+        .organization(organization)
+        .build();
   }
 
   @Test

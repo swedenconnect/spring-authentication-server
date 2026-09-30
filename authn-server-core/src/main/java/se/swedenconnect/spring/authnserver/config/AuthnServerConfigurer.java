@@ -1,0 +1,486 @@
+/*
+ * Copyright 2026 Sweden Connect
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package se.swedenconnect.spring.authnserver.config;
+
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+
+import se.swedenconnect.spring.authnserver.authentication.provider.AbstractUserAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.authentication.provider.redirect.SessionBasedRedirectAuthenticationRepository;
+import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
+import se.swedenconnect.spring.authnserver.subject.AbstractSubjectIdentifierGenerator;
+
+/**
+ * The configurer for the whole authentication server. It holds the values that are common to all protocols, and the
+ * configurers of the protocols that the server offers, and applies them in one {@link SecurityFilterChain} that matches
+ * the endpoints of those protocols.
+ * <p>
+ * Some of the shared values may be overridden by a protocol, see {@link AbstractProtocolConfigurer}. A protocol value,
+ * when assigned, wins over the shared one.
+ * </p>
+ * <p>
+ * Every value is checked when the filter chain is built. Without Spring Boot, set up the chain like this:
+ * </p>
+ *
+ * <pre>{@code
+ * final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+ *     .baseUrl("https://idp.example.com")
+ *     .authenticationProvider(provider)
+ *     .protocol(new Saml2IdpConfigurer()
+ *         .defaultCredential(credential));
+ * AuthnServerConfigurer.applyDefaultSecurity(http, configurer);
+ * return http.build();
+ * }</pre>
+ *
+ * @author Martin Lindström
+ */
+public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerConfigurer, HttpSecurity> {
+
+  /** Logger. */
+  private static final Logger log = LoggerFactory.getLogger(AuthnServerConfigurer.class);
+
+  /** The default clock skew, 30 seconds. */
+  public static final Duration DEFAULT_CLOCK_SKEW = Duration.ofSeconds(30);
+
+  /** The base URL: protocol, host and context path. */
+  private String baseUrl;
+
+  /** The shared single sign-on policy. */
+  private SsoPolicy ssoPolicy = SsoPolicy.defaultPolicy();
+
+  /** The shared clock skew. */
+  private Duration clockSkew = DEFAULT_CLOCK_SKEW;
+
+  /** Whether user messages are supported. */
+  private boolean supportsUserMessage = false;
+
+  /** The shared subject identifier secret. */
+  private byte[] subjectIdentifierSecret;
+
+  /** The shared subject identifier hash algorithm. */
+  private String subjectIdentifierHashAlgorithm = AbstractSubjectIdentifierGenerator.DEFAULT_HASH_ALGORITHM;
+
+  /** The maximum age of an authentication in progress. */
+  private Duration authnFlowMaxAge = SessionBasedRedirectAuthenticationRepository.DEFAULT_MAX_AGE;
+
+  /** The authentication providers. */
+  private final List<UserAuthenticationProvider> authenticationProviders = new ArrayList<>();
+
+  /** The protocol configurers, keyed by their type. */
+  private final Map<Class<?>, AbstractProtocolConfigurer<?>> protocols = new LinkedHashMap<>();
+
+  /** The matcher for the endpoints of all protocols, assigned when the configurer is initialized. */
+  private RequestMatcher endpointsMatcher;
+
+  /**
+   * Applies the configurer to the supplied {@link HttpSecurity} object, and makes the filter chain match the endpoints
+   * of the configured protocols.
+   * <p>
+   * The caller may adjust the configurer after this call, since the values are read when the chain is built.
+   * </p>
+   *
+   * @param http the HTTP security object
+   * @param configurer the configurer
+   * @throws Exception for configuration errors
+   */
+  public static void applyDefaultSecurity(final @Nonnull HttpSecurity http,
+      final @Nonnull AuthnServerConfigurer configurer) throws Exception {
+
+    final RequestMatcher endpointsMatcher = configurer.getEndpointsMatcher();
+    http
+        .securityMatcher(endpointsMatcher)
+        .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+        .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+        .securityContext(securityContext -> securityContext.requireExplicitSave(false))
+        .with(configurer, Customizer.withDefaults());
+  }
+
+  /**
+   * Assigns the base URL, that is, the protocol, host and context path of the server, for example
+   * {@code https://idp.example.com/auth}. It must not end with a {@code /}. Required.
+   *
+   * @param baseUrl the base URL
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer baseUrl(final @Nonnull String baseUrl) {
+    this.baseUrl = baseUrl;
+    return this;
+  }
+
+  /**
+   * Gets the base URL.
+   *
+   * @return the base URL, or {@code null} if it has not been assigned
+   */
+  public @Nullable String getBaseUrl() {
+    return this.baseUrl;
+  }
+
+  /**
+   * Assigns the shared single sign-on policy. It applies unless a protocol or an authentication provider has a policy
+   * of its own. The order is: provider, protocol, shared.
+   *
+   * @param ssoPolicy the policy
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer ssoPolicy(final @Nonnull SsoPolicy ssoPolicy) {
+    this.ssoPolicy = Objects.requireNonNull(ssoPolicy, "ssoPolicy must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the shared single sign-on policy. Defaults to {@link SsoPolicy#defaultPolicy()}.
+   *
+   * @return the policy
+   */
+  public @Nonnull SsoPolicy getSsoPolicy() {
+    return this.ssoPolicy;
+  }
+
+  /**
+   * Assigns the shared clock skew, the time that clocks of other parties may differ from the server clock.
+   *
+   * @param clockSkew the clock skew
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer clockSkew(final @Nonnull Duration clockSkew) {
+    this.clockSkew = Objects.requireNonNull(clockSkew, "clockSkew must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the shared clock skew. Defaults to {@link #DEFAULT_CLOCK_SKEW}.
+   *
+   * @return the clock skew
+   */
+  public @Nonnull Duration getClockSkew() {
+    return this.clockSkew;
+  }
+
+  /**
+   * Assigns whether the server supports displaying a user message from the requester.
+   *
+   * @param supportsUserMessage whether user messages are supported
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer supportsUserMessage(final boolean supportsUserMessage) {
+    this.supportsUserMessage = supportsUserMessage;
+    return this;
+  }
+
+  /**
+   * Tells whether the server supports user messages. Defaults to {@code false}.
+   *
+   * @return {@code true} if user messages are supported and {@code false} otherwise
+   */
+  public boolean isSupportsUserMessage() {
+    return this.supportsUserMessage;
+  }
+
+  /**
+   * Assigns the shared secret used when subject identifiers are computed. Assigning a secret is strongly recommended.
+   *
+   * @param secret the secret, or {@code null} for no secret
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer subjectIdentifierSecret(final @Nullable byte[] secret) {
+    this.subjectIdentifierSecret = secret != null ? secret.clone() : null;
+    return this;
+  }
+
+  /**
+   * Gets the shared subject identifier secret.
+   *
+   * @return the secret, or {@code null} if none has been assigned
+   */
+  public @Nullable byte[] getSubjectIdentifierSecret() {
+    return this.subjectIdentifierSecret != null ? this.subjectIdentifierSecret.clone() : null;
+  }
+
+  /**
+   * Assigns the shared hash algorithm used when subject identifiers are computed.
+   *
+   * @param hashAlgorithm the JCE name of the hash algorithm
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer subjectIdentifierHashAlgorithm(final @Nonnull String hashAlgorithm) {
+    this.subjectIdentifierHashAlgorithm = Objects.requireNonNull(hashAlgorithm, "hashAlgorithm must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the shared subject identifier hash algorithm. Defaults to
+   * {@value AbstractSubjectIdentifierGenerator#DEFAULT_HASH_ALGORITHM}.
+   *
+   * @return the JCE name of the hash algorithm
+   */
+  public @Nonnull String getSubjectIdentifierHashAlgorithm() {
+    return this.subjectIdentifierHashAlgorithm;
+  }
+
+  /**
+   * Assigns the maximum age of an authentication in progress, that is, how long the server waits for the user to come
+   * back from an authentication module.
+   *
+   * @param authnFlowMaxAge the maximum age
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer authnFlowMaxAge(final @Nonnull Duration authnFlowMaxAge) {
+    this.authnFlowMaxAge = Objects.requireNonNull(authnFlowMaxAge, "authnFlowMaxAge must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the maximum age of an authentication in progress. Defaults to
+   * {@link SessionBasedRedirectAuthenticationRepository#DEFAULT_MAX_AGE}.
+   *
+   * @return the maximum age
+   */
+  public @Nonnull Duration getAuthnFlowMaxAge() {
+    return this.authnFlowMaxAge;
+  }
+
+  /**
+   * Adds an authentication provider.
+   *
+   * @param provider the provider
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer authenticationProvider(final @Nonnull UserAuthenticationProvider provider) {
+    this.authenticationProviders.add(Objects.requireNonNull(provider, "provider must not be null"));
+    return this;
+  }
+
+  /**
+   * Gets the authentication providers. The list may be modified.
+   *
+   * @return the authentication providers
+   */
+  public @Nonnull List<UserAuthenticationProvider> getAuthenticationProviders() {
+    return this.authenticationProviders;
+  }
+
+  /**
+   * Registers the configurer of a protocol. A protocol is offered by the server only when its configurer has been
+   * registered. A configurer of the same type replaces a previously registered one.
+   *
+   * @param configurer the protocol configurer
+   * @return this configurer
+   */
+  public @Nonnull AuthnServerConfigurer protocol(final @Nonnull AbstractProtocolConfigurer<?> configurer) {
+    Objects.requireNonNull(configurer, "configurer must not be null");
+    configurer.register(this);
+    this.protocols.put(configurer.getClass(), configurer);
+    return this;
+  }
+
+  /**
+   * Customizes the configurer of a protocol.
+   *
+   * @param type the type of the protocol configurer
+   * @param customizer the customizer
+   * @param <T> the type of the protocol configurer
+   * @return this configurer
+   * @throws IllegalStateException if no configurer of the given type has been registered
+   */
+  public @Nonnull <T extends AbstractProtocolConfigurer<T>> AuthnServerConfigurer protocol(
+      final @Nonnull Class<T> type, final @Nonnull Customizer<T> customizer) {
+    final T configurer = this.getProtocolConfigurer(type);
+    if (configurer == null) {
+      throw new IllegalStateException("No protocol configurer of type %s has been registered"
+          .formatted(type.getSimpleName()));
+    }
+    customizer.customize(configurer);
+    return this;
+  }
+
+  /**
+   * Gets the configurer of a protocol.
+   *
+   * @param type the type of the protocol configurer
+   * @param <T> the type of the protocol configurer
+   * @return the configurer, or {@code null} if no configurer of that type has been registered
+   */
+  public @Nullable <T extends AbstractProtocolConfigurer<T>> T getProtocolConfigurer(final @Nonnull Class<T> type) {
+    return this.protocols.values().stream()
+        .filter(type::isInstance)
+        .map(type::cast)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Gets all registered protocol configurers.
+   *
+   * @return the protocol configurers
+   */
+  public @Nonnull List<AbstractProtocolConfigurer<?>> getProtocolConfigurers() {
+    return Collections.unmodifiableList(new ArrayList<>(this.protocols.values()));
+  }
+
+  /**
+   * Gets a {@link RequestMatcher} for the endpoints of all configured protocols. It may be obtained before the
+   * configurer has been initialized, but it may only be used after that.
+   *
+   * @return a request matcher
+   */
+  public @Nonnull RequestMatcher getEndpointsMatcher() {
+    return request -> {
+      if (this.endpointsMatcher == null) {
+        throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
+      }
+      return this.endpointsMatcher.matches(request);
+    };
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void init(final @Nonnull HttpSecurity http) {
+    this.validate();
+
+    final List<RequestMatcher> matchers = new ArrayList<>();
+    for (final AbstractProtocolConfigurer<?> protocol : this.protocols.values()) {
+      protocol.doInit(http);
+      matchers.add(protocol.getRequestMatcher());
+    }
+    this.endpointsMatcher = matchers.isEmpty() ? request -> false : new OrRequestMatcher(matchers);
+
+    for (final UserAuthenticationProvider provider : this.authenticationProviders) {
+      if (provider instanceof final AbstractUserAuthenticationProvider p) {
+        p.setServerSsoPolicy(this.ssoPolicy);
+        this.protocols.values().forEach(c -> p.setServerSsoPolicy(c.getProtocol(), c.getProtocolSsoPolicy()));
+      }
+    }
+    if (this.protocols.isEmpty()) {
+      log.info("No protocol has been configured - the authentication server does not serve any endpoints");
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void configure(final @Nonnull HttpSecurity http) {
+    this.protocols.values().forEach(p -> p.configure(http));
+  }
+
+  /**
+   * Post processes an object created by a protocol configurer.
+   *
+   * @param object the object
+   * @param <O> the type of the object
+   * @return the processed object
+   */
+  @Nonnull
+  <O> O postProcessObject(final @Nonnull O object) {
+    return this.postProcess(object);
+  }
+
+  /**
+   * Checks that the shared values are set and valid.
+   *
+   * @throws IllegalArgumentException if a value is missing or invalid
+   */
+  private void validate() {
+    if (this.baseUrl == null || this.baseUrl.isBlank()) {
+      throw new IllegalArgumentException(
+          "Missing base URL - assign it with AuthnServerConfigurer.baseUrl() or the authn-server.base-url property");
+    }
+    assertBaseUrl(this.baseUrl, "Base URL");
+    assertClockSkew(this.clockSkew, "Clock skew");
+    if (this.subjectIdentifierSecret != null && this.subjectIdentifierSecret.length == 0) {
+      throw new IllegalArgumentException("Subject identifier secret must not be empty");
+    }
+    assertHashAlgorithm(this.subjectIdentifierHashAlgorithm, "Subject identifier hash algorithm");
+    if (this.authnFlowMaxAge.isNegative() || this.authnFlowMaxAge.isZero()) {
+      throw new IllegalArgumentException("Maximum age of an authentication in progress must be positive");
+    }
+  }
+
+  /**
+   * Checks that a base URL is an absolute HTTP or HTTPS URL that does not end with a {@code /}.
+   *
+   * @param url the URL to check
+   * @param name the name of the value, used in the error message
+   * @throws IllegalArgumentException if the URL is invalid
+   */
+  public static void assertBaseUrl(final @Nonnull String url, final @Nonnull String name) {
+    if (url.endsWith("/")) {
+      throw new IllegalArgumentException("%s '%s' must not end with /".formatted(name, url));
+    }
+    try {
+      final URI uri = new URI(url);
+      if (!("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme()))
+          || uri.getHost() == null || uri.getQuery() != null || uri.getFragment() != null) {
+        throw new IllegalArgumentException(
+            "%s '%s' must be an HTTP or HTTPS URL without query or fragment".formatted(name, url));
+      }
+    }
+    catch (final URISyntaxException e) {
+      throw new IllegalArgumentException("%s '%s' is not a valid URL".formatted(name, url), e);
+    }
+  }
+
+  /**
+   * Checks that a clock skew is not negative.
+   *
+   * @param clockSkew the clock skew
+   * @param name the name of the value, used in the error message
+   * @throws IllegalArgumentException if the value is negative
+   */
+  static void assertClockSkew(final @Nonnull Duration clockSkew, final @Nonnull String name) {
+    if (clockSkew.isNegative()) {
+      throw new IllegalArgumentException(name + " must not be negative");
+    }
+  }
+
+  /**
+   * Checks that a hash algorithm is available.
+   *
+   * @param hashAlgorithm the JCE name of the hash algorithm
+   * @param name the name of the value, used in the error message
+   * @throws IllegalArgumentException if the algorithm is not available
+   */
+  static void assertHashAlgorithm(final @Nonnull String hashAlgorithm, final @Nonnull String name) {
+    try {
+      MessageDigest.getInstance(hashAlgorithm);
+    }
+    catch (final NoSuchAlgorithmException e) {
+      throw new IllegalArgumentException("%s '%s' is not supported".formatted(name, hashAlgorithm), e);
+    }
+  }
+
+}

@@ -21,8 +21,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationUse;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -32,15 +34,25 @@ import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
  * Applies the configured {@link SsoPolicy}: whether single sign-on is allowed at all, how old the previous
  * authentication may be, and whether it may be reused for another requester than the one it was made for.
  * <p>
- * The policy is read for every request, so a change to it takes effect immediately.
+ * The policy is read for every request, so a change to it takes effect immediately. It may depend on the protocol
+ * the requester uses, see {@link #SsoPolicyVoter(Function)}.
  * </p>
  *
  * @author Martin Lindström
  */
 public class SsoPolicyVoter implements SsoVoter {
 
-  /** Where the policy comes from. */
-  private final Supplier<SsoPolicy> policySupplier;
+  /** Where the policy comes from, given the protocol of the requester. */
+  private final Function<AuthenticationProtocol, SsoPolicy> policyResolver;
+
+  /**
+   * Constructor for a policy that depends on the protocol the requester uses.
+   *
+   * @param policyResolver gives the policy for a protocol, asked for every request
+   */
+  public SsoPolicyVoter(final @Nonnull Function<AuthenticationProtocol, SsoPolicy> policyResolver) {
+    this.policyResolver = Objects.requireNonNull(policyResolver, "policyResolver must not be null");
+  }
 
   /**
    * Constructor.
@@ -48,7 +60,8 @@ public class SsoPolicyVoter implements SsoVoter {
    * @param policySupplier where the policy comes from, asked for every request
    */
   public SsoPolicyVoter(final @Nonnull Supplier<SsoPolicy> policySupplier) {
-    this.policySupplier = Objects.requireNonNull(policySupplier, "policySupplier must not be null");
+    Objects.requireNonNull(policySupplier, "policySupplier must not be null");
+    this.policyResolver = protocol -> policySupplier.get();
   }
 
   /**
@@ -66,7 +79,7 @@ public class SsoPolicyVoter implements SsoVoter {
       final @Nonnull AuthenticationRequirements requirements, final @Nonnull Requester requester,
       final @Nonnull List<String> allowedAuthnContexts) {
 
-    final SsoPolicy policy = this.policySupplier.get();
+    final SsoPolicy policy = this.policyResolver.apply(requester.protocol());
     if (!policy.isEnabled()) {
       return SsoDecision.deny(SsoDenialReason.NOT_ALLOWED);
     }

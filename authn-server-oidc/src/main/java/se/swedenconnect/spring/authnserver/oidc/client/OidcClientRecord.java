@@ -53,6 +53,12 @@ public record OidcClientRecord(
     @Nonnull String clientId, @Nonnull OIDCClientMetadata metadata, @Nonnull Set<String> trustMarkTypes) {
 
   /**
+   * The client metadata parameter holding the organisation identifier, defined in OpenID Federation Organization
+   * Identifier Metadata Parameter 1.0.
+   */
+  public static final String ORGANIZATION_IDENTIFIER = "organization_identifier";
+
+  /**
    * Constructor.
    *
    * @param clientId the {@code client_id} of the client
@@ -82,8 +88,8 @@ public record OidcClientRecord(
 
   /**
    * Creates the protocol-neutral record for the client. The display names come from {@code client_name} and the
-   * logotypes from {@code logo_uri}, both in every language that the metadata gives them in, and the marks are the
-   * trust mark types.
+   * logotypes from {@code logo_uri}, both in every language that the metadata gives them in, the organisation number
+   * from {@code organization_identifier}, as given, and the marks are the trust mark types.
    *
    * @return a {@link RequesterRecord}
    */
@@ -93,7 +99,20 @@ public record OidcClientRecord(
         displayNames(this.metadata),
         logos(this.metadata),
         this.trustMarkTypes,
+        organizationIdentifier(this.metadata),
         this.metadata);
+  }
+
+  /**
+   * Gets the {@code organization_identifier} of the client, exactly as given.
+   *
+   * @param metadata the client metadata
+   * @return the organisation identifier, or {@code null} if the metadata has none
+   */
+  private static @Nullable String organizationIdentifier(final @Nonnull OIDCClientMetadata metadata) {
+    return metadata.getCustomField(ORGANIZATION_IDENTIFIER) instanceof final String value && StringUtils.hasText(value)
+        ? value
+        : null;
   }
 
   /**

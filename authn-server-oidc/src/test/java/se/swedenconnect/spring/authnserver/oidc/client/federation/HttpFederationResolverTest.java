@@ -31,6 +31,7 @@ import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
+import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -64,6 +65,31 @@ class HttpFederationResolverTest extends FederationTestSupport {
     assertThat(client.lastResolveRequest.subject()).isEqualTo(CLIENT_ID);
     assertThat(client.lastResolveRequest.trustAnchor()).isEqualTo(TRUST_ANCHOR);
     assertThat(client.lastResolveRequest.type()).isEqualTo("openid_relying_party");
+  }
+
+  @Test
+  void theOrganisationIdentifierOfTheResolvedMetadataReachesTheRecord() {
+    final ECKey trustAnchorKey = key("ta");
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, RESOLVE_ENDPOINT, null));
+
+    final OIDCClientMetadata metadata = clientMetadata("The Client");
+    metadata.setCustomField(OidcClientRecord.ORGANIZATION_IDENTIFIER, "urn:glue:iso6523:0007:5566778899");
+    final StubFederationClient client = new StubFederationClient();
+    client.resolveResponse = resolveResponse(trustAnchorKey, TRUST_ANCHOR, CLIENT_ID, metadata, Set.of(),
+        Instant.now().plus(1, ChronoUnit.HOURS));
+    final HttpFederationResolver resolver = new HttpFederationResolver(settings, client);
+
+    final FederationClientBackend backend = new FederationClientBackend(resolver, (id, type) -> null,
+        new InMemoryFederationCache(), FederationCacheSettings.defaults());
+    assertThat(backend.lookup(CLIENT_ID).organizationNumber()).isEqualTo("urn:glue:iso6523:0007:5566778899");
+    // From the cache
+    assertThat(backend.lookup(CLIENT_ID).organizationNumber()).isEqualTo("urn:glue:iso6523:0007:5566778899");
+
+    client.resolveResponse = resolveResponse(trustAnchorKey, TRUST_ANCHOR, "https://other.example.com",
+        clientMetadata("Other"), Set.of(), Instant.now().plus(1, ChronoUnit.HOURS));
+    assertThat(backend.lookup("https://other.example.com").organizationNumber()).isNull();
   }
 
   @Test

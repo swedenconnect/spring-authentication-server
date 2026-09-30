@@ -43,6 +43,8 @@ The protocol-neutral part is:
 - The display names, one per language. A name without a language may appear, and at most one does.
 - The logotypes, with a language where the metadata gives one, and a size where the metadata gives one.
 - The marks that the requester holds.
+- The organisation number of the requester, when its metadata gives one, see
+  [The organisation number](#the-organisation-number).
 
 Picking a name or a logotype for the user's language is done by the record:
 
@@ -80,6 +82,26 @@ if (!record.hasMark("http://id.elegnamnden.se/sprop/1.0/mobile-auth")) {
 
 A mark that the operator has set on a configured client, or on a client held in a repository, is there because the
 operator vouches for it. Those are not verified.
+
+<a name="the-organisation-number"></a>
+### The organisation number
+
+`record.organizationNumber()` tells which organisation the requester belongs to, so that code such as login page
+support, audit and checks for accepting a requester does not have to read SAML or OpenID Connect metadata:
+
+- For SAML it is the `mdorgext:OrganizationNumber` extension of the Service Provider's `md:Organization`, see the
+  [schema](https://docs.swedenconnect.se/schemas/authn/1.0/OrganizationNumber-1.0.xsd).
+- For OpenID Connect it is `organization_identifier` in the client metadata, see
+  [OpenID Federation Organization Identifier Metadata Parameter 1.0](https://www.oidc.se/specifications/openid-federation-organization-identifier-1_0.html)
+  and Section 3 of
+  [Sweden Connect - OpenID Connect Metadata Requirements](https://docs.swedenconnect.se/federation/oidc-metadata-requirements.html).
+
+The value is held exactly as the metadata publishes it, and it is not validated. The two protocols use different
+forms. A SAML value may be `556677-8899`, `5566778899` or anything else, since the schema does not restrict it, while
+an OpenID Connect value is a GLUE URI such as `urn:glue:iso6523:0007:5566778899`. Code that compares requesters across
+protocols handles both forms itself.
+
+The organisation number is optional. A requester whose metadata gives none has `null` in its record.
 
 ## Backends
 
@@ -129,7 +151,8 @@ For a downloading source:
 The display names of a record are taken from the `mdui:UIInfo` extension, then from
 `Organization/OrganizationDisplayName` and finally from `Organization/OrganizationName`. For every language the first
 name found is the one used. Logotypes come from `mdui:UIInfo`. The marks are the entity categories that the Service
-Provider declares.
+Provider declares. The organisation number comes from the `mdorgext:OrganizationNumber` extension of
+`md:Organization`; a Service Provider without `md:Organization`, or without the extension, has none.
 
 ## OpenID Connect: three backends
 
@@ -158,7 +181,14 @@ ClientRegistryBackend backend = new ConfigurationClientBackend(
 
 The display names of a record come from `client_name` and the logotypes from `logo_uri`, both in every language that
 the metadata gives them in. The Sweden Connect profile requires `client_name` in Swedish and English, so a client that
-follows the profile gives the login page a name in both languages.
+follows the profile gives the login page a name in both languages. The organisation number comes from
+`organization_identifier` in the client metadata, for all three backends. A federation client gets it from the
+resolved metadata, where the Sweden Connect registration intermediate sets it. For a configured client, or a client in
+a repository, the operator puts it in the client metadata:
+
+```java
+metadata.setCustomField("organization_identifier", "urn:glue:iso6523:0007:5566778899");
+```
 
 ## The federation backend
 

@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
@@ -45,6 +46,8 @@ class OidcClientBackendsTest {
   private static final String CLIENT_ID = "https://client.example.com";
 
   private static final String MARK = "https://example.com/mark";
+
+  private static final String ORGANIZATION_IDENTIFIER = "urn:glue:iso6523:0007:5566778899";
 
   @Test
   void aConfiguredClientIsFound() {
@@ -122,6 +125,43 @@ class OidcClientBackendsTest {
     assertThat(record).isNotNull();
     assertThat(record.marks()).isEmpty();
     assertThat(backend.requestMark("https://other.example.com", MARK)).isNull();
+  }
+
+  @Test
+  void theOrganisationIdentifierComesFromTheClientMetadata() {
+    final OIDCClientMetadata withIdentifier = metadata("Configured");
+    withIdentifier.setCustomField(OidcClientRecord.ORGANIZATION_IDENTIFIER, ORGANIZATION_IDENTIFIER);
+
+    final ConfigurationClientBackend configuration = new ConfigurationClientBackend(List.of(
+        OidcClientRecord.of(CLIENT_ID, withIdentifier),
+        OidcClientRecord.of("https://other.example.com", metadata("Other"))));
+    assertThat(configuration.lookup(CLIENT_ID).organizationNumber()).isEqualTo(ORGANIZATION_IDENTIFIER);
+    assertThat(configuration.lookup("https://other.example.com").organizationNumber()).isNull();
+
+    final RepositoryClientBackend repository = new RepositoryClientBackend(new InMemoryClientRepository(List.of(
+        OidcClientRecord.of(CLIENT_ID, withIdentifier),
+        OidcClientRecord.of("https://other.example.com", metadata("Other")))));
+    assertThat(repository.lookup(CLIENT_ID).organizationNumber()).isEqualTo(ORGANIZATION_IDENTIFIER);
+    assertThat(repository.lookup("https://other.example.com").organizationNumber()).isNull();
+  }
+
+  @Test
+  void theOrganisationIdentifierIsReadFromParsedMetadataAndKeptAsGiven() throws Exception {
+    final OIDCClientMetadata parsed = OIDCClientMetadata.parse(JSONObjectUtils.parse(
+        "{\"client_name\":\"Client\",\"organization_identifier\":\"urn:glue:iso6523:0007:5566778899\"}"));
+    assertThat(OidcClientRecord.of(CLIENT_ID, parsed).toRequesterRecord().organizationNumber())
+        .isEqualTo("urn:glue:iso6523:0007:5566778899");
+  }
+
+  @Test
+  void anEmptyOrNonStringOrganisationIdentifierGivesNone() {
+    final OIDCClientMetadata blank = metadata("Client");
+    blank.setCustomField(OidcClientRecord.ORGANIZATION_IDENTIFIER, " ");
+    assertThat(OidcClientRecord.of(CLIENT_ID, blank).toRequesterRecord().organizationNumber()).isNull();
+
+    final OIDCClientMetadata number = metadata("Client");
+    number.setCustomField(OidcClientRecord.ORGANIZATION_IDENTIFIER, 5566778899L);
+    assertThat(OidcClientRecord.of(CLIENT_ID, number).toRequesterRecord().organizationNumber()).isNull();
   }
 
   private static OIDCClientMetadata metadata(final String name) {
