@@ -35,7 +35,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.util.ClassUtils;
 
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
-import se.swedenconnect.spring.authnserver.autoconfigure.oidc.OidcConfigurationProperties;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
 
@@ -51,9 +50,10 @@ import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
  * @author Martin Lindström
  */
 @AutoConfiguration(
-    afterName = "se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration",
+    afterName = { "se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration",
+        "se.swedenconnect.spring.authnserver.autoconfigure.oidc.OidcAutoConfiguration" },
     beforeName = "org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration")
-@EnableConfigurationProperties({ AuthnServerConfigurationProperties.class, OidcConfigurationProperties.class })
+@EnableConfigurationProperties(AuthnServerConfigurationProperties.class)
 public class AuthnServerAutoConfiguration {
 
   /** The class that tells whether the SAML module is on the classpath. */

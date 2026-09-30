@@ -25,7 +25,6 @@ import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
-import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
 import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
 
@@ -39,12 +38,18 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
  *
  * @author Martin Lindström
  */
-public class GenderToClaimMapper implements ToProtocolAttributeMapper<UserClaim> {
+public class GenderToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
   public @Nonnull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.GENDER);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+    return AttributeIdentifiers.GENDER.equals(identifier) ? List.of(PersonClaims.GENDER_CLAIM_NAME) : List.of();
   }
 
   /** {@inheritDoc} */

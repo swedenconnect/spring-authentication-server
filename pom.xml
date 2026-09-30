@@ -144,6 +144,12 @@
 
       <dependency>
         <groupId>se.swedenconnect.security</groupId>
+        <artifactId>credentials-support-nimbus</artifactId>
+        <version>${credentials-support.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>se.swedenconnect.security</groupId>
         <artifactId>credentials-support-spring-boot-starter</artifactId>
         <version>${credentials-support.version}</version>
       </dependency>

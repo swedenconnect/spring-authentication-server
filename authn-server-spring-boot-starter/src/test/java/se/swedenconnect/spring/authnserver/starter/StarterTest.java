@@ -28,6 +28,8 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
+import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
+
 /**
  * Tests that an application using the starter for both protocols starts with both protocols enabled.
  *
@@ -42,7 +44,12 @@ import org.springframework.mock.web.MockHttpServletResponse;
     "authn-server.saml.credentials.default-credential.jks.store.type=PKCS12",
     "authn-server.saml.credentials.default-credential.jks.key.alias=sign",
     "authn-server.saml.credentials.default-credential.jks.key.key-password=secret",
-    "authn-server.saml.metadata-providers[0].location=classpath:metadata/sp-metadata.xml"
+    "authn-server.saml.metadata-providers[0].location=classpath:metadata/sp-metadata.xml",
+    "authn-server.oidc.keys.signing[0].credential.jks.store.location=classpath:credentials/oidc-keys.p12",
+    "authn-server.oidc.keys.signing[0].credential.jks.store.password=secret",
+    "authn-server.oidc.keys.signing[0].credential.jks.store.type=PKCS12",
+    "authn-server.oidc.keys.signing[0].credential.jks.key.alias=rsa-sign",
+    "authn-server.oidc.keys.signing[0].credential.jks.key.key-password=secret"
 })
 class StarterTest {
 
@@ -57,12 +64,24 @@ class StarterTest {
 
   @Test
   void theSamlMetadataIsPublished() throws Exception {
-    final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/saml2/metadata");
-    request.setServletPath("/saml2/metadata");
+    assertThat(this.get("/saml2/metadata").getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void theOidcDiscoveryDocumentAndJwksArePublished() throws Exception {
+    final MockHttpServletResponse discovery = this.get("/.well-known/openid-configuration");
+    assertThat(discovery.getStatus()).isEqualTo(200);
+    assertThat(OIDCProviderMetadata.parse(discovery.getContentAsString()).getIssuer().getValue())
+        .isEqualTo("https://idp.example.com");
+    assertThat(this.get("/oidc/jwks").getStatus()).isEqualTo(200);
+  }
+
+  private MockHttpServletResponse get(final String path) throws Exception {
+    final MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+    request.setServletPath(path);
     final MockHttpServletResponse response = new MockHttpServletResponse();
     this.securityFilter.doFilter(request, response, new MockFilterChain());
-
-    assertThat(response.getStatus()).isEqualTo(200);
+    return response;
   }
 
 }

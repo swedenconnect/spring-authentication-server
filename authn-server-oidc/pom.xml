@@ -52,6 +52,11 @@
     </dependency>
 
     <dependency>
+      <groupId>se.swedenconnect.security</groupId>
+      <artifactId>credentials-support-nimbus</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>se.oidc.nimbus</groupId>
       <artifactId>oidc-sweden-nimbus</artifactId>
     </dependency>

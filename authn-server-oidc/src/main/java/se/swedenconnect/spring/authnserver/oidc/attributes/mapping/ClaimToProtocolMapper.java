@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Objects;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
-import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
 import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
 
@@ -41,7 +40,7 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
  *
  * @author Martin Lindström
  */
-public class ClaimToProtocolMapper implements ToProtocolAttributeMapper<UserClaim> {
+public class ClaimToProtocolMapper implements ToClaimMapper {
 
   /** The date formatter used for date values. */
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -83,6 +82,12 @@ public class ClaimToProtocolMapper implements ToProtocolAttributeMapper<UserClai
   @Override
   public @Nonnull Collection<String> getSupportedIdentifiers() {
     return List.of(this.identifier);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+    return this.identifier.equals(identifier) ? List.of(this.claimName) : List.of();
   }
 
   /** {@inheritDoc} */

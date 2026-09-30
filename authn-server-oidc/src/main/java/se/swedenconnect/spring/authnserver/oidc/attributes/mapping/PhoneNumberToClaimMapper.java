@@ -26,7 +26,6 @@ import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
-import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
 import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
 
@@ -40,12 +39,23 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
  *
  * @author Martin Lindström
  */
-public class PhoneNumberToClaimMapper implements ToProtocolAttributeMapper<UserClaim> {
+public class PhoneNumberToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
   public @Nonnull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.TELEPHONE_NUMBER, AttributeIdentifiers.MOBILE_NUMBER);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+    if (AttributeIdentifiers.MOBILE_NUMBER.equals(identifier)) {
+      return List.of(PersonClaims.PHONE_NUMBER_CLAIM_NAME, PersonClaims.MSISDN_CLAIM_NAME);
+    }
+    return AttributeIdentifiers.TELEPHONE_NUMBER.equals(identifier)
+        ? List.of(PersonClaims.PHONE_NUMBER_CLAIM_NAME)
+        : List.of();
   }
 
   /** {@inheritDoc} */

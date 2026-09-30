@@ -107,6 +107,16 @@ public class ToProtocolAttributeMapping<O> {
   }
 
   /**
+   * Gets the mapper that handles an attribute.
+   *
+   * @param identifier the attribute identifier
+   * @return the mapper, or {@code null} if no mapper handles the attribute
+   */
+  public @Nullable ToProtocolAttributeMapper<O> getMapper(final @Nonnull String identifier) {
+    return this.mappers.get(Objects.requireNonNull(identifier, "identifier must not be null"));
+  }
+
+  /**
    * Maps the supplied attributes into the protocol representation. Attributes that no mapper handles are left out.
    *
    * @param attributes the attributes to map

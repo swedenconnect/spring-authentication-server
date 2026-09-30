@@ -29,7 +29,6 @@ import net.minidev.json.JSONObject;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
-import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
 import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
 
@@ -42,7 +41,7 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
  *
  * @author Martin Lindström
  */
-public class PlaceOfBirthToClaimMapper implements ToProtocolAttributeMapper<UserClaim> {
+public class PlaceOfBirthToClaimMapper implements ToClaimMapper {
 
   /** The {@code country} field of the claim. */
   public static final String COUNTRY_FIELD = "country";
@@ -58,6 +57,14 @@ public class PlaceOfBirthToClaimMapper implements ToProtocolAttributeMapper<User
   public @Nonnull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.PLACE_OF_BIRTH, AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY,
         AttributeIdentifiers.PLACE_OF_BIRTH_REGION, AttributeIdentifiers.PLACE_OF_BIRTH_LOCALITY);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+    return this.getSupportedIdentifiers().contains(identifier)
+        ? List.of(PersonClaims.PLACE_OF_BIRTH_CLAIM_NAME)
+        : List.of();
   }
 
   /** {@inheritDoc} */

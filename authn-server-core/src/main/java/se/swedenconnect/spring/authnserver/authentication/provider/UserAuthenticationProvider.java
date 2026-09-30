@@ -71,6 +71,28 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
   }
 
   /**
+   * Gets the generic attributes that the provider can deliver, given by their identifiers, for example
+   * {@code attribute.personal-identity-number}. The OpenID Provider maps them to the claims that it declares as
+   * supported, and derives its scopes from them unless the provider declares its scopes. The default is none.
+   *
+   * @return attribute identifiers
+   */
+  default @Nonnull List<String> getSupportedAttributes() {
+    return List.of();
+  }
+
+  /**
+   * Gets the OpenID Connect scopes that the provider offers. When the provider declares scopes, the OpenID Provider
+   * offers exactly those for it. When it declares none, the scopes are derived from the claims of
+   * {@link #getSupportedAttributes()}. Other protocols do not use them. The default is none.
+   *
+   * @return scope values
+   */
+  default @Nonnull List<String> getSupportedScopes() {
+    return List.of();
+  }
+
+  /**
    * Authenticates the user.
    * <p>
    * The result is normally a {@link UserAuthentication}. It is {@code null}, and only {@code null}, when the provider

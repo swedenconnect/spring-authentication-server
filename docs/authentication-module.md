@@ -75,9 +75,35 @@ and the protocol data of the request, records its use, and runs the
 Several providers may be installed, each supporting its own authentication contexts. A provider is asked only about
 requests it can serve, so a module never has to check whether it is the right one.
 
-The supported authentication contexts are also published in the SAML metadata of the Identity Provider, as the
-assurance certification attribute. A provider that declares SAML entity categories overrides `getEntityCategories()`,
-and they are published in the metadata as well. See [Configuration](configuration.html#the-idp-metadata).
+### What the provider declares
+
+Besides its authentication contexts, a provider may declare what it offers. The server publishes the declarations in
+the SAML metadata and in the OpenID Connect discovery document. Each has a default method on
+`UserAuthenticationProvider` that returns an empty list, so a provider overrides only what applies to it.
+
+| Method | What it declares | Used by |
+| :--- | :--- | :--- |
+| `getSupportedAuthnContextUris()` | The authentication contexts the provider can deliver. Required. | SAML: the assurance certification attribute. OpenID Connect: `acr_values_supported`. |
+| `getEntityCategories()` | SAML entity categories. | SAML: the entity category attribute. |
+| `getSupportedAttributes()` | The generic attributes the provider can deliver, by identifier, such as `attribute.personal-identity-number`. | OpenID Connect: the supported claims, and the scopes when none are declared. |
+| `getSupportedScopes()` | The OpenID Connect scopes the provider offers. | OpenID Connect: the offered scopes. |
+
+```java
+@Override
+public @Nonnull List<String> getSupportedAttributes() {
+  return List.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, AttributeIdentifiers.GIVEN_NAME,
+      AttributeIdentifiers.SURNAME, AttributeIdentifiers.DISPLAY_NAME, AttributeIdentifiers.DATE_OF_BIRTH);
+}
+```
+
+A provider that declares its attributes normally does not need to declare scopes, since the OpenID Provider derives
+them from the claims. Declare scopes when the derived set is wrong for the provider, for example a scope whose
+essential claims the provider delivers only some of. How scopes and claims are worked out is described in
+[The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+
+The declarations only tell what the server offers. They do not limit what the provider releases: a provider still
+returns everything it knows about the user, see [The authenticated user](#the-authenticated-user). See
+[Configuration](configuration.html#the-idp-metadata) for the SAML metadata.
 
 A module that cannot authenticate the user inside this call, because it needs pages of its own, is written slightly
 differently, see [Modules with pages of their own](#modules-with-pages-of-their-own).

@@ -54,6 +54,11 @@ The Spring Boot starters:
   policies, modules with pages of their own, the producers, voters and processors and their order, what the response
   holds, which failures are answered to the Service Provider, and how to replace the processing components.
 
+- [The OpenID Provider](openid-provider.html) - Where the discovery document and the keys are published, how the
+  signing and decryption keys are configured and rolled over, how the signing key for a client is chosen, how the
+  scopes, claims and authentication contexts are worked out from the authentication providers, and how to extend the
+  discovery document.
+
 - [Configuration](configuration.html) - The properties of the auto-configuration, the URL layout of the server,
   adjusting the configuration in code, using the configurers without Spring Boot, and migrating the configuration of
   an Identity Provider built on saml-identity-provider.

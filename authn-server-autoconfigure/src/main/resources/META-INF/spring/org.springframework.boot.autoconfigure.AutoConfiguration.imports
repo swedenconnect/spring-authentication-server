@@ -14,4 +14,5 @@
 # limitations under the License.
 #
 se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration
+se.swedenconnect.spring.authnserver.autoconfigure.oidc.OidcAutoConfiguration
 se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerAutoConfiguration

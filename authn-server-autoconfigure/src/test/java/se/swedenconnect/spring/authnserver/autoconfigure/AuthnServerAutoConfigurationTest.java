@@ -61,6 +61,7 @@ import se.swedenconnect.security.credential.spring.autoconfigure.SpringCredentia
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.AbstractUserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
+import se.swedenconnect.spring.authnserver.autoconfigure.oidc.OidcAutoConfiguration;
 import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration;
 import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlCredentialConfiguration;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
@@ -86,11 +87,14 @@ class AuthnServerAutoConfigurationTest {
 
   private static final String CREDENTIALS = "authn-server.saml.credentials.";
 
+  private static final String OIDC_KEY = "authn-server.oidc.keys.signing[0].credential.jks.store.";
+
   private static final String SP_ONE = "https://sp-one.example.com";
 
   private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
       .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
-          ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, AuthnServerAutoConfiguration.class));
+          ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, OidcAutoConfiguration.class,
+          AuthnServerAutoConfiguration.class));
 
   private static final String[] SAML = {
       "authn-server.base-url=" + BASE_URL,
@@ -318,7 +322,10 @@ class AuthnServerAutoConfigurationTest {
 
   @Test
   void anOidcOnlyServerStarts() {
-    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true")
+    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true",
+            OIDC_KEY + "location=classpath:credentials/oidc-keys.p12", OIDC_KEY + "password=secret",
+            OIDC_KEY + "type=PKCS12", "authn-server.oidc.keys.signing[0].credential.jks.key.alias=rsa-sign",
+            "authn-server.oidc.keys.signing[0].credential.jks.key.key-password=secret")
         .run(context -> {
           assertThat(context).hasNotFailed();
           assertThat(context).doesNotHaveBean(SamlAutoConfiguration.class);

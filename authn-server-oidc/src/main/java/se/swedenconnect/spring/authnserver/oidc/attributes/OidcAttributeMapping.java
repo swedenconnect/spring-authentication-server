@@ -20,8 +20,11 @@ import jakarta.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import com.nimbusds.openid.connect.sdk.OIDCClaimsRequest;
 import com.nimbusds.openid.connect.sdk.claims.ClaimsSetRequest;
@@ -43,6 +46,7 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.ClaimToProtoc
 import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.GenderToClaimMapper;
 import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.PhoneNumberToClaimMapper;
 import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.PlaceOfBirthToClaimMapper;
+import se.swedenconnect.spring.authnserver.oidc.attributes.mapping.ToClaimMapper;
 
 /**
  * The mapping between the protocol-neutral attribute model and OpenID Connect claims.
@@ -134,6 +138,23 @@ public class OidcAttributeMapping {
   public @Nonnull List<UserClaim> toClaims(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
       final @Nullable List<GenericRequestedAttribute> requestedAttributes) {
     return this.toProtocolMapping.map(attributes, requestedAttributes);
+  }
+
+  /**
+   * Gets the claims that the supplied attributes may be mapped to. Only mappers that implement {@link ToClaimMapper}
+   * tell which claims they produce, so an attribute handled by another mapper gives no claim here.
+   *
+   * @param identifiers the attribute identifiers
+   * @return the claim names, in the order of the identifiers and without duplicates
+   */
+  public @Nonnull List<String> getClaimNames(final @Nonnull Collection<String> identifiers) {
+    final Set<String> claimNames = new LinkedHashSet<>();
+    for (final String identifier : Objects.requireNonNull(identifiers, "identifiers must not be null")) {
+      if (this.toProtocolMapping.getMapper(identifier) instanceof final ToClaimMapper mapper) {
+        claimNames.addAll(mapper.getClaimNames(identifier));
+      }
+    }
+    return List.copyOf(claimNames);
   }
 
   /**

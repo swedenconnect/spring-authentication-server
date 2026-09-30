@@ -29,7 +29,6 @@ import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
-import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
 import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
 
@@ -48,7 +47,7 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
  *
  * @author Martin Lindström
  */
-public class AddressToClaimMapper implements ToProtocolAttributeMapper<UserClaim> {
+public class AddressToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
@@ -61,6 +60,12 @@ public class AddressToClaimMapper implements ToProtocolAttributeMapper<UserClaim
         AttributeIdentifiers.EIDAS_ADDRESS_THOROUGHFARE, AttributeIdentifiers.EIDAS_ADDRESS_POST_NAME,
         AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_FIRST_LINE,
         AttributeIdentifiers.EIDAS_ADDRESS_ADMIN_UNIT_SECOND_LINE, AttributeIdentifiers.EIDAS_ADDRESS_POST_CODE);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+    return this.getSupportedIdentifiers().contains(identifier) ? List.of(PersonClaims.ADDRESS_CLAIM_NAME) : List.of();
   }
 
   /** {@inheritDoc} */

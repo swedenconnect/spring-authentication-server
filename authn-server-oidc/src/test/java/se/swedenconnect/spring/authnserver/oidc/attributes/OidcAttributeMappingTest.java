@@ -469,4 +469,37 @@ class OidcAttributeMappingTest {
     assertThat(UserClaim.merge(UserClaim.of("x", "1"), UserClaim.of("x", "2")).value()).isEqualTo("1");
   }
 
+
+  @Test
+  void theClaimNamesOfAttributesAreKnown() {
+    assertThat(this.mapping.getClaimNames(List.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER,
+        AttributeIdentifiers.TELEPHONE_NUMBER, AttributeIdentifiers.MOBILE_NUMBER, AttributeIdentifiers.GENDER,
+        AttributeIdentifiers.STREET_ADDRESS, AttributeIdentifiers.LOCALITY, AttributeIdentifiers.PLACE_OF_BIRTH,
+        "attribute.unknown")))
+        .containsExactly(ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME, PersonClaims.PHONE_NUMBER_CLAIM_NAME,
+            PersonClaims.MSISDN_CLAIM_NAME, PersonClaims.GENDER_CLAIM_NAME, PersonClaims.ADDRESS_CLAIM_NAME,
+            PersonClaims.PLACE_OF_BIRTH_CLAIM_NAME);
+    assertThat(this.mapping.getClaimNames(List.of(AttributeIdentifiers.TELEPHONE_NUMBER)))
+        .containsExactly(PersonClaims.PHONE_NUMBER_CLAIM_NAME);
+  }
+
+  @Test
+  void aMapperThatDoesNotTellItsClaimsGivesNoClaimName() {
+    this.mapping.getToProtocolMapping().register(new ToProtocolAttributeMapper<UserClaim>() {
+
+      @Override
+      public @Nonnull Collection<String> getSupportedIdentifiers() {
+        return List.of("attribute.employee-number");
+      }
+
+      @Override
+      public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
+          final @Nonnull ToProtocolMappingContext context) {
+        return List.of();
+      }
+    });
+
+    assertThat(this.mapping.getClaimNames(List.of("attribute.employee-number"))).isEmpty();
+  }
+
 }

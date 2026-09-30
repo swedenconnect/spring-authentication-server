@@ -24,6 +24,11 @@ how the server is set up without Spring Boot.
     - [Request processing](#request-processing)
     - [Replay protection](#replay-protection)
     - [Requester acceptance](#requester-acceptance)
+- [The OpenID Provider](#the-openid-provider)
+    - [Keys](#oidc-keys)
+    - [OIDC endpoints](#oidc-endpoints)
+    - [Scopes and claims](#oidc-scopes-and-claims)
+    - [The discovery document](#oidc-discovery)
 - [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
 - [Using the configurers without Spring Boot](#using-the-configurers-without-spring-boot)
 - [Migrating from saml-identity-provider](#migrating-from-saml-identity-provider)
@@ -62,7 +67,24 @@ authn-server:
         backup-location: /var/idp/sp-metadata-backup.xml
 ```
 
-With this, the IdP metadata is published at `https://idp.example.com/saml2/metadata`. The authentication modules are
+With this, the IdP metadata is published at `https://idp.example.com/saml2/metadata`.
+
+The smallest working OpenID Provider needs a base URL and a signing key:
+
+```yaml
+authn-server:
+  base-url: https://op.example.com
+  oidc:
+    enabled: true
+    keys:
+      signing:
+        - credential:
+            bundle: op-sign
+```
+
+With this, the discovery document is published at `https://op.example.com/.well-known/openid-configuration`.
+
+The authentication modules are
 declared as [`UserAuthenticationProvider`][UserAuthenticationProvider] beans, see
 [Writing an authentication module](authentication-module.html).
 
@@ -90,8 +112,8 @@ Every URL of the server is built from three parts:
 1. The **base URL**, `authn-server.base-url`: protocol, host and context path, for example
    `https://idp.example.com/auth`. It must not end with a `/`.
 
-2. The **protocol path**, for example `authn-server.saml.path`, which defaults to `/saml2`. All endpoints of the
-   protocol are placed under it.
+2. The **protocol path**, for example `authn-server.saml.path`, which defaults to `/saml2`, or
+   `authn-server.oidc.path`, which defaults to `/oidc`. All endpoints of the protocol are placed under it.
 
 3. The **endpoint**, relative to the protocol path, for example `/metadata`.
 
@@ -99,8 +121,12 @@ So with the defaults, the SAML metadata is published at `https://idp.example.com
 protocol path moves every endpoint of that protocol, both where it is served and where the SAML metadata points. An
 empty protocol path places the endpoints directly under the base URL.
 
-A protocol may also place some endpoints directly under the base URL. The OpenID Provider will do this for its
-discovery document and its OpenID Federation entity configuration, since its issuer is the base URL.
+A protocol may also place some endpoints directly under the base URL. The OpenID Provider does this for its discovery
+document, which is published at the issuer followed by `/.well-known/openid-configuration`. The issuer defaults to the
+base URL, so the document is found at `https://idp.example.com/auth/.well-known/openid-configuration`. An issuer with a
+path, which must begin with the base URL, moves the document along with it, see
+[The OpenID Provider](openid-provider.html#where-things-are-published). The OpenID Federation entity configuration
+will be placed in the same way.
 
 The SAML entity ID defaults to the base URL. In a server that offers both protocols, the SAML entity ID and the OpenID
 Connect issuer may thereby be the same URL. That is fine, since they are identifiers in different protocols. Assign
@@ -472,12 +498,133 @@ authn-server:
 
 A Service Provider that is not accepted gets an error response with the status `Responder` / `RequestDenied`.
 
+<a name="the-openid-provider"></a>
+## The OpenID Provider
+
+The OpenID Connect properties are placed under `authn-server.oidc`. How the OpenID Provider uses them is described in
+[The OpenID Provider](openid-provider.html).
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `enabled` | Whether the OpenID Provider is enabled. | `false` |
+| `path` | The OIDC path, see [URL layout](#url-layout). | `/oidc` |
+| `issuer` | The issuer identifier. It must be the base URL, or begin with the base URL followed by a path. The discovery document is published at the issuer followed by `/.well-known/openid-configuration`. | The base URL |
+| `sso.*` | The single sign-on policy for OpenID Connect, see [Single sign-on](#single-sign-on). | `authn-server.sso.*` |
+| `clock-skew` | The clock skew for OpenID Connect. | `authn-server.clock-skew` |
+| `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. | `authn-server.supports-user-message` |
+| `subject-identifier.*` | The subject identifier settings for OpenID Connect. | `authn-server.subject-identifier.*` |
+| `keys.*` | The signing and decryption keys, see [Keys](#oidc-keys). | Required |
+| `endpoints.*` | The endpoints, see [OIDC endpoints](#oidc-endpoints). | See below |
+| `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. | `true` |
+| `scopes[]` | The offered scopes, see [Scopes and claims](#oidc-scopes-and-claims). | Derived from the authentication providers |
+| `claims[]` | Claims supported on top of those of the authentication providers, see [Scopes and claims](#oidc-scopes-and-claims). | - |
+| `ui-locales[]` | The languages of the user interface, as language tags, published as `ui_locales_supported`. The Sweden Connect federation requires `sv` and `en`. | - |
+| `discovery.*` | The discovery document, see [The discovery document](#oidc-discovery). | - |
+
+The values are checked when the filter chain is built, and the application does not start if a required value is
+missing or a value is invalid.
+
+<a name="oidc-keys"></a>
+### Keys
+
+The keys are given as two lists under `authn-server.oidc.keys`. Each entry has a credential, a
+[PkiCredentialConfigurationProperties](https://github.com/swedenconnect/credentials-support/blob/main/credentials-support/src/main/java/se/swedenconnect/security/credential/config/properties/PkiCredentialConfigurationProperties.java),
+the same as for the [SAML credentials](#credentials).
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `signing[].credential.*` | The credential holding the signing key. | Required |
+| `signing[].state` | `active`, the key is published and used, or `future`, the key is published but not used. | `active` |
+| `signing[].default-key` | Whether this is the default key, used for clients that do not ask for an algorithm. Exactly one active key must be the default key, unless there is only one active key. | `false` |
+| `decryption[].credential.*` | The credential holding the decryption key, used for encrypted request objects. | Required |
+| `decryption[].state` | `active`, the key is published and used, or `previous`, the key is not published but still decrypts. | `active` |
+
+At least one active signing key is required. An RSA key must be at least 2048 bits, and an EC key must be on P-256,
+P-384 or P-521. The rules, the key IDs and how to roll over a key are described in
+[The OpenID Provider](openid-provider.html#keys).
+
+```yaml
+authn-server:
+  oidc:
+    keys:
+      signing:
+        - credential:
+            bundle: op-sign-rsa
+          default-key: true
+        - credential:
+            bundle: op-sign-ec
+      decryption:
+        - credential:
+            bundle: op-enc
+```
+
+<a name="oidc-endpoints"></a>
+### OIDC endpoints
+
+The endpoints are given relative to the OIDC path, see [URL layout](#url-layout). They are placed under
+`authn-server.oidc.endpoints`.
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `jwks` | Where the JWKS is published. | `/jwks` |
+
+With the default OIDC path, the JWKS is published at `/oidc/jwks`. The discovery document is not an endpoint under
+the OIDC path; it follows the issuer.
+
+<a name="oidc-scopes-and-claims"></a>
+### Scopes and claims
+
+By default, the offered scopes and the supported claims are worked out from the attributes and scopes that the
+authentication providers declare, see
+[The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+
+- `scopes` replaces the derived scopes. Each scope must be in the scope registry, and `openid` is always offered.
+- `claims` is added to the claims of the providers, and the claims also count when scopes are derived.
+
+```yaml
+authn-server:
+  oidc:
+    scopes:
+      - https://id.oidc.se/scope/naturalPersonInfo
+      - https://id.oidc.se/scope/naturalPersonNumber
+    ui-locales:
+      - sv
+      - en
+```
+
+A `ScopeRegistry` bean replaces the default registry, which holds the built-in scopes, and an `OidcAttributeMapping`
+bean replaces the default attribute mapping. A `SubjectGeneratorFactory` bean replaces the default subject generator
+factory, whose subject types are published as `subject_types_supported`.
+
+<a name="oidc-discovery"></a>
+### The discovery document
+
+Most of the discovery document is worked out from the rest of the configuration, see
+[The OpenID Provider](openid-provider.html#the-discovery-document). Other parameters are added under
+`authn-server.oidc.discovery`:
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `additional-parameters.*` | Parameters added to the discovery document, as a map of name to value, for example `service_documentation` or `op_policy_uri`. A value may be a string, a boolean, a list or a map. A parameter that the OpenID Provider sets itself cannot be given. | - |
+
+```yaml
+authn-server:
+  oidc:
+    discovery:
+      additional-parameters:
+        service_documentation: https://op.example.com/docs
+        op_policy_uri: https://op.example.com/policy
+```
+
+A customizer set in an [adapter](#adjusting-the-configuration-in-code) changes the built document, see
+[Extending the document](openid-provider.html#extending-the-document).
+
 <a name="adjusting-the-configuration-in-code"></a>
 ## Adjusting the configuration in code
 
 The properties are applied to configurers: [`AuthnServerConfigurer`][AuthnServerConfigurer] for the shared values,
-and one configurer per protocol, such as [`Saml2IdpConfigurer`][Saml2IdpConfigurer]. Each value has a method on its
-configurer.
+and one configurer per protocol, [`Saml2IdpConfigurer`][Saml2IdpConfigurer] and
+[`OidcProviderConfigurer`][OidcProviderConfigurer]. Each value has a method on its configurer.
 
 To adjust the configuration, declare any number of [`AuthnServerConfigurerAdapter`][AuthnServerConfigurerAdapter]
 beans. An adapter gets the `HttpSecurity` object of the server's filter chain and the shared configurer, and reaches
@@ -506,8 +653,8 @@ protocol configurer. How the lists work is described in
 ## Using the configurers without Spring Boot
 
 The configurers do not depend on Spring Boot or on the properties. An application without Spring Boot creates the
-configurers itself and applies them to its filter chain. It must also initialize OpenSAML before the chain is built,
-using `OpenSAMLInitializer` from [opensaml-security-ext](https://github.com/swedenconnect/opensaml-security-ext).
+configurers itself and applies them to its filter chain. For SAML, it must also initialize OpenSAML before the chain
+is built, using `OpenSAMLInitializer` from [opensaml-security-ext](https://github.com/swedenconnect/opensaml-security-ext).
 
 ```java
 @Configuration
@@ -528,6 +675,13 @@ public class AuthnServerConfiguration {
     return http.build();
   }
 }
+```
+
+An OpenID Provider is added in the same way, with its signing keys:
+
+```java
+configurer.protocol(new OidcProviderConfigurer()
+    .signingKeys(List.of(SigningKey.active(signCredential))));
 ```
 
 `applyDefaultSecurity` makes the chain match the endpoints of the configured protocols and applies the configurer.
@@ -592,6 +746,7 @@ the resume paths of the redirect providers no longer need to be registered, see
 
 [AuthnServerConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/config/AuthnServerConfigurer.java
 [AuthnServerConfigurerAdapter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/config/AuthnServerConfigurerAdapter.java
+[OidcProviderConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/config/OidcProviderConfigurer.java
 [Saml2IdpConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/config/Saml2IdpConfigurer.java
 [SsoPolicy]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoPolicy.java
 [UserAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/UserAuthenticationProvider.java
