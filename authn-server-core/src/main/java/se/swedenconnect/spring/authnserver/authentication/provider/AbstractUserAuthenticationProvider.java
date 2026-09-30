@@ -17,7 +17,6 @@ package se.swedenconnect.spring.authnserver.authentication.provider;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -29,11 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 
-import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
-import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
+import se.swedenconnect.spring.authnserver.authentication.RequestedAttributeValues;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
@@ -194,7 +192,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
     if (requirements.getSignMessage() != null) {
       return SsoDecision.deny(SsoDenialReason.SIGN_MESSAGE);
     }
-    if (!this.requestedAttributeValuesMatch(requirements, previous.getAuthenticatedUser())) {
+    if (RequestedAttributeValues.contradicts(requirements, previous.getAuthenticatedUser())) {
       return SsoDecision.deny(SsoDenialReason.ATTRIBUTE_VALUE_MISMATCH);
     }
 
@@ -355,31 +353,6 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
     processors.addAll(
         this.serverPostAuthenticationProcessors.getOrDefault(token.getRequester().protocol(), List.of()));
     new DelegatingPostAuthenticationProcessor(processors).process(authentication);
-  }
-
-  /**
-   * Checks that every attribute value the requester asked for matches what the user has. An attribute the user does not
-   * have says nothing, so it is not a mismatch.
-   *
-   * @param requirements what the requester asks for
-   * @param user the authenticated user
-   * @return {@code true} if nothing contradicts the user and {@code false} otherwise
-   */
-  private boolean requestedAttributeValuesMatch(final @NonNull AuthenticationRequirements requirements,
-      final @NonNull AuthenticatedUser user) {
-    for (final GenericRequestedAttribute requested : requirements.getRequestedAttributes()) {
-      if (requested.getRequestedValues().isEmpty()) {
-        continue;
-      }
-      final GenericAttribute<?> attribute = user.getAttribute(requested.getIdentifier());
-      if (attribute == null) {
-        continue;
-      }
-      if (Collections.disjoint(attribute.getValues(), requested.getRequestedValues())) {
-        return false;
-      }
-    }
-    return true;
   }
 
 }

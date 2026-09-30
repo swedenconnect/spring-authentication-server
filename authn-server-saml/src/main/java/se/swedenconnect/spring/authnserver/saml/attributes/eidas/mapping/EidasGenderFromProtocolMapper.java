@@ -49,13 +49,15 @@ public class EidasGenderFromProtocolMapper implements FromProtocolAttributeMappe
       final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
+    final boolean valuesEssential = inputs.stream().anyMatch(SamlRequestedAttribute::requiredValues);
     final List<String> values = inputs.stream()
         .flatMap(i -> i.stringValues().stream())
         .map(EidasAttributeValues::fromGender)
         .filter(Objects::nonNull)
         .distinct()
         .toList();
-    return List.of(new GenericRequestedAttribute(AttributeIdentifiers.GENDER, essential, values, null));
+    return List.of(
+        new GenericRequestedAttribute(AttributeIdentifiers.GENDER, essential, values, valuesEssential, null));
   }
 
 }

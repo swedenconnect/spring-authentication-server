@@ -292,6 +292,8 @@ class OidcAutoConfigurationTest {
   void theTokenPropertiesAreApplied() {
     this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
         .withPropertyValues("authn-server.oidc.endpoints.token=/tokens",
+            "authn-server.oidc.endpoints.userinfo=/me",
+            "authn-server.oidc.sign-user-info=false",
             "authn-server.oidc.tokens.authorization-code-lifetime=30s",
             "authn-server.oidc.tokens.access-token-lifetime=2m",
             "authn-server.oidc.tokens.access-token-single-use=false",
@@ -313,6 +315,10 @@ class OidcAutoConfigurationTest {
               OIDCProviderMetadata.parse(get(context, DISCOVERY).getContentAsString());
           assertThat(metadata.getTokenEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/tokens"));
           assertThat(context.getBean(SecurityFilterChain.class).matches(request("POST", "/oidc/tokens"))).isTrue();
+          assertThat(oidc.isSignUserInfo()).isFalse();
+          assertThat(metadata.getUserInfoEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/me"));
+          assertThat(context.getBean(SecurityFilterChain.class).matches(request("GET", "/oidc/me"))).isTrue();
+          assertThat(context.getBean(SecurityFilterChain.class).matches(request("POST", "/oidc/me"))).isTrue();
         });
   }
 

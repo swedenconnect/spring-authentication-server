@@ -9,8 +9,8 @@
 This page describes the OpenID Provider: where it publishes its discovery document and its keys, how the keys are
 configured and rolled over, how the key that a message to a client is signed with is chosen, how the offered scopes,
 the supported claims and the authentication contexts are worked out from the authentication providers, how
-authentication requests are processed, how the code flow completes with the authorization code, the token endpoint
-and the ID token, and how to extend the discovery document. The properties are described in
+authentication requests are processed, how the code flow completes with the authorization code, the token endpoint,
+the ID token and the UserInfo endpoint, and how to extend the discovery document. The properties are described in
 [Configuration](configuration.html#the-openid-provider).
 
 Source links in this guide point to the `main` branch of the
@@ -39,6 +39,7 @@ Source links in this guide point to the `main` branch of the
     - [Client authentication](#client-authentication)
     - [The access token](#the-access-token)
     - [The ID token](#the-id-token)
+    - [The UserInfo endpoint](#the-userinfo-endpoint)
     - [Where codes and tokens are kept](#where-codes-and-tokens-are-kept)
 - [The discovery document](#the-discovery-document)
     - [Extending the document](#extending-the-document)
@@ -57,6 +58,7 @@ OIDC path, `/oidc` by default, see [URL layout](configuration.html#url-layout). 
 | JWKS | `https://op.example.com/oidc/jwks` |
 | Authorization endpoint | `https://op.example.com/oidc/authorize` |
 | Token endpoint | `https://op.example.com/oidc/token` |
+| UserInfo endpoint | `https://op.example.com/oidc/userinfo` |
 
 The discovery document is always published at the issuer followed by `/.well-known/openid-configuration`, as OpenID
 Connect Discovery, Section 4, requires. It is therefore not under the OIDC path. An issuer with a path moves the
@@ -187,8 +189,7 @@ Section 4.1, leaves the choice to the OpenID Provider, so the default key decide
 If no active key can produce an algorithm that the client accepts, the message is not sent: this is an error, not a
 fallback to another algorithm. Future keys are never used.
 
-UserInfo responses are signed by default. When they are, a client that has not registered
-`userinfo_signed_response_alg` still gets a signed response. Turn signing off with `authn-server.oidc.sign-user-info`.
+UserInfo responses are signed by default, see [The UserInfo endpoint](#the-userinfo-endpoint).
 
 <a name="scopes-claims-and-authentication-contexts"></a>
 ## Scopes, claims and authentication contexts
@@ -476,6 +477,9 @@ the OpenID Connect policy, which wins over the shared one.
 
 When the user has been authenticated, and before the code is issued:
 
+- After a new authentication, the `value` and `values` of the `claims` parameter are compared with the user. Essential
+  values that do not match give `access_denied`, see
+  [When the user does not match the requested values](authentication-module.html#when-the-user-does-not-match-the-requested-values).
 - The `sub` of the user for the client is computed, public or pairwise, see
   [Identifying the user](attributes.html#identifying-the-user). If the client asked for a `sub` with a value in the
   `claims` parameter, or with `id_token_hint`, it must be the same. Otherwise the client gets `access_denied` and no
@@ -581,6 +585,8 @@ endpoint.
 | `authn-server.oidc.tokens.access-token-lifetime` | 5 minutes |
 | `authn-server.oidc.tokens.access-token-single-use` | `true`, so that the first UserInfo call uses up the token |
 
+With single use off, the token may be used at the UserInfo endpoint until it expires or is revoked.
+
 <a name="the-id-token"></a>
 ### The ID token
 
@@ -623,6 +629,66 @@ the algorithm needs. Following
 
 A client that asks for other algorithms, or has no usable key, is a client configuration error: its authentication
 request ends at the OpenID Provider, and the error is logged at `WARN`.
+
+<a name="the-userinfo-endpoint"></a>
+### The UserInfo endpoint
+
+The UserInfo endpoint, `/oidc/userinfo` by default, gives the client the claims that belong in UserInfo, as the
+Swedish OpenID Connect Profile, Section 4.1, requires. It accepts GET and POST.
+
+**Presenting the access token.** The token is accepted in two ways, following RFC 6750, Section 2:
+
+- In the `Authorization` header: `Authorization: Bearer <token>`.
+- As the `access_token` parameter of a form-encoded POST body.
+
+The URI query parameter of RFC 6750, Section 2.3, is not accepted. A request that carries the token in more than one
+way is rejected.
+
+**Single use.** By default an access token may only be used once: the first successful call uses it up, and a second
+call with the same token gets `invalid_token`. A call that fails does not use up the token. See
+[The access token](#the-access-token) for how to turn this off.
+
+**What the response holds.** The response holds `sub`, the same value as in the ID token, and the claims whose
+delivery target includes UserInfo, following Section 4.2 of the profile:
+
+- claims asked for under `userinfo` in the `claims` parameter,
+- claims of a requested scope that the scope definition delivers from the UserInfo endpoint,
+- a claim asked for in the ID token through the `claims` parameter, which is also covered by a requested scope
+  delivered from the UserInfo endpoint.
+
+A request with only the `openid` scope gets a response with only `sub`. The claims are those released when the
+authentication completed, and kept with the access token. The release is not run again when the endpoint is called.
+
+**Signing.** Responses are signed by default, `authn-server.oidc.sign-user-info`. A signed response is a JWT, signed
+with the key chosen for the client, see [Choosing the signing key for a client](#choosing-the-signing-key-for-a-client),
+and it also holds `iss` and `aud`. The content type is then `application/jwt`.
+
+| `sign-user-info` | The client has registered `userinfo_signed_response_alg` | Response |
+| :--- | :--- | :--- |
+| `true` (default) | Yes or no | Signed JWT |
+| `false` | No | Plain JSON (`application/json`) |
+| `false` | Yes | Signed JWT |
+
+**Encryption.** When the client has registered `userinfo_encrypted_response_alg`, the response is encrypted for the
+client, with the same algorithms and key rules as the ID token, see [The ID token](#the-id-token). The content
+encryption is given by `userinfo_encrypted_response_enc`, `A128CBC-HS256` by default. A signed response is signed and
+then encrypted. When signing is off and the client has not asked for it, the response is encrypted only, as OpenID
+Connect Core, Section 5.3.2, allows: the encrypted payload is the JSON claims set.
+
+A client whose declared algorithms cannot be used, or that has no usable encryption key, gets the error
+`invalid_client_metadata` (HTTP status 400) and no claims. This is logged at `WARN` as a client configuration error.
+
+**Errors.** Errors follow RFC 6750, Section 3, including the `WWW-Authenticate` header. Every response, also an error
+response, carries `Cache-Control: no-store`.
+
+| Failure | Response |
+| :--- | :--- |
+| No access token | HTTP status 401, `WWW-Authenticate: Bearer` without an error code |
+| The token is sent in the URI query, in more than one way, or is malformed | `invalid_request` (HTTP status 400) |
+| The token is unknown, expired, revoked or already used | `invalid_token` (HTTP status 401) |
+| The response cannot be signed or encrypted for the client | `invalid_client_metadata` (HTTP status 400) |
+
+The request processing is found in [`UserInfoRequestProcessor`][UserInfoRequestProcessor].
 
 <a name="where-codes-and-tokens-are-kept"></a>
 ### Where codes and tokens are kept
@@ -682,6 +748,10 @@ The discovery document holds:
 | `token_endpoint_auth_signing_alg_values_supported` | The algorithms accepted for client assertions: those of `private_key_jwt` and of `client_secret_jwt`, when enabled. Never `none`. Left out when neither method is enabled. |
 | `id_token_encryption_alg_values_supported` | `RSA-OAEP-256`, `RSA-OAEP` and `ECDH-ES`. |
 | `id_token_encryption_enc_values_supported` | `A128CBC-HS256`, `A256CBC-HS512`, `A128GCM` and `A256GCM`. |
+| `userinfo_endpoint` | The URL of the UserInfo endpoint. |
+| `userinfo_signing_alg_values_supported` | The algorithms the active signing keys can produce, as for the ID token. |
+| `userinfo_encryption_alg_values_supported` | `RSA-OAEP-256`, `RSA-OAEP` and `ECDH-ES`. |
+| `userinfo_encryption_enc_values_supported` | `A128CBC-HS256`, `A256CBC-HS512`, `A128GCM` and `A256GCM`. |
 
 <a name="extending-the-document"></a>
 ### Extending the document
@@ -728,6 +798,7 @@ AuthnServerConfigurerAdapter discoveryAdjustments() {
 [OidcUnrecoverableError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcUnrecoverableError.java
 [SigningKeySelector]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/keys/SigningKeySelector.java
 [SupportedScopesAndClaims]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/scope/SupportedScopesAndClaims.java
+[UserInfoRequestProcessor]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/userinfo/UserInfoRequestProcessor.java
 
 -----
 

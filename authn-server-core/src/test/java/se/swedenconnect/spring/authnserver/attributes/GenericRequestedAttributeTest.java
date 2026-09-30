@@ -58,6 +58,30 @@ class GenericRequestedAttributeTest {
   }
 
   @Test
+  void whetherTheValuesAreEssentialFollowsTheAttributeThatCarriesThem() {
+    // A required attribute without values does not make voluntary values essential
+    final GenericRequestedAttribute merged = GenericRequestedAttribute.of(AttributeIdentifiers.SURNAME, true)
+        .merge(new GenericRequestedAttribute(AttributeIdentifiers.SURNAME, false, List.of("Ek"), null));
+    assertThat(merged.isEssential()).isTrue();
+    assertThat(merged.isRequestedValuesEssential()).isFalse();
+
+    final GenericRequestedAttribute essentialValues =
+        new GenericRequestedAttribute(AttributeIdentifiers.SURNAME, true, List.of("Ek"), null)
+            .merge(GenericRequestedAttribute.of(AttributeIdentifiers.SURNAME, false));
+    assertThat(essentialValues.isRequestedValuesEssential()).isTrue();
+  }
+
+  @Test
+  void essentialValuesMakeTheAttributeEssentialAndNeedValues() {
+    assertThat(new GenericRequestedAttribute(AttributeIdentifiers.SURNAME, false, List.of("Ek"), true, null)
+        .isEssential()).isTrue();
+    final GenericRequestedAttribute noValues =
+        new GenericRequestedAttribute(AttributeIdentifiers.SURNAME, false, null, true, null);
+    assertThat(noValues.isRequestedValuesEssential()).isFalse();
+    assertThat(noValues.isEssential()).isFalse();
+  }
+
+  @Test
   void protocolDataIsReplacedUnlessItKnowsHowToMerge() {
     final GenericRequestedAttribute first = new GenericRequestedAttribute(AttributeIdentifiers.SURNAME, false, null,
         Map.of("plain", "first", "mergeable", new Marks("a")));

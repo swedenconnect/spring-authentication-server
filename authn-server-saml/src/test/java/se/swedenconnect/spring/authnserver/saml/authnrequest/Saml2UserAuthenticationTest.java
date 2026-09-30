@@ -52,12 +52,14 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.opensaml.core.xml.schema.XSString;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.ext.reqattr.RequestedAttributes;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.AuthnContextComparisonTypeEnumeration;
 import org.opensaml.saml.saml2.core.AuthnRequest;
+import org.opensaml.saml.saml2.core.AttributeValue;
 import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.saml.saml2.core.KeyInfoConfirmationDataType;
 import org.opensaml.saml.saml2.core.Response;
@@ -65,6 +67,7 @@ import org.opensaml.saml.saml2.core.StatusCode;
 import org.opensaml.saml.saml2.core.SubjectConfirmation;
 import org.opensaml.saml.saml2.metadata.EntitiesDescriptor;
 import org.opensaml.saml.saml2.metadata.EntityDescriptor;
+import org.opensaml.saml.saml2.metadata.RequestedAttribute;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.security.x509.BasicX509Credential;
 import org.opensaml.xmlsec.keyinfo.KeyInfoSupport;
@@ -87,10 +90,13 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import se.swedenconnect.opensaml.saml2.attribute.AttributeUtils;
 import se.swedenconnect.opensaml.saml2.core.build.ExtensionsBuilder;
 import se.swedenconnect.opensaml.saml2.core.build.RequestedAuthnContextBuilder;
+import se.swedenconnect.opensaml.saml2.metadata.build.AttributeConsumingServiceBuilder;
 import se.swedenconnect.opensaml.saml2.metadata.build.RequestedAttributeBuilder;
 import se.swedenconnect.opensaml.saml2.metadata.provider.StaticMetadataProvider;
 import se.swedenconnect.opensaml.saml2.request.RequestHttpObject;
 import se.swedenconnect.opensaml.sweid.saml2.attribute.AttributeConstants;
+import se.swedenconnect.opensaml.sweid.saml2.authn.psc.build.MatchValueBuilder;
+import se.swedenconnect.opensaml.sweid.saml2.authn.psc.build.PrincipalSelectionBuilder;
 import se.swedenconnect.opensaml.sweid.saml2.metadata.entitycategory.EntityCategoryConstants;
 import se.swedenconnect.opensaml.sweid.saml2.signservice.dss.Message;
 import se.swedenconnect.opensaml.sweid.saml2.signservice.dss.SignMessage;
@@ -145,6 +151,8 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
   private static final String PNR = "197705232382";
 
   private static final String COORDINATION_NUMBER = "197010632391";
+
+  private static final String OTHER_PNR = "196911292032";
 
   private static final String LOA3_PNR = EntityCategoryConstants.SERVICE_ENTITY_CATEGORY_LOA3_PNR.getUri();
 
@@ -678,6 +686,86 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     assertThat(attribute(second, AttributeConstants.ATTRIBUTE_NAME_MAIL)).isEqualTo("kalle@example.com");
   }
 
+  // Requested attribute values
+
+  @Test
+  void anEssentialRequestedValueThatDoesNotMatchIsUnknownPrincipalAndRemovesTheSessionAuthentication()
+      throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, provider);
+    this.send(toHttpRequest(this.request(r -> {})));
+    assertThat(this.session.getAttribute("SPRING_SECURITY_CONTEXT")).isNotNull();
+
+    final RequestHttpObject<AuthnRequest> request = this.request(r -> r.setExtensions(requestedAttributes(true,
+        AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER, OTHER_PNR)));
+    this.assertErrorResponse(this.send(toHttpRequest(request)), request, StatusCode.REQUESTER,
+        StatusCode.UNKNOWN_PRINCIPAL);
+    assertThat(provider.calls).isEqualTo(2);
+    assertThat(this.session.getAttribute("SPRING_SECURITY_CONTEXT")).isNull();
+
+    this.send(toHttpRequest(this.request(r -> {})));
+    assertThat(provider.calls).isEqualTo(3);
+  }
+
+  @Test
+  void aVoluntaryRequestedValueThatDoesNotMatchProceedsWithTheActualValue() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    final Assertion assertion = assertion(parseResponse(this.send(toHttpRequest(this.request(r -> r.setExtensions(
+        requestedAttributes(false, AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER,
+            OTHER_PNR)))))));
+    assertThat(attribute(assertion, AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER)).isEqualTo(PNR);
+  }
+
+  @Test
+  void severalRequestedValuesFailOnlyWhenNoneMatches() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    assertThat(parseResponse(this.send(toHttpRequest(this.request(r -> r.setExtensions(requestedAttributes(true,
+        AttributeConstants.ATTRIBUTE_NAME_GIVEN_NAME, "Olle", "Kalle"))))))
+        .getStatus().getStatusCode().getValue()).isEqualTo(StatusCode.SUCCESS);
+
+    final RequestHttpObject<AuthnRequest> request = this.request(r -> r.setExtensions(requestedAttributes(true,
+        AttributeConstants.ATTRIBUTE_NAME_GIVEN_NAME, "Olle", "Nisse")));
+    this.assertErrorResponse(this.send(toHttpRequest(request)), request, StatusCode.REQUESTER,
+        StatusCode.UNKNOWN_PRINCIPAL);
+  }
+
+  @Test
+  void aRequestedValueForAnAttributeTheUserDoesNotHaveProceeds() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    final Assertion assertion = assertion(parseResponse(this.send(toHttpRequest(this.request(r -> r.setExtensions(
+        requestedAttributes(true, AttributeConstants.ATTRIBUTE_NAME_MAIL, "kalle@example.com")))))));
+    assertThat(attribute(assertion, AttributeConstants.ATTRIBUTE_NAME_MAIL)).isNull();
+  }
+
+  @Test
+  void aPrincipalSelectionValueIsNotEssentialEvenWhenTheMetadataRequiresTheAttribute() throws Exception {
+    this.start(spMetadata(sp -> sp.attributeConsumingServices(AttributeConsumingServiceBuilder.builder()
+        .index(0).isDefault(true)
+        .requestedAttributes(RequestedAttributeBuilder.builder(
+            AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER).isRequired(true).build())
+        .build())), c -> {}, new TestProvider("direct", LOA3));
+    final Assertion assertion = assertion(parseResponse(this.send(toHttpRequest(this.request(r -> r.setExtensions(
+        ExtensionsBuilder.builder().extension(PrincipalSelectionBuilder.builder()
+            .matchValues(MatchValueBuilder.builder()
+                .name(AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER)
+                .value(OTHER_PNR)
+                .build())
+            .build()).build()))))));
+    assertThat(attribute(assertion, AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER)).isEqualTo(PNR);
+  }
+
+  @Test
+  void aRequiredValueInTheMetadataIsEssential() throws Exception {
+    final RequestedAttribute requested =
+        RequestedAttributeBuilder.builder(AttributeConstants.ATTRIBUTE_NAME_GIVEN_NAME).isRequired(true).build();
+    requested.getAttributeValues().add(stringValue("Olle"));
+    this.start(spMetadata(sp -> sp.attributeConsumingServices(AttributeConsumingServiceBuilder.builder()
+        .index(0).isDefault(true).requestedAttributes(requested).build())), c -> {}, new TestProvider("direct", LOA3));
+    final RequestHttpObject<AuthnRequest> request = this.request(r -> {});
+    this.assertErrorResponse(this.send(toHttpRequest(request)), request, StatusCode.REQUESTER,
+        StatusCode.UNKNOWN_PRINCIPAL);
+  }
+
   // Producers, voters and processors
 
   @Test
@@ -874,6 +962,25 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
       extension.getRequestedAttributes().add(RequestedAttributeBuilder.builder(name).isRequired(true).build());
     }
     return ExtensionsBuilder.builder().extension(extension).build();
+  }
+
+  private static org.opensaml.saml.saml2.core.Extensions requestedAttributes(final boolean required,
+      final String name, final String... values) {
+    final RequestedAttributes extension =
+        (RequestedAttributes) XMLObjectSupport.buildXMLObject(RequestedAttributes.DEFAULT_ELEMENT_NAME);
+    final RequestedAttribute requested = RequestedAttributeBuilder.builder(name).isRequired(required).build();
+    for (final String value : values) {
+      requested.getAttributeValues().add(stringValue(value));
+    }
+    extension.getRequestedAttributes().add(requested);
+    return ExtensionsBuilder.builder().extension(extension).build();
+  }
+
+  private static XSString stringValue(final String value) {
+    final XSString xs = (XSString) XMLObjectSupport.getBuilder(XSString.TYPE_NAME)
+        .buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
+    xs.setValue(value);
+    return xs;
   }
 
   private static SignMessage signMessage(final String text) {

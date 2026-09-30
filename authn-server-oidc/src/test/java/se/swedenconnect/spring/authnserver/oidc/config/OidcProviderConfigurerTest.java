@@ -98,7 +98,6 @@ class OidcProviderConfigurerTest {
     assertThat(metadata.getSubjectTypes()).containsExactly(SubjectType.PUBLIC, SubjectType.PAIRWISE);
     assertThat(metadata.getUILocales()).extracting(LangTag::toString).containsExactly("sv", "en");
     assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME)).isNull();
-    assertThat(metadata.getUserInfoJWSAlgs()).isNull();
     assertThat(metadata.getAuthorizationEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/authorize"));
     assertThat(metadata.getResponseTypes()).containsExactly(ResponseType.CODE);
     assertThat(metadata.getResponseModes()).containsExactly(ResponseMode.QUERY, ResponseMode.FORM_POST);
@@ -120,6 +119,20 @@ class OidcProviderConfigurerTest {
         .containsExactly(JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.ECDH_ES);
     assertThat(metadata.getIDTokenJWEEncs()).containsExactly(EncryptionMethod.A128CBC_HS256,
         EncryptionMethod.A256CBC_HS512, EncryptionMethod.A128GCM, EncryptionMethod.A256GCM);
+    assertThat(metadata.getUserInfoEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/userinfo"));
+    assertThat(metadata.getUserInfoJWSAlgs()).isEqualTo(metadata.getIDTokenJWSAlgs());
+    assertThat(metadata.getUserInfoJWEAlgs())
+        .containsExactly(JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.ECDH_ES);
+    assertThat(metadata.getUserInfoJWEEncs()).containsExactly(EncryptionMethod.A128CBC_HS256,
+        EncryptionMethod.A256CBC_HS512, EncryptionMethod.A128GCM, EncryptionMethod.A256GCM);
+  }
+
+  @Test
+  void theUserInfoEndpointCanBeMoved() {
+    assertThat(new OidcProviderConfigurerTest().buildWith(c -> c.userInfoEndpoint("/me")).getUserInfoEndpointURI())
+        .isEqualTo(URI.create(BASE_URL + "/oidc/me"));
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.userInfoEndpoint("me")))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("UserInfo endpoint");
   }
 
   @Test

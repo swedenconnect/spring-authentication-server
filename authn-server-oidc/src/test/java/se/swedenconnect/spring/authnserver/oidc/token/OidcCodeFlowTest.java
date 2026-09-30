@@ -93,7 +93,6 @@ import com.sun.net.httpserver.HttpServer;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import net.minidev.json.JSONObject;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
@@ -118,7 +117,8 @@ import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 
 /**
  * End-to-end tests of the OpenID Connect code flow: the authentication request, the authentication of the user with a
- * direct and a redirect provider, the authorization code response, the token request and the ID token.
+ * direct and a redirect provider, the authorization code response, the token request, the ID token and the UserInfo
+ * endpoint.
  *
  * @author Martin Lindström
  */
@@ -131,6 +131,14 @@ class OidcCodeFlowTest {
   private static final String TOKEN_PATH = "/oidc/token";
 
   private static final String TOKEN_ENDPOINT = BASE_URL + TOKEN_PATH;
+
+  private static final String USERINFO_PATH = "/oidc/userinfo";
+
+  private static final String USERINFO_ENC_CLIENT = "https://userinfo-enc.example.com";
+
+  private static final String USERINFO_BAD_ENC_CLIENT = "https://userinfo-bad-enc.example.com";
+
+  private static final String OTHER_PNR = "196911292032";
 
   private static final String REDIRECT_URI = "https://rp.example.com/callback";
 
@@ -441,7 +449,7 @@ class OidcCodeFlowTest {
     this.start(c -> {}, new TestProvider("direct", LOA3));
     final Tokens tokens = this.codeFlow(params(RSA_CLIENT));
     assertThat(tokens.idToken().getClaims()).containsOnlyKeys("iss", "sub", "aud", "exp", "iat", "auth_time", "acr");
-    assertThat(tokens.userInfo()).isEmpty();
+    assertThat(tokens.userInfo()).containsOnlyKeys("sub", "iss", "aud");
   }
 
   @Test
@@ -494,6 +502,268 @@ class OidcCodeFlowTest {
     final Map<String, String> params = params(RSA_CLIENT);
     params.put("id_token_hint", hint.serialize());
     assertThat(query(this.send(get(AUTHZ_PATH, params))).get("error")).isEqualTo("access_denied");
+  }
+
+  // UserInfo
+
+  @Test
+  void userInfoWithTheTokenInTheHeaderAndInAPostBody() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("scope", "openid profile");
+
+    Map<String, Object> json = this.tokenJson(params);
+    final String sub = SignedJWT.parse((String) json.get("id_token")).getJWTClaimsSet().getSubject();
+    MockHttpServletResponse response = this.send(userInfoRequest("GET", (String) json.get("access_token"), null));
+    assertThat(response.getStatus()).isEqualTo(200);
+    SignedJWT jwt = signedUserInfo(response);
+    assertThat(jwt.getHeader().getAlgorithm()).isEqualTo(JWSAlgorithm.RS256);
+    final JWTClaimsSet claims = jwt.getJWTClaimsSet();
+    assertThat(claims.getSubject()).isEqualTo(sub);
+    assertThat(claims.getIssuer()).isEqualTo(BASE_URL);
+    assertThat(claims.getAudience()).containsExactly(RSA_CLIENT);
+    assertThat(claims.getClaims()).containsEntry("given_name", "Kalle").containsEntry("family_name", "Kula")
+        .doesNotContainKey(PNR_CLAIM);
+
+    // In a POST body, and with the header in a POST
+    json = this.tokenJson(params);
+    response = this.send(userInfoRequest("POST", null, (String) json.get("access_token")));
+    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(200);
+    jwt = signedUserInfo(response);
+    assertThat(jwt.getJWTClaimsSet().getSubject()).isEqualTo(sub);
+
+    json = this.tokenJson(params);
+    response = this.send(userInfoRequest("POST", (String) json.get("access_token"), null));
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void theUserInfoResponseIsSignedWithTheKeyChosenForTheClient() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, Object> json = this.tokenJson(params(EC_CLIENT));
+    final SignedJWT jwt =
+        signedUserInfo(this.send(userInfoRequest("GET", (String) json.get("access_token"), null)));
+    assertThat(jwt.getHeader().getAlgorithm()).isEqualTo(JWSAlgorithm.ES256);
+    assertThat(jwt.getJWTClaimsSet().getAudience()).containsExactly(EC_CLIENT);
+  }
+
+  @Test
+  void anEncryptedUserInfoResponseIsSignedThenEncrypted() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(USERINFO_ENC_CLIENT);
+    params.put("scope", "openid profile");
+    final Map<String, Object> json = this.tokenJson(params);
+    // The ID token is not encrypted
+    final String sub = SignedJWT.parse((String) json.get("id_token")).getJWTClaimsSet().getSubject();
+
+    final MockHttpServletResponse response =
+        this.send(userInfoRequest("GET", (String) json.get("access_token"), null));
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getContentType()).startsWith("application/jwt");
+    final JWEObject jwe = JWEObject.parse(response.getContentAsString());
+    assertThat(jwe.getHeader().getAlgorithm()).isEqualTo(JWEAlgorithm.RSA_OAEP_256);
+    assertThat(jwe.getHeader().getEncryptionMethod()).isEqualTo(EncryptionMethod.A256GCM);
+    assertThat(jwe.getHeader().getContentType()).isEqualTo("JWT");
+    assertThat(jwe.getHeader().getKeyID()).isEqualTo("enc-key");
+    jwe.decrypt(new RSADecrypter(CLIENT_ENC.getPrivateKey()));
+    final SignedJWT jwt = jwe.getPayload().toSignedJWT();
+    verifyByOp(jwt);
+    assertThat(jwt.getJWTClaimsSet().getSubject()).isEqualTo(sub);
+    assertThat(jwt.getJWTClaimsSet().getAudience()).containsExactly(USERINFO_ENC_CLIENT);
+    assertThat(jwt.getJWTClaimsSet().getClaims()).containsEntry("given_name", "Kalle");
+  }
+
+  @Test
+  void withSigningOffAUserInfoResponseMayBeEncryptedOnly() throws Exception {
+    this.start(c -> oidc(c).signUserInfo(false), new TestProvider("direct", LOA3));
+    final Map<String, Object> json = this.tokenJson(params(USERINFO_ENC_CLIENT));
+    final MockHttpServletResponse response =
+        this.send(userInfoRequest("GET", (String) json.get("access_token"), null));
+    assertThat(response.getContentType()).startsWith("application/jwt");
+    final JWEObject jwe = JWEObject.parse(response.getContentAsString());
+    assertThat(jwe.getHeader().getContentType()).isNull();
+    jwe.decrypt(new RSADecrypter(CLIENT_ENC.getPrivateKey()));
+    assertThat(jwe.getPayload().toJSONObject()).containsOnlyKeys("sub");
+  }
+
+  @Test
+  void withSigningOffOnlyAClientThatAsksForSigningGetsASignedResponse() throws Exception {
+    this.start(c -> oidc(c).signUserInfo(false), new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("scope", "openid profile");
+    final Map<String, Object> json = this.tokenJson(params);
+    final MockHttpServletResponse response =
+        this.send(userInfoRequest("GET", (String) json.get("access_token"), null));
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getContentType()).startsWith("application/json");
+    final Map<String, Object> claims = JSONObjectUtils.parse(response.getContentAsString());
+    assertThat(claims).containsOnlyKeys("sub", "given_name", "family_name")
+        .containsEntry("sub", SignedJWT.parse((String) json.get("id_token")).getJWTClaimsSet().getSubject());
+
+    final Map<String, Object> ecJson = this.tokenJson(params(EC_CLIENT));
+    final SignedJWT jwt =
+        signedUserInfo(this.send(userInfoRequest("GET", (String) ecJson.get("access_token"), null)));
+    assertThat(jwt.getHeader().getAlgorithm()).isEqualTo(JWSAlgorithm.ES256);
+  }
+
+  @Test
+  void aClientWhoseUserInfoEncryptionCannotBeUsedGetsAnErrorAndNoClaims() throws Exception {
+    final ListAppender<ILoggingEvent> appender = appender(ClientEncryption.class);
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(USERINFO_BAD_ENC_CLIENT);
+    params.put("scope", "openid profile");
+    final Map<String, Object> json = this.tokenJson(params);
+    final MockHttpServletResponse response =
+        this.send(userInfoRequest("GET", (String) json.get("access_token"), null));
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(response.getContentAsString()).doesNotContain("Kalle");
+    assertBearerError(response, 400, "invalid_client_metadata");
+    assertThat(appender.list).anyMatch(e -> e.getFormattedMessage().contains("Client configuration error"));
+  }
+
+  @Test
+  void aSingleUseAccessTokenIsConsumedByTheFirstCall() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final String token = (String) this.tokenJson(params(RSA_CLIENT)).get("access_token");
+    assertThat(this.send(userInfoRequest("GET", token, null)).getStatus()).isEqualTo(200);
+    assertBearerError(this.send(userInfoRequest("GET", token, null)), 401, "invalid_token");
+    assertBearerError(this.send(userInfoRequest("POST", null, token)), 401, "invalid_token");
+  }
+
+  @Test
+  void anAccessTokenThatIsNotSingleUseWorksUntilItExpires() throws Exception {
+    this.start(c -> oidc(c).singleUseAccessTokens(false).accessTokenLifetime(Duration.ofMillis(700)),
+        new TestProvider("direct", LOA3));
+    final String token = (String) this.tokenJson(params(RSA_CLIENT)).get("access_token");
+    assertThat(this.send(userInfoRequest("GET", token, null)).getStatus()).isEqualTo(200);
+    assertThat(this.send(userInfoRequest("GET", token, null)).getStatus()).isEqualTo(200);
+    Thread.sleep(800);
+    assertBearerError(this.send(userInfoRequest("GET", token, null)), 401, "invalid_token");
+  }
+
+  @Test
+  void userInfoRequestErrorsFollowRfc6750() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final String token = (String) this.tokenJson(params(RSA_CLIENT)).get("access_token");
+
+    // No token
+    assertBearerError(this.send(userInfoRequest("GET", null, null)), 401, null);
+    final MockHttpServletRequest basic = userInfoRequest("GET", null, null);
+    basic.addHeader("Authorization", "Basic dXNlcjpwYXNz");
+    assertBearerError(this.send(basic), 401, null);
+
+    // In the query
+    final MockHttpServletRequest query = userInfoRequest("GET", null, null);
+    query.setQueryString("access_token=" + token);
+    query.addParameter("access_token", token);
+    assertBearerError(this.send(query), 400, "invalid_request");
+
+    // Two ways
+    assertBearerError(this.send(userInfoRequest("POST", token, token)), 400, "invalid_request");
+
+    // Malformed
+    final MockHttpServletRequest malformed = userInfoRequest("GET", null, null);
+    malformed.addHeader("Authorization", "Bearer ");
+    assertBearerError(this.send(malformed), 400, "invalid_request");
+
+    // Unknown
+    assertBearerError(this.send(userInfoRequest("GET", "unknown-token", null)), 401, "invalid_token");
+
+    // None of the failures used up the token
+    assertThat(this.send(userInfoRequest("GET", token, null)).getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void anExpiredAccessTokenIsInvalid() throws Exception {
+    this.start(c -> oidc(c).accessTokenLifetime(Duration.ofMillis(200)), new TestProvider("direct", LOA3));
+    final String token = (String) this.tokenJson(params(RSA_CLIENT)).get("access_token");
+    Thread.sleep(300);
+    assertBearerError(this.send(userInfoRequest("GET", token, null)), 401, "invalid_token");
+  }
+
+  @Test
+  void theAccessTokenOfAReusedCodeIsRevoked() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final String code = this.authorize(params(RSA_CLIENT)).get("code");
+    final String token = (String) JSONObjectUtils.parse(this.token(privateKeyJwt(RSA_CLIENT, CLIENT_RSA, "rsa-key"),
+        code, REDIRECT_URI, null).getContentAsString()).get("access_token");
+    this.token(privateKeyJwt(RSA_CLIENT, CLIENT_RSA, "rsa-key"), code, REDIRECT_URI, null);
+    assertBearerError(this.send(userInfoRequest("GET", token, null)), 401, "invalid_token");
+  }
+
+  // Requested claim values
+
+  @Test
+  void anEssentialRequestedValueThatDoesNotMatchIsAccessDeniedAndRemovesTheSessionAuthentication()
+      throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    this.start(c -> {}, provider);
+    this.authorize(params(RSA_CLIENT));
+    assertThat(provider.calls).isOne();
+
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("claims", "{\"id_token\":{\"" + PNR_CLAIM + "\":{\"essential\":true,\"value\":\"" + OTHER_PNR
+        + "\"}}}");
+    final Map<String, String> response = query(this.send(get(AUTHZ_PATH, params)));
+    assertThat(response.get("error")).isEqualTo("access_denied");
+    assertThat(response.get("state")).isEqualTo("state-1");
+    assertThat(response).doesNotContainKey("code");
+    assertThat(provider.calls).isEqualTo(2);
+
+    this.authorize(params(RSA_CLIENT));
+    assertThat(provider.calls).isEqualTo(3);
+  }
+
+  @Test
+  void aVoluntaryRequestedValueThatDoesNotMatchProceedsWithTheActualValue() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("claims", "{\"id_token\":{\"" + PNR_CLAIM + "\":{\"value\":\"" + OTHER_PNR + "\"}}}");
+    assertThat(this.codeFlow(params).idToken().getClaims()).containsEntry(PNR_CLAIM, PNR);
+  }
+
+  @Test
+  void severalRequestedValuesFailOnlyWhenNoneMatches() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("claims", "{\"userinfo\":{\"given_name\":{\"essential\":true,\"values\":[\"Olle\",\"Kalle\"]}}}");
+    assertThat(this.codeFlow(params).userInfo()).containsEntry("given_name", "Kalle");
+
+    params.put("claims", "{\"userinfo\":{\"given_name\":{\"essential\":true,\"values\":[\"Olle\",\"Nisse\"]}}}");
+    assertThat(query(this.send(get(AUTHZ_PATH, params))).get("error")).isEqualTo("access_denied");
+  }
+
+  @Test
+  void aRequestedValueForAClaimTheUserDoesNotHaveProceeds() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("claims", "{\"userinfo\":{\"email\":{\"essential\":true,\"value\":\"kalle@example.com\"}}}");
+    assertThat(this.codeFlow(params).userInfo()).doesNotContainKey("email");
+  }
+
+  @Test
+  void aScopeMarkingTheClaimEssentialMakesAVoluntaryValueEssential() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("scope", "openid " + PNR_SCOPE);
+    params.put("claims", "{\"userinfo\":{\"" + PNR_CLAIM + "\":{\"value\":\"" + OTHER_PNR + "\"}}}");
+    assertThat(query(this.send(get(AUTHZ_PATH, params))).get("error")).isEqualTo("access_denied");
+  }
+
+  @Test
+  void aResumedAuthenticationIsCheckedAgainstTheRequestedValues() throws Exception {
+    final TestRedirectProvider provider = new TestRedirectProvider(LOA3);
+    this.start(c -> {}, provider);
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("claims", "{\"id_token\":{\"" + PNR_CLAIM + "\":{\"essential\":true,\"value\":\"" + OTHER_PNR
+        + "\"}}}");
+    final MockHttpServletResponse redirect = this.send(get(AUTHZ_PATH, params));
+    final String authnId = redirect.getRedirectedUrl().substring(redirect.getRedirectedUrl().indexOf('=') + 1);
+    provider.getAuthenticatorRepository().complete(new UserAuthentication(user(LOA3)),
+        this.appRequest(AUTHN_PATH, authnId));
+    final Map<String, String> response = query(this.send(this.appRequest(RESUME_PATH, authnId)));
+    assertThat(response.get("error")).isEqualTo("access_denied");
+    assertThat(response).doesNotContainKey("code");
   }
 
   // Token endpoint failures
@@ -723,14 +993,70 @@ class OidcCodeFlowTest {
   }
 
   private Tokens codeFlow(final Map<String, String> params) throws Exception {
+    final Map<String, Object> json = this.tokenJson(params);
+    final JWTClaimsSet claims = SignedJWT.parse((String) json.get("id_token")).getJWTClaimsSet();
+    final MockHttpServletResponse response =
+        this.send(userInfoRequest("GET", (String) json.get("access_token"), null));
+    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(200);
+    final Map<String, Object> userInfo = signedUserInfo(response).getJWTClaimsSet().getClaims();
+    assertThat(userInfo.get("sub")).isEqualTo(claims.getSubject());
+    return new Tokens(claims, userInfo);
+  }
+
+  private Map<String, Object> tokenJson(final Map<String, String> params) throws Exception {
     final String code = this.authorize(params).get("code");
     final MockHttpServletResponse response =
         this.token(privateKeyJwt(params.get("client_id"), CLIENT_RSA, "rsa-key"), code, REDIRECT_URI, null);
     assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(200);
-    final Map<String, Object> json = JSONObjectUtils.parse(response.getContentAsString());
-    final JWTClaimsSet claims = SignedJWT.parse((String) json.get("id_token")).getJWTClaimsSet();
-    final AccessTokenData accessToken = ACCESS_TOKENS.get((String) json.get("access_token"));
-    return new Tokens(claims, JSONObjectUtils.parse(accessToken.userInfoClaims()));
+    return JSONObjectUtils.parse(response.getContentAsString());
+  }
+
+  private static MockHttpServletRequest userInfoRequest(final String method, final @Nullable String bearer,
+      final @Nullable String bodyToken) {
+    final MockHttpServletRequest request = new MockHttpServletRequest(method, USERINFO_PATH);
+    request.setScheme("https");
+    request.setServerName("op.example.com");
+    request.setServerPort(443);
+    if (bearer != null) {
+      request.addHeader("Authorization", "Bearer " + bearer);
+    }
+    if (bodyToken != null) {
+      request.setContentType("application/x-www-form-urlencoded");
+      request.addParameter("access_token", bodyToken);
+      request.setContent(("access_token=" + bodyToken).getBytes(StandardCharsets.UTF_8));
+    }
+    return request;
+  }
+
+  private static SignedJWT signedUserInfo(final MockHttpServletResponse response) throws Exception {
+    assertThat(response.getContentType()).startsWith("application/jwt");
+    assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+    final SignedJWT jwt = SignedJWT.parse(response.getContentAsString());
+    verifyByOp(jwt);
+    return jwt;
+  }
+
+  private static void verifyByOp(final SignedJWT jwt) throws Exception {
+    final boolean rsa = JWSAlgorithm.Family.RSA.contains(jwt.getHeader().getAlgorithm());
+    assertThat(jwt.getHeader().getKeyID()).isEqualTo(rsa
+        ? SigningKey.activeDefault(OP_RSA).getKeyId()
+        : SigningKey.active(OP_EC).getKeyId());
+    assertThat(jwt.verify(rsa
+        ? new RSASSAVerifier((RSAPublicKey) OP_RSA.getPublicKey())
+        : new ECDSAVerifier((ECPublicKey) OP_EC.getPublicKey()))).isTrue();
+  }
+
+  private static void assertBearerError(final MockHttpServletResponse response, final int status,
+      final @Nullable String error) {
+    assertThat(response.getStatus()).isEqualTo(status);
+    final String header = response.getHeader("WWW-Authenticate");
+    assertThat(header).startsWith("Bearer");
+    if (error == null) {
+      assertThat(header).doesNotContain("error=");
+    }
+    else {
+      assertThat(header).contains("error=\"" + error + "\"");
+    }
   }
 
   private MockHttpServletResponse token(final Map<String, String> clientAuthentication, final @Nullable String code,
@@ -882,6 +1208,7 @@ class OidcCodeFlowTest {
 
     final OIDCClientMetadata ec = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
     ec.setIDTokenJWSAlg(JWSAlgorithm.ES256);
+    ec.setUserInfoJWSAlg(JWSAlgorithm.ES256);
     clients.add(OidcClientRecord.of(EC_CLIENT, ec));
 
     final OIDCClientMetadata jwksUriClient = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null);
@@ -898,6 +1225,17 @@ class OidcCodeFlowTest {
     final OIDCClientMetadata badEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
     badEnc.setIDTokenJWEAlg(JWEAlgorithm.RSA1_5);
     clients.add(OidcClientRecord.of(BAD_ENC_CLIENT, badEnc));
+
+    final OIDCClientMetadata userInfoEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT,
+        new JWKSet(List.of(rsaJwk(CLIENT_RSA, "rsa-key", KeyUse.SIGNATURE),
+            rsaJwk(CLIENT_ENC, "enc-key", KeyUse.ENCRYPTION))));
+    userInfoEnc.setUserInfoJWEAlg(JWEAlgorithm.RSA_OAEP_256);
+    userInfoEnc.setUserInfoJWEEnc(EncryptionMethod.A256GCM);
+    clients.add(OidcClientRecord.of(USERINFO_ENC_CLIENT, userInfoEnc));
+
+    final OIDCClientMetadata userInfoBadEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
+    userInfoBadEnc.setUserInfoJWEAlg(JWEAlgorithm.RSA1_5);
+    clients.add(OidcClientRecord.of(USERINFO_BAD_ENC_CLIENT, userInfoBadEnc));
 
     for (final Map.Entry<String, ClientAuthenticationMethod> e : Map.of(
         BASIC_CLIENT, ClientAuthenticationMethod.CLIENT_SECRET_BASIC,

@@ -72,8 +72,18 @@ public class OidcTokenEndpointFilter extends OncePerRequestFilter {
       return;
     }
     final HTTPRequest httpRequest = JakartaServletUtils.createHTTPRequest(request);
-    final HTTPResponse httpResponse = this.processor.process(httpRequest);
+    write(this.processor.process(httpRequest), response);
+  }
 
+  /**
+   * Writes a Nimbus HTTP response to the servlet response.
+   *
+   * @param httpResponse the response to write
+   * @param response the servlet response
+   * @throws IOException for write errors
+   */
+  static void write(final @NonNull HTTPResponse httpResponse, final @NonNull HttpServletResponse response)
+      throws IOException {
     response.setStatus(httpResponse.getStatusCode());
     for (final Map.Entry<String, List<String>> header : httpResponse.getHeaderMap().entrySet()) {
       for (final String value : header.getValue()) {

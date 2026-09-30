@@ -52,7 +52,8 @@ import se.swedenconnect.spring.authnserver.oidc.scope.ScopeRegistry;
  * endpoint when a requested scope covers it. The target is carried as protocol data, see {@link ClaimDeliveryTarget}.
  * </p>
  * <p>
- * A claim is essential if any source says so. Claims that are not user attributes, such as {@code sub} and
+ * A claim is essential if any source says so. Requested values are essential when the claims request entry that
+ * carries them is, or when a requested scope marks the claim as essential. Claims that are not user attributes, such as {@code sub} and
  * {@code auth_time}, have no mapping and are left out.
  * </p>
  *
@@ -172,7 +173,7 @@ public class OidcRequestedAttributeResolver {
         if (requirement.essential()) {
           entry = entry.withClaimRequirement(ClaimRequirement.ESSENTIAL);
         }
-        requestedClaims.add(new RequestedClaim(entry, target));
+        requestedClaims.add(new RequestedClaim(entry, target, true));
       }
     }
   }

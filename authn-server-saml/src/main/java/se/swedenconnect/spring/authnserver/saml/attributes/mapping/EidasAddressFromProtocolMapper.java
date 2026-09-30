@@ -66,6 +66,7 @@ public class EidasAddressFromProtocolMapper implements FromProtocolAttributeMapp
       final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
+    final boolean valuesEssential = inputs.stream().anyMatch(SamlRequestedAttribute::requiredValues);
     final List<String> values = inputs.stream()
         .flatMap(i -> i.stringValues().stream())
         .toList();
@@ -78,7 +79,8 @@ public class EidasAddressFromProtocolMapper implements FromProtocolAttributeMapp
     final List<GenericRequestedAttribute> result = new ArrayList<>();
     for (final String value : values) {
       for (final Map.Entry<String, String> part : EidasNaturalPersonAddress.parse(value).entrySet()) {
-        result.add(new GenericRequestedAttribute(part.getKey(), essential, List.of(part.getValue()), null));
+        result.add(new GenericRequestedAttribute(
+            part.getKey(), essential, List.of(part.getValue()), valuesEssential, null));
       }
     }
     return result;

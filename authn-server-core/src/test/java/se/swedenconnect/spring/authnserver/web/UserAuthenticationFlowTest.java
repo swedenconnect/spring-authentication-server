@@ -37,6 +37,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
+import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
+import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
@@ -185,6 +187,33 @@ class UserAuthenticationFlowTest {
         .isThrownBy(() -> flow.authenticate(token(), request, new MockHttpServletResponse()));
     assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNull();
     assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+  }
+
+  @Test
+  void aNewAuthenticationThatDoesNotMatchEssentialRequestedValuesFailsAndRemovesTheSessionAuthentication() {
+    final MockHttpServletRequest request = sessionWithAuthentication();
+    final UserAuthenticationFlow flow = new UserAuthenticationFlow(
+        List.of(provider("first", new ArrayList<>(), new UserAuthentication(user()))));
+    final UserAuthenticationInputToken token = token();
+    token.getAuthnRequirements().setRequestedAttributes(List.of(new GenericRequestedAttribute(
+        AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, true, List.of("196911292032"), null)));
+    assertThatExceptionOfType(AuthenticationErrorException.class)
+        .isThrownBy(() -> flow.authenticate(token, request, new MockHttpServletResponse()))
+        .satisfies(e -> assertThat(e.getError()).isEqualTo(AuthenticationError.UNKNOWN_PRINCIPAL));
+    assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNull();
+  }
+
+  @Test
+  void aReusedAuthenticationIsNotCheckedAgainstTheRequestedValues() throws Exception {
+    final UserAuthentication previous = new UserAuthentication(user());
+    SecurityContextHolder.setContext(new SecurityContextImpl(previous));
+    final UserAuthenticationFlow flow =
+        new UserAuthenticationFlow(List.of(provider("first", new ArrayList<>(), previous)));
+    final UserAuthenticationInputToken token = token();
+    token.getAuthnRequirements().setRequestedAttributes(List.of(new GenericRequestedAttribute(
+        AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, true, List.of("196911292032"), null)));
+    assertThat(flow.authenticate(token, new MockHttpServletRequest(), new MockHttpServletResponse()))
+        .isSameAs(previous);
   }
 
   @Test

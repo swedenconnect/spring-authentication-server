@@ -28,19 +28,7 @@ import org.slf4j.LoggerFactory;
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWEAlgorithm;
-import com.nimbusds.jose.JWEEncrypter;
-import com.nimbusds.jose.JWEHeader;
-import com.nimbusds.jose.JWEObject;
-import com.nimbusds.jose.KeySourceException;
 import com.nimbusds.jose.Payload;
-import com.nimbusds.jose.crypto.ECDHEncrypter;
-import com.nimbusds.jose.crypto.RSAEncrypter;
-import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.JWKMatcher;
-import com.nimbusds.jose.jwk.KeyType;
-import com.nimbusds.jose.jwk.KeyUse;
-import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.oauth2.sdk.ParseException;
 import com.nimbusds.oauth2.sdk.id.Audience;
@@ -70,10 +58,7 @@ import se.swedenconnect.spring.authnserver.oidc.keys.SigningKeySelector;
  * <p>
  * The token is always signed, with the key chosen for the client by the {@link SigningKeySelector}. When the client has
  * registered {@code id_token_encrypted_response_alg}, the signed token is encrypted with the client's encryption key,
- * using the algorithms that Sweden Connect Security Requirements, Section 3.2, allows: {@code RSA-OAEP},
- * {@code RSA-OAEP-256} and {@code ECDH-ES}, with {@code A128CBC-HS256}, {@code A256CBC-HS512}, {@code A128GCM} or
- * {@code A256GCM}. The content encryption defaults to {@code A128CBC-HS256}, as OpenID Connect Dynamic Client
- * Registration says.
+ * see {@link ClientEncryption} for the algorithms.
  * </p>
  *
  * @author Martin Lindström
@@ -87,12 +72,13 @@ public class IdTokenBuilder {
   public static final Duration DEFAULT_LIFETIME = Duration.ofMinutes(5);
 
   /** The key management algorithms that ID tokens may be encrypted with. */
-  public static final List<JWEAlgorithm> SUPPORTED_ENCRYPTION_ALGORITHMS =
-      List.of(JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.ECDH_ES);
+  public static final List<JWEAlgorithm> SUPPORTED_ENCRYPTION_ALGORITHMS = ClientEncryption.SUPPORTED_ALGORITHMS;
 
   /** The content encryption algorithms that ID tokens may be encrypted with. */
-  public static final List<EncryptionMethod> SUPPORTED_ENCRYPTION_METHODS = List.of(EncryptionMethod.A128CBC_HS256,
-      EncryptionMethod.A256CBC_HS512, EncryptionMethod.A128GCM, EncryptionMethod.A256GCM);
+  public static final List<EncryptionMethod> SUPPORTED_ENCRYPTION_METHODS = ClientEncryption.SUPPORTED_METHODS;
+
+  /** What is encrypted, for log and error messages. */
+  private static final String WHAT = "ID token";
 
   /** The issuer. */
   private final String issuer;
@@ -100,8 +86,8 @@ public class IdTokenBuilder {
   /** Chooses the signing key. */
   private final SigningKeySelector signingKeySelector;
 
-  /** Finds the encryption keys of clients. */
-  private final ClientKeyResolver clientKeyResolver;
+  /** Encrypts ID tokens for clients. */
+  private final ClientEncryption clientEncryption;
 
   /** The lifetime of an ID token. */
   private final Duration lifetime;
@@ -118,7 +104,8 @@ public class IdTokenBuilder {
       final @NonNull ClientKeyResolver clientKeyResolver, final @NonNull Duration lifetime) {
     this.issuer = Objects.requireNonNull(issuer, "issuer must not be null");
     this.signingKeySelector = Objects.requireNonNull(signingKeySelector, "signingKeySelector must not be null");
-    this.clientKeyResolver = Objects.requireNonNull(clientKeyResolver, "clientKeyResolver must not be null");
+    this.clientEncryption =
+        new ClientEncryption(Objects.requireNonNull(clientKeyResolver, "clientKeyResolver must not be null"));
     this.lifetime = Objects.requireNonNull(lifetime, "lifetime must not be null");
   }
 
@@ -157,7 +144,8 @@ public class IdTokenBuilder {
     if (metadata.getIDTokenJWEAlg() == null) {
       return signed.serialize();
     }
-    return this.encrypt(signed, code.clientId(), metadata);
+    return this.clientEncryption.encrypt(new Payload(signed), true, code.clientId(), metadata,
+        metadata.getIDTokenJWEAlg(), metadata.getIDTokenJWEEnc(), WHAT);
   }
 
   /**
@@ -172,101 +160,8 @@ public class IdTokenBuilder {
   public void checkEncryption(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata)
       throws UnrecoverableErrorException {
     if (metadata.getIDTokenJWEAlg() != null) {
-      this.getEncryptionKey(clientId, metadata);
+      this.clientEncryption.check(clientId, metadata, metadata.getIDTokenJWEAlg(), metadata.getIDTokenJWEEnc(), WHAT);
     }
-  }
-
-  /**
-   * Encrypts a signed ID token.
-   *
-   * @param signed the signed token
-   * @param clientId the {@code client_id}
-   * @param metadata the client metadata
-   * @return the serialized encrypted token
-   * @throws UnrecoverableErrorException if the token cannot be encrypted
-   */
-  private @NonNull String encrypt(final @NonNull SignedJWT signed, final @NonNull String clientId,
-      final @NonNull OIDCClientMetadata metadata) throws UnrecoverableErrorException {
-
-    final JWK key = this.getEncryptionKey(clientId, metadata);
-    final JWEAlgorithm algorithm = metadata.getIDTokenJWEAlg();
-    final EncryptionMethod method = getEncryptionMethod(metadata);
-    try {
-      final JWEEncrypter encrypter = key instanceof final RSAKey rsaKey
-          ? new RSAEncrypter(rsaKey)
-          : new ECDHEncrypter((ECKey) key);
-      final JWEObject jwe = new JWEObject(new JWEHeader.Builder(algorithm, method)
-          .contentType("JWT")
-          .keyID(key.getKeyID())
-          .build(), new Payload(signed));
-      jwe.encrypt(encrypter);
-      return jwe.serialize();
-    }
-    catch (final JOSEException e) {
-      log.warn("Client configuration error - the ID token could not be encrypted with {}/{} - {} "
-          + "[requester: 'OIDC:{}']", algorithm, method, e.getMessage(), clientId);
-      throw new UnrecoverableErrorException(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION,
-          "The ID token could not be encrypted for the client", e);
-    }
-  }
-
-  /**
-   * Gets the key to encrypt ID tokens for the client with.
-   *
-   * @param clientId the {@code client_id}
-   * @param metadata the client metadata, which declares {@code id_token_encrypted_response_alg}
-   * @return the key
-   * @throws UnrecoverableErrorException if the algorithms are not allowed or the client has no usable key
-   */
-  private @NonNull JWK getEncryptionKey(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata)
-      throws UnrecoverableErrorException {
-
-    final JWEAlgorithm algorithm = Objects.requireNonNull(metadata.getIDTokenJWEAlg());
-    final EncryptionMethod method = getEncryptionMethod(metadata);
-    if (!SUPPORTED_ENCRYPTION_ALGORITHMS.contains(algorithm) || !SUPPORTED_ENCRYPTION_METHODS.contains(method)) {
-      throw configurationError("The ID token encryption algorithms %s/%s are not supported"
-          .formatted(algorithm, method), clientId);
-    }
-    final JWKMatcher matcher = new JWKMatcher.Builder()
-        .keyType(KeyType.forAlgorithm(algorithm))
-        .keyUses(KeyUse.ENCRYPTION, null)
-        .algorithms(algorithm, null)
-        .build();
-    final List<JWK> keys;
-    try {
-      keys = this.clientKeyResolver.resolve(clientId, metadata, matcher);
-    }
-    catch (final KeySourceException e) {
-      throw configurationError("The encryption keys of the client could not be obtained - " + e.getMessage(),
-          clientId);
-    }
-    if (keys.isEmpty()) {
-      throw configurationError("The client has no key for ID token encryption with " + algorithm, clientId);
-    }
-    return keys.getFirst();
-  }
-
-  /**
-   * Gets the content encryption algorithm, {@code A128CBC-HS256} when the client has not registered one.
-   *
-   * @param metadata the client metadata
-   * @return the content encryption algorithm
-   */
-  private static @NonNull EncryptionMethod getEncryptionMethod(final @NonNull OIDCClientMetadata metadata) {
-    return metadata.getIDTokenJWEEnc() != null ? metadata.getIDTokenJWEEnc() : EncryptionMethod.A128CBC_HS256;
-  }
-
-  /**
-   * Creates the exception for a client that ID tokens cannot be encrypted for, and logs it.
-   *
-   * @param message the message
-   * @param clientId the {@code client_id}
-   * @return an {@link UnrecoverableErrorException}
-   */
-  private static @NonNull UnrecoverableErrorException configurationError(final @NonNull String message,
-      final @NonNull String clientId) {
-    log.warn("Client configuration error - {} [requester: 'OIDC:{}']", message, clientId);
-    return new UnrecoverableErrorException(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION, message);
   }
 
 }

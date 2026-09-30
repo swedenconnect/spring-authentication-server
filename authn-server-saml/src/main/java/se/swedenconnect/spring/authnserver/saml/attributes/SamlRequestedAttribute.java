@@ -117,6 +117,17 @@ public record SamlRequestedAttribute(@NonNull Attribute attribute, boolean requi
     return SamlAttributeValues.getStringValues(this.attribute);
   }
 
+  /**
+   * Predicate telling whether the values of this requested attribute are essential, which is when the attribute is
+   * required and carries values. A {@code PrincipalSelection} value is never required, even when the metadata of the
+   * Service Provider requires the attribute, since each source gives a requested attribute of its own.
+   *
+   * @return {@code true} if the attribute is required and carries values, and {@code false} otherwise
+   */
+  public boolean requiredValues() {
+    return this.required && !this.stringValues().isEmpty();
+  }
+
   /** {@inheritDoc} */
   @Override
   public String toString() {

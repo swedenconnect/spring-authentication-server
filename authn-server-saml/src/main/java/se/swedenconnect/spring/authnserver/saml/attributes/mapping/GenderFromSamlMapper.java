@@ -51,13 +51,15 @@ public class GenderFromSamlMapper implements FromProtocolAttributeMapper<SamlReq
       final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
+    final boolean valuesEssential = inputs.stream().anyMatch(SamlRequestedAttribute::requiredValues);
     final List<String> values = inputs.stream()
         .flatMap(i -> i.stringValues().stream())
         .map(GenderFromSamlMapper::toGenericValue)
         .filter(java.util.Objects::nonNull)
         .distinct()
         .toList();
-    return List.of(new GenericRequestedAttribute(AttributeIdentifiers.GENDER, essential, values, null));
+    return List.of(
+        new GenericRequestedAttribute(AttributeIdentifiers.GENDER, essential, values, valuesEssential, null));
   }
 
   /**

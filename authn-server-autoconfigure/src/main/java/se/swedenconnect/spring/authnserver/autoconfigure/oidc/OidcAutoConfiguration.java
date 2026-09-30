@@ -128,6 +128,9 @@ public class OidcAutoConfiguration {
     if (properties.getEndpoints().getToken() != null) {
       configurer.tokenEndpoint(properties.getEndpoints().getToken());
     }
+    if (properties.getEndpoints().getUserinfo() != null) {
+      configurer.userInfoEndpoint(properties.getEndpoints().getUserinfo());
+    }
     final OidcConfigurationProperties.TokenProperties tokens = properties.getTokens();
     if (tokens.getAuthorizationCodeLifetime() != null) {
       configurer.authorizationCodeLifetime(tokens.getAuthorizationCodeLifetime());

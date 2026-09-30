@@ -38,6 +38,10 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.RequestedClaim;
  * The delivery target of the claim is carried over as protocol data, see {@link ClaimDeliveryTarget}. A claim that is
  * requested both in the ID token and from the UserInfo endpoint carries both targets.
  * </p>
+ * <p>
+ * The requested values are essential when a claims request entry that carries values is essential, or when a
+ * requested scope marks the claim as essential, see {@link RequestedClaim#essentialValues()}.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -105,6 +109,7 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
       final @NonNull FromProtocolMappingContext<RequestedClaim> context) {
 
     final boolean essential = inputs.stream().anyMatch(RequestedClaim::essential);
+    final boolean valuesEssential = inputs.stream().anyMatch(RequestedClaim::essentialValues);
     final ClaimDeliveryTarget target = deliveryTarget(inputs);
     final List<String> values = new ArrayList<>();
     if (!this.ignoreValues) {
@@ -125,7 +130,7 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
       for (final String value : values) {
         typedValues.add(AttributeValues.fromString(value, identifier, context.getDefinitions()));
       }
-      result.add(new GenericRequestedAttribute(identifier, essential, typedValues, protocolData));
+      result.add(new GenericRequestedAttribute(identifier, essential, typedValues, valuesEssential, protocolData));
     }
     return result;
   }

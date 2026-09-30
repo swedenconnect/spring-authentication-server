@@ -79,6 +79,7 @@ public class IdentityNumberFromSamlMapper implements FromProtocolAttributeMapper
       final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
+    final boolean valuesEssential = inputs.stream().anyMatch(SamlRequestedAttribute::requiredValues);
     final List<String> values = inputs.stream()
         .flatMap(i -> i.stringValues().stream())
         .distinct()
@@ -103,11 +104,11 @@ public class IdentityNumberFromSamlMapper implements FromProtocolAttributeMapper
     final List<GenericRequestedAttribute> result = new ArrayList<>();
     if (!personalIdentityNumbers.isEmpty()) {
       result.add(new GenericRequestedAttribute(
-          this.personalIdentityNumberIdentifier, essential, personalIdentityNumbers, null));
+          this.personalIdentityNumberIdentifier, essential, personalIdentityNumbers, valuesEssential, null));
     }
     if (!coordinationNumbers.isEmpty()) {
       result.add(new GenericRequestedAttribute(
-          this.coordinationNumberIdentifier, essential, coordinationNumbers, null));
+          this.coordinationNumberIdentifier, essential, coordinationNumbers, valuesEssential, null));
     }
     return result;
   }

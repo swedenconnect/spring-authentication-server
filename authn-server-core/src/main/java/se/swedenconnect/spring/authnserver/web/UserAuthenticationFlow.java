@@ -38,6 +38,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextRepository;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
+import se.swedenconnect.spring.authnserver.authentication.RequestedAttributeValues;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
@@ -57,6 +58,12 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
  * The session holds one authentication for the whole server, whichever protocol it was made for. It is kept in the
  * Spring Security {@link SecurityContext}. Whether it may be reused for a request is decided by the provider, from its
  * single sign-on policy and voters.
+ * </p>
+ * <p>
+ * After a new authentication, as opposed to a reused one, the requested attribute values are compared with the
+ * user, see {@link RequestedAttributeValues}. Essential values that do not match fail the request with
+ * {@link AuthenticationError#UNKNOWN_PRINCIPAL}. A result that is not the session authentication that was given to
+ * the provider counts as a new authentication.
  * </p>
  * <p>
  * The session authentication stays when a request leads to a redirect for a new authentication, and when a request
@@ -130,6 +137,11 @@ public class UserAuthenticationFlow {
       final Authentication result;
       try {
         result = provider.authenticateUser(token);
+        if (result instanceof final UserAuthentication userAuthentication
+            && userAuthentication != token.getPreviousAuthentication()) {
+          RequestedAttributeValues.check(token.getAuthnRequirements(), userAuthentication.getAuthenticatedUser(),
+              token.getLogString());
+        }
       }
       catch (final AuthenticationErrorException e) {
         this.failAuthentication(request, response, e);
@@ -215,7 +227,10 @@ public class UserAuthenticationFlow {
         continue;
       }
       try {
-        return prepare(provider.resumeAuthentication(token), inputToken);
+        final UserAuthentication authentication = provider.resumeAuthentication(token);
+        RequestedAttributeValues.check(inputToken.getAuthnRequirements(), authentication.getAuthenticatedUser(),
+            inputToken.getLogString());
+        return prepare(authentication, inputToken);
       }
       catch (final AuthenticationErrorException e) {
         this.failAuthentication(request, response, e);

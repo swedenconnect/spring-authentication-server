@@ -78,12 +78,13 @@ public class SamlFromProtocolMapper implements FromProtocolAttributeMapper<SamlR
       }
     }
     final boolean essential = required;
+    final boolean valuesEssential = inputs.stream().anyMatch(SamlRequestedAttribute::requiredValues);
     return this.identifiers.stream()
         .map(identifier -> new GenericRequestedAttribute(identifier, essential,
             values.stream()
                 .map(v -> AttributeValues.fromString(v, identifier, context.getDefinitions()))
                 .toList(),
-            null))
+            valuesEssential, null))
         .toList();
   }
 

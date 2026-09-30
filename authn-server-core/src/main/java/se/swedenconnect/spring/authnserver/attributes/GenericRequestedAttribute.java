@@ -36,6 +36,11 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * requester will accept.
  * </p>
  * <p>
+ * Whether the requested values are essential is kept apart from whether the attribute is essential. It is decided by
+ * the request entry that carries the values, not by other requests for the same attribute. When the values are
+ * essential and none of them matches the authenticated user, the request fails. Otherwise a mismatch is only logged.
+ * </p>
+ * <p>
  * Protocol data is data that only the protocol layer understands. The generic layer carries it along and never looks
  * at it. The delivery target of an OpenID Connect claim, ID token or UserInfo, is such data.
  * </p>
@@ -56,11 +61,14 @@ public class GenericRequestedAttribute implements Serializable {
   /** The values that the requester will accept, or an empty list. */
   private final List<? extends Serializable> requestedValues;
 
+  /** Whether the requested values are essential. */
+  private final boolean requestedValuesEssential;
+
   /** Protocol specific data. */
   private final Map<String, Serializable> protocolData;
 
   /**
-   * Constructor.
+   * Constructor. The requested values, if any, are essential when the attribute is.
    *
    * @param identifier the attribute identifier, see {@link AttributeIdentifiers}
    * @param essential whether the requester requires the attribute
@@ -70,9 +78,26 @@ public class GenericRequestedAttribute implements Serializable {
   public GenericRequestedAttribute(final @NonNull String identifier, final boolean essential,
       final @Nullable List<? extends Serializable> requestedValues,
       final @Nullable Map<String, Serializable> protocolData) {
+    this(identifier, essential, requestedValues, essential, protocolData);
+  }
+
+  /**
+   * Constructor.
+   *
+   * @param identifier the attribute identifier, see {@link AttributeIdentifiers}
+   * @param essential whether the requester requires the attribute
+   * @param requestedValues the values that the requester will accept, may be {@code null}
+   * @param requestedValuesEssential whether the requested values are essential. Ignored when there are no values. When
+   *     set, the attribute is also essential
+   * @param protocolData protocol specific data, may be {@code null}
+   */
+  public GenericRequestedAttribute(final @NonNull String identifier, final boolean essential,
+      final @Nullable List<? extends Serializable> requestedValues, final boolean requestedValuesEssential,
+      final @Nullable Map<String, Serializable> protocolData) {
     this.identifier = Objects.requireNonNull(identifier, "identifier must not be null");
-    this.essential = essential;
     this.requestedValues = requestedValues != null ? List.copyOf(requestedValues) : List.of();
+    this.requestedValuesEssential = requestedValuesEssential && !this.requestedValues.isEmpty();
+    this.essential = essential || this.requestedValuesEssential;
     this.protocolData = protocolData != null
         ? Collections.unmodifiableMap(new LinkedHashMap<>(protocolData))
         : Map.of();
@@ -127,6 +152,16 @@ public class GenericRequestedAttribute implements Serializable {
   }
 
   /**
+   * Predicate telling whether the requested values are essential, meaning that the request fails if none of them
+   * matches the authenticated user. Always {@code false} when there are no requested values.
+   *
+   * @return {@code true} if the requested values are essential and {@code false} otherwise
+   */
+  public boolean isRequestedValuesEssential() {
+    return this.requestedValuesEssential;
+  }
+
+  /**
    * Gets all protocol specific data.
    *
    * @return a map of protocol specific data, possibly empty
@@ -150,7 +185,9 @@ public class GenericRequestedAttribute implements Serializable {
 
   /**
    * Creates a copy of this requested attribute where the essential flag is the logical or of this attribute's flag
-   * and the supplied one, and where the protocol data of both attributes is merged.
+   * and the supplied one, and where the protocol data of both attributes is merged. The requested values are those of
+   * this attribute, or of the supplied one if this has none, and whether they are essential follows the attribute
+   * they come from.
    * <p>
    * Protocol data of the supplied attribute replaces the data of this attribute, key by key, unless the data
    * implements {@link MergeableProtocolData} and so decides the result for its key itself.
@@ -168,10 +205,9 @@ public class GenericRequestedAttribute implements Serializable {
       data.merge(entry.getKey(), entry.getValue(), (existing, added) ->
           existing instanceof final MergeableProtocolData mergeable ? mergeable.mergeWith(added) : added);
     }
-    final List<? extends Serializable> values =
-        !this.requestedValues.isEmpty() ? this.requestedValues : other.requestedValues;
-    return new GenericRequestedAttribute(
-        this.identifier, this.essential || other.essential, values, data);
+    final GenericRequestedAttribute valuesSource = !this.requestedValues.isEmpty() ? this : other;
+    return new GenericRequestedAttribute(this.identifier, this.essential || other.essential,
+        valuesSource.requestedValues, valuesSource.requestedValuesEssential, data);
   }
 
   /** {@inheritDoc} */
@@ -184,6 +220,7 @@ public class GenericRequestedAttribute implements Serializable {
       return false;
     }
     return this.essential == other.essential
+        && this.requestedValuesEssential == other.requestedValuesEssential
         && Objects.equals(this.identifier, other.identifier)
         && Objects.equals(this.requestedValues, other.requestedValues)
         && Objects.equals(this.protocolData, other.protocolData);
@@ -192,7 +229,8 @@ public class GenericRequestedAttribute implements Serializable {
   /** {@inheritDoc} */
   @Override
   public int hashCode() {
-    return Objects.hash(this.identifier, this.essential, this.requestedValues, this.protocolData);
+    return Objects.hash(this.identifier, this.essential, this.requestedValues, this.requestedValuesEssential,
+        this.protocolData);
   }
 
   /** {@inheritDoc} */
@@ -201,7 +239,8 @@ public class GenericRequestedAttribute implements Serializable {
     final StringBuilder sb = new StringBuilder(this.identifier);
     sb.append(", essential=").append(this.essential);
     if (!this.requestedValues.isEmpty()) {
-      sb.append(", values=").append(this.requestedValues);
+      sb.append(", values=").append(this.requestedValues)
+          .append(", values-essential=").append(this.requestedValuesEssential);
     }
     if (!this.protocolData.isEmpty()) {
       sb.append(", protocol-data=").append(this.protocolData);

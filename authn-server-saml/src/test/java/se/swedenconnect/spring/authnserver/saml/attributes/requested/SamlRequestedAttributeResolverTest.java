@@ -148,6 +148,7 @@ class SamlRequestedAttributeResolverTest extends RequestedAttributeTestSupport {
       assertThat(a.getIdentifier()).isEqualTo(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER);
       assertThat(a.isEssential()).isTrue();
       assertThat(a.getRequestedValues()).isEqualTo(List.of("196911292032"));
+      assertThat(a.isRequestedValuesEssential()).isFalse();
     });
   }
 

@@ -44,9 +44,15 @@ ClaimDeliveryTarget target = requested.getProtocolData(
     ClaimDeliveryTarget.PROTOCOL_DATA_KEY, ClaimDeliveryTarget.class);
 ```
 
+Whether the requested values are essential, `isRequestedValuesEssential()`, is kept apart from whether the attribute
+is essential. It is decided by the request entry that carries the values, not by other requests for the same attribute.
+When essential values do not match the authenticated user the request fails with `UNKNOWN_PRINCIPAL`, while voluntary
+values that do not match are only logged, see
+[When the user does not match the requested values](authentication-module.html#when-the-user-does-not-match-the-requested-values).
+
 The same attribute may be asked for in more than one place. Merging two requested attributes gives an attribute that
-is essential if either of them was, and the protocol data of the second one replaces the data of the first, key by
-key. Data that implements `MergeableProtocolData` decides the result for its key itself, which is how a claim asked
+is essential if either of them was, the values of the first one that has values, with whether they are essential, and
+the protocol data of the second one replacing the data of the first, key by key. Data that implements `MergeableProtocolData` decides the result for its key itself, which is how a claim asked
 for in the ID token by one source and from the UserInfo endpoint by another ends up delivered in both places.
 
 ### Attribute definitions
@@ -115,6 +121,10 @@ all:
 Each source has a `RequestedAttributeProcessor` of its own. An attribute that more than one source asks for appears
 once in the result and is essential if any source said so.
 
+A `RequestedAttribute` may carry values, in the request or in the metadata. The values are essential only when the
+entry that carries them is required. A `PrincipalSelection` value therefore stays voluntary, even when the metadata
+requires the same attribute without values.
+
 ```java
 SamlRequestedAttributeResolver resolver = new SamlRequestedAttributeResolver(idpEntityCategories);
 List<GenericRequestedAttribute> requested =
@@ -168,7 +178,11 @@ OidcRequestedAttributeResolver resolver = new OidcRequestedAttributeResolver();
 List<GenericRequestedAttribute> requested = resolver.resolve(scope, claimsRequest, logString);
 ```
 
-A claim is essential if any source says so. Claims that are not user attributes, such as `sub`, `auth_time` and
+A claim is essential if any source says so. A `value` or `values` of the `claims` parameter is essential when the entry
+that carries it is essential, with one exception: when a requested scope marks the claim as essential, the value is
+essential even if the `claims` entry is not. With the scope `https://id.oidc.se/scope/naturalPersonNumber`, which marks
+the personal identity number as essential, a voluntary `value` for that claim is essential. Claims that are not user
+attributes, such as `sub`, `auth_time` and
 `acr`, have no mapping and are left out, like any other claim that no mapper handles.
 
 #### Where a claim is delivered

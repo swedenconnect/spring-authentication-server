@@ -63,6 +63,7 @@ import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
 import se.swedenconnect.spring.authnserver.oidc.token.AuthorizationCodeStore;
 import se.swedenconnect.spring.authnserver.oidc.token.ClientAssertionReplayCache;
 import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientEncryption;
 import se.swedenconnect.spring.authnserver.oidc.token.IdTokenBuilder;
 import se.swedenconnect.spring.authnserver.oidc.token.InMemoryAccessTokenStore;
 import se.swedenconnect.spring.authnserver.oidc.token.InMemoryAuthorizationCodeStore;
@@ -72,7 +73,9 @@ import se.swedenconnect.spring.authnserver.oidc.web.OidcAuthnRequestProcessingFi
 import se.swedenconnect.spring.authnserver.oidc.web.OidcErrorResponseProcessingFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcJwksEndpointFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcResumedAuthenticationHandler;
+import se.swedenconnect.spring.authnserver.oidc.userinfo.UserInfoRequestProcessor;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcTokenEndpointFilter;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcUserInfoEndpointFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcUserAuthenticationProcessingFilter;
 import se.swedenconnect.spring.authnserver.web.ResumedAuthenticationHandler;
 import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
@@ -105,7 +108,8 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  * A processed request is handed to the authentication providers through the {@link UserAuthenticationFlow}, and the
  * client gets an authorization code, which it exchanges for an access token and an ID token at the token endpoint,
  * {@code /oidc/token} by default. The OpenID Connect attribute producers and release voters come before the shared
- * ones.
+ * ones. The access token gives the client the UserInfo claims at the UserInfo endpoint, {@code /oidc/userinfo} by
+ * default, see {@link UserInfoRequestProcessor}.
  * </p>
  *
  * @author Martin Lindström
@@ -126,6 +130,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** The default token endpoint, {@value}. */
   public static final String DEFAULT_TOKEN_ENDPOINT = "/token";
+
+  /** The default UserInfo endpoint, {@value}. */
+  public static final String DEFAULT_USERINFO_ENDPOINT = "/userinfo";
 
   /** The authorization code lifetime above which a warning is logged, 10 minutes (RFC 6749, Section 4.1.2). */
   public static final Duration MAX_RECOMMENDED_CODE_LIFETIME = Duration.ofMinutes(10);
@@ -153,6 +160,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** The token endpoint. */
   private String tokenEndpoint = DEFAULT_TOKEN_ENDPOINT;
+
+  /** The UserInfo endpoint. */
+  private String userInfoEndpoint = DEFAULT_USERINFO_ENDPOINT;
 
   /** The authorization code lifetime. */
   private Duration authorizationCodeLifetime = OidcUserAuthenticationResponder.DEFAULT_CODE_LIFETIME;
@@ -225,6 +235,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** The matcher for the token endpoint. */
   private RequestMatcher tokenRequestMatcher;
+
+  /** The matcher for the UserInfo endpoint. */
+  private RequestMatcher userInfoRequestMatcher;
 
   /** Finds the keys of clients, created at initialization. */
   private ClientKeyResolver clientKeyResolver;
@@ -406,6 +419,27 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
+   * Assigns the UserInfo endpoint, relative to the OIDC path, where UserInfo requests are received with GET and POST.
+   * Defaults to {@value #DEFAULT_USERINFO_ENDPOINT}.
+   *
+   * @param endpoint the endpoint
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer userInfoEndpoint(final @NonNull String endpoint) {
+    this.userInfoEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the UserInfo endpoint, relative to the OIDC path.
+   *
+   * @return the endpoint
+   */
+  public @NonNull String getUserInfoEndpoint() {
+    return this.userInfoEndpoint;
+  }
+
+  /**
    * Assigns the authorization code lifetime. Defaults to 1 minute. A lifetime above 10 minutes, the maximum that RFC
    * 6749, Section 4.1.2, recommends, is logged as a warning at startup.
    *
@@ -447,7 +481,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
-   * Assigns whether an access token may only be used once, at the UserInfo endpoint. Defaults to {@code true}.
+   * Assigns whether an access token may only be used once, at the UserInfo endpoint. Defaults to {@code true}, which
+   * means that the first successful UserInfo request consumes the token. When {@code false}, the token may be used
+   * until it expires.
    *
    * @param singleUseAccessTokens whether access tokens may only be used once
    * @return this configurer
@@ -555,7 +591,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /**
    * Assigns whether UserInfo responses are signed. Defaults to {@code true}. When they are, a client that has not
-   * registered {@code userinfo_signed_response_alg} still gets a signed response.
+   * registered {@code userinfo_signed_response_alg} still gets a signed response. When they are not, a client gets
+   * plain JSON unless it has registered {@code userinfo_signed_response_alg}.
    *
    * @param signUserInfo whether UserInfo responses are signed
    * @return this configurer
@@ -767,9 +804,12 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
         PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.authorizationEndpoint)));
     this.tokenRequestMatcher =
         PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.tokenEndpoint));
+    this.userInfoRequestMatcher = new OrRequestMatcher(
+        PathPatternRequestMatcher.pathPattern(HttpMethod.GET, this.getEndpointPath(this.userInfoEndpoint)),
+        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.userInfoEndpoint)));
     this.discoveryEndpointConfigurer.init();
     this.requestMatcher = new OrRequestMatcher(this.jwksRequestMatcher, this.authorizationRequestMatcher,
-        this.tokenRequestMatcher, this.discoveryEndpointConfigurer.getRequestMatcher());
+        this.tokenRequestMatcher, this.userInfoRequestMatcher, this.discoveryEndpointConfigurer.getRequestMatcher());
 
     final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
     this.clientKeyResolver =
@@ -866,6 +906,16 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     tokenRequestProcessor.setSingleUseAccessTokens(this.singleUseAccessTokens);
     http.addFilterBefore(this.postProcess(new OidcTokenEndpointFilter(this.tokenRequestMatcher, tokenRequestProcessor)),
         AbstractPreAuthenticatedProcessingFilter.class);
+
+    // The UserInfo endpoint ...
+    //
+    final UserInfoRequestProcessor userInfoRequestProcessor = new UserInfoRequestProcessor(this.getIssuer(),
+        this.accessTokenStore, server.getClientRegistry(), this.signingKeySelector,
+        new ClientEncryption(this.clientKeyResolver));
+    userInfoRequestProcessor.setSignUserInfo(this.signUserInfo);
+    http.addFilterBefore(
+        this.postProcess(new OidcUserInfoEndpointFilter(this.userInfoRequestMatcher, userInfoRequestProcessor)),
+        AbstractPreAuthenticatedProcessingFilter.class);
   }
 
   /** {@inheritDoc} */
@@ -938,6 +988,10 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     if (!this.authorizationEndpoint.startsWith("/")) {
       throw new IllegalArgumentException(
           "Invalid OIDC authorization endpoint '%s' - it must begin with /".formatted(this.authorizationEndpoint));
+    }
+    if (!this.userInfoEndpoint.startsWith("/")) {
+      throw new IllegalArgumentException(
+          "Invalid OIDC UserInfo endpoint '%s' - it must begin with /".formatted(this.userInfoEndpoint));
     }
     if (!this.tokenEndpoint.startsWith("/")) {
       throw new IllegalArgumentException(

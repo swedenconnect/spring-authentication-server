@@ -277,6 +277,41 @@ class OidcRequestedAttributeResolverTest {
 
     assertThat(attribute(result, AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER).getRequestedValues())
         .isEqualTo(List.of("196911292032"));
+    assertThat(attribute(result, AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER).isRequestedValuesEssential())
+        .isTrue();
+  }
+
+  @Test
+  void theEntryCarryingTheValueDecidesWhetherItIsEssential() throws Exception {
+    final List<GenericRequestedAttribute> result = this.resolve("openid",
+        """
+            {
+              "id_token" : { "family_name" : { "essential" : true } },
+              "userinfo" : { "family_name" : { "value" : "Ekvall" } }
+            }
+            """);
+
+    final GenericRequestedAttribute surname = attribute(result, AttributeIdentifiers.SURNAME);
+    assertThat(surname.isEssential()).isTrue();
+    assertThat(surname.getRequestedValues()).isEqualTo(List.of("Ekvall"));
+    assertThat(surname.isRequestedValuesEssential()).isFalse();
+  }
+
+  @Test
+  void aScopeMarkingTheClaimEssentialMakesAVoluntaryValueEssential() throws Exception {
+    final String claims = """
+        {
+          "userinfo" : { "https://id.oidc.se/claim/personalIdentityNumber" : { "value" : "196911292032" } }
+        }
+        """;
+    assertThat(attribute(this.resolve("openid", claims), AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER)
+        .isRequestedValuesEssential()).isFalse();
+    assertThat(attribute(this.resolve("openid https://id.oidc.se/scope/naturalPersonNumber", claims),
+        AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER).isRequestedValuesEssential()).isTrue();
+    // A scope that does not mark the claim essential does not
+    assertThat(attribute(this.resolve("openid profile", """
+        { "userinfo" : { "family_name" : { "value" : "Ekvall" } } }
+        """), AttributeIdentifiers.SURNAME).isRequestedValuesEssential()).isFalse();
   }
 
   @Test

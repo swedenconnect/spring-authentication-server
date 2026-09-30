@@ -588,6 +588,29 @@ public class OidcConfigurationProperties {
     private String token;
 
     /**
+     * Where UserInfo requests are received. Defaults to /userinfo.
+     */
+    private String userinfo;
+
+    /**
+     * Gets the UserInfo endpoint.
+     *
+     * @return the UserInfo endpoint
+     */
+    public @Nullable String getUserinfo() {
+      return this.userinfo;
+    }
+
+    /**
+     * Assigns the UserInfo endpoint.
+     *
+     * @param userinfo the UserInfo endpoint
+     */
+    public void setUserinfo(final @Nullable String userinfo) {
+      this.userinfo = userinfo;
+    }
+
+    /**
      * Gets the token endpoint.
      *
      * @return the token endpoint

@@ -522,7 +522,7 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `requester-acceptance.*` | Which clients are accepted, see [Requester acceptance](#oidc-requester-acceptance). | Every known client |
 | `tokens.*` | The lifetimes of codes and tokens, see [The token endpoint and tokens](#oidc-token-endpoint). | See below |
 | `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint, see [The token endpoint and tokens](#oidc-token-endpoint). | `private_key_jwt` |
-| `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. | `true` |
+| `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. When they are not, only a client that has registered it gets a signed response, see [The UserInfo endpoint](openid-provider.html#the-userinfo-endpoint). | `true` |
 | `scopes[]` | The offered scopes, see [Scopes and claims](#oidc-scopes-and-claims). | Derived from the authentication providers |
 | `claims[]` | Claims supported on top of those of the authentication providers, see [Scopes and claims](#oidc-scopes-and-claims). | - |
 | `ui-locales[]` | The languages of the user interface, as language tags, published as `ui_locales_supported`. The Sweden Connect federation requires `sv` and `en`. | - |
@@ -576,9 +576,10 @@ The endpoints are given relative to the OIDC path, see [URL layout](#url-layout)
 | `jwks` | Where the JWKS is published. | `/jwks` |
 | `authorization` | Where authentication requests are received, with GET and POST. | `/authorize` |
 | `token` | Where token requests are received, with POST. | `/token` |
+| `userinfo` | Where UserInfo requests are received, with GET and POST. | `/userinfo` |
 
-With the default OIDC path, the JWKS is published at `/oidc/jwks`, the authorization endpoint is `/oidc/authorize` and
-the token endpoint is `/oidc/token`.
+With the default OIDC path, the JWKS is published at `/oidc/jwks`, the authorization endpoint is `/oidc/authorize`,
+the token endpoint is `/oidc/token` and the UserInfo endpoint is `/oidc/userinfo`.
 The discovery document is not an endpoint under the OIDC path; it follows the issuer.
 
 <a name="oidc-authorization-requests"></a>
@@ -637,7 +638,7 @@ How the code flow, the token endpoint and the tokens work is described in
 | :--- | :--- | :--- |
 | `tokens.authorization-code-lifetime` | How long an authorization code is valid. A lifetime above 10 minutes is logged as a warning. | 1 minute |
 | `tokens.access-token-lifetime` | How long an access token is valid. | 5 minutes |
-| `tokens.access-token-single-use` | Whether an access token may only be used once, at the UserInfo endpoint. | `true` |
+| `tokens.access-token-single-use` | Whether an access token may only be used once, at the UserInfo endpoint. When `false`, it may be used until it expires. | `true` |
 | `tokens.id-token-lifetime` | How long an ID token is valid. A lifetime above 5 minutes, which the Swedish OpenID Connect Profile does not allow, is logged as a warning. | 5 minutes |
 | `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint: `private_key_jwt`, `client_secret_basic`, `client_secret_post` and `client_secret_jwt`. `none` is not supported. | `private_key_jwt` |
 

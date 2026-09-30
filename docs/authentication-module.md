@@ -163,9 +163,30 @@ accept.
 
 There is no separate notion of principal selection. When a SAML requester sends a `PrincipalSelection` extension, or an
 OpenID Connect client sends a claims request with a `value`, the module sees a requested attribute that carries that
-value and is not essential. A hint that the user is `197705232382` therefore arrives as a requested
-`attribute.personal-identity-number` with that value, and a module that can prefill a field should look for exactly
-that.
+value. A hint that the user is `197705232382` therefore arrives as a requested `attribute.personal-identity-number`
+with that value, and a module that can prefill a field should look for exactly that.
+
+<a name="when-the-user-does-not-match-the-requested-values"></a>
+#### When the user does not match the requested values
+
+A module does not have to check the requested values itself. After a new authentication, the library compares every
+requested attribute that carries values with the user the module returned. The attribute matches when any requested
+value equals any of the user's values for it.
+
+| The user | The values are essential | The values are voluntary |
+| :--- | :--- | :--- |
+| Has a matching value | The request proceeds. | The request proceeds. |
+| Has the attribute, but no matching value | The request fails with `UNKNOWN_PRINCIPAL`, and the session authentication is removed. | The request proceeds with the user's actual values, and the mismatch is logged at `INFO`. |
+| Does not have the attribute | The request proceeds, logged at `INFO`. | The request proceeds, logged at `INFO`. |
+
+A missing attribute never fails the request, following OpenID Connect Core, Section 5.5.1. The logs name the attribute,
+never the requested or the actual values. A reused authentication is not checked here; the rule for single sign-on is
+described under [The rules that always apply](#the-rules-that-always-apply).
+
+Whether the values are essential is `isRequestedValuesEssential()` of the requested attribute. It is decided by the
+request entry that carries the values, not by other requests for the same attribute, see
+[Generic requested attribute](attributes.html#generic-requested-attribute). A `PrincipalSelection` value is therefore
+voluntary even when the metadata of the Service Provider requires the attribute.
 
 A module returns the attributes it actually established. It is not obliged to return everything that was asked for, and
 it may return more.
@@ -408,7 +429,7 @@ depends on how a request ends:
   so another request, for example in another browser tab, may still reuse it.
 - An authentication that has started and ends in an error removes it. This covers every error a module reports,
   including `CANCEL`, `FRAUD` and `POSSIBLE_FRAUD`, and errors raised while the result is completed, such as
-  `SIGN_MESSAGE_NOT_DISPLAYED`. After fraud, or after the user stopped, the earlier authentication must not let the next
+  `SIGN_MESSAGE_NOT_DISPLAYED` and `UNKNOWN_PRINCIPAL` for a user who does not match essential requested values. After fraud, or after the user stopped, the earlier authentication must not let the next
   request through.
 - A request that fails before any authentication started leaves it in place, since such a failure says nothing about
   the user. That is an invalid request, an unknown or rejected requester, `NO_AUTHN_CONTEXT` when no provider could

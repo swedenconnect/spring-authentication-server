@@ -53,6 +53,7 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecode
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.scope.SupportedScopesAndClaims;
 import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientEncryption;
 import se.swedenconnect.spring.authnserver.oidc.token.IdTokenBuilder;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcDiscoveryEndpointFilter;
 
@@ -76,6 +77,10 @@ import se.swedenconnect.spring.authnserver.oidc.web.OidcDiscoveryEndpointFilter;
  * For the token endpoint, it holds the endpoint, the grant type {@code authorization_code}, the enabled client
  * authentication methods and the algorithms accepted for client assertions, and the algorithms that ID tokens can be
  * encrypted with.
+ * </p>
+ * <p>
+ * For the UserInfo endpoint, it holds the endpoint, the signing algorithms, which are those of the active signing keys,
+ * and the algorithms that responses can be encrypted with.
  * </p>
  * <p>
  * Additional parameters are added to the built document, and may not replace a parameter that the OpenID Provider
@@ -255,6 +260,13 @@ public class OidcDiscoveryEndpointConfigurer {
     }
     metadata.setIDTokenJWEAlgs(IdTokenBuilder.SUPPORTED_ENCRYPTION_ALGORITHMS);
     metadata.setIDTokenJWEEncs(IdTokenBuilder.SUPPORTED_ENCRYPTION_METHODS);
+
+    // The UserInfo endpoint ...
+    //
+    metadata.setUserInfoEndpointURI(URI.create(oidc.getEndpointUrl(oidc.getUserInfoEndpoint())));
+    metadata.setUserInfoJWSAlgs(keys.getSigningAlgorithms());
+    metadata.setUserInfoJWEAlgs(ClientEncryption.SUPPORTED_ALGORITHMS);
+    metadata.setUserInfoJWEEncs(ClientEncryption.SUPPORTED_METHODS);
 
     final OIDCProviderMetadata result = this.addParameters(metadata);
     this.providerMetadataCustomizer.customize(result);
