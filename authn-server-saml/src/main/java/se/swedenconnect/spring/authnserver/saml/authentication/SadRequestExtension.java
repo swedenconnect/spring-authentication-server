@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.opensaml.sweid.saml2.signservice.sap.SADRequest;
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -74,7 +74,7 @@ public class SadRequestExtension implements Serializable {
    *
    * @param sadRequest the {@code SADRequest} extension
    */
-  public SadRequestExtension(final @Nonnull SADRequest sadRequest) {
+  public SadRequestExtension(final @NonNull SADRequest sadRequest) {
     Objects.requireNonNull(sadRequest, "sadRequest must not be null");
     this.id = sadRequest.getID();
     this.requesterId = sadRequest.getRequesterID();

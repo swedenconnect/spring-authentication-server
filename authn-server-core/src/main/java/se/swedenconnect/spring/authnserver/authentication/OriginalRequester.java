@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -39,7 +38,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  *          any specification. Only OpenID Connect carries it
  * @author Martin Lindström
  */
-public record OriginalRequester(@Nonnull String identifier, @Nullable String token) implements Serializable {
+public record OriginalRequester(@NonNull String identifier, @Nullable String token) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -63,7 +62,7 @@ public record OriginalRequester(@Nonnull String identifier, @Nullable String tok
    * @param identifier the identifier of the original requester
    * @return an {@link OriginalRequester}
    */
-  public static @Nonnull OriginalRequester of(final @Nonnull String identifier) {
+  public static @NonNull OriginalRequester of(final @NonNull String identifier) {
     return new OriginalRequester(identifier, null);
   }
 

@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.text.ParseException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -25,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -156,11 +155,11 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param supportedScopes the scopes that the OpenID Provider offers
    * @param supportedAuthnContextUris the authentication contexts that the OpenID Provider supports
    */
-  public OidcAuthnRequestAuthenticationProvider(final @Nonnull OidcKeys keys, final @Nonnull String issuer,
-      final @Nonnull ClientRegistry clientRegistry, final @Nonnull RequesterAcceptance requesterAcceptance,
-      final @Nonnull OidcRequestedAttributeResolver requestedAttributeResolver,
-      final @Nonnull RequestObjectDecoder requestObjectDecoder, final @Nonnull List<String> supportedScopes,
-      final @Nonnull List<String> supportedAuthnContextUris) {
+  public OidcAuthnRequestAuthenticationProvider(final @NonNull OidcKeys keys, final @NonNull String issuer,
+      final @NonNull ClientRegistry clientRegistry, final @NonNull RequesterAcceptance requesterAcceptance,
+      final @NonNull OidcRequestedAttributeResolver requestedAttributeResolver,
+      final @NonNull RequestObjectDecoder requestObjectDecoder, final @NonNull List<String> supportedScopes,
+      final @NonNull List<String> supportedAuthnContextUris) {
     this.keys = Objects.requireNonNull(keys, "keys must not be null");
     this.issuer = Objects.requireNonNull(issuer, "issuer must not be null");
     this.clientRegistry = Objects.requireNonNull(clientRegistry, "clientRegistry must not be null");
@@ -180,7 +179,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @throws UnrecoverableErrorException if the client registry fails during the requester acceptance check
    */
   @Override
-  public @Nonnull Authentication authenticate(final @Nonnull Authentication authentication)
+  public @NonNull Authentication authenticate(final @NonNull Authentication authentication)
       throws OidcErrorResponseException, UnrecoverableErrorException {
 
     final OidcAuthnRequestAuthenticationToken token = (OidcAuthnRequestAuthenticationToken) authentication;
@@ -245,7 +244,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * Supports {@link OidcAuthnRequestAuthenticationToken}.
    */
   @Override
-  public boolean supports(final @Nonnull Class<?> authentication) {
+  public boolean supports(final @NonNull Class<?> authentication) {
     return OidcAuthnRequestAuthenticationToken.class.isAssignableFrom(authentication);
   }
 
@@ -257,8 +256,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @return the authentication requirements
    * @throws OidcErrorResponseException for errors that are sent to the client
    */
-  protected @Nonnull OidcAuthenticationRequirements createAuthenticationRequirements(
-      final @Nonnull AuthenticationRequest request, final @Nonnull OidcAuthnRequestAuthenticationToken token)
+  protected @NonNull OidcAuthenticationRequirements createAuthenticationRequirements(
+      final @NonNull AuthenticationRequest request, final @NonNull OidcAuthnRequestAuthenticationToken token)
       throws OidcErrorResponseException {
 
     final String logString = token.getLogString();
@@ -324,8 +323,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param logString the log string
    * @throws OidcErrorResponseException with {@code invalid_request_object}
    */
-  private void checkRequestObjectSigning(final @Nonnull OidcAuthnRequestAuthenticationToken token,
-      final @Nonnull OIDCClientMetadata metadata, final @Nonnull String logString) throws OidcErrorResponseException {
+  private void checkRequestObjectSigning(final @NonNull OidcAuthnRequestAuthenticationToken token,
+      final @NonNull OIDCClientMetadata metadata, final @NonNull String logString) throws OidcErrorResponseException {
 
     final RequestObjectDecoder.DecodedJwt requestObject = token.getRequestObject();
     if (requestObject == null) {
@@ -356,8 +355,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param logString the log string
    * @throws OidcErrorResponseException with {@code invalid_request}
    */
-  private void checkPkce(final @Nonnull AuthenticationRequest request, final @Nonnull OIDCClientMetadata metadata,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private void checkPkce(final @NonNull AuthenticationRequest request, final @NonNull OIDCClientMetadata metadata,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     if (request.getCodeChallenge() == null) {
       if (request.getCodeChallengeMethod() != null) {
@@ -386,8 +385,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @return the subject of the ID token
    * @throws OidcErrorResponseException with {@code invalid_request} if the hint is invalid
    */
-  private @Nonnull String validateIdTokenHint(final @Nonnull JWT idTokenHint, final @Nonnull String clientId,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private @NonNull String validateIdTokenHint(final @NonNull JWT idTokenHint, final @NonNull String clientId,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     if (!(idTokenHint instanceof final SignedJWT signed)) {
       throw invalidRequest("The id_token_hint is not a signed JWT", logString);
@@ -443,8 +442,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @return the authentication context URIs, in the requester's order of preference
    * @throws OidcErrorResponseException for unmet essential values
    */
-  private @Nonnull List<String> resolveAuthnContexts(final @Nonnull AuthenticationRequest request,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private @NonNull List<String> resolveAuthnContexts(final @NonNull AuthenticationRequest request,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     List<String> requested = List.of();
     boolean essential = false;
@@ -475,7 +474,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param claims the claims parameter, may be {@code null}
    * @return the entry, or {@code null}
    */
-  private static @Nullable ClaimsSetRequest.Entry getAcrEntry(final @Nullable OIDCClaimsRequest claims) {
+  private static ClaimsSetRequest.@Nullable Entry getAcrEntry(final @Nullable OIDCClaimsRequest claims) {
     if (claims == null) {
       return null;
     }
@@ -493,8 +492,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @return the user message, or {@code null}
    * @throws OidcErrorResponseException for an invalid user message, when user messages are supported
    */
-  private @Nullable GenericUserMessage extractUserMessage(final @Nonnull OidcAuthnRequestAuthenticationToken token,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private @Nullable GenericUserMessage extractUserMessage(final @NonNull OidcAuthnRequestAuthenticationToken token,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     final String value = getParameter(token, ParameterConstants.USER_MESSAGE_PARAM_NAME);
     if (value == null) {
@@ -531,8 +530,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @return the sign message, or {@code null} if no signature is requested
    * @throws OidcErrorResponseException with {@code invalid_request} for an invalid signature request
    */
-  private @Nullable GenericSignMessage extractSignMessage(final @Nonnull OidcAuthnRequestAuthenticationToken token,
-      final @Nonnull List<String> scopes, final @Nullable Prompt prompt, final @Nonnull String logString)
+  private @Nullable GenericSignMessage extractSignMessage(final @NonNull OidcAuthnRequestAuthenticationToken token,
+      final @NonNull List<String> scopes, final @Nullable Prompt prompt, final @NonNull String logString)
       throws OidcErrorResponseException {
 
     final boolean sign = scopes.contains(ScopeConstants.SIGN.getValue());
@@ -599,7 +598,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param message the message
    * @return the localized messages
    */
-  private static @Nonnull List<LocalizedMessage> toLocalizedMessages(final @Nonnull UserMessage message) {
+  private static @NonNull List<LocalizedMessage> toLocalizedMessages(final @NonNull UserMessage message) {
     return message.getMessages().stream()
         .map(m -> new LocalizedMessage(m.getLanguage() != null ? m.getLanguage().toString() : null, m.getMessage()))
         .toList();
@@ -612,7 +611,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @return the MIME type
    * @throws IllegalArgumentException for a MIME type that is not allowed
    */
-  private static @Nonnull MessageMimeType toMimeType(final @Nullable String mimeType) {
+  private static @NonNull MessageMimeType toMimeType(final @Nullable String mimeType) {
     final MessageMimeType type = MessageMimeType.parse(mimeType);
     if (type == MessageMimeType.TEXT_HTML || MessageMimeType.SAML_TEXT.equalsIgnoreCase(Objects.toString(mimeType))) {
       throw new IllegalArgumentException("Unsupported message MIME type: " + mimeType);
@@ -627,8 +626,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param name the parameter name
    * @return the value, or {@code null}
    */
-  private static @Nullable String getParameter(final @Nonnull OidcAuthnRequestAuthenticationToken token,
-      final @Nonnull String name) {
+  private static @Nullable String getParameter(final @NonNull OidcAuthnRequestAuthenticationToken token,
+      final @NonNull String name) {
     final List<String> values = token.getParameters().get(name);
     return values != null && !values.isEmpty() && StringUtils.hasText(values.getFirst()) ? values.getFirst() : null;
   }
@@ -639,7 +638,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param map the map
    * @return a map with string keys
    */
-  private static @Nonnull Map<String, Object> toStringKeyMap(final @Nonnull Map<?, ?> map) {
+  private static @NonNull Map<String, Object> toStringKeyMap(final @NonNull Map<?, ?> map) {
     final JSONObject result = new JSONObject();
     map.forEach((k, v) -> result.put(String.valueOf(k), v));
     return result;
@@ -652,8 +651,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param logString the log string
    * @return an {@link OidcErrorResponseException}
    */
-  private static @Nonnull OidcErrorResponseException invalidRequest(final @Nonnull String description,
-      final @Nonnull String logString) {
+  private static @NonNull OidcErrorResponseException invalidRequest(final @NonNull String description,
+      final @NonNull String logString) {
     log.info("Invalid authentication request - {} [{}]", description, logString);
     return new OidcErrorResponseException(OAuth2Error.INVALID_REQUEST, description);
   }

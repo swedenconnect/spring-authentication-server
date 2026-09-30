@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.registry.acceptance;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
@@ -44,7 +44,7 @@ public interface RequesterAcceptance {
    * @return {@code true} if the requester is accepted and {@code false} otherwise
    * @throws ClientRegistryException if the registry fails when asked for a mark
    */
-  boolean isAccepted(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry)
+  boolean isAccepted(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry)
       throws ClientRegistryException;
 
   /**
@@ -52,7 +52,7 @@ public interface RequesterAcceptance {
    *
    * @return a {@link RequesterAcceptance}
    */
-  static @Nonnull RequesterAcceptance acceptAll() {
+  static @NonNull RequesterAcceptance acceptAll() {
     return AcceptAllRequesterAcceptance.INSTANCE;
   }
 

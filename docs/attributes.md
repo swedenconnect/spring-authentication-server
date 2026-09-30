@@ -443,8 +443,8 @@ public class LookedUpSubjectIdentifierGenerator implements SubjectIdentifierGene
   private final transient SubjectIdentifierRepository repository;
 
   @Override
-  public @Nonnull String getSubjectIdentifier(final @Nonnull AuthenticatedUser user,
-      final @Nonnull Requester requester) {
+  public @NonNull String getSubjectIdentifier(final @NonNull AuthenticatedUser user,
+      final @NonNull Requester requester) {
     return this.repository.getOrCreate(user.getUsername(), requester);
   }
 }

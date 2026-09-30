@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,6 +22,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.OIDCClaimsRequest;
 import com.nimbusds.openid.connect.sdk.claims.ClaimsSetRequest;
@@ -79,7 +79,7 @@ public class OidcAttributeMapping {
    *
    * @param definitions the attribute definitions to use
    */
-  public OidcAttributeMapping(final @Nonnull AttributeDefinitionRegistry definitions) {
+  public OidcAttributeMapping(final @NonNull AttributeDefinitionRegistry definitions) {
     this(definitions, true);
   }
 
@@ -89,7 +89,7 @@ public class OidcAttributeMapping {
    * @param definitions the attribute definitions to use
    * @param registerBuiltInMappers whether to register the built-in mappers
    */
-  public OidcAttributeMapping(final @Nonnull AttributeDefinitionRegistry definitions,
+  public OidcAttributeMapping(final @NonNull AttributeDefinitionRegistry definitions,
       final boolean registerBuiltInMappers) {
     Objects.requireNonNull(definitions, "definitions must not be null");
     this.fromProtocolMapping = new FromProtocolAttributeMapping<>(definitions, RequestedClaim::name);
@@ -106,7 +106,7 @@ public class OidcAttributeMapping {
    * @param requestedClaims the requested claims
    * @return the generic requested attributes
    */
-  public @Nonnull List<GenericRequestedAttribute> toGeneric(final @Nonnull List<RequestedClaim> requestedClaims) {
+  public @NonNull List<GenericRequestedAttribute> toGeneric(final @NonNull List<RequestedClaim> requestedClaims) {
     return this.fromProtocolMapping.map(requestedClaims);
   }
 
@@ -117,7 +117,7 @@ public class OidcAttributeMapping {
    * @param claimsRequest the claims request, may be {@code null}
    * @return the generic requested attributes
    */
-  public @Nonnull List<GenericRequestedAttribute> toGenericFromClaimsRequest(
+  public @NonNull List<GenericRequestedAttribute> toGenericFromClaimsRequest(
       final @Nullable OIDCClaimsRequest claimsRequest) {
     if (claimsRequest == null) {
       return List.of();
@@ -135,7 +135,7 @@ public class OidcAttributeMapping {
    * @param requestedAttributes the requested attributes of the operation, may be {@code null}
    * @return the claims
    */
-  public @Nonnull List<UserClaim> toClaims(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
+  public @NonNull List<UserClaim> toClaims(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
       final @Nullable List<GenericRequestedAttribute> requestedAttributes) {
     return this.toProtocolMapping.map(attributes, requestedAttributes);
   }
@@ -147,7 +147,7 @@ public class OidcAttributeMapping {
    * @param identifiers the attribute identifiers
    * @return the claim names, in the order of the identifiers and without duplicates
    */
-  public @Nonnull List<String> getClaimNames(final @Nonnull Collection<String> identifiers) {
+  public @NonNull List<String> getClaimNames(final @NonNull Collection<String> identifiers) {
     final Set<String> claimNames = new LinkedHashSet<>();
     for (final String identifier : Objects.requireNonNull(identifiers, "identifiers must not be null")) {
       if (this.toProtocolMapping.getMapper(identifier) instanceof final ToClaimMapper mapper) {
@@ -162,7 +162,7 @@ public class OidcAttributeMapping {
    *
    * @return a {@link FromProtocolAttributeMapping}
    */
-  public @Nonnull FromProtocolAttributeMapping<RequestedClaim> getFromProtocolMapping() {
+  public @NonNull FromProtocolAttributeMapping<RequestedClaim> getFromProtocolMapping() {
     return this.fromProtocolMapping;
   }
 
@@ -171,7 +171,7 @@ public class OidcAttributeMapping {
    *
    * @return a {@link ToProtocolAttributeMapping}
    */
-  public @Nonnull ToProtocolAttributeMapping<UserClaim> getToProtocolMapping() {
+  public @NonNull ToProtocolAttributeMapping<UserClaim> getToProtocolMapping() {
     return this.toProtocolMapping;
   }
 
@@ -182,8 +182,8 @@ public class OidcAttributeMapping {
    * @param claimsSetRequest the claims set request, may be {@code null}
    * @param target the delivery target
    */
-  private static void addEntries(final @Nonnull List<RequestedClaim> requestedClaims,
-      final @Nullable ClaimsSetRequest claimsSetRequest, final @Nonnull ClaimDeliveryTarget target) {
+  private static void addEntries(final @NonNull List<RequestedClaim> requestedClaims,
+      final @Nullable ClaimsSetRequest claimsSetRequest, final @NonNull ClaimDeliveryTarget target) {
     if (claimsSetRequest == null) {
       return;
     }
@@ -197,7 +197,7 @@ public class OidcAttributeMapping {
    *
    * @return the built-in mappers
    */
-  public static @Nonnull List<FromProtocolAttributeMapper<RequestedClaim>> getBuiltInFromProtocolMappers() {
+  public static @NonNull List<FromProtocolAttributeMapper<RequestedClaim>> getBuiltInFromProtocolMappers() {
     final List<FromProtocolAttributeMapper<RequestedClaim>> mappers = new ArrayList<>();
 
     // OpenID Connect Core standard claims.
@@ -307,7 +307,7 @@ public class OidcAttributeMapping {
    *
    * @return the built-in mappers
    */
-  public static @Nonnull List<ToProtocolAttributeMapper<UserClaim>> getBuiltInToProtocolMappers() {
+  public static @NonNull List<ToProtocolAttributeMapper<UserClaim>> getBuiltInToProtocolMappers() {
     final List<ToProtocolAttributeMapper<UserClaim>> mappers = new ArrayList<>();
 
     // OpenID Connect Core standard claims.

@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Map;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The elements of the IdP metadata that are given as values to the {@link Saml2IdpMetadataEndpointConfigurer}.
@@ -103,7 +103,7 @@ public final class IdpMetadataElements {
    * @param minKeySize the smallest key size in bits, or {@code null}
    * @param maxKeySize the largest key size in bits, or {@code null}
    */
-  public record SigningMethod(@Nonnull String algorithm, @Nullable Integer minKeySize, @Nullable Integer maxKeySize) {
+  public record SigningMethod(@NonNull String algorithm, @Nullable Integer minKeySize, @Nullable Integer maxKeySize) {
   }
 
   /**
@@ -114,7 +114,7 @@ public final class IdpMetadataElements {
    * @param oaepParams the OAEP parameters in Base64, or {@code null}
    * @param digestMethod the digest algorithm URI for key transport algorithms that need one, or {@code null}
    */
-  public record EncryptionMethod(@Nonnull String algorithm, @Nullable Integer keySize, @Nullable String oaepParams,
+  public record EncryptionMethod(@NonNull String algorithm, @Nullable Integer keySize, @Nullable String oaepParams,
       @Nullable String digestMethod) {
   }
 

@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -55,9 +55,9 @@ class FederationJwtVerifier {
    * @return the claims of the JWT
    * @throws ClientRegistryException if the JWT does not verify
    */
-  static @Nonnull JWTClaimsSet verify(final @Nonnull SignedJWT jwt, final @Nonnull String type,
-      final @Nonnull JWKSet keys, final @Nonnull String issuer, final @Nonnull String subject,
-      final @Nonnull Set<String> requiredClaims) throws ClientRegistryException {
+  static @NonNull JWTClaimsSet verify(final @NonNull SignedJWT jwt, final @NonNull String type,
+      final @NonNull JWKSet keys, final @NonNull String issuer, final @NonNull String subject,
+      final @NonNull Set<String> requiredClaims) throws ClientRegistryException {
 
     Objects.requireNonNull(jwt, "jwt must not be null");
     final DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();

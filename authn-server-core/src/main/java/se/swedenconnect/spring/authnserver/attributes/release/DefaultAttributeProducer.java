@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.release;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
@@ -51,8 +51,8 @@ public class DefaultAttributeProducer implements AttributeProducer {
    * @throws UnrecoverableErrorException if the result carries no authentication requirements
    */
   @Override
-  public @Nonnull List<GenericAttribute<? extends Serializable>> releaseAttributes(
-      final @Nonnull UserAuthentication userAuthentication) {
+  public @NonNull List<GenericAttribute<? extends Serializable>> releaseAttributes(
+      final @NonNull UserAuthentication userAuthentication) {
 
     final AuthenticationRequirements requirements = userAuthentication.getAuthnRequirements();
     if (requirements == null) {

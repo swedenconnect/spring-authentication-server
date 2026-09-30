@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.release;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +64,8 @@ public class DefaultAttributeReleaseManager implements AttributeReleaseManager {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericAttribute<? extends Serializable>> releaseAttributes(
-      final @Nonnull UserAuthentication userAuthentication) {
+  public @NonNull List<GenericAttribute<? extends Serializable>> releaseAttributes(
+      final @NonNull UserAuthentication userAuthentication) {
 
     final List<GenericAttribute<? extends Serializable>> released = new ArrayList<>();
     for (final AttributeProducer producer : this.producers) {
@@ -93,13 +92,13 @@ public class DefaultAttributeReleaseManager implements AttributeReleaseManager {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<AttributeProducer> getAttributeProducers() {
+  public @NonNull List<AttributeProducer> getAttributeProducers() {
     return Collections.unmodifiableList(this.producers);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
+  public @NonNull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
     return Collections.unmodifiableList(this.voters);
   }
 
@@ -110,8 +109,8 @@ public class DefaultAttributeReleaseManager implements AttributeReleaseManager {
    * @param attribute the attribute to vote on
    * @return the outcome of the vote
    */
-  private @Nonnull AttributeReleaseVote vote(final @Nonnull UserAuthentication userAuthentication,
-      final @Nonnull GenericAttribute<? extends Serializable> attribute) {
+  private @NonNull AttributeReleaseVote vote(final @NonNull UserAuthentication userAuthentication,
+      final @NonNull GenericAttribute<? extends Serializable> attribute) {
 
     AttributeReleaseVote outcome = AttributeReleaseVote.DONT_KNOW;
     for (final AttributeReleaseVoter voter : this.voters) {

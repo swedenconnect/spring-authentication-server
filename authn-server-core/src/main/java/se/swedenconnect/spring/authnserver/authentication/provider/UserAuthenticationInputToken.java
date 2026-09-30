@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -62,8 +61,8 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    * @param authnRequirements what the requester asks for
    * @param requester who is asking
    */
-  public UserAuthenticationInputToken(final @Nonnull AuthenticationRequirements authnRequirements,
-      final @Nonnull Requester requester) {
+  public UserAuthenticationInputToken(final @NonNull AuthenticationRequirements authnRequirements,
+      final @NonNull Requester requester) {
     this(authnRequirements, requester, null, null);
   }
 
@@ -76,8 +75,8 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    *          identifier, so {@code null} is given for that protocol
    * @param protocolRequestData protocol specific data about the request, may be {@code null}
    */
-  public UserAuthenticationInputToken(final @Nonnull AuthenticationRequirements authnRequirements,
-      final @Nonnull Requester requester, final @Nullable String requestId,
+  public UserAuthenticationInputToken(final @NonNull AuthenticationRequirements authnRequirements,
+      final @NonNull Requester requester, final @Nullable String requestId,
       final @Nullable Serializable protocolRequestData) {
     super(List.of());
     this.authnRequirements = Objects.requireNonNull(authnRequirements, "authnRequirements must not be null");
@@ -92,7 +91,7 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    *
    * @return the authentication requirements
    */
-  public @Nonnull AuthenticationRequirements getAuthnRequirements() {
+  public @NonNull AuthenticationRequirements getAuthnRequirements() {
     return this.authnRequirements;
   }
 
@@ -101,7 +100,7 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    *
    * @return the requester
    */
-  public @Nonnull Requester getRequester() {
+  public @NonNull Requester getRequester() {
     return this.requester;
   }
 
@@ -146,7 +145,7 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    * Maps to {@link #getRequester()}.
    */
   @Override
-  public @Nonnull Object getPrincipal() {
+  public @NonNull Object getPrincipal() {
     return this.requester;
   }
 
@@ -154,7 +153,7 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    * Always returns the empty string.
    */
   @Override
-  public @Nonnull Object getCredentials() {
+  public @NonNull Object getCredentials() {
     return "";
   }
 
@@ -163,7 +162,7 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    *
    * @return a log string
    */
-  public @Nonnull String getLogString() {
+  public @NonNull String getLogString() {
     return this.requestId != null
         ? "requester: '%s', request: '%s'".formatted(this.requester, this.requestId)
         : "requester: '%s'".formatted(this.requester);
@@ -171,7 +170,7 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return this.getLogString();
   }
 

@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.nameid;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.NameID;
@@ -65,14 +64,14 @@ public class DefaultNameIDGeneratorFactory extends AbstractSubjectIdentifierGene
    *
    * @param idpEntityId the Identity Provider entityID, which becomes the {@code NameQualifier}
    */
-  public DefaultNameIDGeneratorFactory(final @Nonnull String idpEntityId) {
+  public DefaultNameIDGeneratorFactory(final @NonNull String idpEntityId) {
     super(idpEntityId);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull NameIDGenerator getNameIDGenerator(final @Nonnull AuthnRequest authnRequest,
-      final @Nonnull EntityDescriptor peerMetadata) throws SamlErrorStatusException {
+  public @NonNull NameIDGenerator getNameIDGenerator(final @NonNull AuthnRequest authnRequest,
+      final @NonNull EntityDescriptor peerMetadata) throws SamlErrorStatusException {
 
     final NameIDPolicy policy = authnRequest.getNameIDPolicy();
 
@@ -93,7 +92,7 @@ public class DefaultNameIDGeneratorFactory extends AbstractSubjectIdentifierGene
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<String> getSupportedFormats() {
+  public @NonNull List<String> getSupportedFormats() {
     return NameID.PERSISTENT.equals(this.defaultFormat)
         ? List.of(NameID.PERSISTENT, NameID.TRANSIENT)
         : List.of(NameID.TRANSIENT, NameID.PERSISTENT);
@@ -105,7 +104,7 @@ public class DefaultNameIDGeneratorFactory extends AbstractSubjectIdentifierGene
    *
    * @param format the {@code NameID} format
    */
-  public void setDefaultFormat(final @Nonnull String format) {
+  public void setDefaultFormat(final @NonNull String format) {
     if (!this.isSupported(format)) {
       throw new IllegalArgumentException("Unsupported NameID format - " + format);
     }
@@ -120,8 +119,8 @@ public class DefaultNameIDGeneratorFactory extends AbstractSubjectIdentifierGene
    * @return a {@link NameIDGenerator}
    * @throws SamlErrorStatusException if the format is not supported
    */
-  protected @Nonnull NameIDGenerator createNameIDGenerator(final @Nullable String format,
-      final @Nonnull String spNameQualifier) throws SamlErrorStatusException {
+  protected @NonNull NameIDGenerator createNameIDGenerator(final @Nullable String format,
+      final @NonNull String spNameQualifier) throws SamlErrorStatusException {
 
     final String nameIDFormat = format == null || NameID.UNSPECIFIED.equals(format)
         ? this.defaultFormat
@@ -153,7 +152,7 @@ public class DefaultNameIDGeneratorFactory extends AbstractSubjectIdentifierGene
    * @param peerMetadata the metadata of the Service Provider
    * @return the format, or {@code null} if the metadata declares no format that is supported
    */
-  private @Nullable String getFormatFromMetadata(final @Nonnull EntityDescriptor peerMetadata) {
+  private @Nullable String getFormatFromMetadata(final @NonNull EntityDescriptor peerMetadata) {
     final SPSSODescriptor ssoDescriptor = peerMetadata.getSPSSODescriptor(SAMLConstants.SAML20P_NS);
     if (ssoDescriptor == null) {
       return null;

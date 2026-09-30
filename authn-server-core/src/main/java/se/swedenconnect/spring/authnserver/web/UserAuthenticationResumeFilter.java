@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
@@ -72,8 +72,8 @@ public class UserAuthenticationResumeFilter extends OncePerRequestFilter {
    * @param providers the redirect providers
    * @param handlers the handlers of the protocols that the server offers
    */
-  public UserAuthenticationResumeFilter(final @Nonnull List<UserRedirectAuthenticationProvider> providers,
-      final @Nonnull Collection<ResumedAuthenticationHandler> handlers) {
+  public UserAuthenticationResumeFilter(final @NonNull List<UserRedirectAuthenticationProvider> providers,
+      final @NonNull Collection<ResumedAuthenticationHandler> handlers) {
     Objects.requireNonNull(providers, "providers must not be null")
         .forEach(p -> this.providers.put(p, PathPatternRequestMatcher.pathPattern(p.getResumeAuthnPath())));
     Objects.requireNonNull(handlers, "handlers must not be null")
@@ -82,8 +82,8 @@ public class UserAuthenticationResumeFilter extends OncePerRequestFilter {
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     final List<UserRedirectAuthenticationProvider> matching = this.providers.entrySet().stream()

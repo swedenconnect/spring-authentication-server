@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.registry;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -25,6 +22,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -52,12 +52,12 @@ import se.swedenconnect.spring.authnserver.authentication.Requester;
  * @author Martin Lindström
  */
 public record RequesterRecord(
-    @Nonnull Requester requester,
-    @Nonnull List<DisplayName> displayNames,
-    @Nonnull List<Logo> logos,
-    @Nonnull Set<String> marks,
+    @NonNull Requester requester,
+    @NonNull List<DisplayName> displayNames,
+    @NonNull List<Logo> logos,
+    @NonNull Set<String> marks,
     @Nullable String organizationNumber,
-    @Nonnull Object protocolMetadata) {
+    @NonNull Object protocolMetadata) {
 
   /**
    * Constructor.
@@ -86,8 +86,8 @@ public record RequesterRecord(
    * @param marks the marks that the requester holds
    * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
    */
-  public RequesterRecord(final @Nonnull Requester requester, final @Nonnull List<DisplayName> displayNames,
-      final @Nonnull List<Logo> logos, final @Nonnull Set<String> marks, final @Nonnull Object protocolMetadata) {
+  public RequesterRecord(final @NonNull Requester requester, final @NonNull List<DisplayName> displayNames,
+      final @NonNull List<Logo> logos, final @NonNull Set<String> marks, final @NonNull Object protocolMetadata) {
     this(requester, displayNames, logos, marks, null, protocolMetadata);
   }
 
@@ -96,7 +96,7 @@ public record RequesterRecord(
    *
    * @return the protocol
    */
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return this.requester.protocol();
   }
 
@@ -105,7 +105,7 @@ public record RequesterRecord(
    *
    * @return the requester identity
    */
-  public @Nonnull String getIdentifier() {
+  public @NonNull String getIdentifier() {
     return this.requester.identifier();
   }
 
@@ -117,7 +117,7 @@ public record RequesterRecord(
    * @return the protocol metadata
    * @throws IllegalArgumentException if the metadata is not of the requested type
    */
-  public <T> @Nonnull T getProtocolMetadata(final @Nonnull Class<T> type) {
+  public <T> @NonNull T getProtocolMetadata(final @NonNull Class<T> type) {
     Objects.requireNonNull(type, "type must not be null");
     if (!type.isInstance(this.protocolMetadata)) {
       throw new IllegalArgumentException("The protocol metadata of %s is not a %s".formatted(
@@ -165,7 +165,7 @@ public record RequesterRecord(
    * @param mark the mark identifier
    * @return {@code true} if the requester holds the mark and {@code false} otherwise
    */
-  public boolean hasMark(final @Nonnull String mark) {
+  public boolean hasMark(final @NonNull String mark) {
     return this.marks.contains(Objects.requireNonNull(mark, "mark must not be null"));
   }
 
@@ -175,7 +175,7 @@ public record RequesterRecord(
    * @param additionalMarks the marks to add
    * @return a {@link RequesterRecord}
    */
-  public @Nonnull RequesterRecord withMarks(final @Nonnull Collection<String> additionalMarks) {
+  public @NonNull RequesterRecord withMarks(final @NonNull Collection<String> additionalMarks) {
     Objects.requireNonNull(additionalMarks, "additionalMarks must not be null");
     if (this.marks.containsAll(additionalMarks)) {
       return this;

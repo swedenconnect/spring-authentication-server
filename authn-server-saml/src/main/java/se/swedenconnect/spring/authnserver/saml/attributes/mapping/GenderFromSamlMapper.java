@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.opensaml.sweid.saml2.attribute.AttributeConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
@@ -41,14 +41,14 @@ public class GenderFromSamlMapper implements FromProtocolAttributeMapper<SamlReq
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedNames() {
+  public @NonNull Collection<String> getSupportedNames() {
     return List.of(AttributeConstants.ATTRIBUTE_NAME_GENDER);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<SamlRequestedAttribute> inputs,
-      final @Nonnull FromProtocolMappingContext<SamlRequestedAttribute> context) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<SamlRequestedAttribute> inputs,
+      final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
     final List<String> values = inputs.stream()

@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.subject;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.SubjectType;
 
@@ -45,13 +45,13 @@ public class DefaultSubjectGeneratorFactory extends AbstractSubjectIdentifierGen
    *
    * @param issuer the OpenID Provider issuer identifier
    */
-  public DefaultSubjectGeneratorFactory(final @Nonnull String issuer) {
+  public DefaultSubjectGeneratorFactory(final @NonNull String issuer) {
     super(issuer);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull SubjectGenerator getSubjectGenerator(final @Nullable SubjectType subjectType,
+  public @NonNull SubjectGenerator getSubjectGenerator(final @Nullable SubjectType subjectType,
       final @Nullable URI sectorIdentifierUri, final @Nullable Collection<URI> redirectUris)
       throws UnrecoverableErrorException {
 
@@ -70,7 +70,7 @@ public class DefaultSubjectGeneratorFactory extends AbstractSubjectIdentifierGen
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<SubjectType> getSupportedSubjectTypes() {
+  public @NonNull List<SubjectType> getSupportedSubjectTypes() {
     return List.of(SubjectType.PUBLIC, SubjectType.PAIRWISE);
   }
 

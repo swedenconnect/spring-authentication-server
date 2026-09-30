@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -34,9 +34,9 @@ public class AuthnContextSsoVoter implements SsoVoter {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull SsoDecision vote(final @Nonnull UserAuthentication previousAuthentication,
-      final @Nonnull AuthenticationRequirements requirements, final @Nonnull Requester requester,
-      final @Nonnull List<String> allowedAuthnContexts) {
+  public @NonNull SsoDecision vote(final @NonNull UserAuthentication previousAuthentication,
+      final @NonNull AuthenticationRequirements requirements, final @NonNull Requester requester,
+      final @NonNull List<String> allowedAuthnContexts) {
     return allowedAuthnContexts.contains(previousAuthentication.getAuthenticatedUser().getAuthnContextUri())
         ? SsoDecision.allow()
         : SsoDecision.deny(SsoDenialReason.OTHER_AUTHN_CONTEXT);

@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
@@ -182,7 +181,7 @@ public class OidcConfigurationProperties {
    *
    * @return the single sign-on properties
    */
-  public @Nonnull SsoProperties getSso() {
+  public @NonNull SsoProperties getSso() {
     return this.sso;
   }
 
@@ -227,7 +226,7 @@ public class OidcConfigurationProperties {
    *
    * @return the subject identifier properties
    */
-  public @Nonnull SubjectIdentifierProperties getSubjectIdentifier() {
+  public @NonNull SubjectIdentifierProperties getSubjectIdentifier() {
     return this.subjectIdentifier;
   }
 
@@ -236,7 +235,7 @@ public class OidcConfigurationProperties {
    *
    * @return the key properties
    */
-  public @Nonnull KeyProperties getKeys() {
+  public @NonNull KeyProperties getKeys() {
     return this.keys;
   }
 
@@ -245,7 +244,7 @@ public class OidcConfigurationProperties {
    *
    * @return the endpoint properties
    */
-  public @Nonnull EndpointProperties getEndpoints() {
+  public @NonNull EndpointProperties getEndpoints() {
     return this.endpoints;
   }
 
@@ -326,7 +325,7 @@ public class OidcConfigurationProperties {
    *
    * @return the discovery properties
    */
-  public @Nonnull DiscoveryProperties getDiscovery() {
+  public @NonNull DiscoveryProperties getDiscovery() {
     return this.discovery;
   }
 
@@ -335,7 +334,7 @@ public class OidcConfigurationProperties {
    *
    * @return the authorization request properties
    */
-  public @Nonnull AuthorizationRequestProperties getAuthorizationRequest() {
+  public @NonNull AuthorizationRequestProperties getAuthorizationRequest() {
     return this.authorizationRequest;
   }
 
@@ -344,7 +343,7 @@ public class OidcConfigurationProperties {
    *
    * @return the requester acceptance properties
    */
-  public @Nonnull RequesterAcceptanceProperties getRequesterAcceptance() {
+  public @NonNull RequesterAcceptanceProperties getRequesterAcceptance() {
     return this.requesterAcceptance;
   }
 
@@ -445,7 +444,7 @@ public class OidcConfigurationProperties {
      *
      * @return the state
      */
-    public @Nonnull SigningKey.State getState() {
+    public SigningKey.@NonNull State getState() {
       return this.state;
     }
 
@@ -454,7 +453,7 @@ public class OidcConfigurationProperties {
      *
      * @param state the state
      */
-    public void setState(final @Nonnull SigningKey.State state) {
+    public void setState(final SigningKey.@NonNull State state) {
       this.state = state;
     }
 
@@ -516,7 +515,7 @@ public class OidcConfigurationProperties {
      *
      * @return the state
      */
-    public @Nonnull DecryptionKey.State getState() {
+    public DecryptionKey.@NonNull State getState() {
       return this.state;
     }
 
@@ -525,7 +524,7 @@ public class OidcConfigurationProperties {
      *
      * @param state the state
      */
-    public void setState(final @Nonnull DecryptionKey.State state) {
+    public void setState(final DecryptionKey.@NonNull State state) {
       this.state = state;
     }
   }
@@ -717,7 +716,7 @@ public class OidcConfigurationProperties {
      *
      * @return the combination mode
      */
-    public @Nullable ConfigurableRequesterAcceptance.Mode getMode() {
+    public ConfigurableRequesterAcceptance.@Nullable Mode getMode() {
       return this.mode;
     }
 
@@ -726,7 +725,7 @@ public class OidcConfigurationProperties {
      *
      * @param mode the combination mode
      */
-    public void setMode(final @Nullable ConfigurableRequesterAcceptance.Mode mode) {
+    public void setMode(final ConfigurableRequesterAcceptance.@Nullable Mode mode) {
       this.mode = mode;
     }
 

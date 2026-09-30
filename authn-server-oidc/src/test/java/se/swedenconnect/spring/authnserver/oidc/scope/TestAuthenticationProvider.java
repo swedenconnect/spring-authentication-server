@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.scope;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
@@ -38,27 +37,27 @@ public record TestAuthenticationProvider(String name, List<String> authnContextU
     List<String> scopes) implements UserAuthenticationProvider {
 
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.name;
   }
 
   @Override
-  public @Nonnull List<String> getSupportedAuthnContextUris() {
+  public @NonNull List<String> getSupportedAuthnContextUris() {
     return this.authnContextUris;
   }
 
   @Override
-  public @Nonnull List<String> getSupportedAttributes() {
+  public @NonNull List<String> getSupportedAttributes() {
     return this.attributes;
   }
 
   @Override
-  public @Nonnull List<String> getSupportedScopes() {
+  public @NonNull List<String> getSupportedScopes() {
     return this.scopes;
   }
 
   @Override
-  public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+  public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
     throw new UnsupportedOperationException();
   }
 

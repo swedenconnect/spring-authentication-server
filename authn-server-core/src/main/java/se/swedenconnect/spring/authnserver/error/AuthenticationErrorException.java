@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.error;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -48,7 +47,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    *
    * @param error the error
    */
-  public AuthenticationErrorException(final @Nonnull AuthenticationError error) {
+  public AuthenticationErrorException(final @NonNull AuthenticationError error) {
     this(Objects.requireNonNull(error, "error must not be null"), error.getDefaultMessage(), null, null);
   }
 
@@ -59,7 +58,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    * @param description a description of what went wrong, suitable for logs and for the error that the requester is
    *          given. It is never shown to the user
    */
-  public AuthenticationErrorException(final @Nonnull AuthenticationError error, final @Nonnull String description) {
+  public AuthenticationErrorException(final @NonNull AuthenticationError error, final @NonNull String description) {
     this(error, description, null, null);
   }
 
@@ -70,7 +69,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    * @param description a description of what went wrong
    * @param cause the cause of the error
    */
-  public AuthenticationErrorException(final @Nonnull AuthenticationError error, final @Nonnull String description,
+  public AuthenticationErrorException(final @NonNull AuthenticationError error, final @NonNull String description,
       final @Nullable Throwable cause) {
     this(error, description, cause, null);
   }
@@ -82,8 +81,8 @@ public class AuthenticationErrorException extends AuthenticationException {
    * @param error the error
    * @param ssoDenialReason why a previous authentication was not reused
    */
-  public AuthenticationErrorException(final @Nonnull AuthenticationError error,
-      final @Nonnull SsoDenialReason ssoDenialReason) {
+  public AuthenticationErrorException(final @NonNull AuthenticationError error,
+      final @NonNull SsoDenialReason ssoDenialReason) {
     this(error, Objects.requireNonNull(ssoDenialReason, "ssoDenialReason must not be null").getDescription(), null,
         ssoDenialReason);
   }
@@ -96,7 +95,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    * @param cause the cause of the error, may be {@code null}
    * @param ssoDenialReason why a previous authentication was not reused, may be {@code null}
    */
-  protected AuthenticationErrorException(final @Nonnull AuthenticationError error, final @Nonnull String description,
+  protected AuthenticationErrorException(final @NonNull AuthenticationError error, final @NonNull String description,
       final @Nullable Throwable cause, final @Nullable SsoDenialReason ssoDenialReason) {
     super(Objects.requireNonNull(description, "description must not be null"));
     if (cause != null) {
@@ -111,7 +110,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    *
    * @return the error
    */
-  public @Nonnull AuthenticationError getError() {
+  public @NonNull AuthenticationError getError() {
     return this.error;
   }
 
@@ -120,7 +119,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    *
    * @return the message code
    */
-  public @Nonnull String getMessageCode() {
+  public @NonNull String getMessageCode() {
     return this.error.getMessageCode();
   }
 
@@ -130,7 +129,7 @@ public class AuthenticationErrorException extends AuthenticationException {
    *
    * @return the description
    */
-  public @Nonnull String getDescription() {
+  public @NonNull String getDescription() {
     return this.getMessage();
   }
 

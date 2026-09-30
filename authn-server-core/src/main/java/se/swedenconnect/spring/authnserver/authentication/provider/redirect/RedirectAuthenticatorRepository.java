@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
@@ -44,8 +44,7 @@ public interface RedirectAuthenticatorRepository {
    * @return the redirect token, or {@code null} if the request carries no identifier or there is no such
    *           authentication
    */
-  @Nullable
-  RedirectForAuthenticationToken getInputToken(@Nonnull final HttpServletRequest request);
+  @Nullable RedirectForAuthenticationToken getInputToken(final @NonNull HttpServletRequest request);
 
   /**
    * Saves the result of the authentication that a request concerns.
@@ -54,7 +53,7 @@ public interface RedirectAuthenticatorRepository {
    * @param request the HTTP servlet request
    * @throws IllegalStateException if the request carries no identifier or there is no such authentication
    */
-  void complete(@Nonnull final Authentication result, @Nonnull final HttpServletRequest request)
+  void complete(final @NonNull Authentication result, final @NonNull HttpServletRequest request)
       throws IllegalStateException;
 
   /**
@@ -64,7 +63,7 @@ public interface RedirectAuthenticatorRepository {
    * @param request the HTTP servlet request
    * @throws IllegalStateException if the request carries no identifier or there is no such authentication
    */
-  void complete(@Nonnull final AuthenticationErrorException error, @Nonnull final HttpServletRequest request)
+  void complete(final @NonNull AuthenticationErrorException error, final @NonNull HttpServletRequest request)
       throws IllegalStateException;
 
 }

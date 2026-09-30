@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link FederationCache} that keeps its entries in the memory of one node. It is the default, and it is what a
@@ -50,13 +50,13 @@ public class InMemoryFederationCache implements FederationCache {
    *
    * @param clock the clock to use
    */
-  public InMemoryFederationCache(final @Nonnull Clock clock) {
+  public InMemoryFederationCache(final @NonNull Clock clock) {
     this.clock = Objects.requireNonNull(clock, "clock must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable CachedClientRecord get(final @Nonnull String clientId) {
+  public @Nullable CachedClientRecord get(final @NonNull String clientId) {
     Objects.requireNonNull(clientId, "clientId must not be null");
     final CachedClientRecord record = this.entries.get(clientId);
     if (record == null) {
@@ -71,14 +71,14 @@ public class InMemoryFederationCache implements FederationCache {
 
   /** {@inheritDoc} */
   @Override
-  public void put(final @Nonnull CachedClientRecord record) {
+  public void put(final @NonNull CachedClientRecord record) {
     Objects.requireNonNull(record, "record must not be null");
     this.entries.put(record.clientId(), record);
   }
 
   /** {@inheritDoc} */
   @Override
-  public void remove(final @Nonnull String clientId) {
+  public void remove(final @NonNull String clientId) {
     this.entries.remove(Objects.requireNonNull(clientId, "clientId must not be null"));
   }
 

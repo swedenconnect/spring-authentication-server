@@ -15,15 +15,15 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.opensaml.eidas.ext.attributes.AttributeUtils;
 import se.swedenconnect.opensaml.eidas.ext.attributes.CurrentAddressType;
@@ -78,7 +78,7 @@ public class EidasNaturalPersonAddress {
    *
    * @return the attribute identifiers
    */
-  public static @Nonnull List<String> getIdentifiers() {
+  public static @NonNull List<String> getIdentifiers() {
     return List.copyOf(KEY_TO_IDENTIFIER.values());
   }
 
@@ -89,7 +89,7 @@ public class EidasNaturalPersonAddress {
    * @param value the attribute value
    * @return a map from generic attribute identifier to value
    */
-  public static @Nonnull Map<String, String> parse(final @Nullable String value) {
+  public static @NonNull Map<String, String> parse(final @Nullable String value) {
     final Map<String, String> result = new LinkedHashMap<>();
     if (value == null || value.isBlank()) {
       return result;
@@ -115,7 +115,7 @@ public class EidasNaturalPersonAddress {
    * @param values a map from generic attribute identifier to value
    * @return the attribute value, or {@code null} if no part of the address was supplied
    */
-  public static @Nullable String format(final @Nonnull Map<String, String> values) {
+  public static @Nullable String format(final @NonNull Map<String, String> values) {
     final CurrentAddressType address = toCurrentAddress(values);
     return address != null ? address.toSwedishEidString() : null;
   }
@@ -126,7 +126,7 @@ public class EidasNaturalPersonAddress {
    * @param values a map from generic attribute identifier to value
    * @return a {@link CurrentAddressType}, or {@code null} if no part of the address was supplied
    */
-  public static @Nullable CurrentAddressType toCurrentAddress(final @Nonnull Map<String, String> values) {
+  public static @Nullable CurrentAddressType toCurrentAddress(final @NonNull Map<String, String> values) {
     CurrentAddressType address = null;
     for (final Map.Entry<String, BiConsumer<CurrentAddressType, String>> setter : SETTERS.entrySet()) {
       final String value = values.get(setter.getKey());
@@ -147,7 +147,7 @@ public class EidasNaturalPersonAddress {
    * @param value the value to decode
    * @return the decoded value
    */
-  private static @Nonnull String decode(final @Nonnull String value) {
+  private static @NonNull String decode(final @NonNull String value) {
     return URLDecoder.decode(value, StandardCharsets.UTF_8);
   }
 

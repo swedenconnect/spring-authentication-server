@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 
@@ -49,16 +48,14 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
    *
    * @return the name of the provider
    */
-  @Nonnull
-  String getName();
+  @NonNull String getName();
 
   /**
    * Gets the authentication contexts that the provider can deliver.
    *
    * @return the supported authentication context URIs
    */
-  @Nonnull
-  List<String> getSupportedAuthnContextUris();
+  @NonNull List<String> getSupportedAuthnContextUris();
 
   /**
    * Gets the SAML entity categories that the provider declares. The SAML Identity Provider publishes them in its
@@ -66,7 +63,7 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
    *
    * @return entity category URIs
    */
-  default @Nonnull List<String> getEntityCategories() {
+  default @NonNull List<String> getEntityCategories() {
     return List.of();
   }
 
@@ -77,7 +74,7 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
    *
    * @return attribute identifiers
    */
-  default @Nonnull List<String> getSupportedAttributes() {
+  default @NonNull List<String> getSupportedAttributes() {
     return List.of();
   }
 
@@ -88,7 +85,7 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
    *
    * @return scope values
    */
-  default @Nonnull List<String> getSupportedScopes() {
+  default @NonNull List<String> getSupportedScopes() {
     return List.of();
   }
 
@@ -104,15 +101,14 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
    * @return the authentication, or {@code null} if the provider does not handle the request
    * @throws AuthenticationErrorException if the authentication fails in a way that can be reported to the requester
    */
-  @Nullable
-  Authentication authenticateUser(@Nonnull final UserAuthenticationInputToken token)
+  @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token)
       throws AuthenticationErrorException;
 
   /**
    * Maps to {@link #authenticateUser(UserAuthenticationInputToken)}.
    */
   @Override
-  default @Nullable Authentication authenticate(final @Nonnull Authentication authentication) {
+  default @Nullable Authentication authenticate(final @NonNull Authentication authentication) {
     if (!(authentication instanceof final UserAuthenticationInputToken token)) {
       return null;
     }
@@ -123,7 +119,7 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
    * Supports {@link UserAuthenticationInputToken}.
    */
   @Override
-  default boolean supports(final @Nonnull Class<?> authentication) {
+  default boolean supports(final @NonNull Class<?> authentication) {
     return UserAuthenticationInputToken.class.isAssignableFrom(authentication);
   }
 

@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.subject;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.ByteArrayOutputStream;
 import java.io.Serial;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
@@ -93,7 +92,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    *
    * @param issuerQualifier the qualifier for the issuer
    */
-  protected AbstractSubjectIdentifierGenerator(final @Nonnull String issuerQualifier) {
+  protected AbstractSubjectIdentifierGenerator(final @NonNull String issuerQualifier) {
     this(issuerQualifier, null);
   }
 
@@ -104,7 +103,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    * @param requesterQualifier the qualifier for the requester, or {@code null} if the identifier is the same for all
    *     requesters
    */
-  protected AbstractSubjectIdentifierGenerator(final @Nonnull String issuerQualifier,
+  protected AbstractSubjectIdentifierGenerator(final @NonNull String issuerQualifier,
       final @Nullable String requesterQualifier) {
     if (!StringUtils.hasText(issuerQualifier)) {
       throw new IllegalArgumentException("issuerQualifier must be set and not empty");
@@ -117,8 +116,8 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    * Computes the identifier from the user ID and the qualifiers.
    */
   @Override
-  public @Nonnull String getSubjectIdentifier(final @Nonnull AuthenticatedUser user,
-      final @Nonnull Requester requester) throws UnrecoverableErrorException {
+  public @NonNull String getSubjectIdentifier(final @NonNull AuthenticatedUser user,
+      final @NonNull Requester requester) throws UnrecoverableErrorException {
     Objects.requireNonNull(user, "user must not be null");
     Objects.requireNonNull(requester, "requester must not be null");
     return this.computeIdentifier(this.getUserId(user));
@@ -131,7 +130,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    * @return the identifier
    * @throws UnrecoverableErrorException if the identifier can not be computed
    */
-  protected final @Nonnull String computeIdentifier(final @Nonnull String userId)
+  protected final @NonNull String computeIdentifier(final @NonNull String userId)
       throws UnrecoverableErrorException {
     Objects.requireNonNull(userId, "userId must not be null");
     final byte[] input = this.getInput(userId);
@@ -160,7 +159,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    * @return the user ID
    * @throws UnrecoverableErrorException if the user has no ID
    */
-  protected @Nonnull String getUserId(final @Nonnull AuthenticatedUser user) throws UnrecoverableErrorException {
+  protected @NonNull String getUserId(final @NonNull AuthenticatedUser user) throws UnrecoverableErrorException {
     final String userId = user.getUsername();
     if (!StringUtils.hasText(userId)) {
       throw new UnrecoverableErrorException(CommonUnrecoverableError.INTERNAL,
@@ -174,7 +173,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    *
    * @return the qualifier for the issuer
    */
-  protected @Nonnull String getIssuerQualifier() {
+  protected @NonNull String getIssuerQualifier() {
     return this.issuerQualifier;
   }
 
@@ -205,7 +204,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    *
    * @param hashAlgorithm the JCE name of the hash algorithm
    */
-  public void setHashAlgorithm(final @Nonnull String hashAlgorithm) {
+  public void setHashAlgorithm(final @NonNull String hashAlgorithm) {
     if (!StringUtils.hasText(hashAlgorithm)) {
       throw new IllegalArgumentException("hashAlgorithm must be set and not empty");
     }
@@ -218,7 +217,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    *
    * @param secret the secret, or {@code null} for no secret
    */
-  public void setSecret(final @Nullable byte[] secret) {
+  public void setSecret(final byte @Nullable [] secret) {
     this.secret = secret != null ? secret.clone() : null;
   }
 
@@ -229,7 +228,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    * @param userId the user ID
    * @return the bytes to compute over
    */
-  private byte[] getInput(final @Nonnull String userId) {
+  private byte[] getInput(final @NonNull String userId) {
     final ByteArrayOutputStream input = new ByteArrayOutputStream();
     if (this.requesterQualifier != null) {
       input.writeBytes(this.requesterQualifier.getBytes(StandardCharsets.UTF_8));
@@ -247,7 +246,7 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
    * @param hashAlgorithm the JCE name of the hash algorithm
    * @return the JCE name of the MAC algorithm
    */
-  private static @Nonnull String macAlgorithm(final @Nonnull String hashAlgorithm) {
+  private static @NonNull String macAlgorithm(final @NonNull String hashAlgorithm) {
     return "Hmac" + hashAlgorithm.replace("-", "");
   }
 

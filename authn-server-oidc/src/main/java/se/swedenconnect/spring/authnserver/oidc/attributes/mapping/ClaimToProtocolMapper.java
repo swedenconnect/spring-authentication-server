@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolMappingContext;
@@ -60,7 +60,7 @@ public class ClaimToProtocolMapper implements ToClaimMapper {
    * @param identifier the generic attribute identifier
    * @param claimName the claim name
    */
-  public ClaimToProtocolMapper(final @Nonnull String identifier, final @Nonnull String claimName) {
+  public ClaimToProtocolMapper(final @NonNull String identifier, final @NonNull String claimName) {
     this(identifier, claimName, false);
   }
 
@@ -71,7 +71,7 @@ public class ClaimToProtocolMapper implements ToClaimMapper {
    * @param claimName the claim name
    * @param array whether the claim holds an array of values
    */
-  public ClaimToProtocolMapper(final @Nonnull String identifier, final @Nonnull String claimName,
+  public ClaimToProtocolMapper(final @NonNull String identifier, final @NonNull String claimName,
       final boolean array) {
     this.identifier = Objects.requireNonNull(identifier, "identifier must not be null");
     this.claimName = Objects.requireNonNull(claimName, "claimName must not be null");
@@ -80,20 +80,20 @@ public class ClaimToProtocolMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(this.identifier);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+  public @NonNull Collection<String> getClaimNames(final @NonNull String identifier) {
     return this.identifier.equals(identifier) ? List.of(this.claimName) : List.of();
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<UserClaim> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
     final GenericAttribute<? extends Serializable> attribute = attributes.get(0);
     if (this.array) {
       final List<Object> values = new ArrayList<>();
@@ -109,7 +109,7 @@ public class ClaimToProtocolMapper implements ToClaimMapper {
    * @param value the value to convert
    * @return the claim value
    */
-  public static @Nonnull Object toClaimValue(final @Nonnull Serializable value) {
+  public static @NonNull Object toClaimValue(final @NonNull Serializable value) {
     if (value instanceof final LocalDate date) {
       return DATE_FORMATTER.format(date);
     }

@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import com.nimbusds.jose.jwk.JWKSet;
@@ -41,9 +40,9 @@ import com.nimbusds.jose.jwk.JWKSet;
  * @author Martin Lindström
  */
 public record FederationSettings(
-    @Nonnull TrustAnchor trustAnchor,
-    @Nonnull Resolver resolver,
-    @Nonnull Map<String, TrustMarkIssuer> trustMarkIssuers) {
+    @NonNull TrustAnchor trustAnchor,
+    @NonNull Resolver resolver,
+    @NonNull Map<String, TrustMarkIssuer> trustMarkIssuers) {
 
   /**
    * Constructor.
@@ -77,8 +76,8 @@ public record FederationSettings(
    * @param resolver the resolver service that is asked
    * @return a {@link FederationSettings}
    */
-  public static @Nonnull FederationSettings of(
-      final @Nonnull TrustAnchor trustAnchor, final @Nonnull Resolver resolver) {
+  public static @NonNull FederationSettings of(
+      final @NonNull TrustAnchor trustAnchor, final @NonNull Resolver resolver) {
     return new FederationSettings(trustAnchor, resolver, Map.of());
   }
 
@@ -88,7 +87,7 @@ public record FederationSettings(
    *
    * @return the verification keys of the resolver
    */
-  public @Nonnull JWKSet getResolverKeys() {
+  public @NonNull JWKSet getResolverKeys() {
     return this.resolver.keys() != null ? this.resolver.keys() : this.trustAnchor.keys();
   }
 
@@ -98,7 +97,7 @@ public record FederationSettings(
    * @param trustMarkType the trust mark type
    * @return a {@link TrustMarkIssuer}, or {@code null} if no issuer is configured for the type
    */
-  public @Nullable TrustMarkIssuer getTrustMarkIssuer(final @Nonnull String trustMarkType) {
+  public @Nullable TrustMarkIssuer getTrustMarkIssuer(final @NonNull String trustMarkType) {
     return this.trustMarkIssuers.get(Objects.requireNonNull(trustMarkType, "trustMarkType must not be null"));
   }
 
@@ -109,7 +108,7 @@ public record FederationSettings(
    * @param issuer the trust mark issuer
    * @return the verification keys of the issuer
    */
-  public @Nonnull JWKSet getTrustMarkIssuerKeys(final @Nonnull TrustMarkIssuer issuer) {
+  public @NonNull JWKSet getTrustMarkIssuerKeys(final @NonNull TrustMarkIssuer issuer) {
     Objects.requireNonNull(issuer, "issuer must not be null");
     return issuer.keys() != null ? issuer.keys() : this.trustAnchor.keys();
   }
@@ -120,7 +119,7 @@ public record FederationSettings(
    * @param entityId the entity identifier of the trust anchor
    * @param keys the federation keys of the trust anchor
    */
-  public record TrustAnchor(@Nonnull String entityId, @Nonnull JWKSet keys) {
+  public record TrustAnchor(@NonNull String entityId, @NonNull JWKSet keys) {
 
     /**
      * Constructor.
@@ -145,7 +144,7 @@ public record FederationSettings(
    * @param keys the federation keys of the resolver, or {@code null} when the resolver is the trust anchor and the
    *          trust anchor keys are used
    */
-  public record Resolver(@Nonnull String entityId, @Nonnull URI endpoint, @Nullable JWKSet keys) {
+  public record Resolver(@NonNull String entityId, @NonNull URI endpoint, @Nullable JWKSet keys) {
 
     /**
      * Constructor.
@@ -171,7 +170,7 @@ public record FederationSettings(
    * @param keys the federation keys of the issuer, or {@code null} when the issuer is the trust anchor and the trust
    *          anchor keys are used
    */
-  public record TrustMarkIssuer(@Nonnull String entityId, @Nonnull URI endpoint, @Nullable JWKSet keys) {
+  public record TrustMarkIssuer(@NonNull String entityId, @NonNull URI endpoint, @Nullable JWKSet keys) {
 
     /**
      * Constructor.

@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A registry of the generic attributes that are known to the application.
@@ -37,20 +37,20 @@ public interface AttributeDefinitionRegistry {
    * @param identifier the attribute identifier
    * @return the {@link AttributeDefinition}, or {@code null} if no definition has been registered
    */
-  @Nullable AttributeDefinition getDefinition(final @Nonnull String identifier);
+  @Nullable AttributeDefinition getDefinition(final @NonNull String identifier);
 
   /**
    * Gets all registered definitions.
    *
    * @return all {@link AttributeDefinition}s
    */
-  @Nonnull Collection<AttributeDefinition> getDefinitions();
+  @NonNull Collection<AttributeDefinition> getDefinitions();
 
   /**
    * Registers a definition. A definition for an identifier that is already registered replaces the previous one.
    *
    * @param definition the definition to register
    */
-  void register(final @Nonnull AttributeDefinition definition);
+  void register(final @NonNull AttributeDefinition definition);
 
 }

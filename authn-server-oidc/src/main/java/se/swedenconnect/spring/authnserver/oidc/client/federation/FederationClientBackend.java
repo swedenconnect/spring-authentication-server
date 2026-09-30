@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,9 +78,9 @@ public class FederationClientBackend implements ClientRegistryBackend {
    * @param cache where resolved clients are kept
    * @param settings the cache settings
    */
-  public FederationClientBackend(final @Nonnull FederationResolver resolver,
-      final @Nonnull TrustMarkRequester trustMarkRequester, final @Nonnull FederationCache cache,
-      final @Nonnull FederationCacheSettings settings) {
+  public FederationClientBackend(final @NonNull FederationResolver resolver,
+      final @NonNull TrustMarkRequester trustMarkRequester, final @NonNull FederationCache cache,
+      final @NonNull FederationCacheSettings settings) {
     this(resolver, trustMarkRequester, cache, settings, Clock.systemUTC());
   }
 
@@ -94,9 +93,9 @@ public class FederationClientBackend implements ClientRegistryBackend {
    * @param settings the cache settings
    * @param clock the clock to use
    */
-  public FederationClientBackend(final @Nonnull FederationResolver resolver,
-      final @Nonnull TrustMarkRequester trustMarkRequester, final @Nonnull FederationCache cache,
-      final @Nonnull FederationCacheSettings settings, final @Nonnull Clock clock) {
+  public FederationClientBackend(final @NonNull FederationResolver resolver,
+      final @NonNull TrustMarkRequester trustMarkRequester, final @NonNull FederationCache cache,
+      final @NonNull FederationCacheSettings settings, final @NonNull Clock clock) {
     this.resolver = Objects.requireNonNull(resolver, "resolver must not be null");
     this.trustMarkRequester = Objects.requireNonNull(trustMarkRequester, "trustMarkRequester must not be null");
     this.cache = Objects.requireNonNull(cache, "cache must not be null");
@@ -108,7 +107,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.name;
   }
 
@@ -117,13 +116,13 @@ public class FederationClientBackend implements ClientRegistryBackend {
    *
    * @param name the backend name
    */
-  public void setName(final @Nonnull String name) {
+  public void setName(final @NonNull String name) {
     this.name = Objects.requireNonNull(name, "name must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.OIDC;
   }
 
@@ -132,20 +131,20 @@ public class FederationClientBackend implements ClientRegistryBackend {
    *
    * @return the {@link LookupTracker} of the backend
    */
-  public @Nonnull LookupTracker getLookupTracker() {
+  public @NonNull LookupTracker getLookupTracker() {
     return this.lookupTracker;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord lookup(final @Nonnull String identifier) throws ClientRegistryException {
+  public @Nullable RequesterRecord lookup(final @NonNull String identifier) throws ClientRegistryException {
     final CachedClientRecord entry = this.entryFor(identifier);
     return entry.isFound() ? this.toRecord(entry) : null;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord requestMark(final @Nonnull String identifier, final @Nonnull String mark)
+  public @Nullable RequesterRecord requestMark(final @NonNull String identifier, final @NonNull String mark)
       throws ClientRegistryException {
 
     Objects.requireNonNull(mark, "mark must not be null");
@@ -172,7 +171,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
    * @return a {@link CachedClientRecord}, which may be one telling that the client is not known
    * @throws ClientRegistryException if the resolution fails
    */
-  private @Nonnull CachedClientRecord entryFor(final @Nonnull String identifier) throws ClientRegistryException {
+  private @NonNull CachedClientRecord entryFor(final @NonNull String identifier) throws ClientRegistryException {
     Objects.requireNonNull(identifier, "identifier must not be null");
     this.lookupTracker.record(identifier);
 
@@ -200,7 +199,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
    * @param entry the cache entry, which must hold a client
    * @return a {@link RequesterRecord}
    */
-  private @Nonnull RequesterRecord toRecord(final @Nonnull CachedClientRecord entry) {
+  private @NonNull RequesterRecord toRecord(final @NonNull CachedClientRecord entry) {
     return new OidcClientRecord(entry.clientId(), Objects.requireNonNull(entry.metadata()),
         entry.getMarks(this.clock.instant())).toRequesterRecord();
   }

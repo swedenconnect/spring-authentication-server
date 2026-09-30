@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseTarget;
@@ -39,8 +39,8 @@ import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseTarget;
  * @param claimsRequest the {@code claims} parameter as a JSON string, or {@code null}
  * @author Martin Lindström
  */
-public record OidcAuthnRequestData(@Nonnull OidcResponseTarget responseTarget, @Nullable String nonce,
-    @Nullable String codeChallenge, @Nullable String codeChallengeMethod, @Nonnull List<String> scopes,
+public record OidcAuthnRequestData(@NonNull OidcResponseTarget responseTarget, @Nullable String nonce,
+    @Nullable String codeChallenge, @Nullable String codeChallengeMethod, @NonNull List<String> scopes,
     @Nullable String claimsRequest) implements Serializable {
 
   @Serial

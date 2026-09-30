@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.error;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.error.UnrecoverableError;
 
@@ -69,13 +69,13 @@ public enum OidcUnrecoverableError implements UnrecoverableError {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getMessageCode() {
+  public @NonNull String getMessageCode() {
     return this.messageCode;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getDescription() {
+  public @NonNull String getDescription() {
     return this.description;
   }
 

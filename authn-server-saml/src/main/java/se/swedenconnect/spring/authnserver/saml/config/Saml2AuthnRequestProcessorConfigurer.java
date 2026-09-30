@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Response;
 import org.springframework.context.MessageSource;
@@ -79,7 +78,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param messageReplayChecker the replay checker
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer messageReplayChecker(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer messageReplayChecker(
       final @Nullable MessageReplayChecker messageReplayChecker) {
     this.messageReplayChecker = messageReplayChecker;
     return this;
@@ -101,7 +100,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param requestedAttributeResolver the resolver
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer requestedAttributeResolver(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer requestedAttributeResolver(
       final @Nullable SamlRequestedAttributeResolver requestedAttributeResolver) {
     this.requestedAttributeResolver = requestedAttributeResolver;
     return this;
@@ -124,7 +123,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param signMessageExtractor the extractor
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer signMessageExtractor(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer signMessageExtractor(
       final @Nullable SignMessageExtractor signMessageExtractor) {
     this.signMessageExtractor = signMessageExtractor;
     return this;
@@ -145,7 +144,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param assertionConsumerServiceValidator the validator
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer assertionConsumerServiceValidator(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer assertionConsumerServiceValidator(
       final @Nullable AssertionConsumerServiceValidator assertionConsumerServiceValidator) {
     this.assertionConsumerServiceValidator = assertionConsumerServiceValidator;
     return this;
@@ -166,7 +165,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param responsePage the response page
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer responsePage(final @Nullable ResponsePage responsePage) {
+  public @NonNull Saml2AuthnRequestProcessorConfigurer responsePage(final @Nullable ResponsePage responsePage) {
     this.responsePage = responsePage;
     return this;
   }
@@ -187,7 +186,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param messageSource the message source
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer messageSource(final @Nullable MessageSource messageSource) {
+  public @NonNull Saml2AuthnRequestProcessorConfigurer messageSource(final @Nullable MessageSource messageSource) {
     this.messageSource = messageSource;
     return this;
   }
@@ -207,7 +206,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param responseCustomizer the customizer
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer responseCustomizer(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer responseCustomizer(
       final @Nullable Customizer<Response> responseCustomizer) {
     this.responseCustomizer = responseCustomizer;
     return this;
@@ -228,7 +227,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param assertionCustomizer the customizer
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer assertionCustomizer(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer assertionCustomizer(
       final @Nullable Customizer<Assertion> assertionCustomizer) {
     this.assertionCustomizer = assertionCustomizer;
     return this;
@@ -252,7 +251,7 @@ public class Saml2AuthnRequestProcessorConfigurer {
    * @param successHandler the handler
    * @return this configurer
    */
-  public @Nonnull Saml2AuthnRequestProcessorConfigurer successHandler(
+  public @NonNull Saml2AuthnRequestProcessorConfigurer successHandler(
       final @Nullable AuthenticationSuccessHandler successHandler) {
     this.successHandler = successHandler;
     return this;

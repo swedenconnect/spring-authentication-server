@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,8 +74,8 @@ public class Saml2ErrorResponseProcessingFilter extends OncePerRequestFilter {
    * @param responseBuilder builds the error response
    * @param responseSender sends the error response
    */
-  public Saml2ErrorResponseProcessingFilter(final @Nonnull RequestMatcher requestMatcher,
-      final @Nonnull Saml2ResponseBuilder responseBuilder, final @Nonnull Saml2ResponseSender responseSender) {
+  public Saml2ErrorResponseProcessingFilter(final @NonNull RequestMatcher requestMatcher,
+      final @NonNull Saml2ResponseBuilder responseBuilder, final @NonNull Saml2ResponseSender responseSender) {
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
     this.responseBuilder = Objects.requireNonNull(responseBuilder, "responseBuilder must not be null");
     this.responseSender = Objects.requireNonNull(responseSender, "responseSender must not be null");
@@ -83,8 +83,8 @@ public class Saml2ErrorResponseProcessingFilter extends OncePerRequestFilter {
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {

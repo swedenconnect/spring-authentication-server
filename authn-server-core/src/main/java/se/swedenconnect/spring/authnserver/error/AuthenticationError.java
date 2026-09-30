@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.error;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
 
 /**
@@ -80,7 +79,7 @@ public enum AuthenticationError {
    *
    * @return the message code
    */
-  public @Nonnull String getMessageCode() {
+  public @NonNull String getMessageCode() {
     return this.messageCode;
   }
 
@@ -89,7 +88,7 @@ public enum AuthenticationError {
    *
    * @return the default message
    */
-  public @Nonnull String getDefaultMessage() {
+  public @NonNull String getDefaultMessage() {
     return this.defaultMessage;
   }
 

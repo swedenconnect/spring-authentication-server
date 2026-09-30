@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -31,6 +28,8 @@ import java.util.Optional;
 import javax.xml.namespace.QName;
 
 import net.shibboleth.shared.xml.XMLParserException;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.io.UnmarshallingException;
 import org.opensaml.core.xml.util.XMLObjectSupport;
@@ -159,7 +158,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @param samlConfigurer the SAML configurer
    */
-  Saml2IdpMetadataEndpointConfigurer(final @Nonnull Saml2IdpConfigurer samlConfigurer) {
+  Saml2IdpMetadataEndpointConfigurer(final @NonNull Saml2IdpConfigurer samlConfigurer) {
     this.samlConfigurer = samlConfigurer;
   }
 
@@ -169,7 +168,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param template the template, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer template(final @Nullable Resource template) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer template(final @Nullable Resource template) {
     this.template = template;
     return this;
   }
@@ -180,7 +179,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param cacheDuration the cache duration
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer cacheDuration(final @Nonnull Duration cacheDuration) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer cacheDuration(final @NonNull Duration cacheDuration) {
     this.cacheDuration = Objects.requireNonNull(cacheDuration, "cacheDuration must not be null");
     return this;
   }
@@ -191,7 +190,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param validityPeriod the validity period
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer validityPeriod(final @Nonnull Duration validityPeriod) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer validityPeriod(final @NonNull Duration validityPeriod) {
     this.validityPeriod = Objects.requireNonNull(validityPeriod, "validityPeriod must not be null");
     return this;
   }
@@ -202,7 +201,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param digestMethods the digest algorithm URIs, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer digestMethods(final @Nullable List<String> digestMethods) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer digestMethods(final @Nullable List<String> digestMethods) {
     this.digestMethods = digestMethods;
     return this;
   }
@@ -214,7 +213,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param underRole whether the elements are placed under the role descriptor
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer digestMethodsUnderRole(final boolean underRole) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer digestMethodsUnderRole(final boolean underRole) {
     this.digestMethodsUnderRole = underRole;
     return this;
   }
@@ -225,7 +224,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param signingMethods the signing methods, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer signingMethods(
+  public @NonNull Saml2IdpMetadataEndpointConfigurer signingMethods(
       final @Nullable List<IdpMetadataElements.SigningMethod> signingMethods) {
     this.signingMethods = signingMethods;
     return this;
@@ -238,7 +237,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param underRole whether the elements are placed under the role descriptor
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer signingMethodsUnderRole(final boolean underRole) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer signingMethodsUnderRole(final boolean underRole) {
     this.signingMethodsUnderRole = underRole;
     return this;
   }
@@ -249,7 +248,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param encryptionMethods the encryption methods, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer encryptionMethods(
+  public @NonNull Saml2IdpMetadataEndpointConfigurer encryptionMethods(
       final @Nullable List<IdpMetadataElements.EncryptionMethod> encryptionMethods) {
     this.encryptionMethods = encryptionMethods;
     return this;
@@ -261,7 +260,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param uiInfo the UI information, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer uiInfo(final @Nullable IdpMetadataElements.UiInfo uiInfo) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer uiInfo(final IdpMetadataElements.@Nullable UiInfo uiInfo) {
     this.uiInfo = uiInfo;
     return this;
   }
@@ -272,7 +271,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param attributeNames the SAML attribute names, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer requestedPrincipalSelection(
+  public @NonNull Saml2IdpMetadataEndpointConfigurer requestedPrincipalSelection(
       final @Nullable List<String> attributeNames) {
     this.requestedPrincipalSelection = attributeNames;
     return this;
@@ -284,8 +283,8 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param organization the organisation, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer organization(
-      final @Nullable IdpMetadataElements.Organization organization) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer organization(
+      final IdpMetadataElements.@Nullable Organization organization) {
     this.organization = organization;
     return this;
   }
@@ -296,7 +295,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param contactPersons the contact persons, keyed by type, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer contactPersons(
+  public @NonNull Saml2IdpMetadataEndpointConfigurer contactPersons(
       final @Nullable Map<ContactPersonType, IdpMetadataElements.ContactPerson> contactPersons) {
     this.contactPersons = contactPersons;
     return this;
@@ -308,8 +307,8 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull Saml2IdpMetadataEndpointConfigurer entityDescriptorCustomizer(
-      final @Nonnull Customizer<EntityDescriptor> customizer) {
+  public @NonNull Saml2IdpMetadataEndpointConfigurer entityDescriptorCustomizer(
+      final @NonNull Customizer<EntityDescriptor> customizer) {
     this.entityDescriptorCustomizer = Objects.requireNonNull(customizer, "customizer must not be null");
     return this;
   }
@@ -340,7 +339,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @param http the HTTP security object
    */
-  void configure(final @Nonnull HttpSecurity http) {
+  void configure(final @NonNull HttpSecurity http) {
     final Saml2IdpMetadataEndpointFilter filter =
         new Saml2IdpMetadataEndpointFilter(this.createEntityDescriptorContainer(), this.requestMatcher);
     http.addFilterBefore(this.samlConfigurer.postProcessObject(filter),
@@ -352,8 +351,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @return the request matcher
    */
-  @Nonnull
-  RequestMatcher getRequestMatcher() {
+  @NonNull RequestMatcher getRequestMatcher() {
     return Objects.requireNonNull(this.requestMatcher, "The configurer has not been initialized");
   }
 
@@ -362,8 +360,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @return an {@link EntityDescriptorContainer}
    */
-  @Nonnull
-  EntityDescriptorContainer createEntityDescriptorContainer() {
+  @NonNull EntityDescriptorContainer createEntityDescriptorContainer() {
     final EntityDescriptorBuilder entityDescriptorBuilder = this.buildEntityDescriptor();
     this.entityDescriptorCustomizer.customize(entityDescriptorBuilder.object());
 
@@ -387,7 +384,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @return a builder holding the metadata
    */
-  private @Nonnull EntityDescriptorBuilder buildEntityDescriptor() {
+  private @NonNull EntityDescriptorBuilder buildEntityDescriptor() {
     final Saml2IdpConfigurer saml = this.samlConfigurer;
     final Collection<UserAuthenticationProvider> providers = saml.getServer().getAuthenticationProviders();
 
@@ -590,7 +587,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @return the key descriptors
    */
-  private @Nonnull List<KeyDescriptor> buildKeyDescriptors() {
+  private @NonNull List<KeyDescriptor> buildKeyDescriptors() {
     final Saml2IdpConfigurer saml = this.samlConfigurer;
     final PkiCredential defaultCredential = saml.getDefaultCredential();
 
@@ -651,7 +648,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    *
    * @return the encryption methods
    */
-  private @Nonnull List<EncryptionMethod> buildEncryptionMethods() {
+  private @NonNull List<EncryptionMethod> buildEncryptionMethods() {
     return Objects.requireNonNull(this.encryptionMethods).stream()
         .filter(e -> StringUtils.hasText(e.algorithm()))
         .map(e -> {
@@ -729,8 +726,8 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param contactPerson the contact person
    * @return a {@link ContactPerson}
    */
-  private static @Nonnull ContactPerson toContactPerson(final @Nonnull ContactPersonType type,
-      final @Nonnull IdpMetadataElements.ContactPerson contactPerson) {
+  private static @NonNull ContactPerson toContactPerson(final @NonNull ContactPersonType type,
+      final IdpMetadataElements.@NonNull ContactPerson contactPerson) {
 
     final ContactPerson cp = ContactPersonBuilder.builder()
         .type(toOpenSamlEnum(type))
@@ -754,7 +751,7 @@ public class Saml2IdpMetadataEndpointConfigurer {
    * @param type the type
    * @return the OpenSAML value
    */
-  private static @Nonnull ContactPersonTypeEnumeration toOpenSamlEnum(final @Nonnull ContactPersonType type) {
+  private static @NonNull ContactPersonTypeEnumeration toOpenSamlEnum(final @NonNull ContactPersonType type) {
     if (type == ContactPersonType.security) {
       return ContactPersonTypeEnumeration.OTHER;
     }

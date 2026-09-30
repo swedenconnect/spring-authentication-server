@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.schema.XSString;
 import org.opensaml.saml.saml2.core.Attribute;
@@ -51,8 +50,8 @@ public class EidasAttributeValues {
    * @param values the values
    * @return an {@link Attribute}, or {@code null} if no value could be built
    */
-  public static @Nullable Attribute createAttribute(final @Nonnull EidasAttributeTemplate template,
-      final @Nonnull List<? extends Serializable> values) {
+  public static @Nullable Attribute createAttribute(final @NonNull EidasAttributeTemplate template,
+      final @NonNull List<? extends Serializable> values) {
     Objects.requireNonNull(template, "template must not be null");
     final Attribute attribute = AttributeUtils.createAttribute(template.name(), template.friendlyName());
     for (final Serializable value : values) {
@@ -71,8 +70,8 @@ public class EidasAttributeValues {
    * @param value the value
    * @return an {@link XMLObject}, or {@code null} if the value does not fit the type of the attribute
    */
-  public static @Nullable XMLObject createValue(final @Nonnull EidasAttributeTemplate template,
-      final @Nonnull Serializable value) {
+  public static @Nullable XMLObject createValue(final @NonNull EidasAttributeTemplate template,
+      final @NonNull Serializable value) {
     final XMLObject valueObject =
         AttributeUtils.createAttributeValueObject(template.valueTypeName(), template.valueType());
 
@@ -145,7 +144,7 @@ public class EidasAttributeValues {
    * @param value the value, a {@link LocalDate} or a string on the form {@code YYYY-MM-DD}
    * @return a {@link LocalDate}, or {@code null} if the value is not a date
    */
-  private static @Nullable LocalDate toLocalDate(final @Nonnull Serializable value) {
+  private static @Nullable LocalDate toLocalDate(final @NonNull Serializable value) {
     if (value instanceof final LocalDate date) {
       return date;
     }

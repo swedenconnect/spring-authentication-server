@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.subject;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.id.SectorID;
@@ -50,7 +50,7 @@ public class PairwiseSubjectGenerator extends AbstractSubjectIdentifierGenerator
    * @param issuer the OpenID Provider issuer identifier
    * @param sectorId the sector identifier of the client
    */
-  public PairwiseSubjectGenerator(final @Nonnull String issuer, final @Nonnull SectorID sectorId) {
+  public PairwiseSubjectGenerator(final @NonNull String issuer, final @NonNull SectorID sectorId) {
     super(issuer, Objects.requireNonNull(sectorId, "sectorId must not be null").getValue());
     this.sectorId = sectorId;
   }
@@ -60,7 +60,7 @@ public class PairwiseSubjectGenerator extends AbstractSubjectIdentifierGenerator
    *
    * @return the sector identifier
    */
-  public @Nonnull SectorID getSectorId() {
+  public @NonNull SectorID getSectorId() {
     return this.sectorId;
   }
 
@@ -68,7 +68,7 @@ public class PairwiseSubjectGenerator extends AbstractSubjectIdentifierGenerator
    * Returns {@link SubjectType#PAIRWISE}.
    */
   @Override
-  public @Nonnull SubjectType getSubjectType() {
+  public @NonNull SubjectType getSubjectType() {
     return SubjectType.PAIRWISE;
   }
 

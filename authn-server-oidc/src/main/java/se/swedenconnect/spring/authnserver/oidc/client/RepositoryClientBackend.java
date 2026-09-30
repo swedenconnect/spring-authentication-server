@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
@@ -46,7 +46,7 @@ public class RepositoryClientBackend implements ClientRegistryBackend {
    *
    * @param repository where the clients are held
    */
-  public RepositoryClientBackend(final @Nonnull ClientRepository repository) {
+  public RepositoryClientBackend(final @NonNull ClientRepository repository) {
     this(repository, DEFAULT_NAME);
   }
 
@@ -56,26 +56,26 @@ public class RepositoryClientBackend implements ClientRegistryBackend {
    * @param repository where the clients are held
    * @param name the backend name
    */
-  public RepositoryClientBackend(final @Nonnull ClientRepository repository, final @Nonnull String name) {
+  public RepositoryClientBackend(final @NonNull ClientRepository repository, final @NonNull String name) {
     this.repository = Objects.requireNonNull(repository, "repository must not be null");
     this.name = Objects.requireNonNull(name, "name must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.name;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.OIDC;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord lookup(final @Nonnull String identifier) throws ClientRegistryException {
+  public @Nullable RequesterRecord lookup(final @NonNull String identifier) throws ClientRegistryException {
     Objects.requireNonNull(identifier, "identifier must not be null");
     final OidcClientRecord client = this.repository.findByClientId(identifier);
     return client != null ? client.toRequesterRecord() : null;

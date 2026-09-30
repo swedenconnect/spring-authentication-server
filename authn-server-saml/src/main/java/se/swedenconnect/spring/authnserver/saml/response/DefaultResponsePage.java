@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
 
@@ -39,9 +39,9 @@ public class DefaultResponsePage implements ResponsePage {
 
   /** {@inheritDoc} */
   @Override
-  public void sendResponse(final @Nonnull HttpServletRequest httpServletRequest,
-      final @Nonnull HttpServletResponse httpServletResponse, final @Nonnull String destination,
-      final @Nonnull String samlResponse, final @Nullable String relayState) throws IOException {
+  public void sendResponse(final @NonNull HttpServletRequest httpServletRequest,
+      final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
+      final @NonNull String samlResponse, final @Nullable String relayState) throws IOException {
 
     final String page = generateResponsePage(destination, samlResponse, relayState);
     httpServletResponse.setContentType("text/html;charset=UTF-8");
@@ -59,8 +59,8 @@ public class DefaultResponsePage implements ResponsePage {
    * @param relayState the relay state, or {@code null}
    * @return the HTML page
    */
-  public static @Nonnull String generateResponsePage(final @Nonnull String destination,
-      final @Nonnull String samlResponse, final @Nullable String relayState) {
+  public static @NonNull String generateResponsePage(final @NonNull String destination,
+      final @NonNull String samlResponse, final @Nullable String relayState) {
 
     final StringBuilder builder = new StringBuilder();
     builder.append("<!DOCTYPE html>").append(NEWLINE);
@@ -96,7 +96,7 @@ public class DefaultResponsePage implements ResponsePage {
    * @param value the value
    * @return the escaped value
    */
-  private static @Nonnull String escape(final @Nonnull String value) {
+  private static @NonNull String escape(final @NonNull String value) {
     return HtmlUtils.htmlEscape(value, StandardCharsets.UTF_8.name());
   }
 

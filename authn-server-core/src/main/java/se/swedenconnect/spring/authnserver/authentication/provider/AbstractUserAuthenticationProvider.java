@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -117,7 +116,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token)
+  public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token)
       throws AuthenticationErrorException {
 
     final List<String> authnContextUris = this.filterRequestedAuthnContextUris(token);
@@ -159,9 +158,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @return the authentication, normally a {@link UserAuthentication}
    * @throws AuthenticationErrorException if the authentication fails in a way that can be reported to the requester
    */
-  @Nonnull
-  protected abstract Authentication authenticate(@Nonnull final UserAuthenticationInputToken token,
-      @Nonnull final List<String> authnContextUris) throws AuthenticationErrorException;
+  protected abstract @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+      final @NonNull List<String> authnContextUris) throws AuthenticationErrorException;
 
   /**
    * Decides whether the previous authentication may be reused.
@@ -175,8 +173,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param authnContextUris the authentication contexts that may be used
    * @return an {@link SsoDecision}, which is either allowed or denied with a reason
    */
-  protected @Nonnull SsoDecision decideSso(final @Nonnull UserAuthenticationInputToken token,
-      final @Nonnull List<String> authnContextUris) {
+  protected @NonNull SsoDecision decideSso(final @NonNull UserAuthenticationInputToken token,
+      final @NonNull List<String> authnContextUris) {
 
     final UserAuthentication previous = token.getPreviousAuthentication();
     if (previous == null) {
@@ -222,7 +220,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param token what the provider is given
    * @return the authentication contexts that may be used, possibly empty
    */
-  protected @Nonnull List<String> filterRequestedAuthnContextUris(final @Nonnull UserAuthenticationInputToken token) {
+  protected @NonNull List<String> filterRequestedAuthnContextUris(final @NonNull UserAuthenticationInputToken token) {
     final List<String> supported = this.getSupportedAuthnContextUris();
     final List<String> requested = token.getAuthnRequirements().getAuthnContextRequirements();
     if (requested.isEmpty()) {
@@ -239,7 +237,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    *
    * @return the voters, in the order they are asked
    */
-  public @Nonnull List<SsoVoter> getSsoVoters() {
+  public @NonNull List<SsoVoter> getSsoVoters() {
     return this.ssoVoters;
   }
 
@@ -249,7 +247,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    *
    * @return the processors, in the order they are run
    */
-  public @Nonnull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
+  public @NonNull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
     return this.postAuthenticationProcessors;
   }
 
@@ -259,7 +257,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    *
    * @return the single sign-on policy
    */
-  public @Nonnull SsoPolicy getSsoPolicy() {
+  public @NonNull SsoPolicy getSsoPolicy() {
     return this.ssoPolicy != null ? this.ssoPolicy : this.serverSsoPolicy;
   }
 
@@ -270,7 +268,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param protocol the protocol of the requester
    * @return the single sign-on policy
    */
-  public @Nonnull SsoPolicy getSsoPolicy(final @Nonnull AuthenticationProtocol protocol) {
+  public @NonNull SsoPolicy getSsoPolicy(final @NonNull AuthenticationProtocol protocol) {
     if (this.ssoPolicy != null) {
       return this.ssoPolicy;
     }
@@ -291,7 +289,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    *
    * @param serverSsoPolicy the server default policy
    */
-  public void setServerSsoPolicy(final @Nonnull SsoPolicy serverSsoPolicy) {
+  public void setServerSsoPolicy(final @NonNull SsoPolicy serverSsoPolicy) {
     this.serverSsoPolicy = Objects.requireNonNull(serverSsoPolicy, "serverSsoPolicy must not be null");
   }
 
@@ -302,7 +300,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param protocol the protocol
    * @param ssoPolicy the policy, or {@code null} to follow the server default for this protocol
    */
-  public void setServerSsoPolicy(final @Nonnull AuthenticationProtocol protocol, final @Nullable SsoPolicy ssoPolicy) {
+  public void setServerSsoPolicy(final @NonNull AuthenticationProtocol protocol, final @Nullable SsoPolicy ssoPolicy) {
     Objects.requireNonNull(protocol, "protocol must not be null");
     if (ssoPolicy != null) {
       this.protocolSsoPolicies.put(protocol, ssoPolicy);
@@ -319,7 +317,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param protocol the protocol
    * @param voters the voters, or {@code null} for none
    */
-  public void setServerSsoVoters(final @Nonnull AuthenticationProtocol protocol,
+  public void setServerSsoVoters(final @NonNull AuthenticationProtocol protocol,
       final @Nullable List<SsoVoter> voters) {
     Objects.requireNonNull(protocol, "protocol must not be null");
     this.serverSsoVoters.put(protocol, voters != null ? List.copyOf(voters) : List.of());
@@ -332,7 +330,7 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param protocol the protocol
    * @param processors the processors, or {@code null} for none
    */
-  public void setServerPostAuthenticationProcessors(final @Nonnull AuthenticationProtocol protocol,
+  public void setServerPostAuthenticationProcessors(final @NonNull AuthenticationProtocol protocol,
       final @Nullable List<PostAuthenticationProcessor> processors) {
     Objects.requireNonNull(protocol, "protocol must not be null");
     this.serverPostAuthenticationProcessors.put(protocol, processors != null ? List.copyOf(processors) : List.of());
@@ -345,8 +343,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param token what the provider was given
    * @throws AuthenticationErrorException if the post-authentication processing rejects the result
    */
-  protected void completeResult(final @Nonnull UserAuthentication authentication,
-      final @Nonnull UserAuthenticationInputToken token) throws AuthenticationErrorException {
+  protected void completeResult(final @NonNull UserAuthentication authentication,
+      final @NonNull UserAuthenticationInputToken token) throws AuthenticationErrorException {
     authentication.setAuthnRequirements(token.getAuthnRequirements());
     authentication.setProtocolRequestData(token.getProtocolRequestData());
     authentication.registerUse(token.getRequester().protocol(), token.getRequester().identifier(),
@@ -367,8 +365,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    * @param user the authenticated user
    * @return {@code true} if nothing contradicts the user and {@code false} otherwise
    */
-  private boolean requestedAttributeValuesMatch(final @Nonnull AuthenticationRequirements requirements,
-      final @Nonnull AuthenticatedUser user) {
+  private boolean requestedAttributeValuesMatch(final @NonNull AuthenticationRequirements requirements,
+      final @NonNull AuthenticatedUser user) {
     for (final GenericRequestedAttribute requested : requirements.getRequestedAttributes()) {
       if (requested.getRequestedValues().isEmpty()) {
         continue;

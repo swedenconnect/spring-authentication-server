@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.claims.ClaimsSet;
 
@@ -37,7 +37,7 @@ import net.minidev.json.JSONObject;
  * @param value the claim value
  * @author Martin Lindström
  */
-public record UserClaim(@Nonnull String name, @Nonnull Object value) {
+public record UserClaim(@NonNull String name, @NonNull Object value) {
 
   /**
    * Constructor.
@@ -57,7 +57,7 @@ public record UserClaim(@Nonnull String name, @Nonnull Object value) {
    * @param value the claim value
    * @return a {@link UserClaim}
    */
-  public static @Nonnull UserClaim of(final @Nonnull String name, final @Nonnull Object value) {
+  public static @NonNull UserClaim of(final @NonNull String name, final @NonNull Object value) {
     return new UserClaim(name, value);
   }
 
@@ -72,7 +72,7 @@ public record UserClaim(@Nonnull String name, @Nonnull Object value) {
    * @param second the second claim
    * @return the merged claim
    */
-  public static @Nonnull UserClaim merge(final @Nonnull UserClaim first, final @Nonnull UserClaim second) {
+  public static @NonNull UserClaim merge(final @NonNull UserClaim first, final @NonNull UserClaim second) {
     final JSONObject firstObject = toJsonObject(first.value());
     final JSONObject secondObject = toJsonObject(second.value());
     if (firstObject == null || secondObject == null) {
@@ -89,7 +89,7 @@ public record UserClaim(@Nonnull String name, @Nonnull Object value) {
    * @param value the value
    * @return a {@link JSONObject}, or {@code null} if the value is not an object
    */
-  private static JSONObject toJsonObject(final @Nonnull Object value) {
+  private static JSONObject toJsonObject(final @NonNull Object value) {
     if (value instanceof final JSONObject jsonObject) {
       return jsonObject;
     }
@@ -104,7 +104,7 @@ public record UserClaim(@Nonnull String name, @Nonnull Object value) {
    *
    * @param claimsSet the claims set to add to
    */
-  public void addTo(final @Nonnull ClaimsSet claimsSet) {
+  public void addTo(final @NonNull ClaimsSet claimsSet) {
     claimsSet.setClaim(this.name, this.value);
   }
 

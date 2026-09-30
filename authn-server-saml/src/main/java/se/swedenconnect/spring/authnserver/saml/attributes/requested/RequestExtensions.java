@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 
 import javax.xml.namespace.QName;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.Extensions;
@@ -42,8 +41,8 @@ class RequestExtensions {
    * @param type the extension type
    * @return the extension, or {@code null} if the request does not carry one
    */
-  static <T extends XMLObject> @Nullable T getExtension(final @Nonnull AuthnRequest authnRequest,
-      final @Nonnull QName elementName, final @Nonnull Class<T> type) {
+  static <T extends XMLObject> @Nullable T getExtension(final @NonNull AuthnRequest authnRequest,
+      final @NonNull QName elementName, final @NonNull Class<T> type) {
 
     final Extensions extensions = authnRequest.getExtensions();
     if (extensions == null) {

@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.error;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.security.core.AuthenticationException;
 
@@ -57,8 +56,8 @@ public class SamlErrorStatusException extends AuthenticationException {
    * @param statusMessageCode the message code for resolving the status message
    * @param description a description of what went wrong, for logs. It is never shown to the user
    */
-  public SamlErrorStatusException(final @Nonnull SamlErrorStatus status, final @Nonnull String statusMessageCode,
-      final @Nonnull String description) {
+  public SamlErrorStatusException(final @NonNull SamlErrorStatus status, final @NonNull String statusMessageCode,
+      final @NonNull String description) {
     this(status, statusMessageCode, description, null);
   }
 
@@ -70,8 +69,8 @@ public class SamlErrorStatusException extends AuthenticationException {
    * @param description a description of what went wrong, for logs. It is never shown to the user
    * @param cause the cause of the error, may be {@code null}
    */
-  public SamlErrorStatusException(final @Nonnull SamlErrorStatus status, final @Nonnull String statusMessageCode,
-      final @Nonnull String description, final @Nullable Throwable cause) {
+  public SamlErrorStatusException(final @NonNull SamlErrorStatus status, final @NonNull String statusMessageCode,
+      final @NonNull String description, final @Nullable Throwable cause) {
     super(Objects.requireNonNull(description, "description must not be null"));
     if (cause != null) {
       this.initCause(cause);
@@ -86,7 +85,7 @@ public class SamlErrorStatusException extends AuthenticationException {
    * @param error the error of the authentication step
    * @return a {@link SamlErrorStatusException}
    */
-  public static @Nonnull SamlErrorStatusException of(final @Nonnull AuthenticationErrorException error) {
+  public static @NonNull SamlErrorStatusException of(final @NonNull AuthenticationErrorException error) {
     return new SamlErrorStatusException(SamlErrorStatus.of(error.getError()), error.getMessageCode(),
         error.getDescription(), error);
   }
@@ -96,7 +95,7 @@ public class SamlErrorStatusException extends AuthenticationException {
    *
    * @return a {@link SamlErrorStatus}
    */
-  public @Nonnull SamlErrorStatus getStatus() {
+  public @NonNull SamlErrorStatus getStatus() {
     return this.status;
   }
 
@@ -105,7 +104,7 @@ public class SamlErrorStatusException extends AuthenticationException {
    *
    * @return the message code
    */
-  public @Nonnull String getStatusMessageCode() {
+  public @NonNull String getStatusMessageCode() {
     return this.statusMessageCode;
   }
 
@@ -114,7 +113,7 @@ public class SamlErrorStatusException extends AuthenticationException {
    *
    * @return the description
    */
-  public @Nonnull String getDescription() {
+  public @NonNull String getDescription() {
     return this.getMessage();
   }
 

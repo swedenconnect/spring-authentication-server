@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * The attribute definitions that the library ships with. The set is the union of the attributes of the Attribute
@@ -189,7 +189,7 @@ public class BuiltInAttributeDefinitions {
    *
    * @return an immutable list of {@link AttributeDefinition}s
    */
-  public static @Nonnull List<AttributeDefinition> getDefinitions() {
+  public static @NonNull List<AttributeDefinition> getDefinitions() {
     return DEFINITIONS;
   }
 

@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -70,8 +69,8 @@ public class AuthnServerAutoConfiguration {
    * @param resourceLoader gives the class loader of the application
    * @throws IllegalStateException if the protocol configuration is invalid
    */
-  public AuthnServerAutoConfiguration(final @Nonnull Environment environment,
-      final @Nonnull ResourceLoader resourceLoader) {
+  public AuthnServerAutoConfiguration(final @NonNull Environment environment,
+      final @NonNull ResourceLoader resourceLoader) {
     final Binder binder = Binder.get(environment);
     final boolean samlEnabled = binder.bind("authn-server.saml.enabled", Boolean.class).orElse(false);
     final boolean oidcEnabled = binder.bind("authn-server.oidc.enabled", Boolean.class).orElse(false);

@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest.validation;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAuthenticationToken;
@@ -36,7 +36,7 @@ public interface AuthnRequestValidator {
    * @throws UnrecoverableErrorException for errors that cannot be reported to the Service Provider
    * @throws SamlErrorStatusException for errors that are reported to the Service Provider
    */
-  void validate(final @Nonnull Saml2AuthnRequestAuthenticationToken token)
+  void validate(final @NonNull Saml2AuthnRequestAuthenticationToken token)
       throws UnrecoverableErrorException, SamlErrorStatusException;
 
 }

@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.release;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -42,7 +42,7 @@ public interface AttributeProducer {
    * @param userAuthentication the authentication result
    * @return the released attributes, possibly empty
    */
-  @Nonnull List<GenericAttribute<? extends Serializable>> releaseAttributes(
-      final @Nonnull UserAuthentication userAuthentication);
+  @NonNull List<GenericAttribute<? extends Serializable>> releaseAttributes(
+      final @NonNull UserAuthentication userAuthentication);
 
 }

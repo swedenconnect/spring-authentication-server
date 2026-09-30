@@ -15,15 +15,15 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.keys;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -69,7 +69,7 @@ public final class OidcKeys {
    * @param decryptionKeys the decryption keys, may be {@code null} or empty
    * @throws IllegalArgumentException if the keys break any of the rules
    */
-  public OidcKeys(final @Nonnull List<SigningKey> signingKeys, final @Nullable List<DecryptionKey> decryptionKeys) {
+  public OidcKeys(final @NonNull List<SigningKey> signingKeys, final @Nullable List<DecryptionKey> decryptionKeys) {
     this.signingKeys = List.copyOf(Objects.requireNonNull(signingKeys, "signingKeys must not be null"));
     this.decryptionKeys = decryptionKeys != null ? List.copyOf(decryptionKeys) : List.of();
 
@@ -103,7 +103,7 @@ public final class OidcKeys {
    *
    * @return the signing keys
    */
-  public @Nonnull List<SigningKey> getSigningKeys() {
+  public @NonNull List<SigningKey> getSigningKeys() {
     return this.signingKeys;
   }
 
@@ -112,7 +112,7 @@ public final class OidcKeys {
    *
    * @return the active signing keys
    */
-  public @Nonnull List<SigningKey> getActiveSigningKeys() {
+  public @NonNull List<SigningKey> getActiveSigningKeys() {
     final List<SigningKey> active = new ArrayList<>();
     for (final SigningKey key : this.signingKeys) {
       if (key.isActive()) {
@@ -132,7 +132,7 @@ public final class OidcKeys {
    *
    * @return the default signing key
    */
-  public @Nonnull SigningKey getDefaultSigningKey() {
+  public @NonNull SigningKey getDefaultSigningKey() {
     return this.defaultSigningKey;
   }
 
@@ -141,7 +141,7 @@ public final class OidcKeys {
    *
    * @return the decryption keys
    */
-  public @Nonnull List<DecryptionKey> getDecryptionKeys() {
+  public @NonNull List<DecryptionKey> getDecryptionKeys() {
     return this.decryptionKeys;
   }
 
@@ -151,7 +151,7 @@ public final class OidcKeys {
    *
    * @return the published keys
    */
-  public @Nonnull JWKSet getPublishedKeys() {
+  public @NonNull JWKSet getPublishedKeys() {
     return this.publishedKeys;
   }
 
@@ -160,7 +160,7 @@ public final class OidcKeys {
    *
    * @return the signing algorithms
    */
-  public @Nonnull List<JWSAlgorithm> getSigningAlgorithms() {
+  public @NonNull List<JWSAlgorithm> getSigningAlgorithms() {
     final Set<JWSAlgorithm> algorithms = new LinkedHashSet<>();
     this.getActiveSigningKeys().forEach(k -> algorithms.addAll(k.getAlgorithms()));
     return List.copyOf(algorithms);
@@ -172,7 +172,7 @@ public final class OidcKeys {
    *
    * @return the key management algorithms, empty if there is no active decryption key
    */
-  public @Nonnull List<JWEAlgorithm> getDecryptionAlgorithms() {
+  public @NonNull List<JWEAlgorithm> getDecryptionAlgorithms() {
     final Set<JWEAlgorithm> algorithms = new LinkedHashSet<>();
     this.decryptionKeys.stream().filter(DecryptionKey::isActive).forEach(k -> algorithms.addAll(k.getAlgorithms()));
     return List.copyOf(algorithms);
@@ -184,7 +184,7 @@ public final class OidcKeys {
    * @param keyIds the key IDs
    * @param use what the keys are used for, for the error message
    */
-  private static void assertUniqueKeyIds(final @Nonnull List<String> keyIds, final @Nonnull String use) {
+  private static void assertUniqueKeyIds(final @NonNull List<String> keyIds, final @NonNull String use) {
     final Set<String> seen = new HashSet<>();
     for (final String keyId : keyIds) {
       if (!seen.add(keyId)) {

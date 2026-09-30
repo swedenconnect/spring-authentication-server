@@ -18,8 +18,7 @@ package se.swedenconnect.spring.authnserver.error;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 
 import se.swedenconnect.spring.authnserver.sso.SsoDenialReason;
@@ -95,12 +94,12 @@ class ErrorModelTest {
     final UnrecoverableError error = new UnrecoverableError() {
 
       @Override
-      public @Nonnull String getMessageCode() {
+      public @NonNull String getMessageCode() {
         return "oidc.error.unrecoverable.unknown-client";
       }
 
       @Override
-      public @Nonnull String getDescription() {
+      public @NonNull String getDescription() {
         return "The client is not registered";
       }
     };

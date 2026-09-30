@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -53,7 +53,7 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    * @param identifier the attribute identifier, see {@link AttributeIdentifiers}
    * @param values the attribute values
    */
-  public GenericAttribute(final @Nonnull String identifier, final @Nonnull List<T> values) {
+  public GenericAttribute(final @NonNull String identifier, final @NonNull List<T> values) {
     this.identifier = Objects.requireNonNull(identifier, "identifier must not be null");
     Objects.requireNonNull(values, "values must not be null");
     if (values.isEmpty()) {
@@ -73,8 +73,8 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    * @param value the attribute value
    * @return a {@link GenericAttribute}
    */
-  public static <T extends Serializable> @Nonnull GenericAttribute<T> of(
-      final @Nonnull String identifier, final @Nonnull T value) {
+  public static <T extends Serializable> @NonNull GenericAttribute<T> of(
+      final @NonNull String identifier, final @NonNull T value) {
     return new GenericAttribute<>(identifier, List.of(value));
   }
 
@@ -86,8 +86,8 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    * @param values the attribute values
    * @return a {@link GenericAttribute}
    */
-  public static <T extends Serializable> @Nonnull GenericAttribute<T> of(
-      final @Nonnull String identifier, final @Nonnull List<T> values) {
+  public static <T extends Serializable> @NonNull GenericAttribute<T> of(
+      final @NonNull String identifier, final @NonNull List<T> values) {
     return new GenericAttribute<>(identifier, values);
   }
 
@@ -96,7 +96,7 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    *
    * @return the attribute identifier
    */
-  public @Nonnull String getIdentifier() {
+  public @NonNull String getIdentifier() {
     return this.identifier;
   }
 
@@ -105,7 +105,7 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    *
    * @return the attribute values
    */
-  public @Nonnull List<T> getValues() {
+  public @NonNull List<T> getValues() {
     return this.values;
   }
 
@@ -114,7 +114,7 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    *
    * @return the first attribute value
    */
-  public @Nonnull T getValue() {
+  public @NonNull T getValue() {
     return this.values.get(0);
   }
 
@@ -123,7 +123,7 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    *
    * @return the attribute values in string form
    */
-  public @Nonnull List<String> getStringValues() {
+  public @NonNull List<String> getStringValues() {
     final List<String> stringValues = new ArrayList<>(this.values.size());
     for (final T value : this.values) {
       stringValues.add(String.valueOf(value));
@@ -138,7 +138,7 @@ public class GenericAttribute<T extends Serializable> implements Serializable {
    * @param type the requested type
    * @return the value, or {@code null} if the first value is not of the supplied type
    */
-  public <V extends Serializable> @Nullable V getValue(final @Nonnull Class<V> type) {
+  public <V extends Serializable> @Nullable V getValue(final @NonNull Class<V> type) {
     final T value = this.getValue();
     return type.isInstance(value) ? type.cast(value) : null;
   }

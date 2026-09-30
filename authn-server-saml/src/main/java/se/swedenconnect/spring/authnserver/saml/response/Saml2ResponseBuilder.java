@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
@@ -25,6 +22,8 @@ import java.util.Objects;
 import net.shibboleth.shared.component.ComponentInitializationException;
 import net.shibboleth.shared.security.IdentifierGenerationStrategy;
 import net.shibboleth.shared.security.impl.RandomIdentifierGenerationStrategy;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.EncryptedAssertion;
@@ -89,7 +88,7 @@ public class Saml2ResponseBuilder {
    * @param issuer the entityID of the Identity Provider
    * @param signingCredential the signing credential
    */
-  public Saml2ResponseBuilder(final @Nonnull String issuer, final @Nonnull PkiCredential signingCredential) {
+  public Saml2ResponseBuilder(final @NonNull String issuer, final @NonNull PkiCredential signingCredential) {
     this.issuer = Objects.requireNonNull(issuer, "issuer must not be null");
     this.signingCredential =
         new OpenSamlCredential(Objects.requireNonNull(signingCredential, "signingCredential must not be null"));
@@ -107,8 +106,8 @@ public class Saml2ResponseBuilder {
    * @return a signed {@link Response}
    * @throws UnrecoverableErrorException if the response cannot be built or signed
    */
-  public @Nonnull Response buildErrorResponse(final @Nonnull Saml2ResponseAttributes responseAttributes,
-      final @Nonnull SamlErrorStatusException error) throws UnrecoverableErrorException {
+  public @NonNull Response buildErrorResponse(final @NonNull Saml2ResponseAttributes responseAttributes,
+      final @NonNull SamlErrorStatusException error) throws UnrecoverableErrorException {
 
     final Status status = (Status) XMLObjectSupport.buildXMLObject(Status.DEFAULT_ELEMENT_NAME);
     final StatusCode statusCode = (StatusCode) XMLObjectSupport.buildXMLObject(StatusCode.DEFAULT_ELEMENT_NAME);
@@ -141,8 +140,8 @@ public class Saml2ResponseBuilder {
    * @return a signed {@link Response}
    * @throws UnrecoverableErrorException if the response cannot be built, encrypted or signed
    */
-  public @Nonnull Response buildResponse(final @Nonnull Saml2ResponseAttributes responseAttributes,
-      final @Nonnull Assertion assertion) throws UnrecoverableErrorException {
+  public @NonNull Response buildResponse(final @NonNull Saml2ResponseAttributes responseAttributes,
+      final @NonNull Assertion assertion) throws UnrecoverableErrorException {
 
     final Status status = (Status) XMLObjectSupport.buildXMLObject(Status.DEFAULT_ELEMENT_NAME);
     final StatusCode statusCode = (StatusCode) XMLObjectSupport.buildXMLObject(StatusCode.DEFAULT_ELEMENT_NAME);
@@ -169,8 +168,8 @@ public class Saml2ResponseBuilder {
    * @return an {@link EncryptedAssertion}
    * @throws UnrecoverableErrorException if the assertion cannot be encrypted
    */
-  protected @Nonnull EncryptedAssertion encryptAssertion(final @Nonnull Assertion assertion,
-      final @Nonnull Saml2ResponseAttributes responseAttributes) throws UnrecoverableErrorException {
+  protected @NonNull EncryptedAssertion encryptAssertion(final @NonNull Assertion assertion,
+      final @NonNull Saml2ResponseAttributes responseAttributes) throws UnrecoverableErrorException {
     try {
       final EncryptedData encryptedData = this.getEncrypter().encrypt(assertion,
           new SAMLObjectEncrypter.Peer(responseAttributes.getPeerMetadata()));
@@ -193,8 +192,8 @@ public class Saml2ResponseBuilder {
    * @param status the status
    * @return a {@link Response}
    */
-  protected @Nonnull Response createResponse(final @Nonnull Saml2ResponseAttributes responseAttributes,
-      final @Nonnull Status status) {
+  protected @NonNull Response createResponse(final @NonNull Saml2ResponseAttributes responseAttributes,
+      final @NonNull Status status) {
 
     final Response response = (Response) XMLObjectSupport.buildXMLObject(Response.DEFAULT_ELEMENT_NAME);
     response.setID(this.idGenerator.generateIdentifier());
@@ -215,8 +214,8 @@ public class Saml2ResponseBuilder {
    * @param responseAttributes where and how the response is sent
    * @throws UnrecoverableErrorException if the response cannot be signed
    */
-  protected void signResponse(final @Nonnull Response response,
-      final @Nonnull Saml2ResponseAttributes responseAttributes) throws UnrecoverableErrorException {
+  protected void signResponse(final @NonNull Response response,
+      final @NonNull Saml2ResponseAttributes responseAttributes) throws UnrecoverableErrorException {
     try {
       SAMLObjectSigner.sign(response, this.signingCredential,
           SecurityConfigurationSupport.getGlobalSignatureSigningConfiguration(), responseAttributes.getPeerMetadata());
@@ -236,7 +235,7 @@ public class Saml2ResponseBuilder {
    * @param error the error
    * @return the status message
    */
-  private @Nullable String resolveStatusMessage(final @Nonnull SamlErrorStatusException error) {
+  private @Nullable String resolveStatusMessage(final @NonNull SamlErrorStatusException error) {
     if (this.messageSource != null) {
       final String message =
           this.messageSource.getMessage(error.getStatusMessageCode(), null, null, Locale.ENGLISH);
@@ -261,7 +260,7 @@ public class Saml2ResponseBuilder {
    *
    * @return the encrypter
    */
-  private @Nonnull SAMLObjectEncrypter getEncrypter() {
+  private @NonNull SAMLObjectEncrypter getEncrypter() {
     if (this.encrypter == null) {
       try {
         this.encrypter = new SAMLObjectEncrypter();
@@ -278,7 +277,7 @@ public class Saml2ResponseBuilder {
    *
    * @param responseCustomizer the customizer
    */
-  public void setResponseCustomizer(final @Nonnull Customizer<Response> responseCustomizer) {
+  public void setResponseCustomizer(final @NonNull Customizer<Response> responseCustomizer) {
     this.responseCustomizer = Objects.requireNonNull(responseCustomizer, "responseCustomizer must not be null");
   }
 
@@ -287,7 +286,7 @@ public class Saml2ResponseBuilder {
    *
    * @param idGenerator the generator
    */
-  public void setIdGenerator(final @Nonnull IdentifierGenerationStrategy idGenerator) {
+  public void setIdGenerator(final @NonNull IdentifierGenerationStrategy idGenerator) {
     this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator must not be null");
   }
 

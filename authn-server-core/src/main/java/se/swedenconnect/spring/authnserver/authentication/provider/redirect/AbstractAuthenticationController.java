@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.servlet.ModelAndView;
@@ -54,7 +54,7 @@ public abstract class AbstractAuthenticationController<T extends UserRedirectAut
    * @throws UnrecoverableErrorException {@link CommonUnrecoverableError#INVALID_SESSION} if the request does not
    *           belong to an authentication in progress
    */
-  protected @Nonnull RedirectForAuthenticationToken getInputToken(final @Nonnull HttpServletRequest request)
+  protected @NonNull RedirectForAuthenticationToken getInputToken(final @NonNull HttpServletRequest request)
       throws UnrecoverableErrorException {
     final RedirectForAuthenticationToken token =
         this.getProvider().getAuthenticatorRepository().getInputToken(request);
@@ -74,8 +74,8 @@ public abstract class AbstractAuthenticationController<T extends UserRedirectAut
    * @throws UnrecoverableErrorException {@link CommonUnrecoverableError#INVALID_SESSION} if the request does not
    *           belong to an authentication in progress
    */
-  protected @Nonnull ModelAndView complete(final @Nonnull HttpServletRequest request,
-      final @Nonnull Authentication authentication) throws UnrecoverableErrorException {
+  protected @NonNull ModelAndView complete(final @NonNull HttpServletRequest request,
+      final @NonNull Authentication authentication) throws UnrecoverableErrorException {
     Objects.requireNonNull(authentication, "authentication must not be null");
     final RedirectForAuthenticationToken token = this.getInputToken(request);
     this.getProvider().getAuthenticatorRepository().complete(authentication, request);
@@ -92,8 +92,8 @@ public abstract class AbstractAuthenticationController<T extends UserRedirectAut
    * @throws UnrecoverableErrorException {@link CommonUnrecoverableError#INVALID_SESSION} if the request does not
    *           belong to an authentication in progress
    */
-  protected @Nonnull ModelAndView complete(final @Nonnull HttpServletRequest request,
-      final @Nonnull AuthenticationErrorException error) throws UnrecoverableErrorException {
+  protected @NonNull ModelAndView complete(final @NonNull HttpServletRequest request,
+      final @NonNull AuthenticationErrorException error) throws UnrecoverableErrorException {
     Objects.requireNonNull(error, "error must not be null");
     final RedirectForAuthenticationToken token = this.getInputToken(request);
     this.getProvider().getAuthenticatorRepository().complete(error, request);
@@ -109,7 +109,7 @@ public abstract class AbstractAuthenticationController<T extends UserRedirectAut
    * @throws UnrecoverableErrorException {@link CommonUnrecoverableError#INVALID_SESSION} if the request does not
    *           belong to an authentication in progress
    */
-  protected @Nonnull ModelAndView cancel(final @Nonnull HttpServletRequest request)
+  protected @NonNull ModelAndView cancel(final @NonNull HttpServletRequest request)
       throws UnrecoverableErrorException {
     return this.complete(request, new AuthenticationErrorException(AuthenticationError.CANCEL));
   }
@@ -119,8 +119,7 @@ public abstract class AbstractAuthenticationController<T extends UserRedirectAut
    *
    * @return the provider
    */
-  @Nonnull
-  protected abstract T getProvider();
+  protected abstract @NonNull T getProvider();
 
   /**
    * Builds the redirect back to the resume path, with the identifier of the authentication.
@@ -128,7 +127,7 @@ public abstract class AbstractAuthenticationController<T extends UserRedirectAut
    * @param token the redirect token of the authentication
    * @return a {@link ModelAndView}
    */
-  private static @Nonnull ModelAndView resumeView(final @Nonnull RedirectForAuthenticationToken token) {
+  private static @NonNull ModelAndView resumeView(final @NonNull RedirectForAuthenticationToken token) {
     return new ModelAndView("redirect:" + token.getResumeRedirectPath());
   }
 

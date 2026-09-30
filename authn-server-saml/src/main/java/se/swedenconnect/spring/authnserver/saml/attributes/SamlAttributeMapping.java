@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.Attribute;
 import org.opensaml.saml.saml2.metadata.RequestedAttribute;
 
@@ -77,7 +76,7 @@ public class SamlAttributeMapping {
    *
    * @param definitions the attribute definitions to use
    */
-  public SamlAttributeMapping(final @Nonnull AttributeDefinitionRegistry definitions) {
+  public SamlAttributeMapping(final @NonNull AttributeDefinitionRegistry definitions) {
     this(definitions, true);
   }
 
@@ -87,7 +86,7 @@ public class SamlAttributeMapping {
    * @param definitions the attribute definitions to use
    * @param registerBuiltInMappers whether to register the built-in mappers
    */
-  public SamlAttributeMapping(final @Nonnull AttributeDefinitionRegistry definitions,
+  public SamlAttributeMapping(final @NonNull AttributeDefinitionRegistry definitions,
       final boolean registerBuiltInMappers) {
     Objects.requireNonNull(definitions, "definitions must not be null");
     this.fromProtocolMapping = new FromProtocolAttributeMapping<>(definitions, SamlRequestedAttribute::name);
@@ -105,8 +104,8 @@ public class SamlAttributeMapping {
    * @param requestedAttributes the SAML requested attributes
    * @return the generic requested attributes
    */
-  public @Nonnull List<GenericRequestedAttribute> toGeneric(
-      final @Nonnull List<SamlRequestedAttribute> requestedAttributes) {
+  public @NonNull List<GenericRequestedAttribute> toGeneric(
+      final @NonNull List<SamlRequestedAttribute> requestedAttributes) {
     return this.fromProtocolMapping.map(requestedAttributes);
   }
 
@@ -117,8 +116,8 @@ public class SamlAttributeMapping {
    * @param requestedAttributes the SAML requested attributes
    * @return the generic requested attributes
    */
-  public @Nonnull List<GenericRequestedAttribute> toGenericFromRequestedAttributes(
-      final @Nonnull List<? extends RequestedAttribute> requestedAttributes) {
+  public @NonNull List<GenericRequestedAttribute> toGenericFromRequestedAttributes(
+      final @NonNull List<? extends RequestedAttribute> requestedAttributes) {
     final List<SamlRequestedAttribute> inputs = new ArrayList<>(requestedAttributes.size());
     requestedAttributes.forEach(a -> inputs.add(SamlRequestedAttribute.of(a)));
     return this.toGeneric(inputs);
@@ -131,7 +130,7 @@ public class SamlAttributeMapping {
    * @param requestedAttributes the requested attributes of the operation, may be {@code null}
    * @return the SAML attributes
    */
-  public @Nonnull List<Attribute> toSaml(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
+  public @NonNull List<Attribute> toSaml(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
       final @Nullable List<GenericRequestedAttribute> requestedAttributes) {
     return this.toProtocolMapping.map(attributes, requestedAttributes);
   }
@@ -141,7 +140,7 @@ public class SamlAttributeMapping {
    *
    * @return a {@link FromProtocolAttributeMapping}
    */
-  public @Nonnull FromProtocolAttributeMapping<SamlRequestedAttribute> getFromProtocolMapping() {
+  public @NonNull FromProtocolAttributeMapping<SamlRequestedAttribute> getFromProtocolMapping() {
     return this.fromProtocolMapping;
   }
 
@@ -150,7 +149,7 @@ public class SamlAttributeMapping {
    *
    * @return a {@link ToProtocolAttributeMapping}
    */
-  public @Nonnull ToProtocolAttributeMapping<Attribute> getToProtocolMapping() {
+  public @NonNull ToProtocolAttributeMapping<Attribute> getToProtocolMapping() {
     return this.toProtocolMapping;
   }
 
@@ -159,7 +158,7 @@ public class SamlAttributeMapping {
    *
    * @return the built-in mappers
    */
-  public static @Nonnull List<FromProtocolAttributeMapper<SamlRequestedAttribute>> getBuiltInFromProtocolMappers() {
+  public static @NonNull List<FromProtocolAttributeMapper<SamlRequestedAttribute>> getBuiltInFromProtocolMappers() {
     final List<FromProtocolAttributeMapper<SamlRequestedAttribute>> mappers = new ArrayList<>();
 
     // One SAML attribute, one generic attribute.
@@ -233,7 +232,7 @@ public class SamlAttributeMapping {
    *
    * @return the built-in mappers
    */
-  public static @Nonnull List<ToProtocolAttributeMapper<Attribute>> getBuiltInToProtocolMappers() {
+  public static @NonNull List<ToProtocolAttributeMapper<Attribute>> getBuiltInToProtocolMappers() {
     final List<ToProtocolAttributeMapper<Attribute>> mappers = new ArrayList<>();
 
     // One generic attribute, one SAML attribute.
@@ -325,8 +324,8 @@ public class SamlAttributeMapping {
    * @param name the SAML attribute name
    * @param identifier the generic attribute identifier
    */
-  private static void simple(final @Nonnull List<FromProtocolAttributeMapper<SamlRequestedAttribute>> mappers,
-      final @Nonnull String name, final @Nonnull String identifier) {
+  private static void simple(final @NonNull List<FromProtocolAttributeMapper<SamlRequestedAttribute>> mappers,
+      final @NonNull String name, final @NonNull String identifier) {
     mappers.add(new SamlFromProtocolMapper(name, identifier));
   }
 

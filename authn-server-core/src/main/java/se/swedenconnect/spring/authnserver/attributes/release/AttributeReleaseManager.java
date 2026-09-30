@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.release;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * Runs the {@link AttributeProducer}s and lets the {@link AttributeReleaseVoter}s decide what is kept. It is itself a
@@ -45,13 +45,13 @@ public interface AttributeReleaseManager extends AttributeProducer {
    *
    * @return the {@link AttributeProducer}s
    */
-  @Nonnull List<AttributeProducer> getAttributeProducers();
+  @NonNull List<AttributeProducer> getAttributeProducers();
 
   /**
    * Gets the voters that this manager asks.
    *
    * @return the {@link AttributeReleaseVoter}s
    */
-  @Nonnull List<AttributeReleaseVoter> getAttributeReleaseVoters();
+  @NonNull List<AttributeReleaseVoter> getAttributeReleaseVoters();
 
 }

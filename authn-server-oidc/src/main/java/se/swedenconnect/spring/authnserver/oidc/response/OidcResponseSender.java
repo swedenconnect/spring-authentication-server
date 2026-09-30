@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.response;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -25,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
@@ -51,8 +51,8 @@ public class OidcResponseSender {
    * @param error the error, with its description
    * @throws IOException for errors writing the response
    */
-  public void sendError(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull OidcResponseTarget target, final @Nonnull ErrorObject error) throws IOException {
+  public void sendError(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull OidcResponseTarget target, final @NonNull ErrorObject error) throws IOException {
     final Map<String, String> parameters = new LinkedHashMap<>();
     parameters.put("error", Objects.requireNonNull(error.getCode(), "error code must not be null"));
     if (error.getDescription() != null) {
@@ -70,8 +70,8 @@ public class OidcResponseSender {
    * @param parameters the response parameters, without {@code state}
    * @throws IOException for errors writing the response
    */
-  public void send(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull OidcResponseTarget target, final @Nonnull Map<String, String> parameters) throws IOException {
+  public void send(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull OidcResponseTarget target, final @NonNull Map<String, String> parameters) throws IOException {
 
     final Map<String, String> allParameters = new LinkedHashMap<>(parameters);
     if (target.state() != null) {
@@ -92,7 +92,7 @@ public class OidcResponseSender {
    *
    * @param responsePage the response page
    */
-  public void setResponsePage(final @Nonnull ResponsePage responsePage) {
+  public void setResponsePage(final @NonNull ResponsePage responsePage) {
     this.responsePage = Objects.requireNonNull(responsePage, "responsePage must not be null");
   }
 

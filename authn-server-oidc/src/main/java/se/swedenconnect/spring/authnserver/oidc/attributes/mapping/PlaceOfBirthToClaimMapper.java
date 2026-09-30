@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
 
@@ -54,14 +54,14 @@ public class PlaceOfBirthToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.PLACE_OF_BIRTH, AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY,
         AttributeIdentifiers.PLACE_OF_BIRTH_REGION, AttributeIdentifiers.PLACE_OF_BIRTH_LOCALITY);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+  public @NonNull Collection<String> getClaimNames(final @NonNull String identifier) {
     return this.getSupportedIdentifiers().contains(identifier)
         ? List.of(PersonClaims.PLACE_OF_BIRTH_CLAIM_NAME)
         : List.of();
@@ -69,8 +69,8 @@ public class PlaceOfBirthToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<UserClaim> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
 
     final Map<String, Object> fields = new LinkedHashMap<>();
     put(fields, COUNTRY_FIELD, context.getStringValue(AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY));
@@ -95,7 +95,7 @@ public class PlaceOfBirthToClaimMapper implements ToClaimMapper {
    * @param field the field name
    * @param value the value
    */
-  private static void put(final @Nonnull Map<String, Object> fields, final @Nonnull String field,
+  private static void put(final @NonNull Map<String, Object> fields, final @NonNull String field,
       final String value) {
     if (value != null && !value.isBlank()) {
       fields.put(field, value);

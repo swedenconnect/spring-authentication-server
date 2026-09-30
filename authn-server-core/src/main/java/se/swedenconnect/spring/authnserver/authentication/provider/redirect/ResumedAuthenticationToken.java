@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.Serial;
@@ -24,6 +22,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 
@@ -61,8 +61,8 @@ public class ResumedAuthenticationToken implements Authentication {
    * @param redirectToken the redirect token that started the authentication
    * @param authnToken what the module's controller produced
    */
-  public ResumedAuthenticationToken(final @Nonnull RedirectForAuthenticationToken redirectToken,
-      final @Nonnull Authentication authnToken) {
+  public ResumedAuthenticationToken(final @NonNull RedirectForAuthenticationToken redirectToken,
+      final @NonNull Authentication authnToken) {
     this.redirectToken = Objects.requireNonNull(redirectToken, "redirectToken must not be null");
     this.authnToken = Objects.requireNonNull(authnToken, "authnToken must not be null");
     this.error = null;
@@ -74,8 +74,8 @@ public class ResumedAuthenticationToken implements Authentication {
    * @param redirectToken the redirect token that started the authentication
    * @param error the error that the module's controller reported
    */
-  public ResumedAuthenticationToken(final @Nonnull RedirectForAuthenticationToken redirectToken,
-      final @Nonnull AuthenticationErrorException error) {
+  public ResumedAuthenticationToken(final @NonNull RedirectForAuthenticationToken redirectToken,
+      final @NonNull AuthenticationErrorException error) {
     this.redirectToken = Objects.requireNonNull(redirectToken, "redirectToken must not be null");
     this.authnToken = null;
     this.error = Objects.requireNonNull(error, "error must not be null");
@@ -86,7 +86,7 @@ public class ResumedAuthenticationToken implements Authentication {
    *
    * @return the identifier of the authentication
    */
-  public @Nonnull String getAuthnId() {
+  public @NonNull String getAuthnId() {
     return this.redirectToken.getAuthnId();
   }
 
@@ -96,7 +96,7 @@ public class ResumedAuthenticationToken implements Authentication {
    *
    * @return the protocol
    */
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return this.redirectToken.getProtocol();
   }
 
@@ -105,7 +105,7 @@ public class ResumedAuthenticationToken implements Authentication {
    *
    * @return the authentication input token
    */
-  public @Nonnull UserAuthenticationInputToken getAuthnInputToken() {
+  public @NonNull UserAuthenticationInputToken getAuthnInputToken() {
     return this.redirectToken.getAuthnInputToken();
   }
 
@@ -114,7 +114,7 @@ public class ResumedAuthenticationToken implements Authentication {
    *
    * @return the authentication context URIs, possibly empty
    */
-  public @Nonnull List<String> getAuthnContextUris() {
+  public @NonNull List<String> getAuthnContextUris() {
     return this.redirectToken.getAuthnContextUris();
   }
 
@@ -123,7 +123,7 @@ public class ResumedAuthenticationToken implements Authentication {
    *
    * @return the redirect token
    */
-  public @Nonnull RedirectForAuthenticationToken getRedirectToken() {
+  public @NonNull RedirectForAuthenticationToken getRedirectToken() {
     return this.redirectToken;
   }
 
@@ -174,13 +174,13 @@ public class ResumedAuthenticationToken implements Authentication {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.authnToken != null ? this.authnToken.getName() : this.redirectToken.getName();
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<? extends GrantedAuthority> getAuthorities() {
+  public @NonNull Collection<? extends GrantedAuthority> getAuthorities() {
     return this.authnToken != null ? this.authnToken.getAuthorities() : List.of();
   }
 
@@ -198,7 +198,7 @@ public class ResumedAuthenticationToken implements Authentication {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Object getPrincipal() {
+  public @NonNull Object getPrincipal() {
     return this.authnToken != null ? this.authnToken.getPrincipal() : this.redirectToken.getPrincipal();
   }
 
@@ -219,7 +219,7 @@ public class ResumedAuthenticationToken implements Authentication {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return this.error != null
         ? "%s, error: '%s'".formatted(this.redirectToken, this.error.getDescription())
         : this.redirectToken.toString();

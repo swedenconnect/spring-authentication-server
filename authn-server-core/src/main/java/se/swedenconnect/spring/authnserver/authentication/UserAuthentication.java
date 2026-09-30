@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
@@ -25,6 +22,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
@@ -65,7 +64,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    *
    * @param user the authenticated user
    */
-  public UserAuthentication(final @Nonnull AuthenticatedUser user) {
+  public UserAuthentication(final @NonNull AuthenticatedUser user) {
     super(List.of());
     this.user = Objects.requireNonNull(user, "user must not be null");
     this.setDetails(user);
@@ -76,7 +75,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    * Maps to {@link #getAuthenticatedUser()}.
    */
   @Override
-  public @Nonnull Object getPrincipal() {
+  public @NonNull Object getPrincipal() {
     return this.user;
   }
 
@@ -85,7 +84,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    *
    * @return the authenticated user
    */
-  public @Nonnull AuthenticatedUser getAuthenticatedUser() {
+  public @NonNull AuthenticatedUser getAuthenticatedUser() {
     return this.user;
   }
 
@@ -93,7 +92,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    * Always returns the empty string.
    */
   @Override
-  public @Nonnull Object getCredentials() {
+  public @NonNull Object getCredentials() {
     return "";
   }
 
@@ -144,7 +143,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    * @param type the expected type
    * @return the protocol specific request data, or {@code null} if it is missing or of another type
    */
-  public <T extends Serializable> @Nullable T getProtocolRequestData(final @Nonnull Class<T> type) {
+  public <T extends Serializable> @Nullable T getProtocolRequestData(final @NonNull Class<T> type) {
     return type.isInstance(this.protocolRequestData) ? type.cast(this.protocolRequestData) : null;
   }
 
@@ -201,7 +200,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    *          identifier, so {@code null} is given for that protocol
    * @param requestedAttributes the identifiers of the generic attributes that the requester asked for
    */
-  public void registerUse(final @Nonnull AuthenticationProtocol protocol, final @Nonnull String requester,
+  public void registerUse(final @NonNull AuthenticationProtocol protocol, final @NonNull String requester,
       final @Nullable String requestId, final @Nullable Collection<String> requestedAttributes) {
     final Instant instant = this.usageTrack.size() == 0 ? this.user.getAuthnInstant() : Instant.now();
     this.usageTrack.registerUse(new AuthenticationUse(protocol, requester, requestId, instant,
@@ -213,7 +212,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    *
    * @return an {@link AuthenticationUsageTrack}
    */
-  public @Nonnull AuthenticationUsageTrack getUsageTrack() {
+  public @NonNull AuthenticationUsageTrack getUsageTrack() {
     return this.usageTrack;
   }
 
@@ -231,7 +230,7 @@ public class UserAuthentication extends AbstractAuthenticationToken {
    *
    * @return a log string
    */
-  public @Nonnull String getLogString() {
+  public @NonNull String getLogString() {
     final AuthenticationUse use = this.usageTrack.getLatestUse();
     if (use == null) {
       return "requester: 'unknown'";

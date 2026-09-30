@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Conversion of attribute values between their string form and the Java type that an {@link AttributeDefinition}
@@ -42,7 +42,7 @@ public class AttributeValues {
    * @param type the type to convert it to
    * @return the converted value
    */
-  public static @Nonnull Serializable fromString(final @Nonnull String value,
+  public static @NonNull Serializable fromString(final @NonNull String value,
       final @Nullable Class<? extends Serializable> type) {
     if (type == null || type == String.class) {
       return value;
@@ -84,8 +84,8 @@ public class AttributeValues {
    * @param definitions the attribute definitions
    * @return the converted value
    */
-  public static @Nonnull Serializable fromString(final @Nonnull String value, final @Nonnull String identifier,
-      final @Nonnull AttributeDefinitionRegistry definitions) {
+  public static @NonNull Serializable fromString(final @NonNull String value, final @NonNull String identifier,
+      final @NonNull AttributeDefinitionRegistry definitions) {
     final AttributeDefinition definition = definitions.getDefinition(identifier);
     return fromString(value, definition != null ? definition.valueType() : null);
   }

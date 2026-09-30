@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
@@ -87,13 +86,13 @@ public class HttpFederationClient implements FederationClient {
    *
    * @param restClient the HTTP client to use
    */
-  public HttpFederationClient(final @Nonnull RestClient restClient) {
+  public HttpFederationClient(final @NonNull RestClient restClient) {
     this.restClient = Objects.requireNonNull(restClient, "restClient must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable SignedJWT resolve(final @Nonnull FederationRequest<ResolveRequest> request) {
+  public @Nullable SignedJWT resolve(final @NonNull FederationRequest<ResolveRequest> request) {
     final ResolveRequest parameters = request.parameters();
     final StringBuilder query = new StringBuilder();
     appendParameter(query, "sub", parameters.subject());
@@ -106,7 +105,7 @@ public class HttpFederationClient implements FederationClient {
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable SignedJWT trustMark(final @Nonnull FederationRequest<TrustMarkRequest> request) {
+  public @Nullable SignedJWT trustMark(final @NonNull FederationRequest<TrustMarkRequest> request) {
     final TrustMarkRequest parameters = request.parameters();
     final StringBuilder query = new StringBuilder();
     appendParameter(query, "trust_mark_type", parameters.trustMarkType().getValue());
@@ -123,8 +122,8 @@ public class HttpFederationClient implements FederationClient {
    * @return a {@link SignedJWT}, or {@code null} if the endpoint answered that it has nothing
    * @throws ClientRegistryException if the call fails
    */
-  private @Nullable SignedJWT get(final @Nonnull String endpoint, final @Nonnull String query,
-      final @Nonnull String what) throws ClientRegistryException {
+  private @Nullable SignedJWT get(final @NonNull String endpoint, final @NonNull String query,
+      final @NonNull String what) throws ClientRegistryException {
 
     final URI uri = URI.create("%s%c%s".formatted(endpoint, endpoint.indexOf('?') >= 0 ? '&' : '?', query));
     log.trace("Making {} request to {}", what, uri);
@@ -172,8 +171,8 @@ public class HttpFederationClient implements FederationClient {
    * @return the endpoint
    * @throws ClientRegistryException if the request does not give the endpoint
    */
-  private static @Nonnull String endpoint(
-      final @Nonnull FederationRequest<?> request, final @Nonnull String parameter) {
+  private static @NonNull String endpoint(
+      final @NonNull FederationRequest<?> request, final @NonNull String parameter) {
     final Map<String, Object> metadata = request.federationEntityMetadata();
     final Object endpoint = metadata != null ? metadata.get(parameter) : null;
     if (endpoint instanceof final String value && StringUtils.hasText(value)) {
@@ -190,7 +189,7 @@ public class HttpFederationClient implements FederationClient {
    * @param value the parameter value
    */
   private static void appendParameter(
-      final @Nonnull StringBuilder query, final @Nonnull String name, final @Nonnull String value) {
+      final @NonNull StringBuilder query, final @NonNull String name, final @NonNull String value) {
     if (!query.isEmpty()) {
       query.append('&');
     }
@@ -199,31 +198,31 @@ public class HttpFederationClient implements FederationClient {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull SignedJWT entityConfiguration(final FederationRequest<EntityConfigurationRequest> request) {
+  public @NonNull SignedJWT entityConfiguration(final FederationRequest<EntityConfigurationRequest> request) {
     throw new UnsupportedOperationException("The entity configuration call is not implemented");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull SignedJWT fetch(final FederationRequest<FetchRequest> request) {
+  public @NonNull SignedJWT fetch(final FederationRequest<FetchRequest> request) {
     throw new UnsupportedOperationException("The fetch call is not implemented");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<String> subordinateListing(final FederationRequest<SubordinateListingRequest> request) {
+  public @NonNull List<String> subordinateListing(final FederationRequest<SubordinateListingRequest> request) {
     throw new UnsupportedOperationException("The subordinate listing call is not implemented");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<String> trustMarkedListing(final FederationRequest<TrustMarkListingRequest> request) {
+  public @NonNull List<String> trustMarkedListing(final FederationRequest<TrustMarkListingRequest> request) {
     throw new UnsupportedOperationException("The trust marked listing call is not implemented");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull TrustMarkStatusResponse trustMarkStatus(
+  public @NonNull TrustMarkStatusResponse trustMarkStatus(
       final FederationRequest<FederationTrustMarkStatusRequest> request) {
     throw new UnsupportedOperationException("The trust mark status call is not implemented");
   }

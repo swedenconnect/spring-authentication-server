@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -76,9 +76,9 @@ public class OidcAuthnRequestProcessingFilter extends OncePerRequestFilter {
    * @param converter reads the request
    * @param provider validates the request and builds the authentication requirements
    */
-  public OidcAuthnRequestProcessingFilter(final @Nonnull RequestMatcher requestMatcher,
-      final @Nonnull OidcAuthnRequestAuthenticationConverter converter,
-      final @Nonnull OidcAuthnRequestAuthenticationProvider provider) {
+  public OidcAuthnRequestProcessingFilter(final @NonNull RequestMatcher requestMatcher,
+      final @NonNull OidcAuthnRequestAuthenticationConverter converter,
+      final @NonNull OidcAuthnRequestAuthenticationProvider provider) {
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
     this.converter = Objects.requireNonNull(converter, "converter must not be null");
     this.provider = Objects.requireNonNull(provider, "provider must not be null");
@@ -86,8 +86,8 @@ public class OidcAuthnRequestProcessingFilter extends OncePerRequestFilter {
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {
@@ -112,7 +112,7 @@ public class OidcAuthnRequestProcessingFilter extends OncePerRequestFilter {
    *
    * @param successHandler the handler
    */
-  public void setSuccessHandler(final @Nonnull AuthenticationSuccessHandler successHandler) {
+  public void setSuccessHandler(final @NonNull AuthenticationSuccessHandler successHandler) {
     this.successHandler = Objects.requireNonNull(successHandler, "successHandler must not be null");
   }
 

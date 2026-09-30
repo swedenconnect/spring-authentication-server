@@ -15,8 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Where resolved clients are kept between requests.
@@ -39,20 +39,20 @@ public interface FederationCache {
    * @param clientId the {@code client_id} of the client
    * @return a {@link CachedClientRecord}, or {@code null} if the cache holds no valid entry for the client
    */
-  @Nullable CachedClientRecord get(final @Nonnull String clientId);
+  @Nullable CachedClientRecord get(final @NonNull String clientId);
 
   /**
    * Puts an entry in the cache, replacing any entry already held for the same client.
    *
    * @param record the entry
    */
-  void put(final @Nonnull CachedClientRecord record);
+  void put(final @NonNull CachedClientRecord record);
 
   /**
    * Removes the entry for a client.
    *
    * @param clientId the {@code client_id} of the client
    */
-  void remove(final @Nonnull String clientId);
+  void remove(final @NonNull String clientId);
 
 }

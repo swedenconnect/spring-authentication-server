@@ -15,15 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +65,7 @@ public class HttpTrustMarkRequester implements TrustMarkRequester {
    *
    * @param settings the settings of the federation
    */
-  public HttpTrustMarkRequester(final @Nonnull FederationSettings settings) {
+  public HttpTrustMarkRequester(final @NonNull FederationSettings settings) {
     this(settings, new HttpFederationClient());
   }
 
@@ -77,14 +76,14 @@ public class HttpTrustMarkRequester implements TrustMarkRequester {
    * @param federationClient the client making the call
    */
   public HttpTrustMarkRequester(
-      final @Nonnull FederationSettings settings, final @Nonnull FederationClient federationClient) {
+      final @NonNull FederationSettings settings, final @NonNull FederationClient federationClient) {
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.federationClient = Objects.requireNonNull(federationClient, "federationClient must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable TrustMark request(final @Nonnull String clientId, final @Nonnull String trustMarkType)
+  public @Nullable TrustMark request(final @NonNull String clientId, final @NonNull String trustMarkType)
       throws ClientRegistryException {
 
     Objects.requireNonNull(clientId, "clientId must not be null");

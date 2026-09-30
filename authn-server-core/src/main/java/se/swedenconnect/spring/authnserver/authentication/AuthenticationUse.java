@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -38,8 +38,8 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param requestedAttributes the identifiers of the generic attributes that the requester asked for
  * @author Martin Lindström
  */
-public record AuthenticationUse(@Nonnull AuthenticationProtocol protocol, @Nonnull String requester,
-    @Nullable String requestId, @Nonnull Instant instant, @Nonnull List<String> requestedAttributes)
+public record AuthenticationUse(@NonNull AuthenticationProtocol protocol, @NonNull String requester,
+    @Nullable String requestId, @NonNull Instant instant, @NonNull List<String> requestedAttributes)
     implements Serializable {
 
   @Serial

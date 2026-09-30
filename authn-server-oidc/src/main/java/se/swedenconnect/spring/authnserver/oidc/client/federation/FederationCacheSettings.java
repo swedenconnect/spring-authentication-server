@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Duration;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * How resolved clients are cached.
@@ -34,8 +34,8 @@ import java.util.Objects;
  */
 public record FederationCacheSettings(
     @Nullable Duration maximumAge,
-    @Nonnull Duration notFoundTimeToLive,
-    @Nonnull RefreshSettings refresh) {
+    @NonNull Duration notFoundTimeToLive,
+    @NonNull RefreshSettings refresh) {
 
   /** The default time that the answer that a client is unknown is kept: one minute. */
   public static final Duration DEFAULT_NOT_FOUND_TIME_TO_LIVE = Duration.ofMinutes(1);
@@ -63,7 +63,7 @@ public record FederationCacheSettings(
    *
    * @return a {@link FederationCacheSettings}
    */
-  public static @Nonnull FederationCacheSettings defaults() {
+  public static @NonNull FederationCacheSettings defaults() {
     return new FederationCacheSettings(null, DEFAULT_NOT_FOUND_TIME_TO_LIVE, RefreshSettings.disabled());
   }
 
@@ -87,10 +87,10 @@ public record FederationCacheSettings(
    */
   public record RefreshSettings(
       boolean enabled,
-      @Nonnull Duration interval,
-      @Nonnull Duration refreshAhead,
+      @NonNull Duration interval,
+      @NonNull Duration refreshAhead,
       int minimumLookups,
-      @Nonnull Duration lookupPeriod,
+      @NonNull Duration lookupPeriod,
       int maximumClients,
       int maximumTrackedClients) {
 
@@ -152,7 +152,7 @@ public record FederationCacheSettings(
      *
      * @return a {@link RefreshSettings}
      */
-    public static @Nonnull RefreshSettings disabled() {
+    public static @NonNull RefreshSettings disabled() {
       return enabled(false);
     }
 
@@ -162,7 +162,7 @@ public record FederationCacheSettings(
      * @param enabled whether the job runs
      * @return a {@link RefreshSettings}
      */
-    public static @Nonnull RefreshSettings enabled(final boolean enabled) {
+    public static @NonNull RefreshSettings enabled(final boolean enabled) {
       return new RefreshSettings(enabled, DEFAULT_INTERVAL, DEFAULT_REFRESH_AHEAD, DEFAULT_MINIMUM_LOOKUPS,
           DEFAULT_LOOKUP_PERIOD, DEFAULT_MAXIMUM_CLIENTS, DEFAULT_MAXIMUM_TRACKED_CLIENTS);
     }

@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -26,6 +24,8 @@ import java.util.Base64;
 import java.util.Objects;
 
 import net.shibboleth.shared.xml.SerializeSupport;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.io.MarshallingException;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.Response;
@@ -58,9 +58,9 @@ public class Saml2ResponseSender {
    * @param relayState the relay state, or {@code null}
    * @throws UnrecoverableErrorException if the response cannot be sent
    */
-  public void send(final @Nonnull HttpServletRequest httpServletRequest,
-      final @Nonnull HttpServletResponse httpServletResponse, final @Nonnull String destination,
-      final @Nonnull Response response, final @Nullable String relayState) throws UnrecoverableErrorException {
+  public void send(final @NonNull HttpServletRequest httpServletRequest,
+      final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
+      final @NonNull Response response, final @Nullable String relayState) throws UnrecoverableErrorException {
 
     final String encodedResponse = this.encodeResponse(response);
     try {
@@ -78,7 +78,7 @@ public class Saml2ResponseSender {
    *
    * @param responsePage the response page
    */
-  public void setResponsePage(final @Nonnull ResponsePage responsePage) {
+  public void setResponsePage(final @NonNull ResponsePage responsePage) {
     this.responsePage = Objects.requireNonNull(responsePage, "responsePage must not be null");
   }
 
@@ -89,7 +89,7 @@ public class Saml2ResponseSender {
    * @return the encoded response
    * @throws UnrecoverableErrorException if the response cannot be marshalled
    */
-  protected @Nonnull String encodeResponse(final @Nonnull Response response) throws UnrecoverableErrorException {
+  protected @NonNull String encodeResponse(final @NonNull Response response) throws UnrecoverableErrorException {
     try {
       final String xml = SerializeSupport.nodeToString(XMLObjectSupport.marshall(response));
       return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));

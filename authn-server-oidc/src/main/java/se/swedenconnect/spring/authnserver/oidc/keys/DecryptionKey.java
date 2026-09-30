@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.keys;
 
-import jakarta.annotation.Nonnull;
-
 import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.jwk.JWK;
@@ -86,7 +86,7 @@ public final class DecryptionKey {
    * @param state the state of the key
    * @throws IllegalArgumentException if the key does not meet the requirements
    */
-  public DecryptionKey(final @Nonnull PkiCredential credential, final @Nonnull State state) {
+  public DecryptionKey(final @NonNull PkiCredential credential, final @NonNull State state) {
     this.credential = Objects.requireNonNull(credential, "credential must not be null");
     this.state = Objects.requireNonNull(state, "state must not be null");
     KeySupport.assertKeyRequirements(credential, "decryption");
@@ -101,7 +101,7 @@ public final class DecryptionKey {
    * @param credential the credential
    * @return a {@link DecryptionKey}
    */
-  public static @Nonnull DecryptionKey active(final @Nonnull PkiCredential credential) {
+  public static @NonNull DecryptionKey active(final @NonNull PkiCredential credential) {
     return new DecryptionKey(credential, State.ACTIVE);
   }
 
@@ -111,7 +111,7 @@ public final class DecryptionKey {
    * @param credential the credential
    * @return a {@link DecryptionKey}
    */
-  public static @Nonnull DecryptionKey previous(final @Nonnull PkiCredential credential) {
+  public static @NonNull DecryptionKey previous(final @NonNull PkiCredential credential) {
     return new DecryptionKey(credential, State.PREVIOUS);
   }
 
@@ -120,7 +120,7 @@ public final class DecryptionKey {
    *
    * @return the credential
    */
-  public @Nonnull PkiCredential getCredential() {
+  public @NonNull PkiCredential getCredential() {
     return this.credential;
   }
 
@@ -129,7 +129,7 @@ public final class DecryptionKey {
    *
    * @return the state
    */
-  public @Nonnull State getState() {
+  public @NonNull State getState() {
     return this.state;
   }
 
@@ -147,7 +147,7 @@ public final class DecryptionKey {
    *
    * @return the key ID
    */
-  public @Nonnull String getKeyId() {
+  public @NonNull String getKeyId() {
     return this.jwk.getKeyID();
   }
 
@@ -156,7 +156,7 @@ public final class DecryptionKey {
    *
    * @return the public JWK
    */
-  public @Nonnull JWK getPublicJwk() {
+  public @NonNull JWK getPublicJwk() {
     return this.jwk;
   }
 
@@ -165,13 +165,13 @@ public final class DecryptionKey {
    *
    * @return the algorithms
    */
-  public @Nonnull List<JWEAlgorithm> getAlgorithms() {
+  public @NonNull List<JWEAlgorithm> getAlgorithms() {
     return this.algorithms;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return "kid='%s', state=%s, algorithms=%s".formatted(this.getKeyId(), this.state, this.algorithms);
   }
 

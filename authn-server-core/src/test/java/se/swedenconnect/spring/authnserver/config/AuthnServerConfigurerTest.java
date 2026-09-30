@@ -20,13 +20,12 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
 
-import jakarta.annotation.Nonnull;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -69,23 +68,23 @@ class AuthnServerConfigurerTest {
     }
 
     @Override
-    public @Nonnull AuthenticationProtocol getProtocol() {
+    public @NonNull AuthenticationProtocol getProtocol() {
       return AuthenticationProtocol.SAML;
     }
 
     @Override
-    protected void init(final @Nonnull HttpSecurity http) {
+    protected void init(final @NonNull HttpSecurity http) {
       this.initialized = true;
       this.matcher = PathPatternRequestMatcher.pathPattern(this.getEndpointPath("/endpoint"));
     }
 
     @Override
-    protected void configure(final @Nonnull HttpSecurity http) {
+    protected void configure(final @NonNull HttpSecurity http) {
       this.configured = true;
     }
 
     @Override
-    protected @Nonnull RequestMatcher getRequestMatcher() {
+    protected @NonNull RequestMatcher getRequestMatcher() {
       return this.matcher;
     }
   }
@@ -94,18 +93,18 @@ class AuthnServerConfigurerTest {
   static class TestProvider extends AbstractUserAuthenticationProvider {
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return List.of();
     }
 
     @Override
-    protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-        final @Nonnull List<String> authnContextUris) {
+    protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+        final @NonNull List<String> authnContextUris) {
       throw new UnsupportedOperationException();
     }
   }
@@ -391,17 +390,17 @@ class AuthnServerConfigurerTest {
     return new ClientRegistryBackend() {
 
       @Override
-      public @Nonnull String getName() {
+      public @NonNull String getName() {
         return "test";
       }
 
       @Override
-      public @Nonnull AuthenticationProtocol getProtocol() {
+      public @NonNull AuthenticationProtocol getProtocol() {
         return AuthenticationProtocol.SAML;
       }
 
       @Override
-      public RequesterRecord lookup(final @Nonnull String identifier) {
+      public RequesterRecord lookup(final @NonNull String identifier) {
         return record != null && record.getIdentifier().equals(identifier) ? record : null;
       }
     };

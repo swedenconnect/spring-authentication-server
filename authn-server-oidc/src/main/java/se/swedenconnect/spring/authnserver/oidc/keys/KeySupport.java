@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.keys;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.security.PublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.jose.Algorithm;
 import com.nimbusds.jose.jwk.Curve;
@@ -54,7 +54,7 @@ final class KeySupport {
    * @param use what the key is used for, for the error message
    * @throws IllegalArgumentException if the key does not meet the requirements
    */
-  static void assertKeyRequirements(final @Nonnull PkiCredential credential, final @Nonnull String use) {
+  static void assertKeyRequirements(final @NonNull PkiCredential credential, final @NonNull String use) {
     final PublicKey publicKey = credential.getPublicKey();
     if (publicKey instanceof final RSAPublicKey rsa) {
       if (rsa.getModulus().bitLength() < MIN_RSA_KEY_LENGTH) {
@@ -83,7 +83,7 @@ final class KeySupport {
    * @param publicKey the key
    * @return the curve, or {@code null} if the key is not an EC key
    */
-  static @Nullable Curve getCurve(final @Nonnull PublicKey publicKey) {
+  static @Nullable Curve getCurve(final @NonNull PublicKey publicKey) {
     return publicKey instanceof final ECPublicKey ec ? Curve.forECParameterSpec(ec.getParams()) : null;
   }
 
@@ -93,7 +93,7 @@ final class KeySupport {
    * @param credential the credential
    * @return the algorithm, or {@code null} if none has been assigned
    */
-  static @Nullable Algorithm getAssignedAlgorithm(final @Nonnull PkiCredential credential) {
+  static @Nullable Algorithm getAssignedAlgorithm(final @NonNull PkiCredential credential) {
     return JwkMetadataProperties.getJoseAlgorithm(credential.getMetadata());
   }
 
@@ -105,7 +105,7 @@ final class KeySupport {
    * @return a public JWK
    * @throws IllegalArgumentException if no key ID could be established
    */
-  static @Nonnull JWK toPublicJwk(final @Nonnull PkiCredential credential, final @Nonnull KeyUse use) {
+  static @NonNull JWK toPublicJwk(final @NonNull PkiCredential credential, final @NonNull KeyUse use) {
     final JWK jwk = JwkTransformerFunction.publicJwkFunction()
         .withKeyUseFunction(c -> use)
         .withKeyOpsFunction(c -> null)
@@ -127,8 +127,8 @@ final class KeySupport {
    * @return the algorithms
    * @throws IllegalArgumentException if the assigned algorithm is not among the candidates
    */
-  static <A extends Algorithm> @Nonnull List<A> restrictToAssigned(final @Nonnull PkiCredential credential,
-      final @Nonnull List<A> candidates, final @Nonnull String use) {
+  static <A extends Algorithm> @NonNull List<A> restrictToAssigned(final @NonNull PkiCredential credential,
+      final @NonNull List<A> candidates, final @NonNull String use) {
     final Algorithm assigned = getAssignedAlgorithm(credential);
     if (assigned == null) {
       return candidates;

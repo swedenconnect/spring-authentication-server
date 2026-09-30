@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
@@ -39,14 +39,14 @@ public class EidasGenderFromProtocolMapper implements FromProtocolAttributeMappe
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedNames() {
+  public @NonNull Collection<String> getSupportedNames() {
     return List.of(EidasNaturalPersonAttributes.GENDER.name());
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<SamlRequestedAttribute> inputs,
-      final @Nonnull FromProtocolMappingContext<SamlRequestedAttribute> context) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<SamlRequestedAttribute> inputs,
+      final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
     final List<String> values = inputs.stream()

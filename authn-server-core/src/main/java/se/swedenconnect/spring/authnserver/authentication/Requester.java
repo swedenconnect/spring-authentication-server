@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -36,7 +35,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param identifier the identity of the requester, a SAML SP entityID or an OpenID Connect {@code client_id}
  * @author Martin Lindström
  */
-public record Requester(@Nonnull AuthenticationProtocol protocol, @Nonnull String identifier)
+public record Requester(@NonNull AuthenticationProtocol protocol, @NonNull String identifier)
     implements Serializable {
 
   @Serial
@@ -62,13 +61,13 @@ public record Requester(@Nonnull AuthenticationProtocol protocol, @Nonnull Strin
    * @param use the usage record
    * @return {@code true} if the record was made for this requester and {@code false} otherwise
    */
-  public boolean matches(final @Nonnull AuthenticationUse use) {
+  public boolean matches(final @NonNull AuthenticationUse use) {
     return use.protocol() == this.protocol && this.identifier.equals(use.requester());
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return "%s:%s".formatted(this.protocol, this.identifier);
   }
 

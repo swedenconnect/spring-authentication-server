@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.Attribute;
 import org.opensaml.saml.saml2.metadata.RequestedAttribute;
 
@@ -38,7 +37,7 @@ import org.opensaml.saml.saml2.metadata.RequestedAttribute;
  * @param required whether the requester requires the attribute
  * @author Martin Lindström
  */
-public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean required) {
+public record SamlRequestedAttribute(@NonNull Attribute attribute, boolean required) {
 
   /**
    * Constructor.
@@ -57,7 +56,7 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    * @param requestedAttribute the requested attribute
    * @return a {@link SamlRequestedAttribute}
    */
-  public static @Nonnull SamlRequestedAttribute of(final @Nonnull RequestedAttribute requestedAttribute) {
+  public static @NonNull SamlRequestedAttribute of(final @NonNull RequestedAttribute requestedAttribute) {
     Objects.requireNonNull(requestedAttribute, "requestedAttribute must not be null");
     return new SamlRequestedAttribute(requestedAttribute,
         requestedAttribute.isRequired() != null && requestedAttribute.isRequired());
@@ -69,7 +68,7 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    * @param name the SAML attribute name
    * @return a {@link SamlRequestedAttribute}
    */
-  public static @Nonnull SamlRequestedAttribute of(final @Nonnull String name) {
+  public static @NonNull SamlRequestedAttribute of(final @NonNull String name) {
     return new SamlRequestedAttribute(SamlAttributeValues.createAttribute(name, null, List.of()), false);
   }
 
@@ -81,7 +80,7 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    * @param required whether the requester requires the attribute
    * @return a {@link SamlRequestedAttribute}
    */
-  public static @Nonnull SamlRequestedAttribute of(final @Nonnull String name, final @Nullable String friendlyName,
+  public static @NonNull SamlRequestedAttribute of(final @NonNull String name, final @Nullable String friendlyName,
       final boolean required) {
     return of(name, friendlyName, required, List.of());
   }
@@ -95,8 +94,8 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    * @param values the values that the requester will accept
    * @return a {@link SamlRequestedAttribute}
    */
-  public static @Nonnull SamlRequestedAttribute of(final @Nonnull String name, final @Nullable String friendlyName,
-      final boolean required, final @Nonnull List<String> values) {
+  public static @NonNull SamlRequestedAttribute of(final @NonNull String name, final @Nullable String friendlyName,
+      final boolean required, final @NonNull List<String> values) {
     return new SamlRequestedAttribute(SamlAttributeValues.createAttribute(name, friendlyName, values), required);
   }
 
@@ -105,7 +104,7 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    *
    * @return the attribute name
    */
-  public @Nonnull String name() {
+  public @NonNull String name() {
     return this.attribute.getName();
   }
 
@@ -114,7 +113,7 @@ public record SamlRequestedAttribute(@Nonnull Attribute attribute, boolean requi
    *
    * @return the values in string form, possibly empty
    */
-  public @Nonnull List<String> stringValues() {
+  public @NonNull List<String> stringValues() {
     return SamlAttributeValues.getStringValues(this.attribute);
   }
 

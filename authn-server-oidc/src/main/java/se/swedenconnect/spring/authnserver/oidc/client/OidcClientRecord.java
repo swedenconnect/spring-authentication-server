@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +22,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import com.nimbusds.langtag.LangTag;
@@ -50,7 +49,7 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * @author Martin Lindström
  */
 public record OidcClientRecord(
-    @Nonnull String clientId, @Nonnull OIDCClientMetadata metadata, @Nonnull Set<String> trustMarkTypes) {
+    @NonNull String clientId, @NonNull OIDCClientMetadata metadata, @NonNull Set<String> trustMarkTypes) {
 
   /**
    * The client metadata parameter holding the organisation identifier, defined in OpenID Federation Organization
@@ -81,8 +80,8 @@ public record OidcClientRecord(
    * @param metadata the client metadata
    * @return an {@link OidcClientRecord}
    */
-  public static @Nonnull OidcClientRecord of(
-      final @Nonnull String clientId, final @Nonnull OIDCClientMetadata metadata) {
+  public static @NonNull OidcClientRecord of(
+      final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata) {
     return new OidcClientRecord(clientId, metadata, Set.of());
   }
 
@@ -93,7 +92,7 @@ public record OidcClientRecord(
    *
    * @return a {@link RequesterRecord}
    */
-  public @Nonnull RequesterRecord toRequesterRecord() {
+  public @NonNull RequesterRecord toRequesterRecord() {
     return new RequesterRecord(
         new Requester(AuthenticationProtocol.OIDC, this.clientId),
         displayNames(this.metadata),
@@ -109,7 +108,7 @@ public record OidcClientRecord(
    * @param metadata the client metadata
    * @return the organisation identifier, or {@code null} if the metadata has none
    */
-  private static @Nullable String organizationIdentifier(final @Nonnull OIDCClientMetadata metadata) {
+  private static @Nullable String organizationIdentifier(final @NonNull OIDCClientMetadata metadata) {
     return metadata.getCustomField(ORGANIZATION_IDENTIFIER) instanceof final String value && StringUtils.hasText(value)
         ? value
         : null;
@@ -121,7 +120,7 @@ public record OidcClientRecord(
    * @param metadata the client metadata
    * @return a list of display names
    */
-  private static @Nonnull List<DisplayName> displayNames(final @Nonnull OIDCClientMetadata metadata) {
+  private static @NonNull List<DisplayName> displayNames(final @NonNull OIDCClientMetadata metadata) {
     final Map<LangTag, String> entries = metadata.getNameEntries();
     if (entries == null || entries.isEmpty()) {
       return List.of();
@@ -141,7 +140,7 @@ public record OidcClientRecord(
    * @param metadata the client metadata
    * @return a list of logotypes
    */
-  private static @Nonnull List<Logo> logos(final @Nonnull OIDCClientMetadata metadata) {
+  private static @NonNull List<Logo> logos(final @NonNull OIDCClientMetadata metadata) {
     final Map<LangTag, URI> entries = metadata.getLogoURIEntries();
     if (entries == null || entries.isEmpty()) {
       return List.of();

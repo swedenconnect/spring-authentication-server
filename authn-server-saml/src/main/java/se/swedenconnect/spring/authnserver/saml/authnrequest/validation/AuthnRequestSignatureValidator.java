@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest.validation;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.ArrayList;
@@ -25,6 +24,7 @@ import java.util.Objects;
 import net.shibboleth.shared.component.ComponentInitializationException;
 import net.shibboleth.shared.resolver.CriteriaSet;
 import net.shibboleth.shared.resolver.ResolverException;
+import org.jspecify.annotations.NonNull;
 import org.opensaml.core.config.ConfigurationService;
 import org.opensaml.messaging.context.MessageContext;
 import org.opensaml.messaging.handler.MessageHandlerException;
@@ -88,7 +88,7 @@ public class AuthnRequestSignatureValidator implements AuthnRequestValidator {
 
   /** {@inheritDoc} */
   @Override
-  public void validate(final @Nonnull Saml2AuthnRequestAuthenticationToken token) {
+  public void validate(final @NonNull Saml2AuthnRequestAuthenticationToken token) {
     final HttpServletRequest request = Objects.requireNonNull(token.getHttpServletRequest(), "No HTTP request");
     final MessageContext messageContext = Objects.requireNonNull(token.getMessageContext(), "No message context");
     final EntityDescriptor peerMetadata = Objects.requireNonNull(token.getPeerMetadata(), "No peer metadata");
@@ -143,7 +143,7 @@ public class AuthnRequestSignatureValidator implements AuthnRequestValidator {
    * @param peerMetadata the Service Provider metadata
    * @return {@code true} if the request must be signed and {@code false} otherwise
    */
-  protected boolean isSignedAuthnRequestRequired(final @Nonnull EntityDescriptor peerMetadata) {
+  protected boolean isSignedAuthnRequestRequired(final @NonNull EntityDescriptor peerMetadata) {
     return this.requireSignedRequests
         || Boolean.TRUE.equals(peerMetadata.getSPSSODescriptor(SAMLConstants.SAML20P_NS).isAuthnRequestsSigned());
   }
@@ -155,8 +155,8 @@ public class AuthnRequestSignatureValidator implements AuthnRequestValidator {
    * @param peerMetadata the Service Provider metadata
    * @return a {@link SecurityParametersContext}
    */
-  private @Nonnull SecurityParametersContext createSecurityParametersContext(
-      final @Nonnull EntityDescriptor peerMetadata) {
+  private @NonNull SecurityParametersContext createSecurityParametersContext(
+      final @NonNull EntityDescriptor peerMetadata) {
 
     final SignatureValidationConfiguration globalConfig =
         ConfigurationService.get(SignatureValidationConfiguration.class);
@@ -179,7 +179,7 @@ public class AuthnRequestSignatureValidator implements AuthnRequestValidator {
    * @param peerMetadata the Service Provider metadata
    * @return a {@link SignatureTrustEngine}
    */
-  private @Nonnull SignatureTrustEngine createTrustEngine(final @Nonnull EntityDescriptor peerMetadata) {
+  private @NonNull SignatureTrustEngine createTrustEngine(final @NonNull EntityDescriptor peerMetadata) {
     final SPSSODescriptor descriptor = peerMetadata.getSPSSODescriptor(SAMLConstants.SAML20P_NS);
     final List<Credential> credentials = new ArrayList<>();
     for (final KeyDescriptor kd : descriptor.getKeyDescriptors()) {

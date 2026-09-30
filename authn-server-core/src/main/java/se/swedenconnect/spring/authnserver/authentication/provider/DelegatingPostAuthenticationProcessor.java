@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
@@ -44,7 +44,7 @@ public class DelegatingPostAuthenticationProcessor implements PostAuthentication
 
   /** {@inheritDoc} */
   @Override
-  public void process(final @Nonnull UserAuthentication authentication) throws AuthenticationErrorException {
+  public void process(final @NonNull UserAuthentication authentication) throws AuthenticationErrorException {
     for (final PostAuthenticationProcessor processor : this.processors) {
       processor.process(authentication);
     }

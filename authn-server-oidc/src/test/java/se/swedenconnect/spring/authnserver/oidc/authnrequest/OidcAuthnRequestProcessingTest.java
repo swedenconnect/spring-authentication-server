@@ -18,8 +18,6 @@ package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.Filter;
 
 import java.io.IOException;
@@ -39,6 +37,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
@@ -954,17 +954,17 @@ class OidcAuthnRequestProcessingTest {
     final List<String> requestedMarks = new ArrayList<>();
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test";
     }
 
     @Override
-    public @Nonnull AuthenticationProtocol getProtocol() {
+    public @NonNull AuthenticationProtocol getProtocol() {
       return AuthenticationProtocol.OIDC;
     }
 
     @Override
-    public @Nullable RequesterRecord lookup(final @Nonnull String identifier) throws ClientRegistryException {
+    public @Nullable RequesterRecord lookup(final @NonNull String identifier) throws ClientRegistryException {
       if (this.failing) {
         throw new ClientRegistryException("Backend failure");
       }
@@ -983,7 +983,7 @@ class OidcAuthnRequestProcessingTest {
     }
 
     @Override
-    public @Nullable RequesterRecord requestMark(final @Nonnull String identifier, final @Nonnull String mark)
+    public @Nullable RequesterRecord requestMark(final @NonNull String identifier, final @NonNull String mark)
         throws ClientRegistryException {
       if (this.failOnRequestMark) {
         throw new ClientRegistryException("Trust mark issuer failure");

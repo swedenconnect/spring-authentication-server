@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -25,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +69,7 @@ public class EntityCategoryRequestedAttributeProcessor implements RequestedAttri
    *
    * @param idpDeclaredEntityCategories the entity categories that the Identity Provider declares
    */
-  public EntityCategoryRequestedAttributeProcessor(final @Nonnull Collection<String> idpDeclaredEntityCategories) {
+  public EntityCategoryRequestedAttributeProcessor(final @NonNull Collection<String> idpDeclaredEntityCategories) {
     this.idpDeclaredEntityCategories = List.copyOf(
         Objects.requireNonNull(idpDeclaredEntityCategories, "idpDeclaredEntityCategories must not be null"));
   }
@@ -81,15 +80,15 @@ public class EntityCategoryRequestedAttributeProcessor implements RequestedAttri
    *
    * @param entityCategoryRegistry the registry of known entity categories
    */
-  public void setEntityCategoryRegistry(final @Nonnull EntityCategoryRegistry entityCategoryRegistry) {
+  public void setEntityCategoryRegistry(final @NonNull EntityCategoryRegistry entityCategoryRegistry) {
     this.entityCategoryRegistry =
         Objects.requireNonNull(entityCategoryRegistry, "entityCategoryRegistry must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<SamlRequestedAttribute> extractRequestedAttributes(
-      final @Nonnull RequestedAttributeContext context) {
+  public @NonNull List<SamlRequestedAttribute> extractRequestedAttributes(
+      final @NonNull RequestedAttributeContext context) {
 
     final List<ServiceEntityCategory> categories =
         EntityDescriptorUtils.getEntityCategories(context.spMetadata()).stream()
@@ -138,7 +137,7 @@ public class EntityCategoryRequestedAttributeProcessor implements RequestedAttri
    *
    * @return the entity categories of the Swedish eID Framework
    */
-  public static @Nonnull List<EntityCategory> getDefaultEntityCategories() {
+  public static @NonNull List<EntityCategory> getDefaultEntityCategories() {
     return List.of(
         EntityCategoryConstants.SERVICE_ENTITY_CATEGORY_LOA2_PNR,
         EntityCategoryConstants.SERVICE_ENTITY_CATEGORY_LOA3_PNR,
@@ -169,7 +168,7 @@ public class EntityCategoryRequestedAttributeProcessor implements RequestedAttri
    *
    * @return an {@link EntityCategoryRegistry}
    */
-  public static @Nonnull EntityCategoryRegistry getDefaultEntityCategoryRegistry() {
+  public static @NonNull EntityCategoryRegistry getDefaultEntityCategoryRegistry() {
     return new EntityCategoryRegistryImpl(getDefaultEntityCategories());
   }
 
@@ -213,7 +212,7 @@ public class EntityCategoryRequestedAttributeProcessor implements RequestedAttri
      * @param numberOfCategories the number of declared categories
      * @return a {@link SamlRequestedAttribute}
      */
-    @Nonnull SamlRequestedAttribute toRequestedAttribute(final @Nonnull String name, final int numberOfCategories) {
+    @NonNull SamlRequestedAttribute toRequestedAttribute(final @NonNull String name, final int numberOfCategories) {
       return SamlRequestedAttribute.of(name, this.friendlyName,
           this.count == numberOfCategories && this.alwaysRequired);
     }

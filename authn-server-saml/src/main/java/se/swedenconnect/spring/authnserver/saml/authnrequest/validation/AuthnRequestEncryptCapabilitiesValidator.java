@@ -15,10 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest.validation;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.metadata.KeyDescriptor;
 import org.opensaml.saml.saml2.metadata.SPSSODescriptor;
@@ -54,7 +53,7 @@ public class AuthnRequestEncryptCapabilitiesValidator implements AuthnRequestVal
 
   /** {@inheritDoc} */
   @Override
-  public void validate(final @Nonnull Saml2AuthnRequestAuthenticationToken token) throws SamlErrorStatusException {
+  public void validate(final @NonNull Saml2AuthnRequestAuthenticationToken token) throws SamlErrorStatusException {
     if (!this.encryptAssertions) {
       return;
     }

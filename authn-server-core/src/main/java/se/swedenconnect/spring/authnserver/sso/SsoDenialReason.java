@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Why a previous authentication was not reused. The reason is carried in the refusal so that it can be logged, and so
@@ -86,7 +86,7 @@ public enum SsoDenialReason {
    *
    * @return the kind of refusal
    */
-  public @Nonnull SsoDenialKind getKind() {
+  public @NonNull SsoDenialKind getKind() {
     return this.kind;
   }
 
@@ -95,7 +95,7 @@ public enum SsoDenialReason {
    *
    * @return the description
    */
-  public @Nonnull String getDescription() {
+  public @NonNull String getDescription() {
     return this.description;
   }
 

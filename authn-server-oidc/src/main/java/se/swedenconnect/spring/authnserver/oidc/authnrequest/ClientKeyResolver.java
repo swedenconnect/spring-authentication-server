@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.KeySourceException;
@@ -41,8 +41,7 @@ public interface ClientKeyResolver {
    * @return the candidate keys, possibly empty
    * @throws KeySourceException if the keys cannot be obtained
    */
-  @Nonnull
-  List<JWK> resolve(final @Nonnull String clientId, final @Nonnull OIDCClientMetadata metadata,
-      final @Nonnull JWSHeader header) throws KeySourceException;
+  @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
+      final @NonNull JWSHeader header) throws KeySourceException;
 
 }

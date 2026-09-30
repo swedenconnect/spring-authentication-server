@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -100,7 +99,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @param defaultPath the default protocol path
    */
-  protected AbstractProtocolConfigurer(final @Nonnull String defaultPath) {
+  protected AbstractProtocolConfigurer(final @NonNull String defaultPath) {
     this.path = Objects.requireNonNull(defaultPath, "defaultPath must not be null");
   }
 
@@ -109,7 +108,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the protocol
    */
-  public abstract @Nonnull AuthenticationProtocol getProtocol();
+  public abstract @NonNull AuthenticationProtocol getProtocol();
 
   /**
    * Assigns the protocol path, relative to the base URL. It must begin with a {@code /} and must not end with one. An
@@ -118,7 +117,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param path the protocol path
    * @return this configurer
    */
-  public @Nonnull T path(final @Nonnull String path) {
+  public @NonNull T path(final @NonNull String path) {
     this.path = Objects.requireNonNull(path, "path must not be null");
     return this.self();
   }
@@ -128,7 +127,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the protocol path
    */
-  public @Nonnull String getPath() {
+  public @NonNull String getPath() {
     return this.path;
   }
 
@@ -139,7 +138,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param ssoPolicy the policy, or {@code null} to use the shared policy
    * @return this configurer
    */
-  public @Nonnull T ssoPolicy(final @Nullable SsoPolicy ssoPolicy) {
+  public @NonNull T ssoPolicy(final @Nullable SsoPolicy ssoPolicy) {
     this.ssoPolicy = ssoPolicy;
     return this.self();
   }
@@ -150,7 +149,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the single sign-on policy
    */
-  public @Nonnull SsoPolicy getSsoPolicy() {
+  public @NonNull SsoPolicy getSsoPolicy() {
     return this.ssoPolicy != null ? this.ssoPolicy : this.getServer().getSsoPolicy();
   }
 
@@ -160,7 +159,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param clockSkew the clock skew, or {@code null} to use the shared value
    * @return this configurer
    */
-  public @Nonnull T clockSkew(final @Nullable Duration clockSkew) {
+  public @NonNull T clockSkew(final @Nullable Duration clockSkew) {
     this.clockSkew = clockSkew;
     return this.self();
   }
@@ -170,7 +169,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the clock skew
    */
-  public @Nonnull Duration getClockSkew() {
+  public @NonNull Duration getClockSkew() {
     return this.clockSkew != null ? this.clockSkew : this.getServer().getClockSkew();
   }
 
@@ -180,7 +179,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param supportsUserMessage whether user messages are supported, or {@code null} to use the shared setting
    * @return this configurer
    */
-  public @Nonnull T supportsUserMessage(final @Nullable Boolean supportsUserMessage) {
+  public @NonNull T supportsUserMessage(final @Nullable Boolean supportsUserMessage) {
     this.supportsUserMessage = supportsUserMessage;
     return this.self();
   }
@@ -200,7 +199,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param secret the secret, or {@code null} to use the shared secret
    * @return this configurer
    */
-  public @Nonnull T subjectIdentifierSecret(final @Nullable byte[] secret) {
+  public @NonNull T subjectIdentifierSecret(final byte @Nullable [] secret) {
     this.subjectIdentifierSecret = secret != null ? secret.clone() : null;
     return this.self();
   }
@@ -210,7 +209,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the secret, or {@code null} if no secret has been assigned
    */
-  public @Nullable byte[] getSubjectIdentifierSecret() {
+  public byte @Nullable [] getSubjectIdentifierSecret() {
     return this.subjectIdentifierSecret != null
         ? this.subjectIdentifierSecret.clone()
         : this.getServer().getSubjectIdentifierSecret();
@@ -222,7 +221,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param hashAlgorithm the JCE name of the hash algorithm, or {@code null} to use the shared algorithm
    * @return this configurer
    */
-  public @Nonnull T subjectIdentifierHashAlgorithm(final @Nullable String hashAlgorithm) {
+  public @NonNull T subjectIdentifierHashAlgorithm(final @Nullable String hashAlgorithm) {
     this.subjectIdentifierHashAlgorithm = hashAlgorithm;
     return this.self();
   }
@@ -232,7 +231,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the JCE name of the hash algorithm
    */
-  public @Nonnull String getSubjectIdentifierHashAlgorithm() {
+  public @NonNull String getSubjectIdentifierHashAlgorithm() {
     return this.subjectIdentifierHashAlgorithm != null
         ? this.subjectIdentifierHashAlgorithm
         : this.getServer().getSubjectIdentifierHashAlgorithm();
@@ -245,7 +244,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull T attributeProducers(final @Nonnull Customizer<List<AttributeProducer>> customizer) {
+  public @NonNull T attributeProducers(final @NonNull Customizer<List<AttributeProducer>> customizer) {
     customizer.customize(this.attributeProducers);
     return this.self();
   }
@@ -255,7 +254,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the attribute producers
    */
-  public @Nonnull List<AttributeProducer> getAttributeProducers() {
+  public @NonNull List<AttributeProducer> getAttributeProducers() {
     return this.attributeProducers;
   }
 
@@ -265,7 +264,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull T attributeReleaseVoters(final @Nonnull Customizer<List<AttributeReleaseVoter>> customizer) {
+  public @NonNull T attributeReleaseVoters(final @NonNull Customizer<List<AttributeReleaseVoter>> customizer) {
     customizer.customize(this.attributeReleaseVoters);
     return this.self();
   }
@@ -275,7 +274,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the attribute release voters
    */
-  public @Nonnull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
+  public @NonNull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
     return this.attributeReleaseVoters;
   }
 
@@ -286,7 +285,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull T ssoVoters(final @Nonnull Customizer<List<SsoVoter>> customizer) {
+  public @NonNull T ssoVoters(final @NonNull Customizer<List<SsoVoter>> customizer) {
     customizer.customize(this.ssoVoters);
     return this.self();
   }
@@ -296,7 +295,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the single sign-on voters
    */
-  public @Nonnull List<SsoVoter> getSsoVoters() {
+  public @NonNull List<SsoVoter> getSsoVoters() {
     return this.ssoVoters;
   }
 
@@ -307,8 +306,8 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull T postAuthenticationProcessors(
-      final @Nonnull Customizer<List<PostAuthenticationProcessor>> customizer) {
+  public @NonNull T postAuthenticationProcessors(
+      final @NonNull Customizer<List<PostAuthenticationProcessor>> customizer) {
     customizer.customize(this.postAuthenticationProcessors);
     return this.self();
   }
@@ -318,7 +317,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the post-authentication processors
    */
-  public @Nonnull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
+  public @NonNull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
     return this.postAuthenticationProcessors;
   }
 
@@ -329,7 +328,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @return an {@link AttributeReleaseManager}
    * @throws IllegalArgumentException if there is no attribute producer at all
    */
-  protected @Nonnull AttributeReleaseManager createAttributeReleaseManager() {
+  protected @NonNull AttributeReleaseManager createAttributeReleaseManager() {
     final List<AttributeProducer> producers =
         AuthnServerConfigurer.combine(this.attributeProducers, this.getServer().getAttributeProducers());
     if (producers.isEmpty()) {
@@ -357,7 +356,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param endpoint the endpoint, relative to the protocol path
    * @return the path
    */
-  public @Nonnull String getEndpointPath(final @Nonnull String endpoint) {
+  public @NonNull String getEndpointPath(final @NonNull String endpoint) {
     return this.path + endpoint;
   }
 
@@ -367,7 +366,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param endpoint the endpoint, relative to the protocol path
    * @return the URL
    */
-  public @Nonnull String getEndpointUrl(final @Nonnull String endpoint) {
+  public @NonNull String getEndpointUrl(final @NonNull String endpoint) {
     return this.getServer().getBaseUrl() + this.getEndpointPath(endpoint);
   }
 
@@ -377,7 +376,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @return the shared configurer
    * @throws IllegalStateException if the configurer has not been registered
    */
-  public @Nonnull AuthnServerConfigurer getServer() {
+  public @NonNull AuthnServerConfigurer getServer() {
     if (this.server == null) {
       throw new IllegalStateException("The protocol configurer has not been registered with an AuthnServerConfigurer");
     }
@@ -390,21 +389,21 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param http the HTTP security object
    * @throws IllegalArgumentException if a required value is missing or a value is invalid
    */
-  protected abstract void init(final @Nonnull HttpSecurity http);
+  protected abstract void init(final @NonNull HttpSecurity http);
 
   /**
    * Configures the {@link HttpSecurity} object, adding the protocol's filters.
    *
    * @param http the HTTP security object
    */
-  protected abstract void configure(final @Nonnull HttpSecurity http);
+  protected abstract void configure(final @NonNull HttpSecurity http);
 
   /**
    * Gets the request matcher for the protocol's endpoints. Invoked after {@link #init(HttpSecurity)}.
    *
    * @return a request matcher
    */
-  protected abstract @Nonnull RequestMatcher getRequestMatcher();
+  protected abstract @NonNull RequestMatcher getRequestMatcher();
 
   /**
    * Gets the client registry backends that the protocol contributes. Invoked after {@link #init(HttpSecurity)}. The
@@ -412,7 +411,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the backends
    */
-  protected @Nonnull List<ClientRegistryBackend> getClientRegistryBackends() {
+  protected @NonNull List<ClientRegistryBackend> getClientRegistryBackends() {
     return List.of();
   }
 
@@ -431,7 +430,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return a hint telling how to configure a backend
    */
-  protected @Nonnull String getMissingClientRegistryBackendHint() {
+  protected @NonNull String getMissingClientRegistryBackendHint() {
     return "add a client registry backend";
   }
 
@@ -442,7 +441,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @param <O> the type of the object
    * @return the processed object
    */
-  protected final @Nonnull <O> O postProcess(final @Nonnull O object) {
+  protected final <O> @NonNull O postProcess(final @NonNull O object) {
     return this.getServer().postProcessObject(object);
   }
 
@@ -452,7 +451,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    * @return this configurer
    */
   @SuppressWarnings("unchecked")
-  protected final @Nonnull T self() {
+  protected final @NonNull T self() {
     return (T) this;
   }
 
@@ -461,7 +460,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @param server the shared configurer
    */
-  final void register(final @Nonnull AuthnServerConfigurer server) {
+  final void register(final @NonNull AuthnServerConfigurer server) {
     this.server = server;
   }
 
@@ -471,7 +470,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @param http the HTTP security object
    */
-  final void doInit(final @Nonnull HttpSecurity http) {
+  final void doInit(final @NonNull HttpSecurity http) {
     final String name = this.getProtocol().name();
     if (!this.path.isEmpty() && (!this.path.startsWith("/") || this.path.endsWith("/"))) {
       throw new IllegalArgumentException(
@@ -495,8 +494,7 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
    *
    * @return the policy, or {@code null} if the shared policy applies
    */
-  @Nullable
-  SsoPolicy getProtocolSsoPolicy() {
+  @Nullable SsoPolicy getProtocolSsoPolicy() {
     return this.ssoPolicy;
   }
 

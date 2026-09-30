@@ -15,9 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
@@ -43,7 +44,7 @@ public interface RedirectFlowRepository {
    * @param token the redirect token
    * @param request the HTTP servlet request
    */
-  void start(@Nonnull final RedirectForAuthenticationToken token, @Nonnull final HttpServletRequest request);
+  void start(final @NonNull RedirectForAuthenticationToken token, final @NonNull HttpServletRequest request);
 
   /**
    * Gets the protocol that the authentication a request concerns was started for. A filter uses it to tell whether the
@@ -52,8 +53,7 @@ public interface RedirectFlowRepository {
    * @param request the HTTP servlet request
    * @return the protocol, or {@code null} if the request carries no identifier or there is no such authentication
    */
-  @Nullable
-  AuthenticationProtocol getProtocol(@Nonnull final HttpServletRequest request);
+  @Nullable AuthenticationProtocol getProtocol(final @NonNull HttpServletRequest request);
 
   /**
    * Picks up the outcome of the authentication that a request on the resume path concerns, and removes it from the
@@ -64,8 +64,8 @@ public interface RedirectFlowRepository {
    * @throws UnrecoverableErrorException {@link CommonUnrecoverableError#INVALID_SESSION} if the request carries no
    *           identifier, or the authentication is unknown, has expired, has already been resumed, or has no outcome
    */
-  @Nonnull
-  ResumedAuthenticationToken resume(@Nonnull final HttpServletRequest request) throws UnrecoverableErrorException;
+  @NonNull ResumedAuthenticationToken resume(final @NonNull HttpServletRequest request)
+      throws UnrecoverableErrorException;
 
   /**
    * Removes the authentication that a request concerns, if there is one. It is how a flow that is given up is cleaned
@@ -73,6 +73,6 @@ public interface RedirectFlowRepository {
    *
    * @param request the HTTP servlet request
    */
-  void clear(@Nonnull final HttpServletRequest request);
+  void clear(final @NonNull HttpServletRequest request);
 
 }

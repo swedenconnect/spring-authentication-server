@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Collection;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.mapping.ToProtocolAttributeMapper;
 import se.swedenconnect.spring.authnserver.oidc.attributes.UserClaim;
@@ -38,7 +38,6 @@ public interface ToClaimMapper extends ToProtocolAttributeMapper<UserClaim> {
    * @param identifier the attribute identifier, one of {@link #getSupportedIdentifiers()}
    * @return the claim names, empty if the identifier is not handled
    */
-  @Nonnull
-  Collection<String> getClaimNames(final @Nonnull String identifier);
+  @NonNull Collection<String> getClaimNames(final @NonNull String identifier);
 
 }

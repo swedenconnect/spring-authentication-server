@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,6 +25,8 @@ import java.util.Objects;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,8 +73,8 @@ public class ToProtocolAttributeMapping<O> {
    * @param nameExtractor a function giving the protocol name of an output
    * @param merger a function merging two outputs having the same protocol name
    */
-  public ToProtocolAttributeMapping(final @Nonnull AttributeDefinitionRegistry definitions,
-      final @Nonnull Function<O, String> nameExtractor, final @Nonnull BinaryOperator<O> merger) {
+  public ToProtocolAttributeMapping(final @NonNull AttributeDefinitionRegistry definitions,
+      final @NonNull Function<O, String> nameExtractor, final @NonNull BinaryOperator<O> merger) {
     this.definitions = Objects.requireNonNull(definitions, "definitions must not be null");
     this.nameExtractor = Objects.requireNonNull(nameExtractor, "nameExtractor must not be null");
     this.merger = Objects.requireNonNull(merger, "merger must not be null");
@@ -86,7 +85,7 @@ public class ToProtocolAttributeMapping<O> {
    *
    * @param mapper the mapper to register
    */
-  public void register(final @Nonnull ToProtocolAttributeMapper<O> mapper) {
+  public void register(final @NonNull ToProtocolAttributeMapper<O> mapper) {
     Objects.requireNonNull(mapper, "mapper must not be null");
     for (final String identifier : mapper.getSupportedIdentifiers()) {
       final ToProtocolAttributeMapper<O> previous = this.mappers.put(identifier, mapper);
@@ -102,7 +101,7 @@ public class ToProtocolAttributeMapping<O> {
    *
    * @param mappers the mappers to register
    */
-  public void registerAll(final @Nonnull List<? extends ToProtocolAttributeMapper<O>> mappers) {
+  public void registerAll(final @NonNull List<? extends ToProtocolAttributeMapper<O>> mappers) {
     Objects.requireNonNull(mappers, "mappers must not be null").forEach(this::register);
   }
 
@@ -112,7 +111,7 @@ public class ToProtocolAttributeMapping<O> {
    * @param identifier the attribute identifier
    * @return the mapper, or {@code null} if no mapper handles the attribute
    */
-  public @Nullable ToProtocolAttributeMapper<O> getMapper(final @Nonnull String identifier) {
+  public @Nullable ToProtocolAttributeMapper<O> getMapper(final @NonNull String identifier) {
     return this.mappers.get(Objects.requireNonNull(identifier, "identifier must not be null"));
   }
 
@@ -123,7 +122,7 @@ public class ToProtocolAttributeMapping<O> {
    * @param requestedAttributes the requested attributes of the operation, may be {@code null}
    * @return the protocol attributes
    */
-  public @Nonnull List<O> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
+  public @NonNull List<O> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
       final @Nullable List<GenericRequestedAttribute> requestedAttributes) {
     Objects.requireNonNull(attributes, "attributes must not be null");
     final ToProtocolMappingContext context = new Context(this.definitions, attributes,
@@ -160,7 +159,7 @@ public class ToProtocolAttributeMapping<O> {
    *
    * @return an {@link AttributeDefinitionRegistry}
    */
-  public @Nonnull AttributeDefinitionRegistry getDefinitions() {
+  public @NonNull AttributeDefinitionRegistry getDefinitions() {
     return this.definitions;
   }
 
@@ -195,19 +194,19 @@ public class ToProtocolAttributeMapping<O> {
 
     /** {@inheritDoc} */
     @Override
-    public @Nonnull AttributeDefinitionRegistry getDefinitions() {
+    public @NonNull AttributeDefinitionRegistry getDefinitions() {
       return this.definitions;
     }
 
     /** {@inheritDoc} */
     @Override
-    public @Nonnull List<GenericAttribute<? extends Serializable>> getAllAttributes() {
+    public @NonNull List<GenericAttribute<? extends Serializable>> getAllAttributes() {
       return this.attributes;
     }
 
     /** {@inheritDoc} */
     @Override
-    public @Nullable GenericAttribute<? extends Serializable> getAttribute(final @Nonnull String identifier) {
+    public @Nullable GenericAttribute<? extends Serializable> getAttribute(final @NonNull String identifier) {
       return this.attributes.stream()
           .filter(a -> a.getIdentifier().equals(identifier))
           .findFirst()
@@ -216,20 +215,20 @@ public class ToProtocolAttributeMapping<O> {
 
     /** {@inheritDoc} */
     @Override
-    public @Nullable String getStringValue(final @Nonnull String identifier) {
+    public @Nullable String getStringValue(final @NonNull String identifier) {
       final GenericAttribute<? extends Serializable> attribute = this.getAttribute(identifier);
       return attribute != null ? String.valueOf(attribute.getValue()) : null;
     }
 
     /** {@inheritDoc} */
     @Override
-    public @Nonnull List<GenericRequestedAttribute> getRequestedAttributes() {
+    public @NonNull List<GenericRequestedAttribute> getRequestedAttributes() {
       return this.requestedAttributes;
     }
 
     /** {@inheritDoc} */
     @Override
-    public @Nullable GenericRequestedAttribute getRequestedAttribute(final @Nonnull String identifier) {
+    public @Nullable GenericRequestedAttribute getRequestedAttribute(final @NonNull String identifier) {
       return this.requestedAttributes.stream()
           .filter(a -> a.getIdentifier().equals(identifier))
           .findFirst()

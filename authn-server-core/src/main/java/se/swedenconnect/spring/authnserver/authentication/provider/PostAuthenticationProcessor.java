@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
@@ -35,6 +35,6 @@ public interface PostAuthenticationProcessor {
    * @param authentication the result to process
    * @throws AuthenticationErrorException if the result does not meet what the request needed
    */
-  void process(@Nonnull final UserAuthentication authentication) throws AuthenticationErrorException;
+  void process(final @NonNull UserAuthentication authentication) throws AuthenticationErrorException;
 
 }

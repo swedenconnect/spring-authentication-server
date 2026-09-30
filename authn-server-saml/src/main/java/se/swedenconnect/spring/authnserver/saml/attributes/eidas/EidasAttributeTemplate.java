@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Objects;
 
 import javax.xml.namespace.QName;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.core.xml.XMLObject;
 
 /**
@@ -36,8 +35,8 @@ import org.opensaml.core.xml.XMLObject;
  * @param valueType the Java type of the attribute values
  * @author Martin Lindström
  */
-public record EidasAttributeTemplate(@Nonnull String name, @Nonnull String friendlyName,
-    @Nonnull QName valueTypeName, @Nonnull Class<? extends XMLObject> valueType) {
+public record EidasAttributeTemplate(@NonNull String name, @NonNull String friendlyName,
+    @NonNull QName valueTypeName, @NonNull Class<? extends XMLObject> valueType) {
 
   /**
    * Constructor.

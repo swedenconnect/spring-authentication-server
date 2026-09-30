@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
@@ -182,7 +181,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.OIDC;
   }
 
@@ -193,7 +192,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param issuer the issuer, or {@code null} for the default
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer issuer(final @Nullable String issuer) {
+  public @NonNull OidcProviderConfigurer issuer(final @Nullable String issuer) {
     this.issuer = issuer;
     return this;
   }
@@ -203,7 +202,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the issuer
    */
-  public @Nonnull String getIssuer() {
+  public @NonNull String getIssuer() {
     return this.issuer != null ? this.issuer : Objects.requireNonNull(this.getServer().getBaseUrl());
   }
 
@@ -214,7 +213,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param endpoint the endpoint
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer jwksEndpoint(final @Nonnull String endpoint) {
+  public @NonNull OidcProviderConfigurer jwksEndpoint(final @NonNull String endpoint) {
     this.jwksEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
     return this;
   }
@@ -224,7 +223,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the endpoint
    */
-  public @Nonnull String getJwksEndpoint() {
+  public @NonNull String getJwksEndpoint() {
     return this.jwksEndpoint;
   }
 
@@ -235,7 +234,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param endpoint the endpoint
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer authorizationEndpoint(final @Nonnull String endpoint) {
+  public @NonNull OidcProviderConfigurer authorizationEndpoint(final @NonNull String endpoint) {
     this.authorizationEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
     return this;
   }
@@ -245,7 +244,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the endpoint
    */
-  public @Nonnull String getAuthorizationEndpoint() {
+  public @NonNull String getAuthorizationEndpoint() {
     return this.authorizationEndpoint;
   }
 
@@ -257,7 +256,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param requirePkce whether PKCE is required for all clients
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer requirePkce(final boolean requirePkce) {
+  public @NonNull OidcProviderConfigurer requirePkce(final boolean requirePkce) {
     this.requirePkce = requirePkce;
     return this;
   }
@@ -278,7 +277,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param requireSignedRequestObject whether request objects must be signed
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer requireSignedRequestObject(final boolean requireSignedRequestObject) {
+  public @NonNull OidcProviderConfigurer requireSignedRequestObject(final boolean requireSignedRequestObject) {
     this.requireSignedRequestObject = requireSignedRequestObject;
     return this;
   }
@@ -300,7 +299,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param requireState whether {@code state} is required
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer requireState(final boolean requireState) {
+  public @NonNull OidcProviderConfigurer requireState(final boolean requireState) {
     this.requireState = requireState;
     return this;
   }
@@ -320,8 +319,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer authnRequestProcessor(
-      final @Nonnull Customizer<OidcAuthnRequestProcessorConfigurer> customizer) {
+  public @NonNull OidcProviderConfigurer authnRequestProcessor(
+      final @NonNull Customizer<OidcAuthnRequestProcessorConfigurer> customizer) {
     customizer.customize(this.authnRequestProcessorConfigurer);
     return this;
   }
@@ -332,7 +331,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param signingKeys the signing keys
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer signingKeys(final @Nullable List<SigningKey> signingKeys) {
+  public @NonNull OidcProviderConfigurer signingKeys(final @Nullable List<SigningKey> signingKeys) {
     this.signingKeys = signingKeys;
     return this;
   }
@@ -343,7 +342,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param decryptionKeys the decryption keys
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer decryptionKeys(final @Nullable List<DecryptionKey> decryptionKeys) {
+  public @NonNull OidcProviderConfigurer decryptionKeys(final @Nullable List<DecryptionKey> decryptionKeys) {
     this.decryptionKeys = decryptionKeys;
     return this;
   }
@@ -355,7 +354,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param signUserInfo whether UserInfo responses are signed
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer signUserInfo(final boolean signUserInfo) {
+  public @NonNull OidcProviderConfigurer signUserInfo(final boolean signUserInfo) {
     this.signUserInfo = signUserInfo;
     return this;
   }
@@ -375,7 +374,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param scopeRegistry the scope registry, or {@code null} for the default
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer scopeRegistry(final @Nullable ScopeRegistry scopeRegistry) {
+  public @NonNull OidcProviderConfigurer scopeRegistry(final @Nullable ScopeRegistry scopeRegistry) {
     this.scopeRegistry = scopeRegistry;
     return this;
   }
@@ -385,7 +384,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the scope registry
    */
-  public @Nonnull ScopeRegistry getScopeRegistry() {
+  public @NonNull ScopeRegistry getScopeRegistry() {
     if (this.scopeRegistry == null) {
       this.scopeRegistry = new DefaultScopeRegistry();
     }
@@ -399,7 +398,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param attributeMapping the mapping, or {@code null} for the default
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer attributeMapping(final @Nullable OidcAttributeMapping attributeMapping) {
+  public @NonNull OidcProviderConfigurer attributeMapping(final @Nullable OidcAttributeMapping attributeMapping) {
     this.attributeMapping = attributeMapping;
     return this;
   }
@@ -410,7 +409,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the mapping
    */
-  public @Nonnull OidcAttributeMapping getAttributeMapping() {
+  public @NonNull OidcAttributeMapping getAttributeMapping() {
     if (this.attributeMapping == null) {
       this.attributeMapping = new OidcAttributeMapping();
     }
@@ -424,7 +423,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param subjectGeneratorFactory the factory, or {@code null} for the default
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer subjectGeneratorFactory(
+  public @NonNull OidcProviderConfigurer subjectGeneratorFactory(
       final @Nullable SubjectGeneratorFactory subjectGeneratorFactory) {
     this.subjectGeneratorFactory = subjectGeneratorFactory;
     return this;
@@ -437,7 +436,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param scopes the scopes, or {@code null} to derive them
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer scopes(final @Nullable List<String> scopes) {
+  public @NonNull OidcProviderConfigurer scopes(final @Nullable List<String> scopes) {
     this.scopes = scopes;
     return this;
   }
@@ -449,7 +448,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param claims the claims, or {@code null}
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer claims(final @Nullable List<String> claims) {
+  public @NonNull OidcProviderConfigurer claims(final @Nullable List<String> claims) {
     this.claims = claims;
     return this;
   }
@@ -461,7 +460,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param uiLocales the language tags, or {@code null}
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer uiLocales(final @Nullable List<String> uiLocales) {
+  public @NonNull OidcProviderConfigurer uiLocales(final @Nullable List<String> uiLocales) {
     this.uiLocales = uiLocales;
     return this;
   }
@@ -481,8 +480,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull OidcProviderConfigurer discoveryEndpoint(
-      final @Nonnull Customizer<OidcDiscoveryEndpointConfigurer> customizer) {
+  public @NonNull OidcProviderConfigurer discoveryEndpoint(
+      final @NonNull Customizer<OidcDiscoveryEndpointConfigurer> customizer) {
     customizer.customize(this.discoveryEndpointConfigurer);
     return this;
   }
@@ -493,7 +492,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the path
    */
-  public @Nonnull String getDiscoveryEndpointPath() {
+  public @NonNull String getDiscoveryEndpointPath() {
     return this.discoveryEndpointConfigurer.getEndpointPath();
   }
 
@@ -502,7 +501,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the keys
    */
-  public @Nonnull OidcKeys getKeys() {
+  public @NonNull OidcKeys getKeys() {
     return Objects.requireNonNull(this.keys, "The configurer has not been initialized");
   }
 
@@ -511,7 +510,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the signing key selector
    */
-  public @Nonnull SigningKeySelector getSigningKeySelector() {
+  public @NonNull SigningKeySelector getSigningKeySelector() {
     return Objects.requireNonNull(this.signingKeySelector, "The configurer has not been initialized");
   }
 
@@ -520,7 +519,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the scopes and claims
    */
-  public @Nonnull SupportedScopesAndClaims getSupportedScopesAndClaims() {
+  public @NonNull SupportedScopesAndClaims getSupportedScopesAndClaims() {
     return Objects.requireNonNull(this.supportedScopesAndClaims, "The configurer has not been initialized");
   }
 
@@ -530,13 +529,13 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the factory
    */
-  public @Nonnull SubjectGeneratorFactory getActiveSubjectGeneratorFactory() {
+  public @NonNull SubjectGeneratorFactory getActiveSubjectGeneratorFactory() {
     return Objects.requireNonNull(this.activeSubjectGeneratorFactory, "The configurer has not been initialized");
   }
 
   /** {@inheritDoc} */
   @Override
-  protected void init(final @Nonnull HttpSecurity http) {
+  protected void init(final @NonNull HttpSecurity http) {
     this.validate();
 
     this.keys = new OidcKeys(Objects.requireNonNull(this.signingKeys), this.decryptionKeys);
@@ -570,7 +569,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** {@inheritDoc} */
   @Override
-  protected void configure(final @Nonnull HttpSecurity http) {
+  protected void configure(final @NonNull HttpSecurity http) {
     http.addFilterBefore(this.postProcess(new OidcJwksEndpointFilter(this.keys, this.jwksRequestMatcher)),
         AbstractPreAuthenticatedProcessingFilter.class);
     this.discoveryEndpointConfigurer.configure(http);
@@ -619,8 +618,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the authentication context URIs
    */
-  @Nonnull
-  List<String> getSupportedAuthnContextUris() {
+  @NonNull List<String> getSupportedAuthnContextUris() {
     return this.getServer().getAuthenticationProviders().stream()
         .map(UserAuthenticationProvider::getSupportedAuthnContextUris)
         .flatMap(Collection::stream)
@@ -630,7 +628,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** {@inheritDoc} */
   @Override
-  protected @Nonnull RequestMatcher getRequestMatcher() {
+  protected @NonNull RequestMatcher getRequestMatcher() {
     return Objects.requireNonNull(this.requestMatcher, "The configurer has not been initialized");
   }
 
@@ -639,8 +637,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    *
    * @return the discovery endpoint configurer
    */
-  @Nonnull
-  OidcDiscoveryEndpointConfigurer getDiscoveryEndpointConfigurer() {
+  @NonNull OidcDiscoveryEndpointConfigurer getDiscoveryEndpointConfigurer() {
     return this.discoveryEndpointConfigurer;
   }
 
@@ -651,8 +648,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    * @param <O> the type
    * @return the processed object
    */
-  @Nonnull
-  <O> O postProcessObject(final @Nonnull O object) {
+  <O> @NonNull O postProcessObject(final @NonNull O object) {
     return this.postProcess(object);
   }
 

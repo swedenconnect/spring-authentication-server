@@ -15,15 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -63,8 +62,8 @@ public class RedirectAuthenticationState implements Serializable {
    * @param redirectToken the redirect token that started the authentication
    * @param started when the authentication was started
    */
-  public RedirectAuthenticationState(final @Nonnull RedirectForAuthenticationToken redirectToken,
-      final @Nonnull Instant started) {
+  public RedirectAuthenticationState(final @NonNull RedirectForAuthenticationToken redirectToken,
+      final @NonNull Instant started) {
     this.redirectToken = Objects.requireNonNull(redirectToken, "redirectToken must not be null");
     this.started = Objects.requireNonNull(started, "started must not be null");
   }
@@ -74,7 +73,7 @@ public class RedirectAuthenticationState implements Serializable {
    *
    * @return the identifier of the authentication
    */
-  public @Nonnull String getAuthnId() {
+  public @NonNull String getAuthnId() {
     return this.redirectToken.getAuthnId();
   }
 
@@ -83,7 +82,7 @@ public class RedirectAuthenticationState implements Serializable {
    *
    * @return the protocol
    */
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return this.redirectToken.getProtocol();
   }
 
@@ -92,7 +91,7 @@ public class RedirectAuthenticationState implements Serializable {
    *
    * @return the redirect token
    */
-  public @Nonnull RedirectForAuthenticationToken getRedirectToken() {
+  public @NonNull RedirectForAuthenticationToken getRedirectToken() {
     return this.redirectToken;
   }
 
@@ -101,7 +100,7 @@ public class RedirectAuthenticationState implements Serializable {
    *
    * @return the instant the authentication was started
    */
-  public @Nonnull Instant getStarted() {
+  public @NonNull Instant getStarted() {
     return this.started;
   }
 
@@ -137,7 +136,7 @@ public class RedirectAuthenticationState implements Serializable {
    *
    * @param result what the module's controller produced
    */
-  public void complete(final @Nonnull Authentication result) {
+  public void complete(final @NonNull Authentication result) {
     this.result = Objects.requireNonNull(result, "result must not be null");
     this.error = null;
   }
@@ -147,7 +146,7 @@ public class RedirectAuthenticationState implements Serializable {
    *
    * @param error the error that the module's controller reported
    */
-  public void complete(final @Nonnull AuthenticationErrorException error) {
+  public void complete(final @NonNull AuthenticationErrorException error) {
     this.error = Objects.requireNonNull(error, "error must not be null");
     this.result = null;
   }
@@ -158,7 +157,7 @@ public class RedirectAuthenticationState implements Serializable {
    * @param maxAge the maximum age
    * @return {@code true} if the authentication has expired and {@code false} otherwise
    */
-  public boolean isExpired(final @Nonnull Duration maxAge) {
+  public boolean isExpired(final @NonNull Duration maxAge) {
     return this.started.plus(Objects.requireNonNull(maxAge, "maxAge must not be null")).isBefore(Instant.now());
   }
 
@@ -168,7 +167,7 @@ public class RedirectAuthenticationState implements Serializable {
    * @return a {@link ResumedAuthenticationToken}
    * @throws IllegalStateException if the module's controller has not delivered an outcome
    */
-  public @Nonnull ResumedAuthenticationToken toResumedToken() {
+  public @NonNull ResumedAuthenticationToken toResumedToken() {
     if (this.error != null) {
       return new ResumedAuthenticationToken(this.redirectToken, this.error);
     }
@@ -180,7 +179,7 @@ public class RedirectAuthenticationState implements Serializable {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return "%s, started: %s, completed: %s".formatted(this.redirectToken, this.started, this.isCompleted());
   }
 

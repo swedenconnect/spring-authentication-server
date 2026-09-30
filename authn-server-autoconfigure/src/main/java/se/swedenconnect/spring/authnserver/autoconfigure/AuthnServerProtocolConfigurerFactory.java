@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.config.AbstractProtocolConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
@@ -41,7 +41,6 @@ public interface AuthnServerProtocolConfigurerFactory {
    * @return the protocol configurer
    * @throws Exception for errors creating the configurer, for example loading credentials
    */
-  @Nonnull
-  AbstractProtocolConfigurer<?> createConfigurer(final @Nonnull AuthnServerConfigurer server) throws Exception;
+  @NonNull AbstractProtocolConfigurer<?> createConfigurer(final @NonNull AuthnServerConfigurer server) throws Exception;
 
 }

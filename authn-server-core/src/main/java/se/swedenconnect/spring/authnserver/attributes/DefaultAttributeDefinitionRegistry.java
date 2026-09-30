@@ -15,15 +15,15 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The default {@link AttributeDefinitionRegistry}. Unless told otherwise it starts out holding the definitions for
@@ -48,25 +48,25 @@ public class DefaultAttributeDefinitionRegistry implements AttributeDefinitionRe
    *
    * @param definitions the definitions to register
    */
-  public DefaultAttributeDefinitionRegistry(final @Nonnull List<AttributeDefinition> definitions) {
+  public DefaultAttributeDefinitionRegistry(final @NonNull List<AttributeDefinition> definitions) {
     Objects.requireNonNull(definitions, "definitions must not be null").forEach(this::register);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable AttributeDefinition getDefinition(final @Nonnull String identifier) {
+  public @Nullable AttributeDefinition getDefinition(final @NonNull String identifier) {
     return this.definitions.get(Objects.requireNonNull(identifier, "identifier must not be null"));
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<AttributeDefinition> getDefinitions() {
+  public @NonNull Collection<AttributeDefinition> getDefinitions() {
     return Collections.unmodifiableCollection(this.definitions.values());
   }
 
   /** {@inheritDoc} */
   @Override
-  public void register(final @Nonnull AttributeDefinition definition) {
+  public void register(final @NonNull AttributeDefinition definition) {
     Objects.requireNonNull(definition, "definition must not be null");
     this.definitions.put(definition.identifier(), definition);
   }

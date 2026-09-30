@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 
@@ -45,7 +45,7 @@ public interface ToProtocolAttributeMapper<O> {
    *
    * @return the attribute identifiers
    */
-  @Nonnull Collection<String> getSupportedIdentifiers();
+  @NonNull Collection<String> getSupportedIdentifiers();
 
   /**
    * Maps the supplied attributes into protocol attributes.
@@ -54,7 +54,7 @@ public interface ToProtocolAttributeMapper<O> {
    * @param context the mapping context
    * @return the resulting protocol attributes, possibly empty
    */
-  @Nonnull List<O> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context);
+  @NonNull List<O> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context);
 
 }

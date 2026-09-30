@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.registry.acceptance;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
@@ -45,15 +45,15 @@ public class WhitelistRequesterPredicate implements RequesterPredicate {
    * @param protocol the protocol that the predicate applies to
    * @param identifiers the identities of the accepted requesters
    */
-  public WhitelistRequesterPredicate(final @Nonnull AuthenticationProtocol protocol,
-      final @Nonnull Collection<String> identifiers) {
+  public WhitelistRequesterPredicate(final @NonNull AuthenticationProtocol protocol,
+      final @NonNull Collection<String> identifiers) {
     this.protocol = Objects.requireNonNull(protocol, "protocol must not be null");
     this.identifiers = Set.copyOf(Objects.requireNonNull(identifiers, "identifiers must not be null"));
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return this.protocol;
   }
 
@@ -61,7 +61,7 @@ public class WhitelistRequesterPredicate implements RequesterPredicate {
    * Accepts the requester if its identity is in the list.
    */
   @Override
-  public boolean test(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry) {
+  public boolean test(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry) {
     return this.identifiers.contains(record.getIdentifier());
   }
 
@@ -70,7 +70,7 @@ public class WhitelistRequesterPredicate implements RequesterPredicate {
    *
    * @return the identities
    */
-  public @Nonnull Set<String> getIdentifiers() {
+  public @NonNull Set<String> getIdentifiers() {
     return this.identifiers;
   }
 

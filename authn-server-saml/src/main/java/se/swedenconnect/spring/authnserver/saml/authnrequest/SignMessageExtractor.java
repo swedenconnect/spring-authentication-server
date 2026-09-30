@@ -15,8 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.message.GenericSignMessage;
 import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatusException;
@@ -36,8 +36,7 @@ public interface SignMessageExtractor {
    * @return the sign message, or {@code null} if the request has none, or one that is to be ignored
    * @throws SamlErrorStatusException if the sign message is invalid or cannot be decrypted
    */
-  @Nullable
-  GenericSignMessage extract(final @Nonnull Saml2AuthnRequestAuthenticationToken token)
+  @Nullable GenericSignMessage extract(final @NonNull Saml2AuthnRequestAuthenticationToken token)
       throws SamlErrorStatusException;
 
 }

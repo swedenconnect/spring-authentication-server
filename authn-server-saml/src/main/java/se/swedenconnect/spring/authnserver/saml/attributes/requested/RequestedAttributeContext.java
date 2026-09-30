@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.metadata.EntityDescriptor;
 
@@ -31,7 +30,7 @@ import org.opensaml.saml.saml2.metadata.EntityDescriptor;
  * @param spMetadata the metadata entry of the Service Provider
  * @author Martin Lindström
  */
-public record RequestedAttributeContext(@Nonnull AuthnRequest authnRequest, @Nonnull EntityDescriptor spMetadata) {
+public record RequestedAttributeContext(@NonNull AuthnRequest authnRequest, @NonNull EntityDescriptor spMetadata) {
 
   /**
    * Constructor.
@@ -49,7 +48,7 @@ public record RequestedAttributeContext(@Nonnull AuthnRequest authnRequest, @Non
    *
    * @return the log string
    */
-  public @Nonnull String getLogString() {
+  public @NonNull String getLogString() {
     return "entity-id: '%s', authn-request: '%s'".formatted(
         Optional.ofNullable(this.spMetadata.getEntityID()).orElse("unknown"),
         Optional.ofNullable(this.authnRequest.getID()).orElse("unknown"));

@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.error;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.StatusCode;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -33,7 +32,7 @@ import se.swedenconnect.spring.authnserver.error.AuthenticationError;
  * @param subStatusCode the subordinate status code
  * @author Martin Lindström
  */
-public record SamlErrorStatus(@Nonnull String statusCode, @Nonnull String subStatusCode) implements Serializable {
+public record SamlErrorStatus(@NonNull String statusCode, @NonNull String subStatusCode) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -119,7 +118,7 @@ public record SamlErrorStatus(@Nonnull String statusCode, @Nonnull String subSta
    * @param error the error
    * @return a {@link SamlErrorStatus}
    */
-  public static @Nonnull SamlErrorStatus of(final @Nonnull AuthenticationError error) {
+  public static @NonNull SamlErrorStatus of(final @NonNull AuthenticationError error) {
     Objects.requireNonNull(error, "error must not be null");
     return switch (error) {
       case AUTHN_FAILED, SIGN_MESSAGE_NOT_DISPLAYED ->

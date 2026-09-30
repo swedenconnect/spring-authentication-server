@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.error;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * The unrecoverable errors that do not depend on a protocol.
@@ -49,13 +49,13 @@ public enum CommonUnrecoverableError implements UnrecoverableError {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getMessageCode() {
+  public @NonNull String getMessageCode() {
     return this.messageCode;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getDescription() {
+  public @NonNull String getDescription() {
     return this.description;
   }
 

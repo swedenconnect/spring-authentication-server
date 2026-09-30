@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.MessageDigest;
@@ -30,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.config.Customizer;
@@ -111,12 +110,12 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   private static final ClientRegistry EMPTY_CLIENT_REGISTRY = new ClientRegistry() {
 
     @Override
-    public @Nullable RequesterRecord lookup(final @Nonnull Requester requester) {
+    public @Nullable RequesterRecord lookup(final @NonNull Requester requester) {
       return null;
     }
 
     @Override
-    public @Nullable RequesterRecord requestMark(final @Nonnull Requester requester, final @Nonnull String mark) {
+    public @Nullable RequesterRecord requestMark(final @NonNull Requester requester, final @NonNull String mark) {
       return null;
     }
   };
@@ -194,8 +193,8 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param configurer the configurer
    * @throws Exception for configuration errors
    */
-  public static void applyDefaultSecurity(final @Nonnull HttpSecurity http,
-      final @Nonnull AuthnServerConfigurer configurer) throws Exception {
+  public static void applyDefaultSecurity(final @NonNull HttpSecurity http,
+      final @NonNull AuthnServerConfigurer configurer) throws Exception {
 
     final RequestMatcher endpointsMatcher = configurer.getEndpointsMatcher();
     http
@@ -215,7 +214,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param baseUrl the base URL
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer baseUrl(final @Nonnull String baseUrl) {
+  public @NonNull AuthnServerConfigurer baseUrl(final @NonNull String baseUrl) {
     this.baseUrl = baseUrl;
     return this;
   }
@@ -236,7 +235,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param ssoPolicy the policy
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer ssoPolicy(final @Nonnull SsoPolicy ssoPolicy) {
+  public @NonNull AuthnServerConfigurer ssoPolicy(final @NonNull SsoPolicy ssoPolicy) {
     this.ssoPolicy = Objects.requireNonNull(ssoPolicy, "ssoPolicy must not be null");
     return this;
   }
@@ -246,7 +245,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the policy
    */
-  public @Nonnull SsoPolicy getSsoPolicy() {
+  public @NonNull SsoPolicy getSsoPolicy() {
     return this.ssoPolicy;
   }
 
@@ -256,7 +255,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param clockSkew the clock skew
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer clockSkew(final @Nonnull Duration clockSkew) {
+  public @NonNull AuthnServerConfigurer clockSkew(final @NonNull Duration clockSkew) {
     this.clockSkew = Objects.requireNonNull(clockSkew, "clockSkew must not be null");
     return this;
   }
@@ -266,7 +265,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the clock skew
    */
-  public @Nonnull Duration getClockSkew() {
+  public @NonNull Duration getClockSkew() {
     return this.clockSkew;
   }
 
@@ -276,7 +275,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param supportsUserMessage whether user messages are supported
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer supportsUserMessage(final boolean supportsUserMessage) {
+  public @NonNull AuthnServerConfigurer supportsUserMessage(final boolean supportsUserMessage) {
     this.supportsUserMessage = supportsUserMessage;
     return this;
   }
@@ -296,7 +295,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param secret the secret, or {@code null} for no secret
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer subjectIdentifierSecret(final @Nullable byte[] secret) {
+  public @NonNull AuthnServerConfigurer subjectIdentifierSecret(final byte @Nullable [] secret) {
     this.subjectIdentifierSecret = secret != null ? secret.clone() : null;
     return this;
   }
@@ -306,7 +305,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the secret, or {@code null} if none has been assigned
    */
-  public @Nullable byte[] getSubjectIdentifierSecret() {
+  public byte @Nullable [] getSubjectIdentifierSecret() {
     return this.subjectIdentifierSecret != null ? this.subjectIdentifierSecret.clone() : null;
   }
 
@@ -316,7 +315,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param hashAlgorithm the JCE name of the hash algorithm
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer subjectIdentifierHashAlgorithm(final @Nonnull String hashAlgorithm) {
+  public @NonNull AuthnServerConfigurer subjectIdentifierHashAlgorithm(final @NonNull String hashAlgorithm) {
     this.subjectIdentifierHashAlgorithm = Objects.requireNonNull(hashAlgorithm, "hashAlgorithm must not be null");
     return this;
   }
@@ -327,7 +326,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the JCE name of the hash algorithm
    */
-  public @Nonnull String getSubjectIdentifierHashAlgorithm() {
+  public @NonNull String getSubjectIdentifierHashAlgorithm() {
     return this.subjectIdentifierHashAlgorithm;
   }
 
@@ -338,7 +337,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param authnFlowMaxAge the maximum age
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer authnFlowMaxAge(final @Nonnull Duration authnFlowMaxAge) {
+  public @NonNull AuthnServerConfigurer authnFlowMaxAge(final @NonNull Duration authnFlowMaxAge) {
     this.authnFlowMaxAge = Objects.requireNonNull(authnFlowMaxAge, "authnFlowMaxAge must not be null");
     return this;
   }
@@ -349,7 +348,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the maximum age
    */
-  public @Nonnull Duration getAuthnFlowMaxAge() {
+  public @NonNull Duration getAuthnFlowMaxAge() {
     return this.authnFlowMaxAge;
   }
 
@@ -360,7 +359,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param clientRegistry the client registry, or {@code null} to create the default
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer clientRegistry(final @Nullable ClientRegistry clientRegistry) {
+  public @NonNull AuthnServerConfigurer clientRegistry(final @Nullable ClientRegistry clientRegistry) {
     this.clientRegistry = clientRegistry;
     return this;
   }
@@ -372,7 +371,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param backend the backend
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer clientRegistryBackend(final @Nonnull ClientRegistryBackend backend) {
+  public @NonNull AuthnServerConfigurer clientRegistryBackend(final @NonNull ClientRegistryBackend backend) {
     this.clientRegistryBackends.add(Objects.requireNonNull(backend, "backend must not be null"));
     return this;
   }
@@ -383,7 +382,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @return the client registry
    * @throws IllegalStateException if the configurer has not been initialized
    */
-  public @Nonnull ClientRegistry getClientRegistry() {
+  public @NonNull ClientRegistry getClientRegistry() {
     if (this.activeClientRegistry == null) {
       throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
     }
@@ -397,7 +396,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param requesterAcceptance the check, or {@code null} to accept every requester
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer requesterAcceptance(final @Nullable RequesterAcceptance requesterAcceptance) {
+  public @NonNull AuthnServerConfigurer requesterAcceptance(final @Nullable RequesterAcceptance requesterAcceptance) {
     this.requesterAcceptance = requesterAcceptance;
     return this;
   }
@@ -407,7 +406,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the requester acceptance check
    */
-  public @Nonnull RequesterAcceptance getRequesterAcceptance() {
+  public @NonNull RequesterAcceptance getRequesterAcceptance() {
     return this.requesterAcceptance != null ? this.requesterAcceptance : RequesterAcceptance.acceptAll();
   }
 
@@ -418,7 +417,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @return the configurable requester acceptance
    * @throws IllegalStateException if another kind of check has been assigned
    */
-  public @Nonnull ConfigurableRequesterAcceptance configurableRequesterAcceptance() {
+  public @NonNull ConfigurableRequesterAcceptance configurableRequesterAcceptance() {
     if (this.requesterAcceptance == null) {
       this.requesterAcceptance = new ConfigurableRequesterAcceptance();
     }
@@ -435,7 +434,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param provider the provider
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer authenticationProvider(final @Nonnull UserAuthenticationProvider provider) {
+  public @NonNull AuthnServerConfigurer authenticationProvider(final @NonNull UserAuthenticationProvider provider) {
     this.authenticationProviders.add(Objects.requireNonNull(provider, "provider must not be null"));
     return this;
   }
@@ -445,7 +444,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the authentication providers
    */
-  public @Nonnull List<UserAuthenticationProvider> getAuthenticationProviders() {
+  public @NonNull List<UserAuthenticationProvider> getAuthenticationProviders() {
     return this.authenticationProviders;
   }
 
@@ -456,8 +455,8 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer attributeProducers(
-      final @Nonnull Customizer<List<AttributeProducer>> customizer) {
+  public @NonNull AuthnServerConfigurer attributeProducers(
+      final @NonNull Customizer<List<AttributeProducer>> customizer) {
     customizer.customize(this.attributeProducers);
     return this;
   }
@@ -467,7 +466,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the attribute producers
    */
-  public @Nonnull List<AttributeProducer> getAttributeProducers() {
+  public @NonNull List<AttributeProducer> getAttributeProducers() {
     return this.attributeProducers;
   }
 
@@ -478,8 +477,8 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer attributeReleaseVoters(
-      final @Nonnull Customizer<List<AttributeReleaseVoter>> customizer) {
+  public @NonNull AuthnServerConfigurer attributeReleaseVoters(
+      final @NonNull Customizer<List<AttributeReleaseVoter>> customizer) {
     customizer.customize(this.attributeReleaseVoters);
     return this;
   }
@@ -489,7 +488,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the attribute release voters
    */
-  public @Nonnull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
+  public @NonNull List<AttributeReleaseVoter> getAttributeReleaseVoters() {
     return this.attributeReleaseVoters;
   }
 
@@ -500,7 +499,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer ssoVoters(final @Nonnull Customizer<List<SsoVoter>> customizer) {
+  public @NonNull AuthnServerConfigurer ssoVoters(final @NonNull Customizer<List<SsoVoter>> customizer) {
     customizer.customize(this.ssoVoters);
     return this;
   }
@@ -510,7 +509,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the single sign-on voters
    */
-  public @Nonnull List<SsoVoter> getSsoVoters() {
+  public @NonNull List<SsoVoter> getSsoVoters() {
     return this.ssoVoters;
   }
 
@@ -521,8 +520,8 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer postAuthenticationProcessors(
-      final @Nonnull Customizer<List<PostAuthenticationProcessor>> customizer) {
+  public @NonNull AuthnServerConfigurer postAuthenticationProcessors(
+      final @NonNull Customizer<List<PostAuthenticationProcessor>> customizer) {
     customizer.customize(this.postAuthenticationProcessors);
     return this;
   }
@@ -532,7 +531,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the post-authentication processors
    */
-  public @Nonnull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
+  public @NonNull List<PostAuthenticationProcessor> getPostAuthenticationProcessors() {
     return this.postAuthenticationProcessors;
   }
 
@@ -543,7 +542,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param configurer the protocol configurer
    * @return this configurer
    */
-  public @Nonnull AuthnServerConfigurer protocol(final @Nonnull AbstractProtocolConfigurer<?> configurer) {
+  public @NonNull AuthnServerConfigurer protocol(final @NonNull AbstractProtocolConfigurer<?> configurer) {
     Objects.requireNonNull(configurer, "configurer must not be null");
     configurer.register(this);
     this.protocols.put(configurer.getClass(), configurer);
@@ -559,8 +558,8 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @return this configurer
    * @throws IllegalStateException if no configurer of the given type has been registered
    */
-  public @Nonnull <T extends AbstractProtocolConfigurer<T>> AuthnServerConfigurer protocol(
-      final @Nonnull Class<T> type, final @Nonnull Customizer<T> customizer) {
+  public <T extends AbstractProtocolConfigurer<T>> @NonNull AuthnServerConfigurer protocol(
+      final @NonNull Class<T> type, final @NonNull Customizer<T> customizer) {
     final T configurer = this.getProtocolConfigurer(type);
     if (configurer == null) {
       throw new IllegalStateException("No protocol configurer of type %s has been registered"
@@ -577,7 +576,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param <T> the type of the protocol configurer
    * @return the configurer, or {@code null} if no configurer of that type has been registered
    */
-  public @Nullable <T extends AbstractProtocolConfigurer<T>> T getProtocolConfigurer(final @Nonnull Class<T> type) {
+  public <T extends AbstractProtocolConfigurer<T>> @Nullable T getProtocolConfigurer(final @NonNull Class<T> type) {
     return this.protocols.values().stream()
         .filter(type::isInstance)
         .map(type::cast)
@@ -590,7 +589,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the protocol configurers
    */
-  public @Nonnull List<AbstractProtocolConfigurer<?>> getProtocolConfigurers() {
+  public @NonNull List<AbstractProtocolConfigurer<?>> getProtocolConfigurers() {
     return Collections.unmodifiableList(new ArrayList<>(this.protocols.values()));
   }
 
@@ -600,7 +599,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return a request matcher
    */
-  public @Nonnull RequestMatcher getEndpointsMatcher() {
+  public @NonNull RequestMatcher getEndpointsMatcher() {
     return request -> {
       if (this.endpointsMatcher == null) {
         throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
@@ -615,7 +614,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return a request matcher
    */
-  public @Nonnull RequestMatcher getAuthnPathsMatcher() {
+  public @NonNull RequestMatcher getAuthnPathsMatcher() {
     return request -> {
       if (this.authnPathsMatcher == null) {
         throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
@@ -631,7 +630,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @return the user authentication flow
    * @throws IllegalStateException if the configurer has not been initialized
    */
-  public @Nonnull UserAuthenticationFlow getUserAuthenticationFlow() {
+  public @NonNull UserAuthenticationFlow getUserAuthenticationFlow() {
     if (this.userAuthenticationFlow == null) {
       throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
     }
@@ -640,7 +639,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /** {@inheritDoc} */
   @Override
-  public void init(final @Nonnull HttpSecurity http) {
+  public void init(final @NonNull HttpSecurity http) {
     this.validate();
     this.userAuthenticationFlow = new UserAuthenticationFlow(this.authenticationProviders);
 
@@ -680,7 +679,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /** {@inheritDoc} */
   @Override
-  public void configure(final @Nonnull HttpSecurity http) {
+  public void configure(final @NonNull HttpSecurity http) {
     this.protocols.values().forEach(p -> p.configure(http));
 
     final List<ResumedAuthenticationHandler> handlers = this.protocols.values().stream()
@@ -703,7 +702,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param <E> the type of the entries
    * @return a new list
    */
-  static @Nonnull <E> List<E> combine(final @Nonnull List<E> protocolEntries, final @Nonnull List<E> sharedEntries) {
+  static <E> @NonNull List<E> combine(final @NonNull List<E> protocolEntries, final @NonNull List<E> sharedEntries) {
     final List<E> combined = new ArrayList<>(protocolEntries);
     combined.addAll(sharedEntries);
     return combined;
@@ -715,7 +714,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    *
    * @return the client registry
    */
-  private @Nonnull ClientRegistry createClientRegistry() {
+  private @NonNull ClientRegistry createClientRegistry() {
     if (this.clientRegistry != null) {
       return this.clientRegistry;
     }
@@ -739,8 +738,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param <O> the type of the object
    * @return the processed object
    */
-  @Nonnull
-  <O> O postProcessObject(final @Nonnull O object) {
+  <O> @NonNull O postProcessObject(final @NonNull O object) {
     return this.postProcess(object);
   }
 
@@ -772,7 +770,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param name the name of the value, used in the error message
    * @throws IllegalArgumentException if the URL is invalid
    */
-  public static void assertBaseUrl(final @Nonnull String url, final @Nonnull String name) {
+  public static void assertBaseUrl(final @NonNull String url, final @NonNull String name) {
     if (url.endsWith("/")) {
       throw new IllegalArgumentException("%s '%s' must not end with /".formatted(name, url));
     }
@@ -796,7 +794,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param name the name of the value, used in the error message
    * @throws IllegalArgumentException if the value is negative
    */
-  static void assertClockSkew(final @Nonnull Duration clockSkew, final @Nonnull String name) {
+  static void assertClockSkew(final @NonNull Duration clockSkew, final @NonNull String name) {
     if (clockSkew.isNegative()) {
       throw new IllegalArgumentException(name + " must not be negative");
     }
@@ -809,7 +807,7 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
    * @param name the name of the value, used in the error message
    * @throws IllegalArgumentException if the algorithm is not available
    */
-  static void assertHashAlgorithm(final @Nonnull String hashAlgorithm, final @Nonnull String name) {
+  static void assertHashAlgorithm(final @NonNull String hashAlgorithm, final @NonNull String name) {
     try {
       MessageDigest.getInstance(hashAlgorithm);
     }

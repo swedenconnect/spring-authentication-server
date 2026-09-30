@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
@@ -67,10 +66,10 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    * @param requestObject the decoded request object, or {@code null} if the request had none
    * @param responseTarget where and how to answer
    */
-  public OidcAuthnRequestAuthenticationToken(final @Nonnull RequesterRecord requesterRecord,
-      final @Nonnull Map<String, List<String>> parameters,
-      final @Nullable RequestObjectDecoder.DecodedJwt requestObject,
-      final @Nonnull OidcResponseTarget responseTarget) {
+  public OidcAuthnRequestAuthenticationToken(final @NonNull RequesterRecord requesterRecord,
+      final @NonNull Map<String, List<String>> parameters,
+      final RequestObjectDecoder.@Nullable DecodedJwt requestObject,
+      final @NonNull OidcResponseTarget responseTarget) {
     super(List.of());
     this.requesterRecord = Objects.requireNonNull(requesterRecord, "requesterRecord must not be null");
     this.clientMetadata = requesterRecord.getProtocolMetadata(OIDCClientMetadata.class);
@@ -82,7 +81,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Object getCredentials() {
+  public @NonNull Object getCredentials() {
     return "";
   }
 
@@ -90,7 +89,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    * Gets the {@code client_id} of the client.
    */
   @Override
-  public @Nonnull Object getPrincipal() {
+  public @NonNull Object getPrincipal() {
     return this.getClientId();
   }
 
@@ -99,7 +98,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return the {@code client_id}
    */
-  public @Nonnull String getClientId() {
+  public @NonNull String getClientId() {
     return this.responseTarget.clientId();
   }
 
@@ -108,7 +107,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return the requester record
    */
-  public @Nonnull RequesterRecord getRequesterRecord() {
+  public @NonNull RequesterRecord getRequesterRecord() {
     return this.requesterRecord;
   }
 
@@ -117,7 +116,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return the client metadata
    */
-  public @Nonnull OIDCClientMetadata getClientMetadata() {
+  public @NonNull OIDCClientMetadata getClientMetadata() {
     return this.clientMetadata;
   }
 
@@ -127,7 +126,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return the parameters
    */
-  public @Nonnull Map<String, List<String>> getParameters() {
+  public @NonNull Map<String, List<String>> getParameters() {
     return this.parameters;
   }
 
@@ -136,7 +135,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return the request object, or {@code null} if the request had none
    */
-  public @Nullable RequestObjectDecoder.DecodedJwt getRequestObject() {
+  public RequestObjectDecoder.@Nullable DecodedJwt getRequestObject() {
     return this.requestObject;
   }
 
@@ -145,7 +144,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return the response target
    */
-  public @Nonnull OidcResponseTarget getResponseTarget() {
+  public @NonNull OidcResponseTarget getResponseTarget() {
     return this.responseTarget;
   }
 
@@ -154,7 +153,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    *
    * @return a log string
    */
-  public @Nonnull String getLogString() {
+  public @NonNull String getLogString() {
     return logString(this.getClientId());
   }
 
@@ -164,7 +163,7 @@ public class OidcAuthnRequestAuthenticationToken extends AbstractAuthenticationT
    * @param clientId the {@code client_id}
    * @return a log string
    */
-  static @Nonnull String logString(final @Nonnull String clientId) {
+  static @NonNull String logString(final @NonNull String clientId) {
     return "requester: '%s'".formatted(new Requester(AuthenticationProtocol.OIDC, clientId));
   }
 

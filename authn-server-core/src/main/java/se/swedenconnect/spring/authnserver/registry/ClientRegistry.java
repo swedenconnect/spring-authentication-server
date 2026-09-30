@@ -15,8 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.registry;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -46,7 +46,7 @@ public interface ClientRegistry {
    * @return a {@link RequesterRecord}, or {@code null} if the requester is not known
    * @throws ClientRegistryException if a backend fails
    */
-  @Nullable RequesterRecord lookup(final @Nonnull Requester requester) throws ClientRegistryException;
+  @Nullable RequesterRecord lookup(final @NonNull Requester requester) throws ClientRegistryException;
 
   /**
    * Looks up a requester.
@@ -57,7 +57,7 @@ public interface ClientRegistry {
    * @throws ClientRegistryException if a backend fails
    */
   default @Nullable RequesterRecord lookup(
-      final @Nonnull AuthenticationProtocol protocol, final @Nonnull String identifier)
+      final @NonNull AuthenticationProtocol protocol, final @NonNull String identifier)
       throws ClientRegistryException {
     return this.lookup(new Requester(protocol, identifier));
   }
@@ -76,7 +76,7 @@ public interface ClientRegistry {
    *           not known
    * @throws ClientRegistryException if a backend fails
    */
-  @Nullable RequesterRecord requestMark(final @Nonnull Requester requester, final @Nonnull String mark)
+  @Nullable RequesterRecord requestMark(final @NonNull Requester requester, final @NonNull String mark)
       throws ClientRegistryException;
 
 }

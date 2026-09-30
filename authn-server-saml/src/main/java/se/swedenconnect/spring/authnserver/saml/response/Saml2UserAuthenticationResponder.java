@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Response;
 import org.slf4j.Logger;
@@ -71,9 +71,9 @@ public class Saml2UserAuthenticationResponder {
    * @param responseSender sends the response
    * @param flow keeps the authentication in the session
    */
-  public Saml2UserAuthenticationResponder(final @Nonnull Saml2AssertionBuilder assertionBuilder,
-      final @Nonnull Saml2ResponseBuilder responseBuilder, final @Nonnull Saml2ResponseSender responseSender,
-      final @Nonnull UserAuthenticationFlow flow) {
+  public Saml2UserAuthenticationResponder(final @NonNull Saml2AssertionBuilder assertionBuilder,
+      final @NonNull Saml2ResponseBuilder responseBuilder, final @NonNull Saml2ResponseSender responseSender,
+      final @NonNull UserAuthenticationFlow flow) {
     this.assertionBuilder = Objects.requireNonNull(assertionBuilder, "assertionBuilder must not be null");
     this.responseBuilder = Objects.requireNonNull(responseBuilder, "responseBuilder must not be null");
     this.responseSender = Objects.requireNonNull(responseSender, "responseSender must not be null");
@@ -92,8 +92,8 @@ public class Saml2UserAuthenticationResponder {
    *     Provider, in which case the session authentication has been removed
    * @throws UnrecoverableErrorException if the response cannot be built or sent
    */
-  public void sendResponse(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull UserAuthenticationInputToken token, final @Nonnull UserAuthentication authentication)
+  public void sendResponse(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull UserAuthenticationInputToken token, final @NonNull UserAuthentication authentication)
       throws AuthenticationErrorException, UnrecoverableErrorException {
 
     final Saml2AuthnRequestData requestData = getRequestData(token);
@@ -125,8 +125,8 @@ public class Saml2UserAuthenticationResponder {
    * @param error the error
    * @throws UnrecoverableErrorException if the response cannot be built or sent
    */
-  public void sendErrorResponse(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull Saml2ResponseAttributes responseAttributes, final @Nonnull SamlErrorStatusException error)
+  public void sendErrorResponse(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull Saml2ResponseAttributes responseAttributes, final @NonNull SamlErrorStatusException error)
       throws UnrecoverableErrorException {
 
     final Response samlResponse = this.responseBuilder.buildErrorResponse(responseAttributes, error);
@@ -144,7 +144,7 @@ public class Saml2UserAuthenticationResponder {
    * @return the SAML request data
    * @throws UnrecoverableErrorException if the request carries no SAML data
    */
-  public static @Nonnull Saml2AuthnRequestData getRequestData(final @Nonnull UserAuthenticationInputToken token)
+  public static @NonNull Saml2AuthnRequestData getRequestData(final @NonNull UserAuthenticationInputToken token)
       throws UnrecoverableErrorException {
     if (token.getProtocolRequestData() instanceof final Saml2AuthnRequestData data) {
       return data;

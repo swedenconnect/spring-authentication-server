@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
@@ -49,7 +49,7 @@ public class ConfigurationClientBackend implements ClientRegistryBackend {
    *
    * @param clients the configured clients
    */
-  public ConfigurationClientBackend(final @Nonnull Collection<OidcClientRecord> clients) {
+  public ConfigurationClientBackend(final @NonNull Collection<OidcClientRecord> clients) {
     this(clients, DEFAULT_NAME);
   }
 
@@ -60,7 +60,7 @@ public class ConfigurationClientBackend implements ClientRegistryBackend {
    * @param name the backend name
    */
   public ConfigurationClientBackend(
-      final @Nonnull Collection<OidcClientRecord> clients, final @Nonnull String name) {
+      final @NonNull Collection<OidcClientRecord> clients, final @NonNull String name) {
     Objects.requireNonNull(clients, "clients must not be null");
     this.name = Objects.requireNonNull(name, "name must not be null");
     final Map<String, OidcClientRecord> map = new LinkedHashMap<>();
@@ -70,19 +70,19 @@ public class ConfigurationClientBackend implements ClientRegistryBackend {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.name;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.OIDC;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord lookup(final @Nonnull String identifier) {
+  public @Nullable RequesterRecord lookup(final @NonNull String identifier) {
     Objects.requireNonNull(identifier, "identifier must not be null");
     final OidcClientRecord client = this.clients.get(identifier);
     return client != null ? client.toRequesterRecord() : null;

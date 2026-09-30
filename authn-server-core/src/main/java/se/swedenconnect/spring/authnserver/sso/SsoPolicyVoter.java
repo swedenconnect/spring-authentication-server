@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
@@ -50,7 +50,7 @@ public class SsoPolicyVoter implements SsoVoter {
    *
    * @param policyResolver gives the policy for a protocol, asked for every request
    */
-  public SsoPolicyVoter(final @Nonnull Function<AuthenticationProtocol, SsoPolicy> policyResolver) {
+  public SsoPolicyVoter(final @NonNull Function<AuthenticationProtocol, SsoPolicy> policyResolver) {
     this.policyResolver = Objects.requireNonNull(policyResolver, "policyResolver must not be null");
   }
 
@@ -59,7 +59,7 @@ public class SsoPolicyVoter implements SsoVoter {
    *
    * @param policySupplier where the policy comes from, asked for every request
    */
-  public SsoPolicyVoter(final @Nonnull Supplier<SsoPolicy> policySupplier) {
+  public SsoPolicyVoter(final @NonNull Supplier<SsoPolicy> policySupplier) {
     Objects.requireNonNull(policySupplier, "policySupplier must not be null");
     this.policyResolver = protocol -> policySupplier.get();
   }
@@ -69,15 +69,15 @@ public class SsoPolicyVoter implements SsoVoter {
    *
    * @param policy the policy
    */
-  public SsoPolicyVoter(final @Nonnull SsoPolicy policy) {
+  public SsoPolicyVoter(final @NonNull SsoPolicy policy) {
     this(() -> Objects.requireNonNull(policy, "policy must not be null"));
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull SsoDecision vote(final @Nonnull UserAuthentication previousAuthentication,
-      final @Nonnull AuthenticationRequirements requirements, final @Nonnull Requester requester,
-      final @Nonnull List<String> allowedAuthnContexts) {
+  public @NonNull SsoDecision vote(final @NonNull UserAuthentication previousAuthentication,
+      final @NonNull AuthenticationRequirements requirements, final @NonNull Requester requester,
+      final @NonNull List<String> allowedAuthnContexts) {
 
     final SsoPolicy policy = this.policyResolver.apply(requester.protocol());
     if (!policy.isEnabled()) {

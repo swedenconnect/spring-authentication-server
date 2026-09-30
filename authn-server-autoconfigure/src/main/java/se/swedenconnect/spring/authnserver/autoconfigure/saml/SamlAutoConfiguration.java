@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.saml;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.security.cert.X509Certificate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.storage.ReplayCache;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -150,8 +149,8 @@ public class SamlAutoConfiguration {
    * @param properties the SAML properties
    * @return the configurer
    */
-  static @Nonnull Saml2IdpConfigurer createConfigurer(final @Nonnull AuthnServerConfigurer server,
-      final @Nonnull SamlConfigurationProperties properties) {
+  static @NonNull Saml2IdpConfigurer createConfigurer(final @NonNull AuthnServerConfigurer server,
+      final @NonNull SamlConfigurationProperties properties) {
 
     final Saml2IdpConfigurer configurer = new Saml2IdpConfigurer();
     if (properties.getPath() != null) {
@@ -265,8 +264,8 @@ public class SamlAutoConfiguration {
    * @param server the shared configurer
    * @param properties the requester acceptance properties
    */
-  private static void applyRequesterAcceptance(final @Nonnull AuthnServerConfigurer server,
-      final @Nonnull SamlConfigurationProperties.RequesterAcceptanceProperties properties) {
+  private static void applyRequesterAcceptance(final @NonNull AuthnServerConfigurer server,
+      final SamlConfigurationProperties.@NonNull RequesterAcceptanceProperties properties) {
 
     final boolean hasWhitelist = properties.getWhitelist() != null && !properties.getWhitelist().isEmpty();
     final boolean hasMarks = properties.getRequiredMarks() != null && !properties.getRequiredMarks().isEmpty();
@@ -292,8 +291,8 @@ public class SamlAutoConfiguration {
    * @param properties the properties
    * @return a {@link MetadataSource}
    */
-  private static @Nonnull MetadataSource toMetadataSource(
-      final @Nonnull SamlConfigurationProperties.MetadataProviderProperties properties) {
+  private static @NonNull MetadataSource toMetadataSource(
+      final SamlConfigurationProperties.@NonNull MetadataProviderProperties properties) {
     if (properties.getLocation() == null) {
       throw new IllegalArgumentException(
           "Missing location for %s.metadata-providers[]".formatted(SamlConfigurationProperties.PREFIX));
@@ -323,8 +322,8 @@ public class SamlAutoConfiguration {
    * @param uiInfo the properties
    * @return the UI information, or {@code null}
    */
-  private static @Nullable IdpMetadataElements.UiInfo toUiInfo(
-      final @Nullable SamlConfigurationProperties.MetadataProperties.UiInfo uiInfo) {
+  private static IdpMetadataElements.@Nullable UiInfo toUiInfo(
+      final SamlConfigurationProperties.MetadataProperties.@Nullable UiInfo uiInfo) {
     if (uiInfo == null) {
       return null;
     }

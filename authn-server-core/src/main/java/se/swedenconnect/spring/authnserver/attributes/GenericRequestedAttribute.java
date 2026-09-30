@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Collections;
@@ -25,6 +22,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -67,7 +67,7 @@ public class GenericRequestedAttribute implements Serializable {
    * @param requestedValues the values that the requester will accept, may be {@code null}
    * @param protocolData protocol specific data, may be {@code null}
    */
-  public GenericRequestedAttribute(final @Nonnull String identifier, final boolean essential,
+  public GenericRequestedAttribute(final @NonNull String identifier, final boolean essential,
       final @Nullable List<? extends Serializable> requestedValues,
       final @Nullable Map<String, Serializable> protocolData) {
     this.identifier = Objects.requireNonNull(identifier, "identifier must not be null");
@@ -84,7 +84,7 @@ public class GenericRequestedAttribute implements Serializable {
    * @param identifier the attribute identifier
    * @return a {@link GenericRequestedAttribute}
    */
-  public static @Nonnull GenericRequestedAttribute of(final @Nonnull String identifier) {
+  public static @NonNull GenericRequestedAttribute of(final @NonNull String identifier) {
     return new GenericRequestedAttribute(identifier, false, null, null);
   }
 
@@ -95,7 +95,7 @@ public class GenericRequestedAttribute implements Serializable {
    * @param essential whether the requester requires the attribute
    * @return a {@link GenericRequestedAttribute}
    */
-  public static @Nonnull GenericRequestedAttribute of(final @Nonnull String identifier, final boolean essential) {
+  public static @NonNull GenericRequestedAttribute of(final @NonNull String identifier, final boolean essential) {
     return new GenericRequestedAttribute(identifier, essential, null, null);
   }
 
@@ -104,7 +104,7 @@ public class GenericRequestedAttribute implements Serializable {
    *
    * @return the attribute identifier
    */
-  public @Nonnull String getIdentifier() {
+  public @NonNull String getIdentifier() {
     return this.identifier;
   }
 
@@ -122,7 +122,7 @@ public class GenericRequestedAttribute implements Serializable {
    *
    * @return the requested values, or an empty list
    */
-  public @Nonnull List<? extends Serializable> getRequestedValues() {
+  public @NonNull List<? extends Serializable> getRequestedValues() {
     return this.requestedValues;
   }
 
@@ -131,7 +131,7 @@ public class GenericRequestedAttribute implements Serializable {
    *
    * @return a map of protocol specific data, possibly empty
    */
-  public @Nonnull Map<String, Serializable> getProtocolData() {
+  public @NonNull Map<String, Serializable> getProtocolData() {
     return this.protocolData;
   }
 
@@ -143,7 +143,7 @@ public class GenericRequestedAttribute implements Serializable {
    * @param type the expected type
    * @return the data, or {@code null} if it is missing or of another type
    */
-  public <T extends Serializable> @Nullable T getProtocolData(final @Nonnull String key, final @Nonnull Class<T> type) {
+  public <T extends Serializable> @Nullable T getProtocolData(final @NonNull String key, final @NonNull Class<T> type) {
     final Serializable value = this.protocolData.get(key);
     return type.isInstance(value) ? type.cast(value) : null;
   }
@@ -159,7 +159,7 @@ public class GenericRequestedAttribute implements Serializable {
    * @param other the requested attribute to merge with
    * @return a merged {@link GenericRequestedAttribute}
    */
-  public @Nonnull GenericRequestedAttribute merge(final @Nonnull GenericRequestedAttribute other) {
+  public @NonNull GenericRequestedAttribute merge(final @NonNull GenericRequestedAttribute other) {
     if (!this.identifier.equals(other.identifier)) {
       throw new IllegalArgumentException("Can not merge requested attributes with different identifiers");
     }

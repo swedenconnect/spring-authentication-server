@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.MergeableProtocolData;
 
@@ -58,7 +58,7 @@ public enum ClaimDeliveryTarget implements MergeableProtocolData {
    * @param userInfo whether the claim is to be delivered from the UserInfo endpoint
    * @return a {@link ClaimDeliveryTarget}
    */
-  public static @Nonnull ClaimDeliveryTarget of(final boolean idToken, final boolean userInfo) {
+  public static @NonNull ClaimDeliveryTarget of(final boolean idToken, final boolean userInfo) {
     if (idToken && userInfo) {
       return ID_TOKEN_AND_USER_INFO;
     }
@@ -95,14 +95,14 @@ public enum ClaimDeliveryTarget implements MergeableProtocolData {
    * @param other the target to combine with
    * @return a {@link ClaimDeliveryTarget}
    */
-  public @Nonnull ClaimDeliveryTarget combine(final @Nonnull ClaimDeliveryTarget other) {
+  public @NonNull ClaimDeliveryTarget combine(final @NonNull ClaimDeliveryTarget other) {
     Objects.requireNonNull(other, "other must not be null");
     return of(this.isIdToken() || other.isIdToken(), this.isUserInfo() || other.isUserInfo());
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Serializable mergeWith(final @Nonnull Serializable other) {
+  public @NonNull Serializable mergeWith(final @NonNull Serializable other) {
     return other instanceof final ClaimDeliveryTarget target ? this.combine(target) : this;
   }
 

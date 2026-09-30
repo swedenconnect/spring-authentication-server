@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Attribute;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
@@ -50,21 +49,21 @@ public class EidasToProtocolMapper implements ToProtocolAttributeMapper<Attribut
    * @param identifier the generic attribute identifier
    * @param template the eIDAS attribute to produce
    */
-  public EidasToProtocolMapper(final @Nonnull String identifier, final @Nonnull EidasAttributeTemplate template) {
+  public EidasToProtocolMapper(final @NonNull String identifier, final @NonNull EidasAttributeTemplate template) {
     this.identifier = Objects.requireNonNull(identifier, "identifier must not be null");
     this.template = Objects.requireNonNull(template, "template must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(this.identifier);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<Attribute> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<Attribute> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
     final List<Serializable> values = new ArrayList<>();
     for (final GenericAttribute<? extends Serializable> attribute : attributes) {
       for (final Serializable value : attribute.getValues()) {
@@ -82,7 +81,7 @@ public class EidasToProtocolMapper implements ToProtocolAttributeMapper<Attribut
    *
    * @return an {@link EidasAttributeTemplate}
    */
-  public @Nonnull EidasAttributeTemplate getTemplate() {
+  public @NonNull EidasAttributeTemplate getTemplate() {
     return this.template;
   }
 

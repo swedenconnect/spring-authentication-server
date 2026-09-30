@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.release;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +64,8 @@ public class SwedenConnectAttributeReleaseVoter implements AttributeReleaseVoter
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AttributeReleaseVote vote(final @Nonnull UserAuthentication userAuthentication,
-      final @Nonnull GenericAttribute<? extends Serializable> attribute) {
+  public @NonNull AttributeReleaseVote vote(final @NonNull UserAuthentication userAuthentication,
+      final @NonNull GenericAttribute<? extends Serializable> attribute) {
 
     if (AttributeIdentifiers.COORDINATION_NUMBER.equals(attribute.getIdentifier())
         && !entityCategories(userAuthentication).contains(ACCEPTS_COORDINATION_NUMBER)) {
@@ -84,7 +83,7 @@ public class SwedenConnectAttributeReleaseVoter implements AttributeReleaseVoter
    * @param userAuthentication the authentication result
    * @return the declared entity categories, possibly empty
    */
-  private static @Nonnull List<String> entityCategories(final @Nonnull UserAuthentication userAuthentication) {
+  private static @NonNull List<String> entityCategories(final @NonNull UserAuthentication userAuthentication) {
     final AuthenticationRequirements requirements = userAuthentication.getAuthnRequirements();
     return requirements instanceof final SamlAuthenticationRequirements samlRequirements
         ? samlRequirements.getEntityCategories()

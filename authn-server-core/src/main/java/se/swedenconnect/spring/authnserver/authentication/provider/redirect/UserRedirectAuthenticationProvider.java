@@ -15,9 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -46,8 +45,7 @@ public interface UserRedirectAuthenticationProvider extends UserAuthenticationPr
    * @return the authentication result
    * @throws AuthenticationErrorException if the authentication failed in a way that can be reported to the requester
    */
-  @Nonnull
-  UserAuthentication resumeAuthentication(@Nonnull final ResumedAuthenticationToken token)
+  @NonNull UserAuthentication resumeAuthentication(final @NonNull ResumedAuthenticationToken token)
       throws AuthenticationErrorException;
 
   /**
@@ -57,46 +55,42 @@ public interface UserRedirectAuthenticationProvider extends UserAuthenticationPr
    * @param authentication what the module's controller delivered, may be {@code null}
    * @return {@code true} if the provider can use it and {@code false} otherwise
    */
-  boolean supportsUserAuthenticationToken(@Nullable final Authentication authentication);
+  boolean supportsUserAuthenticationToken(final @Nullable Authentication authentication);
 
   /**
    * Gets the side of the storage that the module's controller uses.
    *
    * @return a {@link RedirectAuthenticatorRepository}
    */
-  @Nonnull
-  RedirectAuthenticatorRepository getAuthenticatorRepository();
+  @NonNull RedirectAuthenticatorRepository getAuthenticatorRepository();
 
   /**
    * Gets the side of the storage that the protocol flow uses.
    *
    * @return a {@link RedirectFlowRepository}
    */
-  @Nonnull
-  RedirectFlowRepository getFlowRepository();
+  @NonNull RedirectFlowRepository getFlowRepository();
 
   /**
    * Gets the path that the user is sent to for authentication.
    *
    * @return the authentication path
    */
-  @Nonnull
-  String getAuthnPath();
+  @NonNull String getAuthnPath();
 
   /**
    * Gets the path that the module sends the user back to when the authentication is done.
    *
    * @return the resume path
    */
-  @Nonnull
-  String getResumeAuthnPath();
+  @NonNull String getResumeAuthnPath();
 
   /**
    * Handles a {@link ResumedAuthenticationToken}, which continues an authentication, and a
    * {@link UserAuthenticationInputToken}, which starts one.
    */
   @Override
-  default @Nullable Authentication authenticate(final @Nonnull Authentication authentication) {
+  default @Nullable Authentication authenticate(final @NonNull Authentication authentication) {
     if (authentication instanceof final ResumedAuthenticationToken resumeToken) {
       if (!resumeToken.isError() && !this.supportsUserAuthenticationToken(resumeToken.getAuthnToken())) {
         return null;
@@ -110,7 +104,7 @@ public interface UserRedirectAuthenticationProvider extends UserAuthenticationPr
    * Supports {@link UserAuthenticationInputToken} and {@link ResumedAuthenticationToken}.
    */
   @Override
-  default boolean supports(final @Nonnull Class<?> authentication) {
+  default boolean supports(final @NonNull Class<?> authentication) {
     return UserAuthenticationProvider.super.supports(authentication)
         || ResumedAuthenticationToken.class.isAssignableFrom(authentication);
   }

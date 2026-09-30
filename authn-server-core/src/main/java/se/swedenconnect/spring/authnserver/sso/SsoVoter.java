@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -48,9 +48,8 @@ public interface SsoVoter {
    * @param allowedAuthnContexts the authentication contexts that may be used for this request
    * @return an {@link SsoDecision}
    */
-  @Nonnull
-  SsoDecision vote(@Nonnull final UserAuthentication previousAuthentication,
-      @Nonnull final AuthenticationRequirements requirements, @Nonnull final Requester requester,
-      @Nonnull final List<String> allowedAuthnContexts);
+  @NonNull SsoDecision vote(final @NonNull UserAuthentication previousAuthentication,
+      final @NonNull AuthenticationRequirements requirements, final @NonNull Requester requester,
+      final @NonNull List<String> allowedAuthnContexts);
 
 }

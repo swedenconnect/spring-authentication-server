@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.config;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -47,6 +46,6 @@ public interface AuthnServerConfigurerAdapter {
    * @param http the HTTP security object of the server's filter chain
    * @param configurer the shared configurer
    */
-  void configure(final @Nonnull HttpSecurity http, final @Nonnull AuthnServerConfigurer configurer);
+  void configure(final @NonNull HttpSecurity http, final @NonNull AuthnServerConfigurer configurer);
 
 }

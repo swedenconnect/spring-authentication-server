@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.metadata;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -26,6 +23,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.criterion.EntityIdCriterion;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.ext.saml2mdui.Logo;
@@ -79,7 +78,7 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    *
    * @param metadataResolver where Service Provider metadata is found
    */
-  public SamlMetadataBackend(final @Nonnull MetadataResolver metadataResolver) {
+  public SamlMetadataBackend(final @NonNull MetadataResolver metadataResolver) {
     this(metadataResolver, DEFAULT_NAME);
   }
 
@@ -89,26 +88,26 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param metadataResolver where Service Provider metadata is found
    * @param name the backend name
    */
-  public SamlMetadataBackend(final @Nonnull MetadataResolver metadataResolver, final @Nonnull String name) {
+  public SamlMetadataBackend(final @NonNull MetadataResolver metadataResolver, final @NonNull String name) {
     this.metadataResolver = Objects.requireNonNull(metadataResolver, "metadataResolver must not be null");
     this.name = Objects.requireNonNull(name, "name must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.name;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.SAML;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord lookup(final @Nonnull String identifier) throws ClientRegistryException {
+  public @Nullable RequesterRecord lookup(final @NonNull String identifier) throws ClientRegistryException {
     Objects.requireNonNull(identifier, "identifier must not be null");
     final EntityDescriptor metadata;
     try {
@@ -132,7 +131,7 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param metadata the Service Provider metadata
    * @return a {@link RequesterRecord}
    */
-  public static @Nonnull RequesterRecord toRecord(final @Nonnull EntityDescriptor metadata) {
+  public static @NonNull RequesterRecord toRecord(final @NonNull EntityDescriptor metadata) {
     Objects.requireNonNull(metadata, "metadata must not be null");
     final UIInfo uiInfo = getUiInfo(metadata);
     return new RequesterRecord(
@@ -151,7 +150,7 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param metadata the Service Provider metadata
    * @return the organisation number, or {@code null} if the metadata has none
    */
-  private static @Nullable String getOrganizationNumber(final @Nonnull EntityDescriptor metadata) {
+  private static @Nullable String getOrganizationNumber(final @NonNull EntityDescriptor metadata) {
     return Optional.ofNullable(metadata.getOrganization())
         .map(Organization::getExtensions)
         .flatMap(e -> e.getUnknownXMLObjects(OrganizationNumber.DEFAULT_ELEMENT_NAME).stream()
@@ -169,7 +168,7 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param metadata the Service Provider metadata
    * @return the {@link UIInfo} element, or {@code null} if the metadata has none
    */
-  private static @Nullable UIInfo getUiInfo(final @Nonnull EntityDescriptor metadata) {
+  private static @Nullable UIInfo getUiInfo(final @NonNull EntityDescriptor metadata) {
     return Optional.ofNullable(metadata.getSPSSODescriptor(SAMLConstants.SAML20P_NS))
         .map(SPSSODescriptor::getExtensions)
         .map(e -> e.getUnknownXMLObjects(UIInfo.DEFAULT_ELEMENT_NAME))
@@ -188,8 +187,8 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param uiInfo the UI information of the metadata, or {@code null}
    * @return a list of display names
    */
-  private static @Nonnull List<DisplayName> getDisplayNames(
-      final @Nonnull EntityDescriptor metadata, final @Nullable UIInfo uiInfo) {
+  private static @NonNull List<DisplayName> getDisplayNames(
+      final @NonNull EntityDescriptor metadata, final @Nullable UIInfo uiInfo) {
 
     final Map<String, DisplayName> names = new LinkedHashMap<>();
     if (uiInfo != null) {
@@ -211,7 +210,7 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param value the name, as given in the metadata
    */
   private static void addName(
-      final @Nonnull Map<String, DisplayName> names, final @Nullable String language, final @Nullable String value) {
+      final @NonNull Map<String, DisplayName> names, final @Nullable String language, final @Nullable String value) {
     if (value == null || value.isBlank()) {
       return;
     }
@@ -224,7 +223,7 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
    * @param uiInfo the UI information of the metadata, or {@code null}
    * @return a list of logotypes
    */
-  private static @Nonnull List<se.swedenconnect.spring.authnserver.registry.Logo> getLogos(
+  private static @NonNull List<se.swedenconnect.spring.authnserver.registry.Logo> getLogos(
       final @Nullable UIInfo uiInfo) {
     if (uiInfo == null) {
       return List.of();

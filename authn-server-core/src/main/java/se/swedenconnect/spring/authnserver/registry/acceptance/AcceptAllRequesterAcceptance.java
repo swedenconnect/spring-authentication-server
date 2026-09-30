@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.registry.acceptance;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
@@ -38,7 +38,7 @@ public final class AcceptAllRequesterAcceptance implements RequesterAcceptance {
    * Accepts every requester.
    */
   @Override
-  public boolean isAccepted(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry) {
+  public boolean isAccepted(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry) {
     return true;
   }
 

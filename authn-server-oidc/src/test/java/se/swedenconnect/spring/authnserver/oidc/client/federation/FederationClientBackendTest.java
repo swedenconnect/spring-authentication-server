@@ -18,9 +18,6 @@ package se.swedenconnect.spring.authnserver.oidc.client.federation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,6 +25,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
@@ -290,7 +289,7 @@ class FederationClientBackendTest extends FederationTestSupport {
     Function<String, ResolvedClient> answerFor;
 
     @Override
-    public @Nullable ResolvedClient resolve(final @Nonnull String clientId) {
+    public @Nullable ResolvedClient resolve(final @NonNull String clientId) {
       this.calls++;
       this.asked.add(clientId);
       if (this.failure != null) {
@@ -316,7 +315,7 @@ class FederationClientBackendTest extends FederationTestSupport {
     int calls;
 
     @Override
-    public @Nullable TrustMark request(final @Nonnull String clientId, final @Nonnull String trustMarkType) {
+    public @Nullable TrustMark request(final @NonNull String clientId, final @NonNull String trustMarkType) {
       this.calls++;
       if (this.failure != null) {
         throw this.failure;

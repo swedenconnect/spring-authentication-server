@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.subject;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.oauth2.sdk.id.Subject;
 import com.nimbusds.openid.connect.sdk.SubjectType;
@@ -44,7 +44,7 @@ public interface SubjectGenerator extends SubjectIdentifierGenerator {
    * @return a {@link Subject}
    * @throws UnrecoverableErrorException if the {@code sub} claim can not be generated
    */
-  default @Nonnull Subject getSubject(final @Nonnull AuthenticatedUser user, final @Nonnull Requester requester)
+  default @NonNull Subject getSubject(final @NonNull AuthenticatedUser user, final @NonNull Requester requester)
       throws UnrecoverableErrorException {
     return new Subject(this.getSubjectIdentifier(user, requester));
   }
@@ -54,7 +54,6 @@ public interface SubjectGenerator extends SubjectIdentifierGenerator {
    *
    * @return a {@link SubjectType}
    */
-  @Nonnull
-  SubjectType getSubjectType();
+  @NonNull SubjectType getSubjectType();
 
 }

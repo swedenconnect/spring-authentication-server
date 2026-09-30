@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.schema.XSAny;
 import org.opensaml.core.xml.schema.XSBase64Binary;
@@ -56,7 +55,7 @@ public class SamlAttributeValues {
    * @param attribute the attribute
    * @return the values in string form, possibly empty
    */
-  public static @Nonnull List<String> getStringValues(final @Nullable Attribute attribute) {
+  public static @NonNull List<String> getStringValues(final @Nullable Attribute attribute) {
     if (attribute == null) {
       return List.of();
     }
@@ -106,7 +105,7 @@ public class SamlAttributeValues {
    * @param value the value to convert
    * @return the value in string form
    */
-  public static @Nonnull String toSamlStringValue(final @Nonnull Serializable value) {
+  public static @NonNull String toSamlStringValue(final @NonNull Serializable value) {
     Objects.requireNonNull(value, "value must not be null");
     if (value instanceof final LocalDate date) {
       return DATE_FORMATTER.format(date);
@@ -125,8 +124,8 @@ public class SamlAttributeValues {
    * @param values the attribute values
    * @return an {@link Attribute}
    */
-  public static @Nonnull Attribute createAttribute(final @Nonnull String name, final @Nullable String friendlyName,
-      final @Nonnull List<String> values) {
+  public static @NonNull Attribute createAttribute(final @NonNull String name, final @Nullable String friendlyName,
+      final @NonNull List<String> values) {
     final AttributeBuilder builder = AttributeBuilder.builder(name)
         .friendlyName(friendlyName)
         .nameFormat(Attribute.URI_REFERENCE);
@@ -144,7 +143,7 @@ public class SamlAttributeValues {
    * @param second the second attribute
    * @return an {@link Attribute} holding the values of both
    */
-  public static @Nonnull Attribute merge(final @Nonnull Attribute first, final @Nonnull Attribute second) {
+  public static @NonNull Attribute merge(final @NonNull Attribute first, final @NonNull Attribute second) {
     final List<String> values = new ArrayList<>(getStringValues(first));
     for (final String value : getStringValues(second)) {
       if (!values.contains(value)) {

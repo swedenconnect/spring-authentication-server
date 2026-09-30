@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -25,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -102,7 +101,7 @@ public class OidcDiscoveryEndpointConfigurer {
    *
    * @param oidcConfigurer the OIDC configurer
    */
-  OidcDiscoveryEndpointConfigurer(final @Nonnull OidcProviderConfigurer oidcConfigurer) {
+  OidcDiscoveryEndpointConfigurer(final @NonNull OidcProviderConfigurer oidcConfigurer) {
     this.oidcConfigurer = oidcConfigurer;
   }
 
@@ -115,7 +114,7 @@ public class OidcDiscoveryEndpointConfigurer {
    * @param additionalParameters the parameters, or {@code null}
    * @return this configurer
    */
-  public @Nonnull OidcDiscoveryEndpointConfigurer additionalParameters(
+  public @NonNull OidcDiscoveryEndpointConfigurer additionalParameters(
       final @Nullable Map<String, Object> additionalParameters) {
     this.additionalParameters = additionalParameters;
     return this;
@@ -128,8 +127,8 @@ public class OidcDiscoveryEndpointConfigurer {
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull OidcDiscoveryEndpointConfigurer providerMetadataCustomizer(
-      final @Nonnull Customizer<OIDCProviderMetadata> customizer) {
+  public @NonNull OidcDiscoveryEndpointConfigurer providerMetadataCustomizer(
+      final @NonNull Customizer<OIDCProviderMetadata> customizer) {
     this.providerMetadataCustomizer = Objects.requireNonNull(customizer, "customizer must not be null");
     return this;
   }
@@ -146,7 +145,7 @@ public class OidcDiscoveryEndpointConfigurer {
    *
    * @param http the HTTP security object
    */
-  void configure(final @Nonnull HttpSecurity http) {
+  void configure(final @NonNull HttpSecurity http) {
     final OidcDiscoveryEndpointFilter filter =
         new OidcDiscoveryEndpointFilter(this.createProviderMetadata(), this.getRequestMatcher());
     http.addFilterBefore(this.oidcConfigurer.postProcessObject(filter),
@@ -159,8 +158,7 @@ public class OidcDiscoveryEndpointConfigurer {
    *
    * @return the path
    */
-  @Nonnull
-  String getEndpointPath() {
+  @NonNull String getEndpointPath() {
     final String baseUrl = Objects.requireNonNull(this.oidcConfigurer.getServer().getBaseUrl());
     return this.oidcConfigurer.getIssuer().substring(baseUrl.length()) + WELL_KNOWN_PATH;
   }
@@ -170,8 +168,7 @@ public class OidcDiscoveryEndpointConfigurer {
    *
    * @return the request matcher
    */
-  @Nonnull
-  RequestMatcher getRequestMatcher() {
+  @NonNull RequestMatcher getRequestMatcher() {
     return Objects.requireNonNull(this.requestMatcher, "The configurer has not been initialized");
   }
 
@@ -182,8 +179,7 @@ public class OidcDiscoveryEndpointConfigurer {
    * @throws IllegalArgumentException if an additional parameter is invalid, or replaces a parameter that the OpenID
    *     Provider sets
    */
-  @Nonnull
-  OIDCProviderMetadata createProviderMetadata() {
+  @NonNull OIDCProviderMetadata createProviderMetadata() {
     final OidcProviderConfigurer oidc = this.oidcConfigurer;
     final OidcKeys keys = oidc.getKeys();
     final SupportedScopesAndClaims scopesAndClaims = oidc.getSupportedScopesAndClaims();
@@ -241,7 +237,7 @@ public class OidcDiscoveryEndpointConfigurer {
    * @param metadata the built document
    * @return the document with the additional parameters
    */
-  private @Nonnull OIDCProviderMetadata addParameters(final @Nonnull OIDCProviderMetadata metadata) {
+  private @NonNull OIDCProviderMetadata addParameters(final @NonNull OIDCProviderMetadata metadata) {
     if (this.additionalParameters == null || this.additionalParameters.isEmpty()) {
       return metadata;
     }
@@ -267,7 +263,7 @@ public class OidcDiscoveryEndpointConfigurer {
    * @param value the language tag
    * @return a {@link LangTag}
    */
-  private static @Nonnull LangTag toLangTag(final @Nonnull String value) {
+  private static @NonNull LangTag toLangTag(final @NonNull String value) {
     try {
       return LangTag.parse(value);
     }

@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest.validation;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Objects;
 
 import net.shibboleth.shared.net.URIComparator;
 import net.shibboleth.shared.net.URIException;
 import net.shibboleth.shared.net.impl.BasicURLComparator;
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.metadata.AssertionConsumerService;
@@ -54,13 +53,13 @@ public class AssertionConsumerServiceValidator implements AuthnRequestValidator 
    *
    * @param uriComparator the comparator
    */
-  public void setUriComparator(final @Nonnull URIComparator uriComparator) {
+  public void setUriComparator(final @NonNull URIComparator uriComparator) {
     this.uriComparator = Objects.requireNonNull(uriComparator, "uriComparator must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public void validate(final @Nonnull Saml2AuthnRequestAuthenticationToken token) {
+  public void validate(final @NonNull Saml2AuthnRequestAuthenticationToken token) {
     final AuthnRequest authnRequest = token.getAuthnRequest();
     final SPSSODescriptor ssoDesc =
         Objects.requireNonNull(token.getPeerMetadata()).getSPSSODescriptor(SAMLConstants.SAML20P_NS);

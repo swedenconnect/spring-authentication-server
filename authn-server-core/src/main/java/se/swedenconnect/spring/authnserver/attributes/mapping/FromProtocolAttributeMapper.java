@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 
@@ -44,7 +44,7 @@ public interface FromProtocolAttributeMapper<I> {
    *
    * @return the protocol names
    */
-  @Nonnull Collection<String> getSupportedNames();
+  @NonNull Collection<String> getSupportedNames();
 
   /**
    * Maps the supplied inputs into generic requested attributes.
@@ -53,7 +53,7 @@ public interface FromProtocolAttributeMapper<I> {
    * @param context the mapping context
    * @return the resulting requested attributes, possibly empty
    */
-  @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<I> inputs,
-      final @Nonnull FromProtocolMappingContext<I> context);
+  @NonNull List<GenericRequestedAttribute> map(final @NonNull List<I> inputs,
+      final @NonNull FromProtocolMappingContext<I> context);
 
 }

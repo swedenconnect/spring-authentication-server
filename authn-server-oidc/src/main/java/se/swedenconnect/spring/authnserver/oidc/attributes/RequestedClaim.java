@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.claims.ClaimRequirement;
 import com.nimbusds.openid.connect.sdk.claims.ClaimsSetRequest;
@@ -33,7 +33,7 @@ import com.nimbusds.openid.connect.sdk.claims.ClaimsSetRequest;
  * @param target where the claim is to be delivered
  * @author Martin Lindström
  */
-public record RequestedClaim(@Nonnull ClaimsSetRequest.Entry entry, @Nonnull ClaimDeliveryTarget target) {
+public record RequestedClaim(ClaimsSetRequest.@NonNull Entry entry, @NonNull ClaimDeliveryTarget target) {
 
   /**
    * Constructor.
@@ -52,7 +52,7 @@ public record RequestedClaim(@Nonnull ClaimsSetRequest.Entry entry, @Nonnull Cla
    * @param claimName the claim name
    * @return a {@link RequestedClaim}
    */
-  public static @Nonnull RequestedClaim of(final @Nonnull String claimName) {
+  public static @NonNull RequestedClaim of(final @NonNull String claimName) {
     return new RequestedClaim(new ClaimsSetRequest.Entry(claimName), ClaimDeliveryTarget.USER_INFO);
   }
 
@@ -61,7 +61,7 @@ public record RequestedClaim(@Nonnull ClaimsSetRequest.Entry entry, @Nonnull Cla
    *
    * @return the claim name
    */
-  public @Nonnull String name() {
+  public @NonNull String name() {
     return this.entry.getClaimName();
   }
 
@@ -80,7 +80,7 @@ public record RequestedClaim(@Nonnull ClaimsSetRequest.Entry entry, @Nonnull Cla
    *
    * @return the values in string form, possibly empty
    */
-  public @Nonnull List<String> stringValues() {
+  public @NonNull List<String> stringValues() {
     final List<String> values = new ArrayList<>();
     final String value = asString(this.entry.getRawValue());
     if (value != null) {

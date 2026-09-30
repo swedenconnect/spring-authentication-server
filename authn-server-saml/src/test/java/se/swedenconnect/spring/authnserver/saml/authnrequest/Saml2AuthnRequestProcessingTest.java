@@ -33,7 +33,6 @@ import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestT
 import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestTestSupport.spMetadata;
 import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestTestSupport.toHttpRequest;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.Filter;
 
 import java.nio.charset.StandardCharsets;
@@ -45,6 +44,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.opensaml.core.xml.util.XMLObjectSupport;
@@ -169,22 +169,22 @@ class Saml2AuthnRequestProcessingTest extends OpenSamlTestBase {
     this.start(spMetadata(sp -> {}, LOA3_PNR), c -> c.authenticationProvider(new UserAuthenticationProvider() {
 
       @Override
-      public @Nonnull String getName() {
+      public @NonNull String getName() {
         return "test";
       }
 
       @Override
-      public @Nonnull List<String> getSupportedAuthnContextUris() {
+      public @NonNull List<String> getSupportedAuthnContextUris() {
         return List.of(LOA3, LOA4);
       }
 
       @Override
-      public @Nonnull List<String> getEntityCategories() {
+      public @NonNull List<String> getEntityCategories() {
         return List.of(LOA3_PNR);
       }
 
       @Override
-      public Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+      public Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
         return null;
       }
     }));
@@ -362,17 +362,17 @@ class Saml2AuthnRequestProcessingTest extends OpenSamlTestBase {
     this.start(spMetadata(sp -> {}), c -> c.clientRegistryBackend(new ClientRegistryBackend() {
 
       @Override
-      public @Nonnull String getName() {
+      public @NonNull String getName() {
         return "failing";
       }
 
       @Override
-      public @Nonnull AuthenticationProtocol getProtocol() {
+      public @NonNull AuthenticationProtocol getProtocol() {
         return AuthenticationProtocol.SAML;
       }
 
       @Override
-      public RequesterRecord lookup(final @Nonnull String identifier) throws ClientRegistryException {
+      public RequesterRecord lookup(final @NonNull String identifier) throws ClientRegistryException {
         throw new ClientRegistryException("The backend is down");
       }
     }));
@@ -661,13 +661,13 @@ class Saml2AuthnRequestProcessingTest extends OpenSamlTestBase {
     final RequesterPredicate hasOrganization = new RequesterPredicate() {
 
       @Override
-      public @Nonnull AuthenticationProtocol getProtocol() {
+      public @NonNull AuthenticationProtocol getProtocol() {
         return AuthenticationProtocol.SAML;
       }
 
       @Override
-      public boolean test(final @Nonnull RequesterRecord record,
-          final @Nonnull se.swedenconnect.spring.authnserver.registry.ClientRegistry registry) {
+      public boolean test(final @NonNull RequesterRecord record,
+          final se.swedenconnect.spring.authnserver.registry.@NonNull ClientRegistry registry) {
         return record.getProtocolMetadata(EntityDescriptor.class).getOrganization() != null;
       }
     };

@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
 import java.time.Clock;
 import java.time.Duration;
@@ -27,6 +25,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -58,7 +58,7 @@ public class LookupTracker {
    * @param maximumTrackedClients the largest number of clients that are counted
    * @param period the period that lookups are counted within
    */
-  public LookupTracker(final int maximumTrackedClients, final @Nonnull Duration period) {
+  public LookupTracker(final int maximumTrackedClients, final @NonNull Duration period) {
     this(maximumTrackedClients, period, Clock.systemUTC());
   }
 
@@ -69,7 +69,7 @@ public class LookupTracker {
    * @param period the period that lookups are counted within
    * @param clock the clock to use
    */
-  public LookupTracker(final int maximumTrackedClients, final @Nonnull Duration period, final @Nonnull Clock clock) {
+  public LookupTracker(final int maximumTrackedClients, final @NonNull Duration period, final @NonNull Clock clock) {
     if (maximumTrackedClients < 1) {
       throw new IllegalArgumentException("maximumTrackedClients must be a positive number");
     }
@@ -83,7 +83,7 @@ public class LookupTracker {
    *
    * @param clientId the {@code client_id} of the client
    */
-  public void record(final @Nonnull String clientId) {
+  public void record(final @NonNull String clientId) {
     Objects.requireNonNull(clientId, "clientId must not be null");
     final Instant now = this.clock.instant();
     synchronized (this.counts) {
@@ -105,7 +105,7 @@ public class LookupTracker {
    * @param maximum the largest number of clients to return
    * @return the {@code client_id}s of the qualifying clients
    */
-  public @Nonnull List<String> getFrequentClients(final int minimumLookups, final int maximum) {
+  public @NonNull List<String> getFrequentClients(final int minimumLookups, final int maximum) {
     final Instant now = this.clock.instant();
     final List<Map.Entry<String, Count>> qualifying = new ArrayList<>();
     synchronized (this.counts) {

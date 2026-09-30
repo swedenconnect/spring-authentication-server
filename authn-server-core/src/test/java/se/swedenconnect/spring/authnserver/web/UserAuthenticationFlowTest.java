@@ -21,12 +21,11 @@ import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.LOA3
 import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.samlRequester;
 import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.user;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -87,7 +86,7 @@ class UserAuthenticationFlowTest {
   void aProviderThatAsksForARedirectWithoutBeingARedirectProviderIsAnInternalError() {
     final UserAuthenticationProvider provider = new TestProvider("odd") {
       @Override
-      public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+      public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
         return new RedirectForAuthenticationToken("id", token, List.of(LOA3), "/authn", "/resume");
       }
     };
@@ -176,7 +175,7 @@ class UserAuthenticationFlowTest {
   private static UserAuthenticationProvider failing(final AuthenticationError error) {
     return new TestProvider("failing") {
       @Override
-      public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+      public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
         throw new AuthenticationErrorException(error);
       }
     };
@@ -193,7 +192,7 @@ class UserAuthenticationFlowTest {
       final @Nullable Authentication result) {
     return new TestProvider(name) {
       @Override
-      public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+      public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
         asked.add(name);
         return result;
       }
@@ -209,12 +208,12 @@ class UserAuthenticationFlowTest {
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return this.name;
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return List.of(LOA3);
     }
   }

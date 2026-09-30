@@ -17,8 +17,6 @@ package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.Filter;
 
 import java.net.URI;
@@ -28,6 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.assertj.AssertableWebApplicationContext;
@@ -94,23 +94,23 @@ class OidcAutoConfigurationTest {
       return new UserAuthenticationProvider() {
 
         @Override
-        public @Nonnull String getName() {
+        public @NonNull String getName() {
           return "test";
         }
 
         @Override
-        public @Nonnull List<String> getSupportedAuthnContextUris() {
+        public @NonNull List<String> getSupportedAuthnContextUris() {
           return List.of(LOA3);
         }
 
         @Override
-        public @Nonnull List<String> getSupportedAttributes() {
+        public @NonNull List<String> getSupportedAttributes() {
           return List.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, AttributeIdentifiers.GIVEN_NAME,
               AttributeIdentifiers.SURNAME);
         }
 
         @Override
-        public @Nullable Authentication authenticateUser(final @Nonnull UserAuthenticationInputToken token) {
+        public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
           throw new UnsupportedOperationException();
         }
       };

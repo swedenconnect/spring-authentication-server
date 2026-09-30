@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 import se.swedenconnect.spring.authnserver.attributes.mapping.FromProtocolAttributeMapper;
@@ -50,20 +50,20 @@ public class EidasAddressFromProtocolMapper implements FromProtocolAttributeMapp
    *
    * @param name the attribute name holding the eIDAS natural person address
    */
-  public EidasAddressFromProtocolMapper(final @Nonnull String name) {
+  public EidasAddressFromProtocolMapper(final @NonNull String name) {
     this.name = Objects.requireNonNull(name, "name must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedNames() {
+  public @NonNull Collection<String> getSupportedNames() {
     return List.of(this.name);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<SamlRequestedAttribute> inputs,
-      final @Nonnull FromProtocolMappingContext<SamlRequestedAttribute> context) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<SamlRequestedAttribute> inputs,
+      final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
     final List<String> values = inputs.stream()

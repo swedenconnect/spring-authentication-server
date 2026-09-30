@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.message;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -50,7 +50,7 @@ public abstract class GenericMessage implements Serializable {
    *          without a language, and no language may appear more than once
    * @param mimeType the MIME type of all the messages, {@link MessageMimeType#TEXT_PLAIN} if {@code null}
    */
-  protected GenericMessage(final @Nonnull Collection<LocalizedMessage> messages,
+  protected GenericMessage(final @NonNull Collection<LocalizedMessage> messages,
       final @Nullable MessageMimeType mimeType) {
     Objects.requireNonNull(messages, "messages must not be null");
     if (messages.isEmpty()) {
@@ -77,7 +77,7 @@ public abstract class GenericMessage implements Serializable {
    *
    * @return the messages
    */
-  public @Nonnull List<LocalizedMessage> getMessages() {
+  public @NonNull List<LocalizedMessage> getMessages() {
     return this.messages;
   }
 
@@ -86,7 +86,7 @@ public abstract class GenericMessage implements Serializable {
    *
    * @return the MIME type
    */
-  public @Nonnull MessageMimeType getMimeType() {
+  public @NonNull MessageMimeType getMimeType() {
     return this.mimeType;
   }
 

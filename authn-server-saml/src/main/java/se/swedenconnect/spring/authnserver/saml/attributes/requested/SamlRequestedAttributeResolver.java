@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +66,7 @@ public class SamlRequestedAttributeResolver {
    *
    * @param idpDeclaredEntityCategories the entity categories that the Identity Provider declares
    */
-  public SamlRequestedAttributeResolver(final @Nonnull Collection<String> idpDeclaredEntityCategories) {
+  public SamlRequestedAttributeResolver(final @NonNull Collection<String> idpDeclaredEntityCategories) {
     this(new SamlAttributeMapping(), getDefaultProcessors(idpDeclaredEntityCategories));
   }
 
@@ -77,8 +76,8 @@ public class SamlRequestedAttributeResolver {
    * @param attributeMapping the mapping between SAML attributes and the generic attribute model
    * @param processors the processors, one per source
    */
-  public SamlRequestedAttributeResolver(final @Nonnull SamlAttributeMapping attributeMapping,
-      final @Nonnull List<RequestedAttributeProcessor> processors) {
+  public SamlRequestedAttributeResolver(final @NonNull SamlAttributeMapping attributeMapping,
+      final @NonNull List<RequestedAttributeProcessor> processors) {
     this(Objects.requireNonNull(attributeMapping, "attributeMapping must not be null").getFromProtocolMapping(),
         processors);
   }
@@ -91,8 +90,8 @@ public class SamlRequestedAttributeResolver {
    * @param processors the processors, one per source
    */
   public SamlRequestedAttributeResolver(
-      final @Nonnull FromProtocolAttributeMapping<SamlRequestedAttribute> attributeMapping,
-      final @Nonnull List<RequestedAttributeProcessor> processors) {
+      final @NonNull FromProtocolAttributeMapping<SamlRequestedAttribute> attributeMapping,
+      final @NonNull List<RequestedAttributeProcessor> processors) {
     this.attributeMapping = Objects.requireNonNull(attributeMapping, "attributeMapping must not be null");
     this.processors = List.copyOf(Objects.requireNonNull(processors, "processors must not be null"));
   }
@@ -105,8 +104,8 @@ public class SamlRequestedAttributeResolver {
    * @param idpDeclaredEntityCategories the entity categories that the Identity Provider declares
    * @return the default processors
    */
-  public static @Nonnull List<RequestedAttributeProcessor> getDefaultProcessors(
-      final @Nonnull Collection<String> idpDeclaredEntityCategories) {
+  public static @NonNull List<RequestedAttributeProcessor> getDefaultProcessors(
+      final @NonNull Collection<String> idpDeclaredEntityCategories) {
     return List.of(
         new MetadataRequestedAttributeProcessor(),
         new OasisExtensionRequestedAttributeProcessor(),
@@ -121,7 +120,7 @@ public class SamlRequestedAttributeResolver {
    * @param context the authentication request and the metadata of the Service Provider that sent it
    * @return the generic requested attributes, possibly empty
    */
-  public @Nonnull List<GenericRequestedAttribute> resolve(final @Nonnull RequestedAttributeContext context) {
+  public @NonNull List<GenericRequestedAttribute> resolve(final @NonNull RequestedAttributeContext context) {
     final List<GenericRequestedAttribute> attributes =
         this.attributeMapping.map(this.getRequestedAttributes(context));
 
@@ -137,8 +136,8 @@ public class SamlRequestedAttributeResolver {
    * @param context the authentication request and the metadata of the Service Provider that sent it
    * @return the SAML requested attributes, possibly empty
    */
-  public @Nonnull List<SamlRequestedAttribute> getRequestedAttributes(
-      final @Nonnull RequestedAttributeContext context) {
+  public @NonNull List<SamlRequestedAttribute> getRequestedAttributes(
+      final @NonNull RequestedAttributeContext context) {
     Objects.requireNonNull(context, "context must not be null");
     final List<SamlRequestedAttribute> attributes = new ArrayList<>();
     for (final RequestedAttributeProcessor processor : this.processors) {
@@ -152,7 +151,7 @@ public class SamlRequestedAttributeResolver {
    *
    * @return the processors
    */
-  public @Nonnull List<RequestedAttributeProcessor> getProcessors() {
+  public @NonNull List<RequestedAttributeProcessor> getProcessors() {
     return this.processors;
   }
 
@@ -161,7 +160,7 @@ public class SamlRequestedAttributeResolver {
    *
    * @return a {@link FromProtocolAttributeMapping}
    */
-  public @Nonnull FromProtocolAttributeMapping<SamlRequestedAttribute> getAttributeMapping() {
+  public @NonNull FromProtocolAttributeMapping<SamlRequestedAttribute> getAttributeMapping() {
     return this.attributeMapping;
   }
 

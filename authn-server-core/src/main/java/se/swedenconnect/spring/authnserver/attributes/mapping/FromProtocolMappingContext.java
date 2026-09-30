@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeDefinitionRegistry;
 
@@ -39,13 +39,13 @@ public interface FromProtocolMappingContext<I> {
    *
    * @return an {@link AttributeDefinitionRegistry}
    */
-  @Nonnull AttributeDefinitionRegistry getDefinitions();
+  @NonNull AttributeDefinitionRegistry getDefinitions();
 
   /**
    * Gets every input of the mapping operation, not only those handed to the mapper.
    *
    * @return all inputs of the operation
    */
-  @Nonnull List<I> getAllInputs();
+  @NonNull List<I> getAllInputs();
 
 }

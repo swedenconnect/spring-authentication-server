@@ -18,13 +18,12 @@ package se.swedenconnect.spring.authnserver.attributes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -91,7 +90,7 @@ class GenericRequestedAttributeTest {
     private static final long serialVersionUID = 1L;
 
     @Override
-    public @Nonnull Serializable mergeWith(final @Nonnull Serializable other) {
+    public @NonNull Serializable mergeWith(final @NonNull Serializable other) {
       return other instanceof final Marks marks ? new Marks(this.value + marks.value) : this;
     }
   }

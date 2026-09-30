@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +24,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -58,8 +58,8 @@ abstract class JsonDocumentEndpointFilter extends OncePerRequestFilter {
    * @param document the JSON document
    * @param name the name of the document, for logging
    */
-  JsonDocumentEndpointFilter(final @Nonnull RequestMatcher requestMatcher, final @Nonnull String document,
-      final @Nonnull String name) {
+  JsonDocumentEndpointFilter(final @NonNull RequestMatcher requestMatcher, final @NonNull String document,
+      final @NonNull String name) {
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
     this.document = Objects.requireNonNull(document, "document must not be null").getBytes(StandardCharsets.UTF_8);
     this.name = name;
@@ -67,8 +67,8 @@ abstract class JsonDocumentEndpointFilter extends OncePerRequestFilter {
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {

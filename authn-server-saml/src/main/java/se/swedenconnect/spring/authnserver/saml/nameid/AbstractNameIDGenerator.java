@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.nameid;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.NameID;
 import org.slf4j.Logger;
@@ -51,7 +50,7 @@ public abstract class AbstractNameIDGenerator extends AbstractSubjectIdentifierG
    *
    * @param nameQualifier the name qualifier, normally the IdP entityID
    */
-  protected AbstractNameIDGenerator(final @Nonnull String nameQualifier) {
+  protected AbstractNameIDGenerator(final @NonNull String nameQualifier) {
     super(nameQualifier);
   }
 
@@ -61,13 +60,13 @@ public abstract class AbstractNameIDGenerator extends AbstractSubjectIdentifierG
    * @param nameQualifier the name qualifier, normally the IdP entityID
    * @param spNameQualifier the SP name qualifier, may be {@code null}
    */
-  protected AbstractNameIDGenerator(final @Nonnull String nameQualifier, final @Nullable String spNameQualifier) {
+  protected AbstractNameIDGenerator(final @NonNull String nameQualifier, final @Nullable String spNameQualifier) {
     super(nameQualifier, spNameQualifier);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull NameID getNameID(final @Nonnull AuthenticatedUser user, final @Nonnull Requester requester)
+  public @NonNull NameID getNameID(final @NonNull AuthenticatedUser user, final @NonNull Requester requester)
       throws UnrecoverableErrorException {
 
     final NameID nameID = (NameID) XMLObjectSupport.buildXMLObject(NameID.DEFAULT_ELEMENT_NAME);
@@ -87,7 +86,7 @@ public abstract class AbstractNameIDGenerator extends AbstractSubjectIdentifierG
    *
    * @return the name qualifier
    */
-  protected @Nonnull String getNameQualifier() {
+  protected @NonNull String getNameQualifier() {
     return this.getIssuerQualifier();
   }
 

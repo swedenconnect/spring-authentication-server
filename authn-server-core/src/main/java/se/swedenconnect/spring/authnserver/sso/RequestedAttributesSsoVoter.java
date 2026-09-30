@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
@@ -39,9 +39,9 @@ public class RequestedAttributesSsoVoter implements SsoVoter {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull SsoDecision vote(final @Nonnull UserAuthentication previousAuthentication,
-      final @Nonnull AuthenticationRequirements requirements, final @Nonnull Requester requester,
-      final @Nonnull List<String> allowedAuthnContexts) {
+  public @NonNull SsoDecision vote(final @NonNull UserAuthentication previousAuthentication,
+      final @NonNull AuthenticationRequirements requirements, final @NonNull Requester requester,
+      final @NonNull List<String> allowedAuthnContexts) {
 
     final AuthenticationUse original = previousAuthentication.getUsageTrack().getOriginalAuthentication();
     if (original == null) {

@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.keys;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.jose.Algorithm;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -67,7 +67,7 @@ public class SigningKeySelector {
    *
    * @param keys the keys of the OpenID Provider
    */
-  public SigningKeySelector(final @Nonnull OidcKeys keys) {
+  public SigningKeySelector(final @NonNull OidcKeys keys) {
     this.keys = Objects.requireNonNull(keys, "keys must not be null");
   }
 
@@ -78,7 +78,7 @@ public class SigningKeySelector {
    * @return the selected key and algorithm
    * @throws UnrecoverableErrorException if no active key can produce an algorithm that the client accepts
    */
-  public @Nonnull SelectedSigningKey selectForIdToken(final @Nonnull OIDCClientMetadata client)
+  public @NonNull SelectedSigningKey selectForIdToken(final @NonNull OIDCClientMetadata client)
       throws UnrecoverableErrorException {
     return this.select(client.getIDTokenJWSAlg(),
         parseAlgorithms(client.getCustomField(ID_TOKEN_SIGNING_ALG_VALUES_SUPPORTED)));
@@ -92,7 +92,7 @@ public class SigningKeySelector {
    * @return the selected key and algorithm
    * @throws UnrecoverableErrorException if no active key can produce an algorithm that the client accepts
    */
-  public @Nonnull SelectedSigningKey selectForUserInfo(final @Nonnull OIDCClientMetadata client)
+  public @NonNull SelectedSigningKey selectForUserInfo(final @NonNull OIDCClientMetadata client)
       throws UnrecoverableErrorException {
     return this.select(client.getUserInfoJWSAlg(),
         parseAlgorithms(client.getCustomField(USERINFO_SIGNING_ALG_VALUES_SUPPORTED)));
@@ -107,7 +107,7 @@ public class SigningKeySelector {
    * @return the selected key and algorithm
    * @throws UnrecoverableErrorException if no active key can produce an algorithm that the client accepts
    */
-  public @Nonnull SelectedSigningKey select(final @Nullable JWSAlgorithm declared,
+  public @NonNull SelectedSigningKey select(final @Nullable JWSAlgorithm declared,
       final @Nullable List<JWSAlgorithm> accepted) throws UnrecoverableErrorException {
 
     final List<SigningKey> candidates = this.keys.getActiveSigningKeys();
@@ -163,7 +163,7 @@ public class SigningKeySelector {
    * @param key the key
    * @param algorithm the algorithm
    */
-  public record SelectedSigningKey(@Nonnull SigningKey key, @Nonnull JWSAlgorithm algorithm) {
+  public record SelectedSigningKey(@NonNull SigningKey key, @NonNull JWSAlgorithm algorithm) {
   }
 
 }

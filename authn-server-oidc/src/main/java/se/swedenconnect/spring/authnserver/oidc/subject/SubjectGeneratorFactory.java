@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.subject;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.SubjectType;
 
@@ -49,8 +49,7 @@ public interface SubjectGeneratorFactory {
    * @return a {@link SubjectGenerator}
    * @throws UnrecoverableErrorException if the client is registered in a way that leaves the {@code sub} undetermined
    */
-  @Nonnull
-  SubjectGenerator getSubjectGenerator(final @Nullable SubjectType subjectType,
+  @NonNull SubjectGenerator getSubjectGenerator(final @Nullable SubjectType subjectType,
       final @Nullable URI sectorIdentifierUri, final @Nullable Collection<URI> redirectUris)
       throws UnrecoverableErrorException;
 
@@ -60,7 +59,6 @@ public interface SubjectGeneratorFactory {
    *
    * @return the supported subject identifier types
    */
-  @Nonnull
-  List<SubjectType> getSupportedSubjectTypes();
+  @NonNull List<SubjectType> getSupportedSubjectTypes();
 
 }

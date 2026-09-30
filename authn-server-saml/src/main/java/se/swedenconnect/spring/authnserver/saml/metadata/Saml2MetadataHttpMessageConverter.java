@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.metadata;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.IOException;
 import java.util.Optional;
 
 import net.shibboleth.shared.xml.ParserPool;
 import net.shibboleth.shared.xml.SerializeSupport;
 import net.shibboleth.shared.xml.XMLParserException;
+import org.jspecify.annotations.NonNull;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.io.MarshallingException;
 import org.opensaml.core.xml.io.UnmarshallingException;
@@ -52,14 +51,14 @@ public class Saml2MetadataHttpMessageConverter extends AbstractHttpMessageConver
 
   /** {@inheritDoc} */
   @Override
-  protected boolean supports(final @Nonnull Class<?> clazz) {
+  protected boolean supports(final @NonNull Class<?> clazz) {
     return EntityDescriptor.class.isAssignableFrom(clazz);
   }
 
   /** {@inheritDoc} */
   @Override
-  protected @Nonnull EntityDescriptor readInternal(final @Nonnull Class<? extends EntityDescriptor> clazz,
-      final @Nonnull HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
+  protected @NonNull EntityDescriptor readInternal(final @NonNull Class<? extends EntityDescriptor> clazz,
+      final @NonNull HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
     try {
       final ParserPool pool = XMLObjectProviderRegistrySupport.getParserPool();
       final Element elm = Optional.ofNullable(pool)
@@ -77,7 +76,7 @@ public class Saml2MetadataHttpMessageConverter extends AbstractHttpMessageConver
 
   /** {@inheritDoc} */
   @Override
-  protected void writeInternal(final @Nonnull EntityDescriptor t, final @Nonnull HttpOutputMessage outputMessage)
+  protected void writeInternal(final @NonNull EntityDescriptor t, final @NonNull HttpOutputMessage outputMessage)
       throws IOException, HttpMessageNotWritableException {
     try {
       SerializeSupport.writeNode(XMLObjectSupport.marshall(t), outputMessage.getBody());

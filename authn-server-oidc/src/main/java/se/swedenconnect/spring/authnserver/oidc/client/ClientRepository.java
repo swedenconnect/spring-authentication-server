@@ -15,8 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
@@ -37,6 +37,6 @@ public interface ClientRepository {
    * @return an {@link OidcClientRecord}, or {@code null} if the repository does not hold the client
    * @throws ClientRegistryException if the repository cannot be read
    */
-  @Nullable OidcClientRecord findByClientId(final @Nonnull String clientId) throws ClientRegistryException;
+  @Nullable OidcClientRecord findByClientId(final @NonNull String clientId) throws ClientRegistryException;
 
 }

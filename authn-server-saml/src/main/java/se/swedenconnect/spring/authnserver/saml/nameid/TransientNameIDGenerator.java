@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.nameid;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.NameID;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -45,7 +44,7 @@ public class TransientNameIDGenerator extends AbstractNameIDGenerator {
    *
    * @param nameQualifier the name qualifier, normally the IdP entityID
    */
-  public TransientNameIDGenerator(final @Nonnull String nameQualifier) {
+  public TransientNameIDGenerator(final @NonNull String nameQualifier) {
     super(nameQualifier);
   }
 
@@ -55,7 +54,7 @@ public class TransientNameIDGenerator extends AbstractNameIDGenerator {
    * @param nameQualifier the name qualifier, normally the IdP entityID
    * @param spNameQualifier the SP name qualifier, may be {@code null}
    */
-  public TransientNameIDGenerator(final @Nonnull String nameQualifier, final @Nullable String spNameQualifier) {
+  public TransientNameIDGenerator(final @NonNull String nameQualifier, final @Nullable String spNameQualifier) {
     super(nameQualifier, spNameQualifier);
   }
 
@@ -63,8 +62,8 @@ public class TransientNameIDGenerator extends AbstractNameIDGenerator {
    * Returns a new random identifier. The user and the requester are not used.
    */
   @Override
-  public @Nonnull String getSubjectIdentifier(final @Nonnull AuthenticatedUser user,
-      final @Nonnull Requester requester) {
+  public @NonNull String getSubjectIdentifier(final @NonNull AuthenticatedUser user,
+      final @NonNull Requester requester) {
     return Base64.getEncoder()
         .encodeToString(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
   }
@@ -73,7 +72,7 @@ public class TransientNameIDGenerator extends AbstractNameIDGenerator {
    * Returns {@value NameID#TRANSIENT}.
    */
   @Override
-  public @Nonnull String getFormat() {
+  public @NonNull String getFormat() {
     return NameID.TRANSIENT;
   }
 

@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.keys;
 
-import jakarta.annotation.Nonnull;
-
 import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.Curve;
@@ -89,7 +89,7 @@ public final class SigningKey {
    * @param defaultKey whether this is the default key, only allowed for an active key
    * @throws IllegalArgumentException if the key does not meet the requirements, or a future key is marked as default
    */
-  public SigningKey(final @Nonnull PkiCredential credential, final @Nonnull State state, final boolean defaultKey) {
+  public SigningKey(final @NonNull PkiCredential credential, final @NonNull State state, final boolean defaultKey) {
     this.credential = Objects.requireNonNull(credential, "credential must not be null");
     this.state = Objects.requireNonNull(state, "state must not be null");
     if (defaultKey && state != State.ACTIVE) {
@@ -108,7 +108,7 @@ public final class SigningKey {
    * @param credential the credential
    * @return a {@link SigningKey}
    */
-  public static @Nonnull SigningKey active(final @Nonnull PkiCredential credential) {
+  public static @NonNull SigningKey active(final @NonNull PkiCredential credential) {
     return new SigningKey(credential, State.ACTIVE, false);
   }
 
@@ -118,7 +118,7 @@ public final class SigningKey {
    * @param credential the credential
    * @return a {@link SigningKey}
    */
-  public static @Nonnull SigningKey activeDefault(final @Nonnull PkiCredential credential) {
+  public static @NonNull SigningKey activeDefault(final @NonNull PkiCredential credential) {
     return new SigningKey(credential, State.ACTIVE, true);
   }
 
@@ -128,7 +128,7 @@ public final class SigningKey {
    * @param credential the credential
    * @return a {@link SigningKey}
    */
-  public static @Nonnull SigningKey future(final @Nonnull PkiCredential credential) {
+  public static @NonNull SigningKey future(final @NonNull PkiCredential credential) {
     return new SigningKey(credential, State.FUTURE, false);
   }
 
@@ -137,7 +137,7 @@ public final class SigningKey {
    *
    * @return the credential
    */
-  public @Nonnull PkiCredential getCredential() {
+  public @NonNull PkiCredential getCredential() {
     return this.credential;
   }
 
@@ -146,7 +146,7 @@ public final class SigningKey {
    *
    * @return the state
    */
-  public @Nonnull State getState() {
+  public @NonNull State getState() {
     return this.state;
   }
 
@@ -173,7 +173,7 @@ public final class SigningKey {
    *
    * @return the key ID
    */
-  public @Nonnull String getKeyId() {
+  public @NonNull String getKeyId() {
     return this.jwk.getKeyID();
   }
 
@@ -182,7 +182,7 @@ public final class SigningKey {
    *
    * @return the public JWK
    */
-  public @Nonnull JWK getPublicJwk() {
+  public @NonNull JWK getPublicJwk() {
     return this.jwk;
   }
 
@@ -191,7 +191,7 @@ public final class SigningKey {
    *
    * @return the algorithms
    */
-  public @Nonnull List<JWSAlgorithm> getAlgorithms() {
+  public @NonNull List<JWSAlgorithm> getAlgorithms() {
     return this.algorithms;
   }
 
@@ -200,7 +200,7 @@ public final class SigningKey {
    *
    * @return the preferred algorithm
    */
-  public @Nonnull JWSAlgorithm getPreferredAlgorithm() {
+  public @NonNull JWSAlgorithm getPreferredAlgorithm() {
     return this.algorithms.getFirst();
   }
 
@@ -210,13 +210,13 @@ public final class SigningKey {
    * @param algorithm the algorithm
    * @return {@code true} if the key can produce the algorithm and {@code false} otherwise
    */
-  public boolean supports(final @Nonnull JWSAlgorithm algorithm) {
+  public boolean supports(final @NonNull JWSAlgorithm algorithm) {
     return this.algorithms.contains(algorithm);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return "kid='%s', state=%s, default=%s, algorithms=%s".formatted(
         this.getKeyId(), this.state, this.defaultKey, this.algorithms);
   }
@@ -227,7 +227,7 @@ public final class SigningKey {
    * @param credential the credential
    * @return the algorithms
    */
-  private static @Nonnull List<JWSAlgorithm> supportedAlgorithms(final @Nonnull PkiCredential credential) {
+  private static @NonNull List<JWSAlgorithm> supportedAlgorithms(final @NonNull PkiCredential credential) {
     if (credential.getPublicKey() instanceof RSAPublicKey) {
       return RSA_ALGORITHMS;
     }

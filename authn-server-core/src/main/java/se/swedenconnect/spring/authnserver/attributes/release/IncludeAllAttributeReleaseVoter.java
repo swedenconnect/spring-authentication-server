@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.release;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -34,8 +34,8 @@ public class IncludeAllAttributeReleaseVoter implements AttributeReleaseVoter {
    * Always votes {@link AttributeReleaseVote#INCLUDE}.
    */
   @Override
-  public @Nonnull AttributeReleaseVote vote(final @Nonnull UserAuthentication userAuthentication,
-      final @Nonnull GenericAttribute<? extends Serializable> attribute) {
+  public @NonNull AttributeReleaseVote vote(final @NonNull UserAuthentication userAuthentication,
+      final @NonNull GenericAttribute<? extends Serializable> attribute) {
     return AttributeReleaseVote.INCLUDE;
   }
 

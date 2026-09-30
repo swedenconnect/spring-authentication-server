@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.subject;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
@@ -44,7 +43,7 @@ public abstract class AbstractSubjectIdentifierGeneratorFactory {
    *
    * @param issuerQualifier the qualifier for the issuer
    */
-  protected AbstractSubjectIdentifierGeneratorFactory(final @Nonnull String issuerQualifier) {
+  protected AbstractSubjectIdentifierGeneratorFactory(final @NonNull String issuerQualifier) {
     if (!StringUtils.hasText(issuerQualifier)) {
       throw new IllegalArgumentException("issuerQualifier must be set and not empty");
     }
@@ -56,7 +55,7 @@ public abstract class AbstractSubjectIdentifierGeneratorFactory {
    *
    * @return the qualifier for the issuer
    */
-  protected @Nonnull String getIssuerQualifier() {
+  protected @NonNull String getIssuerQualifier() {
     return this.issuerQualifier;
   }
 
@@ -67,7 +66,7 @@ public abstract class AbstractSubjectIdentifierGeneratorFactory {
    * @param generator the generator
    * @return the supplied generator
    */
-  protected <T extends AbstractSubjectIdentifierGenerator> @Nonnull T configure(final @Nonnull T generator) {
+  protected <T extends AbstractSubjectIdentifierGenerator> @NonNull T configure(final @NonNull T generator) {
     Objects.requireNonNull(generator, "generator must not be null");
     generator.setHashAlgorithm(this.hashAlgorithm);
     generator.setSecret(this.secret);
@@ -80,7 +79,7 @@ public abstract class AbstractSubjectIdentifierGeneratorFactory {
    *
    * @param secret the secret, or {@code null} for no secret
    */
-  public void setSecret(final @Nullable byte[] secret) {
+  public void setSecret(final byte @Nullable [] secret) {
     this.secret = secret != null ? secret.clone() : null;
   }
 
@@ -90,7 +89,7 @@ public abstract class AbstractSubjectIdentifierGeneratorFactory {
    *
    * @param hashAlgorithm the JCE name of the hash algorithm
    */
-  public void setHashAlgorithm(final @Nonnull String hashAlgorithm) {
+  public void setHashAlgorithm(final @NonNull String hashAlgorithm) {
     if (!StringUtils.hasText(hashAlgorithm)) {
       throw new IllegalArgumentException("hashAlgorithm must be set and not empty");
     }

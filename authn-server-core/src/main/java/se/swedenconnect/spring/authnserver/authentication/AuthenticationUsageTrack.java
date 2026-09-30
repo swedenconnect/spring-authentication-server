@@ -15,15 +15,15 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -56,7 +56,7 @@ public class AuthenticationUsageTrack implements Serializable {
    *
    * @param originalAuthentication the original authentication
    */
-  public AuthenticationUsageTrack(final @Nonnull AuthenticationUse originalAuthentication) {
+  public AuthenticationUsageTrack(final @NonNull AuthenticationUse originalAuthentication) {
     this.registerUse(originalAuthentication);
   }
 
@@ -65,7 +65,7 @@ public class AuthenticationUsageTrack implements Serializable {
    *
    * @param use the use to register
    */
-  public void registerUse(final @Nonnull AuthenticationUse use) {
+  public void registerUse(final @NonNull AuthenticationUse use) {
     this.usages.add(Objects.requireNonNull(use, "use must not be null"));
   }
 
@@ -92,7 +92,7 @@ public class AuthenticationUsageTrack implements Serializable {
    *
    * @return a list of usage records, possibly empty
    */
-  public @Nonnull List<AuthenticationUse> getUsages() {
+  public @NonNull List<AuthenticationUse> getUsages() {
     return Collections.unmodifiableList(this.usages);
   }
 

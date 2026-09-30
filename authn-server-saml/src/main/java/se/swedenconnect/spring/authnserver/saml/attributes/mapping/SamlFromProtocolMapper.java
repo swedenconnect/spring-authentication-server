@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeValues;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
@@ -48,7 +48,7 @@ public class SamlFromProtocolMapper implements FromProtocolAttributeMapper<SamlR
    * @param name the SAML attribute name
    * @param identifiers the generic attribute identifiers that the SAML attribute maps to
    */
-  public SamlFromProtocolMapper(final @Nonnull String name, final @Nonnull String... identifiers) {
+  public SamlFromProtocolMapper(final @NonNull String name, final @NonNull String... identifiers) {
     this.name = Objects.requireNonNull(name, "name must not be null");
     this.identifiers = List.of(identifiers);
     if (this.identifiers.isEmpty()) {
@@ -58,14 +58,14 @@ public class SamlFromProtocolMapper implements FromProtocolAttributeMapper<SamlR
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedNames() {
+  public @NonNull Collection<String> getSupportedNames() {
     return List.of(this.name);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<SamlRequestedAttribute> inputs,
-      final @Nonnull FromProtocolMappingContext<SamlRequestedAttribute> context) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<SamlRequestedAttribute> inputs,
+      final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     boolean required = false;
     final List<String> values = new ArrayList<>();
@@ -92,7 +92,7 @@ public class SamlFromProtocolMapper implements FromProtocolAttributeMapper<SamlR
    *
    * @return the attribute identifiers
    */
-  public @Nonnull List<String> getIdentifiers() {
+  public @NonNull List<String> getIdentifiers() {
     return this.identifiers;
   }
 

@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.IOException;
 import java.net.URI;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * Fetches a request object from a {@code request_uri}. It is only asked for URIs that the client has registered.
@@ -35,7 +35,6 @@ public interface RequestUriFetcher {
    * @return the request object, a JWT
    * @throws IOException if the request object cannot be fetched
    */
-  @Nonnull
-  String fetch(final @Nonnull URI requestUri) throws IOException;
+  @NonNull String fetch(final @NonNull URI requestUri) throws IOException;
 
 }

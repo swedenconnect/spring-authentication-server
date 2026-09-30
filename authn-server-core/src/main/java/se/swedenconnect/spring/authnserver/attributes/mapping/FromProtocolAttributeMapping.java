@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,8 +65,8 @@ public class FromProtocolAttributeMapping<I> {
    * @param definitions the attribute definitions
    * @param nameExtractor a function giving the protocol name of an input
    */
-  public FromProtocolAttributeMapping(final @Nonnull AttributeDefinitionRegistry definitions,
-      final @Nonnull Function<I, String> nameExtractor) {
+  public FromProtocolAttributeMapping(final @NonNull AttributeDefinitionRegistry definitions,
+      final @NonNull Function<I, String> nameExtractor) {
     this.definitions = Objects.requireNonNull(definitions, "definitions must not be null");
     this.nameExtractor = Objects.requireNonNull(nameExtractor, "nameExtractor must not be null");
   }
@@ -77,7 +76,7 @@ public class FromProtocolAttributeMapping<I> {
    *
    * @param mapper the mapper to register
    */
-  public void register(final @Nonnull FromProtocolAttributeMapper<I> mapper) {
+  public void register(final @NonNull FromProtocolAttributeMapper<I> mapper) {
     Objects.requireNonNull(mapper, "mapper must not be null");
     for (final String name : mapper.getSupportedNames()) {
       final FromProtocolAttributeMapper<I> previous = this.mappers.put(name, mapper);
@@ -93,7 +92,7 @@ public class FromProtocolAttributeMapping<I> {
    *
    * @param mappers the mappers to register
    */
-  public void registerAll(final @Nonnull List<? extends FromProtocolAttributeMapper<I>> mappers) {
+  public void registerAll(final @NonNull List<? extends FromProtocolAttributeMapper<I>> mappers) {
     Objects.requireNonNull(mappers, "mappers must not be null").forEach(this::register);
   }
 
@@ -103,7 +102,7 @@ public class FromProtocolAttributeMapping<I> {
    * @param inputs the protocol requested attributes
    * @return the generic requested attributes
    */
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<I> inputs) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<I> inputs) {
     Objects.requireNonNull(inputs, "inputs must not be null");
     final FromProtocolMappingContext<I> context = new Context(this.definitions, inputs);
 
@@ -139,7 +138,7 @@ public class FromProtocolAttributeMapping<I> {
    *
    * @return an {@link AttributeDefinitionRegistry}
    */
-  public @Nonnull AttributeDefinitionRegistry getDefinitions() {
+  public @NonNull AttributeDefinitionRegistry getDefinitions() {
     return this.definitions;
   }
 
@@ -154,13 +153,13 @@ public class FromProtocolAttributeMapping<I> {
 
     /** {@inheritDoc} */
     @Override
-    public @Nonnull AttributeDefinitionRegistry getDefinitions() {
+    public @NonNull AttributeDefinitionRegistry getDefinitions() {
       return this.definitions;
     }
 
     /** {@inheritDoc} */
     @Override
-    public @Nonnull List<I> getAllInputs() {
+    public @NonNull List<I> getAllInputs() {
       return this.allInputs;
     }
   }

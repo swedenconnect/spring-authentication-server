@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * Protocol data that decides for itself what happens when two requested attributes carrying it are merged.
@@ -41,6 +41,6 @@ public interface MergeableProtocolData extends Serializable {
    * @param other the data to merge with
    * @return the merged data
    */
-  @Nonnull Serializable mergeWith(final @Nonnull Serializable other);
+  @NonNull Serializable mergeWith(final @NonNull Serializable other);
 
 }

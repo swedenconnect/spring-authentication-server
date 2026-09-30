@@ -23,9 +23,9 @@ import static se.swedenconnect.spring.authnserver.authentication.provider.redire
 import static se.swedenconnect.spring.authnserver.authentication.provider.redirect.RedirectTestSupport.redirectToken;
 import static se.swedenconnect.spring.authnserver.authentication.provider.redirect.RedirectTestSupport.request;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
@@ -57,29 +57,29 @@ class AbstractAuthenticationControllerTest {
     }
 
     @Override
-    protected @Nonnull TestProvider getProvider() {
+    protected @NonNull TestProvider getProvider() {
       return this.provider;
     }
 
     @Override
-    public @Nonnull RedirectForAuthenticationToken getInputToken(final @Nonnull HttpServletRequest request) {
+    public @NonNull RedirectForAuthenticationToken getInputToken(final @NonNull HttpServletRequest request) {
       return super.getInputToken(request);
     }
 
     @Override
-    public @Nonnull ModelAndView complete(final @Nonnull HttpServletRequest request,
-        final @Nonnull Authentication authentication) {
+    public @NonNull ModelAndView complete(final @NonNull HttpServletRequest request,
+        final @NonNull Authentication authentication) {
       return super.complete(request, authentication);
     }
 
     @Override
-    public @Nonnull ModelAndView complete(final @Nonnull HttpServletRequest request,
-        final @Nonnull AuthenticationErrorException error) {
+    public @NonNull ModelAndView complete(final @NonNull HttpServletRequest request,
+        final @NonNull AuthenticationErrorException error) {
       return super.complete(request, error);
     }
 
     @Override
-    public @Nonnull ModelAndView cancel(final @Nonnull HttpServletRequest request) {
+    public @NonNull ModelAndView cancel(final @NonNull HttpServletRequest request) {
       return super.cancel(request);
     }
   }

@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +23,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,8 +103,8 @@ public class RequestObjectDecoder {
    * @param authorizationEndpoint the URL of the authorization endpoint
    * @param clockSkew the allowed clock skew
    */
-  public RequestObjectDecoder(final @Nonnull OidcKeys keys, final @Nonnull ClientKeyResolver clientKeyResolver,
-      final @Nonnull String issuer, final @Nonnull String authorizationEndpoint, final @Nonnull Duration clockSkew) {
+  public RequestObjectDecoder(final @NonNull OidcKeys keys, final @NonNull ClientKeyResolver clientKeyResolver,
+      final @NonNull String issuer, final @NonNull String authorizationEndpoint, final @NonNull Duration clockSkew) {
     this.keys = Objects.requireNonNull(keys, "keys must not be null");
     this.clientKeyResolver = Objects.requireNonNull(clientKeyResolver, "clientKeyResolver must not be null");
     this.audiences = Set.of(Objects.requireNonNull(issuer, "issuer must not be null"),
@@ -123,8 +122,8 @@ public class RequestObjectDecoder {
    * @return the decoded request object
    * @throws OidcErrorResponseException with {@code invalid_request_object} if the request object is invalid
    */
-  public @Nonnull DecodedJwt decodeRequestObject(final @Nonnull String requestObject, final @Nonnull String clientId,
-      final @Nonnull OIDCClientMetadata metadata, final @Nonnull String logString) throws OidcErrorResponseException {
+  public @NonNull DecodedJwt decodeRequestObject(final @NonNull String requestObject, final @NonNull String clientId,
+      final @NonNull OIDCClientMetadata metadata, final @NonNull String logString) throws OidcErrorResponseException {
     return this.decode(requestObject, clientId, metadata, true, "request object", logString);
   }
 
@@ -139,8 +138,8 @@ public class RequestObjectDecoder {
    * @return the decoded JWT
    * @throws OidcErrorResponseException with {@code invalid_request} if the JWT is invalid or not signed
    */
-  public @Nonnull DecodedJwt decodeSignedParameter(final @Nonnull String jwt, final @Nonnull String clientId,
-      final @Nonnull OIDCClientMetadata metadata, final @Nonnull String name, final @Nonnull String logString)
+  public @NonNull DecodedJwt decodeSignedParameter(final @NonNull String jwt, final @NonNull String clientId,
+      final @NonNull OIDCClientMetadata metadata, final @NonNull String name, final @NonNull String logString)
       throws OidcErrorResponseException {
     final DecodedJwt decoded = this.decode(jwt, clientId, metadata, false, name, logString);
     if (decoded.signingAlgorithm() == null) {
@@ -161,9 +160,9 @@ public class RequestObjectDecoder {
    * @return the decoded JWT
    * @throws OidcErrorResponseException if the JWT is invalid
    */
-  private @Nonnull DecodedJwt decode(final @Nonnull String jwt, final @Nonnull String clientId,
-      final @Nonnull OIDCClientMetadata metadata, final boolean requestObject, final @Nonnull String name,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private @NonNull DecodedJwt decode(final @NonNull String jwt, final @NonNull String clientId,
+      final @NonNull OIDCClientMetadata metadata, final boolean requestObject, final @NonNull String name,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     JWT parsed;
     try {
@@ -232,8 +231,8 @@ public class RequestObjectDecoder {
    * @return the payload
    * @throws OidcErrorResponseException if the JWT cannot be decrypted
    */
-  private @Nonnull Payload decrypt(final @Nonnull JWEObject jwt, final boolean requestObject,
-      final @Nonnull String name, final @Nonnull String logString) throws OidcErrorResponseException {
+  private @NonNull Payload decrypt(final @NonNull JWEObject jwt, final boolean requestObject,
+      final @NonNull String name, final @NonNull String logString) throws OidcErrorResponseException {
 
     final JWEHeader header = jwt.getHeader();
     final DefaultJWEDecrypterFactory factory = new DefaultJWEDecrypterFactory();
@@ -266,9 +265,9 @@ public class RequestObjectDecoder {
    * @param logString the log string
    * @throws OidcErrorResponseException if the signature cannot be verified
    */
-  private void verify(final @Nonnull SignedJWT jwt, final @Nonnull String clientId,
-      final @Nonnull OIDCClientMetadata metadata, final boolean requestObject, final @Nonnull String name,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private void verify(final @NonNull SignedJWT jwt, final @NonNull String clientId,
+      final @NonNull OIDCClientMetadata metadata, final boolean requestObject, final @NonNull String name,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     final JWSAlgorithm algorithm = jwt.getHeader().getAlgorithm();
     if (!SUPPORTED_SIGNING_ALGORITHMS.contains(algorithm)) {
@@ -313,9 +312,9 @@ public class RequestObjectDecoder {
    * @param logString the log string
    * @throws OidcErrorResponseException for invalid claims
    */
-  private void checkClaims(final @Nonnull JWTClaimsSet claims, final @Nonnull String clientId,
-      final boolean requireIssuerAndAudience, final boolean requestObject, final @Nonnull String name,
-      final @Nonnull String logString) throws OidcErrorResponseException {
+  private void checkClaims(final @NonNull JWTClaimsSet claims, final @NonNull String clientId,
+      final boolean requireIssuerAndAudience, final boolean requestObject, final @NonNull String name,
+      final @NonNull String logString) throws OidcErrorResponseException {
 
     final Map<String, Object> json = claims.toJSONObject();
     if (json.containsKey("client_id") && !clientId.equals(json.get("client_id"))) {
@@ -361,8 +360,8 @@ public class RequestObjectDecoder {
    * @param cause the cause, may be {@code null}
    * @return an {@link OidcErrorResponseException}
    */
-  private static @Nonnull OidcErrorResponseException invalid(final boolean requestObject,
-      final @Nonnull String description, final @Nonnull String logString, final @Nullable Throwable cause) {
+  private static @NonNull OidcErrorResponseException invalid(final boolean requestObject,
+      final @NonNull String description, final @NonNull String logString, final @Nullable Throwable cause) {
     log.info("{}{} [{}]", description, cause != null ? " - " + cause.getMessage() : "", logString);
     return new OidcErrorResponseException(
         requestObject ? OAuth2Error.INVALID_REQUEST_OBJECT : OAuth2Error.INVALID_REQUEST, description, cause);
@@ -375,7 +374,7 @@ public class RequestObjectDecoder {
    * @param signingAlgorithm the algorithm that the JWT was signed with, or {@code null} if it was not signed
    * @param encrypted whether the JWT was encrypted
    */
-  public record DecodedJwt(@Nonnull JWTClaimsSet claims, @Nullable JWSAlgorithm signingAlgorithm,
+  public record DecodedJwt(@NonNull JWTClaimsSet claims, @Nullable JWSAlgorithm signingAlgorithm,
       boolean encrypted) {
   }
 

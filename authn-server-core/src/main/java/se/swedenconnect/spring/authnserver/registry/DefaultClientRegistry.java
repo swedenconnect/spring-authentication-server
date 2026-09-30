@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.registry;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +44,7 @@ public class DefaultClientRegistry implements ClientRegistry {
    *
    * @param backends the backends, in the order they are to be asked
    */
-  public DefaultClientRegistry(final @Nonnull List<ClientRegistryBackend> backends) {
+  public DefaultClientRegistry(final @NonNull List<ClientRegistryBackend> backends) {
     this.backends = List.copyOf(Objects.requireNonNull(backends, "backends must not be null"));
     if (this.backends.isEmpty()) {
       throw new IllegalArgumentException("backends must not be empty");
@@ -54,7 +53,7 @@ public class DefaultClientRegistry implements ClientRegistry {
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord lookup(final @Nonnull Requester requester) throws ClientRegistryException {
+  public @Nullable RequesterRecord lookup(final @NonNull Requester requester) throws ClientRegistryException {
     Objects.requireNonNull(requester, "requester must not be null");
     for (final ClientRegistryBackend backend : this.backendsFor(requester)) {
       final RequesterRecord record = backend.lookup(requester.identifier());
@@ -69,7 +68,7 @@ public class DefaultClientRegistry implements ClientRegistry {
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RequesterRecord requestMark(final @Nonnull Requester requester, final @Nonnull String mark)
+  public @Nullable RequesterRecord requestMark(final @NonNull Requester requester, final @NonNull String mark)
       throws ClientRegistryException {
     Objects.requireNonNull(requester, "requester must not be null");
     Objects.requireNonNull(mark, "mark must not be null");
@@ -89,7 +88,7 @@ public class DefaultClientRegistry implements ClientRegistry {
    * @param requester the requester
    * @return the backends to ask, in order
    */
-  private @Nonnull List<ClientRegistryBackend> backendsFor(final @Nonnull Requester requester) {
+  private @NonNull List<ClientRegistryBackend> backendsFor(final @NonNull Requester requester) {
     return this.backends.stream()
         .filter(b -> b.getProtocol() == requester.protocol())
         .toList();

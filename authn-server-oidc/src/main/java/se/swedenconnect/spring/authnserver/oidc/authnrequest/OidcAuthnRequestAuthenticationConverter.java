@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
@@ -29,6 +27,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.web.authentication.AuthenticationConverter;
@@ -91,8 +91,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param requestObjectDecoder decodes request objects
    * @param requestUriFetcher fetches request objects passed by reference
    */
-  public OidcAuthnRequestAuthenticationConverter(final @Nonnull ClientRegistry clientRegistry,
-      final @Nonnull RequestObjectDecoder requestObjectDecoder, final @Nonnull RequestUriFetcher requestUriFetcher) {
+  public OidcAuthnRequestAuthenticationConverter(final @NonNull ClientRegistry clientRegistry,
+      final @NonNull RequestObjectDecoder requestObjectDecoder, final @NonNull RequestUriFetcher requestUriFetcher) {
     this.clientRegistry = Objects.requireNonNull(clientRegistry, "clientRegistry must not be null");
     this.requestObjectDecoder = Objects.requireNonNull(requestObjectDecoder, "requestObjectDecoder must not be null");
     this.requestUriFetcher = Objects.requireNonNull(requestUriFetcher, "requestUriFetcher must not be null");
@@ -107,7 +107,7 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @throws OidcErrorResponseException if the request object is invalid, and a response can be sent
    */
   @Override
-  public @Nonnull OidcAuthnRequestAuthenticationToken convert(final @Nonnull HttpServletRequest request)
+  public @NonNull OidcAuthnRequestAuthenticationToken convert(final @NonNull HttpServletRequest request)
       throws UnrecoverableErrorException, OidcErrorResponseException {
 
     final Map<String, List<String>> parameters = getParameters(request);
@@ -197,9 +197,9 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @return the decoded request object
    * @throws OidcErrorResponseException if the request object cannot be fetched or decoded
    */
-  private @Nonnull RequestObjectDecoder.DecodedJwt resolveRequestObject(
-      final @Nonnull Map<String, List<String>> parameters, final @Nonnull String clientId,
-      final @Nonnull OIDCClientMetadata metadata, final @Nonnull String logString) throws OidcErrorResponseException {
+  private RequestObjectDecoder.@NonNull DecodedJwt resolveRequestObject(
+      final @NonNull Map<String, List<String>> parameters, final @NonNull String clientId,
+      final @NonNull OIDCClientMetadata metadata, final @NonNull String logString) throws OidcErrorResponseException {
 
     final String request = getSingleValue(parameters, "request");
     final String requestUri = getSingleValue(parameters, "request_uri");
@@ -254,8 +254,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param parameters the parameters
    * @return the response target, or {@code null} if the parameters do not give a valid one
    */
-  private static @Nullable OidcResponseTarget getResponseTarget(final @Nonnull String clientId,
-      final @Nonnull OIDCClientMetadata metadata, final @Nonnull Map<String, List<String>> parameters) {
+  private static @Nullable OidcResponseTarget getResponseTarget(final @NonNull String clientId,
+      final @NonNull OIDCClientMetadata metadata, final @NonNull Map<String, List<String>> parameters) {
     final String redirectUri = getSingleValue(parameters, "redirect_uri");
     final String responseMode = getResponseMode(parameters);
     if (redirectUri == null || responseMode == null || !isRegisteredRedirectUri(redirectUri, metadata)) {
@@ -270,7 +270,7 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param parameters the parameters
    * @return {@code query} or {@code form_post}, or {@code null} if another response mode is given
    */
-  private static @Nullable String getResponseMode(final @Nonnull Map<String, List<String>> parameters) {
+  private static @Nullable String getResponseMode(final @NonNull Map<String, List<String>> parameters) {
     final String responseMode = getFirstValue(parameters, "response_mode");
     if (responseMode == null || ResponseMode.QUERY.getValue().equals(responseMode)) {
       return ResponseMode.QUERY.getValue();
@@ -285,8 +285,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param metadata the client metadata
    * @return {@code true} if the redirect URI is registered and {@code false} otherwise
    */
-  private static boolean isRegisteredRedirectUri(final @Nonnull String redirectUri,
-      final @Nonnull OIDCClientMetadata metadata) {
+  private static boolean isRegisteredRedirectUri(final @NonNull String redirectUri,
+      final @NonNull OIDCClientMetadata metadata) {
     return metadata.getRedirectionURIs() != null
         && metadata.getRedirectionURIs().stream().map(URI::toString).anyMatch(redirectUri::equals);
   }
@@ -299,8 +299,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param requestObject the request object
    * @return the merged parameters
    */
-  private static @Nonnull Map<String, List<String>> merge(final @Nonnull Map<String, List<String>> parameters,
-      final @Nonnull RequestObjectDecoder.DecodedJwt requestObject) {
+  private static @NonNull Map<String, List<String>> merge(final @NonNull Map<String, List<String>> parameters,
+      final RequestObjectDecoder.@NonNull DecodedJwt requestObject) {
     final Map<String, List<String>> merged = new HashMap<>(parameters);
     merged.remove("request");
     merged.remove("request_uri");
@@ -314,7 +314,7 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param request the HTTP request
    * @return the parameters, without empty values
    */
-  private static @Nonnull Map<String, List<String>> getParameters(final @Nonnull HttpServletRequest request) {
+  private static @NonNull Map<String, List<String>> getParameters(final @NonNull HttpServletRequest request) {
     final Map<String, List<String>> parameters = new HashMap<>();
     request.getParameterMap().forEach((name, values) -> {
       final List<String> nonEmpty = Arrays.stream(values).filter(StringUtils::hasText).toList();
@@ -332,8 +332,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param name the parameter name
    * @return the value, or {@code null} if the parameter is missing or occurs more than once
    */
-  private static @Nullable String getSingleValue(final @Nonnull Map<String, List<String>> parameters,
-      final @Nonnull String name) {
+  private static @Nullable String getSingleValue(final @NonNull Map<String, List<String>> parameters,
+      final @NonNull String name) {
     final List<String> values = parameters.get(name);
     return values != null && values.size() == 1 ? values.getFirst() : null;
   }
@@ -345,8 +345,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param name the parameter name
    * @return the value, or {@code null}
    */
-  private static @Nullable String getFirstValue(final @Nonnull Map<String, List<String>> parameters,
-      final @Nonnull String name) {
+  private static @Nullable String getFirstValue(final @NonNull Map<String, List<String>> parameters,
+      final @NonNull String name) {
     final List<String> values = parameters.get(name);
     return values != null && !values.isEmpty() ? values.getFirst() : null;
   }
@@ -357,7 +357,7 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
    * @param uri the URI
    * @return the URI without fragment
    */
-  private static @Nonnull URI withoutFragment(final @Nonnull URI uri) {
+  private static @NonNull URI withoutFragment(final @NonNull URI uri) {
     if (uri.getRawFragment() == null) {
       return uri;
     }

@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.registry.acceptance;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -24,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +70,7 @@ public class ConfigurableRequesterAcceptance implements RequesterAcceptance {
    * @param predicate the predicate
    * @return this object
    */
-  public @Nonnull ConfigurableRequesterAcceptance addPredicate(final @Nonnull RequesterPredicate predicate) {
+  public @NonNull ConfigurableRequesterAcceptance addPredicate(final @NonNull RequesterPredicate predicate) {
     this.predicates.add(Objects.requireNonNull(predicate, "predicate must not be null"));
     return this;
   }
@@ -81,7 +80,7 @@ public class ConfigurableRequesterAcceptance implements RequesterAcceptance {
    *
    * @return the predicates
    */
-  public @Nonnull List<RequesterPredicate> getPredicates() {
+  public @NonNull List<RequesterPredicate> getPredicates() {
     return this.predicates;
   }
 
@@ -92,8 +91,8 @@ public class ConfigurableRequesterAcceptance implements RequesterAcceptance {
    * @param mode the combination mode
    * @return this object
    */
-  public @Nonnull ConfigurableRequesterAcceptance mode(final @Nonnull AuthenticationProtocol protocol,
-      final @Nonnull Mode mode) {
+  public @NonNull ConfigurableRequesterAcceptance mode(final @NonNull AuthenticationProtocol protocol,
+      final @NonNull Mode mode) {
     this.modes.put(Objects.requireNonNull(protocol, "protocol must not be null"),
         Objects.requireNonNull(mode, "mode must not be null"));
     return this;
@@ -105,13 +104,13 @@ public class ConfigurableRequesterAcceptance implements RequesterAcceptance {
    * @param protocol the protocol
    * @return the combination mode
    */
-  public @Nonnull Mode getMode(final @Nonnull AuthenticationProtocol protocol) {
+  public @NonNull Mode getMode(final @NonNull AuthenticationProtocol protocol) {
     return this.modes.getOrDefault(protocol, Mode.ALL);
   }
 
   /** {@inheritDoc} */
   @Override
-  public boolean isAccepted(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry)
+  public boolean isAccepted(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry)
       throws ClientRegistryException {
 
     final List<RequesterPredicate> applicable = new ArrayList<>();

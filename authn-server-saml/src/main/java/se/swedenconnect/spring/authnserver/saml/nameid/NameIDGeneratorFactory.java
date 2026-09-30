@@ -15,10 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.saml.nameid;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.metadata.EntityDescriptor;
 
@@ -40,9 +39,8 @@ public interface NameIDGeneratorFactory {
    * @return a {@link NameIDGenerator}
    * @throws SamlErrorStatusException if the request asks for a {@code Format} that is not supported
    */
-  @Nonnull
-  NameIDGenerator getNameIDGenerator(final @Nonnull AuthnRequest authnRequest,
-      final @Nonnull EntityDescriptor peerMetadata) throws SamlErrorStatusException;
+  @NonNull NameIDGenerator getNameIDGenerator(final @NonNull AuthnRequest authnRequest,
+      final @NonNull EntityDescriptor peerMetadata) throws SamlErrorStatusException;
 
   /**
    * Gets the {@code NameID} formats that the factory supports, the most preferred one first. They are declared in the
@@ -50,7 +48,6 @@ public interface NameIDGeneratorFactory {
    *
    * @return the supported formats
    */
-  @Nonnull
-  List<String> getSupportedFormats();
+  @NonNull List<String> getSupportedFormats();
 
 }

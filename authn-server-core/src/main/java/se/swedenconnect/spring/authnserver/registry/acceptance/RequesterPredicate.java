@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.registry.acceptance;
 
-import jakarta.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
@@ -40,8 +40,7 @@ public interface RequesterPredicate {
    *
    * @return the protocol
    */
-  @Nonnull
-  AuthenticationProtocol getProtocol();
+  @NonNull AuthenticationProtocol getProtocol();
 
   /**
    * Tests whether the requester meets the condition.
@@ -51,7 +50,7 @@ public interface RequesterPredicate {
    * @return {@code true} if the requester meets the condition and {@code false} otherwise
    * @throws ClientRegistryException if the registry fails when asked for a mark
    */
-  boolean test(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry)
+  boolean test(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry)
       throws ClientRegistryException;
 
 }

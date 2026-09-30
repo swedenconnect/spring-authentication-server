@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.registry;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -33,7 +32,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param name the name
  * @author Martin Lindström
  */
-public record DisplayName(@Nullable String language, @Nonnull String name) implements Serializable {
+public record DisplayName(@Nullable String language, @NonNull String name) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;

@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.xmlsec.encryption.support.DecryptionException;
 import org.slf4j.Logger;
@@ -66,8 +65,8 @@ public class DefaultSignMessageExtractor implements SignMessageExtractor {
    * @param entityId the entityID of the Identity Provider
    * @param decryptionCredentials the credentials for decrypting encrypted messages, the current one first
    */
-  public DefaultSignMessageExtractor(final @Nonnull String entityId,
-      final @Nonnull List<PkiCredential> decryptionCredentials) {
+  public DefaultSignMessageExtractor(final @NonNull String entityId,
+      final @NonNull List<PkiCredential> decryptionCredentials) {
     this.entityId = Objects.requireNonNull(entityId, "entityId must not be null");
     if (!Objects.requireNonNull(decryptionCredentials, "decryptionCredentials must not be null").isEmpty()) {
       final List<Credential> credentials = decryptionCredentials.stream()
@@ -85,7 +84,7 @@ public class DefaultSignMessageExtractor implements SignMessageExtractor {
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable GenericSignMessage extract(final @Nonnull Saml2AuthnRequestAuthenticationToken token)
+  public @Nullable GenericSignMessage extract(final @NonNull Saml2AuthnRequestAuthenticationToken token)
       throws SamlErrorStatusException {
 
     final SignMessage signMessage = Optional.ofNullable(token.getAuthnRequest().getExtensions())
@@ -149,8 +148,8 @@ public class DefaultSignMessageExtractor implements SignMessageExtractor {
    * @param cause the cause, or {@code null}
    * @return a {@link SamlErrorStatusException}
    */
-  private static @Nonnull SamlErrorStatusException error(final @Nonnull String msg,
-      final @Nonnull Saml2AuthnRequestAuthenticationToken token, final @Nullable Throwable cause) {
+  private static @NonNull SamlErrorStatusException error(final @NonNull String msg,
+      final @NonNull Saml2AuthnRequestAuthenticationToken token, final @Nullable Throwable cause) {
     log.info("{} [{}]", msg, token.getLogString());
     return new SamlErrorStatusException(SamlErrorStatus.SIGN_MESSAGE_ERROR,
         SamlErrorStatus.SIGN_MESSAGE_ERROR_MESSAGE_CODE, msg, cause);

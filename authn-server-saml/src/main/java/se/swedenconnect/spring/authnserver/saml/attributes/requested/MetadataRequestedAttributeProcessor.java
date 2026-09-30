@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.metadata.AttributeConsumingService;
 import org.opensaml.saml.saml2.metadata.SPSSODescriptor;
@@ -45,8 +44,8 @@ public class MetadataRequestedAttributeProcessor implements RequestedAttributePr
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<SamlRequestedAttribute> extractRequestedAttributes(
-      final @Nonnull RequestedAttributeContext context) {
+  public @NonNull List<SamlRequestedAttribute> extractRequestedAttributes(
+      final @NonNull RequestedAttributeContext context) {
 
     final SPSSODescriptor descriptor = context.spMetadata().getSPSSODescriptor(SAMLConstants.SAML20P_NS);
     if (descriptor == null) {
@@ -77,7 +76,7 @@ public class MetadataRequestedAttributeProcessor implements RequestedAttributePr
    * @return an {@link AttributeConsumingService}, or {@code null} if the metadata holds none
    */
   private static @Nullable AttributeConsumingService findAttributeConsumingService(
-      final @Nonnull SPSSODescriptor descriptor, final @Nullable Integer index) {
+      final @NonNull SPSSODescriptor descriptor, final @Nullable Integer index) {
 
     AttributeConsumingService found = null;
     for (final AttributeConsumingService service : descriptor.getAttributeConsumingServices()) {

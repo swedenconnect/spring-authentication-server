@@ -20,8 +20,6 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.Mockito.mock;
 
-import jakarta.annotation.Nonnull;
-
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,6 +30,7 @@ import java.util.function.Consumer;
 
 import javax.xml.namespace.QName;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
@@ -97,23 +96,23 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return this.authnContexts;
     }
 
     @Override
-    public @Nonnull List<String> getEntityCategories() {
+    public @NonNull List<String> getEntityCategories() {
       return this.entityCategories;
     }
 
     @Override
-    protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-        final @Nonnull List<String> authnContextUris) {
+    protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+        final @NonNull List<String> authnContextUris) {
       throw new UnsupportedOperationException();
     }
   }

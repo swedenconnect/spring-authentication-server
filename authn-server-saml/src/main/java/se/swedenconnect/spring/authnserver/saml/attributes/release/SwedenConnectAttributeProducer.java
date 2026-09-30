@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.release;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -25,6 +22,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.Attribute;
 import org.slf4j.Logger;
@@ -88,8 +87,8 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    * Releases the requested attributes, the sign message digest and the SAD.
    */
   @Override
-  public @Nonnull List<GenericAttribute<? extends Serializable>> releaseAttributes(
-      final @Nonnull UserAuthentication userAuthentication) {
+  public @NonNull List<GenericAttribute<? extends Serializable>> releaseAttributes(
+      final @NonNull UserAuthentication userAuthentication) {
 
     final List<GenericAttribute<? extends Serializable>> released =
         new ArrayList<>(super.releaseAttributes(userAuthentication));
@@ -112,7 +111,7 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    *
    * @param attributeMapping a {@link SamlAttributeMapping}
    */
-  public void setAttributeMapping(final @Nonnull SamlAttributeMapping attributeMapping) {
+  public void setAttributeMapping(final @NonNull SamlAttributeMapping attributeMapping) {
     this.attributeMapping = Objects.requireNonNull(attributeMapping, "attributeMapping must not be null");
   }
 
@@ -123,7 +122,7 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    *
    * @param signMessageDigestIssuer a {@link SignMessageDigestIssuer}
    */
-  public void setSignMessageDigestIssuer(final @Nonnull SignMessageDigestIssuer signMessageDigestIssuer) {
+  public void setSignMessageDigestIssuer(final @NonNull SignMessageDigestIssuer signMessageDigestIssuer) {
     this.signMessageDigestIssuer =
         Objects.requireNonNull(signMessageDigestIssuer, "signMessageDigestIssuer must not be null");
   }
@@ -154,7 +153,7 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    * @throws AuthenticationErrorException if the digest cannot be built and the sign message had to be shown
    */
   private @Nullable GenericAttribute<String> releaseSignMessageDigest(
-      final @Nonnull UserAuthentication userAuthentication) {
+      final @NonNull UserAuthentication userAuthentication) {
 
     final AuthenticationRequirements requirements = userAuthentication.getAuthnRequirements();
     final GenericSignMessage signMessage = requirements != null ? requirements.getSignMessage() : null;
@@ -195,7 +194,7 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    * @param userAuthentication the authentication result
    * @return the attribute, or {@code null} if it is not to be released
    */
-  private @Nullable GenericAttribute<String> releaseSad(final @Nonnull UserAuthentication userAuthentication) {
+  private @Nullable GenericAttribute<String> releaseSad(final @NonNull UserAuthentication userAuthentication) {
 
     if (!(userAuthentication.getAuthnRequirements() instanceof final SamlAuthenticationRequirements requirements)) {
       return null;
@@ -237,7 +236,7 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    * @param user the authenticated user
    * @return the SAML attribute name, or {@code null} if the attribute has no SAML mapping
    */
-  private @Nullable String samlNameOfPrimaryAttribute(final @Nonnull AuthenticatedUser user) {
+  private @Nullable String samlNameOfPrimaryAttribute(final @NonNull AuthenticatedUser user) {
     final GenericAttribute<? extends Serializable> primary = user.getAttribute(user.getPrimaryAttribute());
     if (primary == null) {
       return null;
@@ -254,7 +253,7 @@ public class SwedenConnectAttributeProducer extends DefaultAttributeProducer {
    * @param language the language of the message that was displayed, may be {@code null}
    * @return the message text
    */
-  private static @Nonnull String displayedText(final @Nonnull GenericSignMessage signMessage,
+  private static @NonNull String displayedText(final @NonNull GenericSignMessage signMessage,
       final @Nullable String language) {
     final LocalizedMessage message = signMessage.getMessage(language);
     return message != null ? message.getText() : signMessage.getMessages().getFirst().getText();

@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
 import se.swedenconnect.spring.authnserver.attributes.SwedishIdentityNumbers;
@@ -57,9 +57,9 @@ public class IdentityNumberFromSamlMapper implements FromProtocolAttributeMapper
    * @param personalIdentityNumberIdentifier the generic attribute identifier for a personal identity number
    * @param coordinationNumberIdentifier the generic attribute identifier for a coordination number
    */
-  public IdentityNumberFromSamlMapper(final @Nonnull String name,
-      final @Nonnull String personalIdentityNumberIdentifier,
-      final @Nonnull String coordinationNumberIdentifier) {
+  public IdentityNumberFromSamlMapper(final @NonNull String name,
+      final @NonNull String personalIdentityNumberIdentifier,
+      final @NonNull String coordinationNumberIdentifier) {
     this.name = Objects.requireNonNull(name, "name must not be null");
     this.personalIdentityNumberIdentifier =
         Objects.requireNonNull(personalIdentityNumberIdentifier, "personalIdentityNumberIdentifier must not be null");
@@ -69,14 +69,14 @@ public class IdentityNumberFromSamlMapper implements FromProtocolAttributeMapper
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedNames() {
+  public @NonNull Collection<String> getSupportedNames() {
     return List.of(this.name);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<SamlRequestedAttribute> inputs,
-      final @Nonnull FromProtocolMappingContext<SamlRequestedAttribute> context) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<SamlRequestedAttribute> inputs,
+      final @NonNull FromProtocolMappingContext<SamlRequestedAttribute> context) {
 
     final boolean essential = inputs.stream().anyMatch(SamlRequestedAttribute::required);
     final List<String> values = inputs.stream()

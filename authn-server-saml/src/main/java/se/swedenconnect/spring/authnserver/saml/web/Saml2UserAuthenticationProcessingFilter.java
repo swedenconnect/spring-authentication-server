@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -66,8 +66,8 @@ public class Saml2UserAuthenticationProcessingFilter extends OncePerRequestFilte
    * @param flow hands the request to the authentication providers
    * @param responder answers the Service Provider
    */
-  public Saml2UserAuthenticationProcessingFilter(final @Nonnull RequestMatcher requestMatcher,
-      final @Nonnull UserAuthenticationFlow flow, final @Nonnull Saml2UserAuthenticationResponder responder) {
+  public Saml2UserAuthenticationProcessingFilter(final @NonNull RequestMatcher requestMatcher,
+      final @NonNull UserAuthenticationFlow flow, final @NonNull Saml2UserAuthenticationResponder responder) {
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
     this.flow = Objects.requireNonNull(flow, "flow must not be null");
     this.responder = Objects.requireNonNull(responder, "responder must not be null");
@@ -75,8 +75,8 @@ public class Saml2UserAuthenticationProcessingFilter extends OncePerRequestFilte
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {

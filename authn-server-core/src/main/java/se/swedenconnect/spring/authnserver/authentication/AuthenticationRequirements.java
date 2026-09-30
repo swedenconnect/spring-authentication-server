@@ -15,15 +15,15 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
@@ -89,7 +89,7 @@ public class AuthenticationRequirements implements Serializable {
    *
    * @param other the requirements to copy
    */
-  protected AuthenticationRequirements(final @Nonnull AuthenticationRequirements other) {
+  protected AuthenticationRequirements(final @NonNull AuthenticationRequirements other) {
     Objects.requireNonNull(other, "other must not be null");
     this.forceAuthn = other.forceAuthn;
     this.maxAuthnAge = other.maxAuthnAge;
@@ -195,7 +195,7 @@ public class AuthenticationRequirements implements Serializable {
    *
    * @return the requested attributes, possibly empty
    */
-  public @Nonnull List<GenericRequestedAttribute> getRequestedAttributes() {
+  public @NonNull List<GenericRequestedAttribute> getRequestedAttributes() {
     return this.requestedAttributes;
   }
 
@@ -215,7 +215,7 @@ public class AuthenticationRequirements implements Serializable {
    *
    * @return the acceptable authentication context URIs, possibly empty
    */
-  public @Nonnull List<String> getAuthnContextRequirements() {
+  public @NonNull List<String> getAuthnContextRequirements() {
     return this.authnContextRequirements;
   }
 
@@ -235,7 +235,7 @@ public class AuthenticationRequirements implements Serializable {
    *
    * @return the requested authentication providers, possibly empty
    */
-  public @Nonnull List<String> getRequestedAuthnProviders() {
+  public @NonNull List<String> getRequestedAuthnProviders() {
     return this.requestedAuthnProviders;
   }
 
@@ -253,7 +253,7 @@ public class AuthenticationRequirements implements Serializable {
    *
    * @return the original requesters, possibly empty
    */
-  public @Nonnull List<OriginalRequester> getOriginalRequesters() {
+  public @NonNull List<OriginalRequester> getOriginalRequesters() {
     return this.originalRequesters;
   }
 

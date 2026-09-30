@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -100,8 +99,8 @@ public class OidcAutoConfiguration {
    * @param properties the OIDC properties
    * @return the configurer
    */
-  static @Nonnull OidcProviderConfigurer createConfigurer(final @Nonnull AuthnServerConfigurer server,
-      final @Nonnull OidcConfigurationProperties properties) {
+  static @NonNull OidcProviderConfigurer createConfigurer(final @NonNull AuthnServerConfigurer server,
+      final @NonNull OidcConfigurationProperties properties) {
 
     final OidcProviderConfigurer configurer = new OidcProviderConfigurer();
     if (properties.getPath() != null) {
@@ -158,8 +157,8 @@ public class OidcAutoConfiguration {
    * @param server the shared configurer
    * @param properties the requester acceptance properties
    */
-  private static void applyRequesterAcceptance(final @Nonnull AuthnServerConfigurer server,
-      final @Nonnull OidcConfigurationProperties.RequesterAcceptanceProperties properties) {
+  private static void applyRequesterAcceptance(final @NonNull AuthnServerConfigurer server,
+      final OidcConfigurationProperties.@NonNull RequesterAcceptanceProperties properties) {
 
     final boolean hasWhitelist = properties.getWhitelist() != null && !properties.getWhitelist().isEmpty();
     final boolean hasMarks = properties.getRequiredMarks() != null && !properties.getRequiredMarks().isEmpty();
@@ -189,7 +188,7 @@ public class OidcAutoConfiguration {
    */
   static @Nullable List<SigningKey> loadSigningKeys(
       final @Nullable List<OidcConfigurationProperties.SigningKeyProperties> properties,
-      final @Nonnull PkiCredentialFactory credentialFactory) throws Exception {
+      final @NonNull PkiCredentialFactory credentialFactory) throws Exception {
     if (properties == null) {
       return null;
     }
@@ -212,7 +211,7 @@ public class OidcAutoConfiguration {
    */
   static @Nullable List<DecryptionKey> loadDecryptionKeys(
       final @Nullable List<OidcConfigurationProperties.DecryptionKeyProperties> properties,
-      final @Nonnull PkiCredentialFactory credentialFactory) throws Exception {
+      final @NonNull PkiCredentialFactory credentialFactory) throws Exception {
     if (properties == null) {
       return null;
     }
@@ -234,9 +233,9 @@ public class OidcAutoConfiguration {
    * @return the credential
    * @throws Exception for errors loading the credential
    */
-  private static @Nonnull PkiCredential loadCredential(
-      final @Nullable PkiCredentialConfigurationProperties configuration, final @Nonnull String name,
-      final @Nonnull PkiCredentialFactory credentialFactory) throws Exception {
+  private static @NonNull PkiCredential loadCredential(
+      final @Nullable PkiCredentialConfigurationProperties configuration, final @NonNull String name,
+      final @NonNull PkiCredentialFactory credentialFactory) throws Exception {
     if (configuration == null) {
       throw new IllegalArgumentException(
           "Missing credential for %s.keys.%s".formatted(OidcConfigurationProperties.PREFIX, name));

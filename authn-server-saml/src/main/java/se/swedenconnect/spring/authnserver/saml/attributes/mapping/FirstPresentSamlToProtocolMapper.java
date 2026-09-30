@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Attribute;
 
 import se.swedenconnect.opensaml.saml2.attribute.AttributeTemplate;
@@ -54,8 +53,8 @@ public class FirstPresentSamlToProtocolMapper implements ToProtocolAttributeMapp
    * @param template the template of the SAML attribute to produce
    * @param identifiers the generic attribute identifiers, in order of precedence
    */
-  public FirstPresentSamlToProtocolMapper(final @Nonnull AttributeTemplate template,
-      final @Nonnull String... identifiers) {
+  public FirstPresentSamlToProtocolMapper(final @NonNull AttributeTemplate template,
+      final @NonNull String... identifiers) {
     this.template = Objects.requireNonNull(template, "template must not be null");
     this.identifiers = List.of(identifiers);
     if (this.identifiers.isEmpty()) {
@@ -65,14 +64,14 @@ public class FirstPresentSamlToProtocolMapper implements ToProtocolAttributeMapp
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return this.identifiers;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<Attribute> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<Attribute> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
     for (final String identifier : this.identifiers) {
       final GenericAttribute<? extends Serializable> attribute = attributes.stream()
           .filter(a -> a.getIdentifier().equals(identifier))

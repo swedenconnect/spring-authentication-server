@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -25,6 +22,9 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
@@ -41,11 +41,11 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @author Martin Lindström
  */
 public record CachedClientRecord(
-    @Nonnull String clientId,
+    @NonNull String clientId,
     @Nullable OIDCClientMetadata metadata,
-    @Nonnull Set<String> trustMarkTypes,
-    @Nonnull Map<String, Instant> onDemandTrustMarks,
-    @Nonnull Instant expiresAt) {
+    @NonNull Set<String> trustMarkTypes,
+    @NonNull Map<String, Instant> onDemandTrustMarks,
+    @NonNull Instant expiresAt) {
 
   /**
    * Constructor.
@@ -73,7 +73,7 @@ public record CachedClientRecord(
    * @param maximumAge how long an entry may live at the most, or {@code null} for no limit
    * @return a {@link CachedClientRecord}
    */
-  public static @Nonnull CachedClientRecord found(final @Nonnull ResolvedClient resolved, final @Nonnull Instant now,
+  public static @NonNull CachedClientRecord found(final @NonNull ResolvedClient resolved, final @NonNull Instant now,
       final @Nullable Duration maximumAge) {
     Objects.requireNonNull(resolved, "resolved must not be null");
     Instant expiresAt = resolved.expiresAt();
@@ -96,8 +96,8 @@ public record CachedClientRecord(
    * @param timeToLive how long the entry is kept
    * @return a {@link CachedClientRecord}
    */
-  public static @Nonnull CachedClientRecord notFound(
-      final @Nonnull String clientId, final @Nonnull Instant now, final @Nonnull Duration timeToLive) {
+  public static @NonNull CachedClientRecord notFound(
+      final @NonNull String clientId, final @NonNull Instant now, final @NonNull Duration timeToLive) {
     return new CachedClientRecord(clientId, null, Set.of(), Map.of(), now.plus(timeToLive));
   }
 
@@ -117,7 +117,7 @@ public record CachedClientRecord(
    * @param now the current time
    * @return {@code true} if the entry has expired and {@code false} otherwise
    */
-  public boolean isExpired(final @Nonnull Instant now) {
+  public boolean isExpired(final @NonNull Instant now) {
     return !now.isBefore(this.expiresAt);
   }
 
@@ -128,7 +128,7 @@ public record CachedClientRecord(
    * @param now the current time
    * @return the marks of the client
    */
-  public @Nonnull Set<String> getMarks(final @Nonnull Instant now) {
+  public @NonNull Set<String> getMarks(final @NonNull Instant now) {
     if (this.onDemandTrustMarks.isEmpty()) {
       return this.trustMarkTypes;
     }
@@ -149,8 +149,8 @@ public record CachedClientRecord(
    * @param trustMarkExpiresAt when the trust mark is no longer valid, or {@code null} if it does not expire
    * @return a {@link CachedClientRecord}
    */
-  public @Nonnull CachedClientRecord withTrustMark(
-      final @Nonnull String type, final @Nullable Instant trustMarkExpiresAt) {
+  public @NonNull CachedClientRecord withTrustMark(
+      final @NonNull String type, final @Nullable Instant trustMarkExpiresAt) {
     Objects.requireNonNull(type, "type must not be null");
     final Instant expiry = trustMarkExpiresAt == null || this.expiresAt.isBefore(trustMarkExpiresAt)
         ? this.expiresAt
@@ -168,8 +168,8 @@ public record CachedClientRecord(
    * @param now the current time
    * @return a {@link CachedClientRecord}
    */
-  public @Nonnull CachedClientRecord carryOverTrustMarks(
-      final @Nullable CachedClientRecord earlier, final @Nonnull Instant now) {
+  public @NonNull CachedClientRecord carryOverTrustMarks(
+      final @Nullable CachedClientRecord earlier, final @NonNull Instant now) {
     if (earlier == null || earlier.onDemandTrustMarks().isEmpty()) {
       return this;
     }

@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
 
@@ -42,20 +42,20 @@ public class GenderToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.GENDER);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+  public @NonNull Collection<String> getClaimNames(final @NonNull String identifier) {
     return AttributeIdentifiers.GENDER.equals(identifier) ? List.of(PersonClaims.GENDER_CLAIM_NAME) : List.of();
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<UserClaim> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
     final String value = String.valueOf(attributes.get(0).getValue()).toLowerCase();
     if (!"female".equals(value) && !"male".equals(value)) {
       return List.of();

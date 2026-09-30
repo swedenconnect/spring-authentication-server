@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.Serial;
@@ -26,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.util.StringUtils;
@@ -80,10 +80,10 @@ public class RedirectForAuthenticationToken implements Authentication {
    * @param authnPath the path that the user is sent to for authentication
    * @param resumeAuthnPath the path that the module sends the user back to when the authentication is done
    */
-  public RedirectForAuthenticationToken(final @Nonnull String authnId,
-      final @Nonnull UserAuthenticationInputToken authnInputToken,
-      final @Nullable Collection<String> authnContextUris, final @Nonnull String authnPath,
-      final @Nonnull String resumeAuthnPath) {
+  public RedirectForAuthenticationToken(final @NonNull String authnId,
+      final @NonNull UserAuthenticationInputToken authnInputToken,
+      final @Nullable Collection<String> authnContextUris, final @NonNull String authnPath,
+      final @NonNull String resumeAuthnPath) {
     this.authnId = requireId(authnId);
     this.authnInputToken = Objects.requireNonNull(authnInputToken, "authnInputToken must not be null");
     this.authnContextUris = authnContextUris != null ? List.copyOf(authnContextUris) : List.of();
@@ -97,7 +97,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the identifier of the authentication
    */
-  public @Nonnull String getAuthnId() {
+  public @NonNull String getAuthnId() {
     return this.authnId;
   }
 
@@ -106,7 +106,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the protocol
    */
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return this.authnInputToken.getRequester().protocol();
   }
 
@@ -115,7 +115,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the authentication input token
    */
-  public @Nonnull UserAuthenticationInputToken getAuthnInputToken() {
+  public @NonNull UserAuthenticationInputToken getAuthnInputToken() {
     return this.authnInputToken;
   }
 
@@ -125,7 +125,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the authentication context URIs, possibly empty
    */
-  public @Nonnull List<String> getAuthnContextUris() {
+  public @NonNull List<String> getAuthnContextUris() {
     return this.authnContextUris;
   }
 
@@ -134,7 +134,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the authentication path
    */
-  public @Nonnull String getAuthnPath() {
+  public @NonNull String getAuthnPath() {
     return this.authnPath;
   }
 
@@ -143,7 +143,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the resume path
    */
-  public @Nonnull String getResumeAuthnPath() {
+  public @NonNull String getResumeAuthnPath() {
     return this.resumeAuthnPath;
   }
 
@@ -152,7 +152,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the path to redirect to
    */
-  public @Nonnull String getRedirectPath() {
+  public @NonNull String getRedirectPath() {
     return pathWithAuthnId(this.authnPath, this.authnId);
   }
 
@@ -162,7 +162,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    *
    * @return the path to redirect to
    */
-  public @Nonnull String getResumeRedirectPath() {
+  public @NonNull String getResumeRedirectPath() {
     return pathWithAuthnId(this.resumeAuthnPath, this.authnId);
   }
 
@@ -173,7 +173,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * @param authnId the identifier of the authentication
    * @return the path with the identifier appended
    */
-  public static @Nonnull String pathWithAuthnId(final @Nonnull String path, final @Nonnull String authnId) {
+  public static @NonNull String pathWithAuthnId(final @NonNull String path, final @NonNull String authnId) {
     return "%s?%s=%s".formatted(requirePath(path, "path"), AUTHN_ID_PARAMETER,
         URLEncoder.encode(requireId(authnId), StandardCharsets.UTF_8));
   }
@@ -185,7 +185,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * @param request the HTTP servlet request
    * @return the identifier of the authentication, or {@code null} if the request does not carry one
    */
-  public static @Nullable String getAuthnId(final @Nonnull HttpServletRequest request) {
+  public static @Nullable String getAuthnId(final @NonNull HttpServletRequest request) {
     final String authnId = Objects.requireNonNull(request, "request must not be null")
         .getParameter(AUTHN_ID_PARAMETER);
     return StringUtils.hasText(authnId) ? authnId : null;
@@ -195,7 +195,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * Maps to the name of the authentication input token.
    */
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return this.authnInputToken.getName();
   }
 
@@ -203,7 +203,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * Always returns an empty list.
    */
   @Override
-  public @Nonnull Collection<? extends GrantedAuthority> getAuthorities() {
+  public @NonNull Collection<? extends GrantedAuthority> getAuthorities() {
     return List.of();
   }
 
@@ -227,7 +227,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * Maps to the principal of the authentication input token.
    */
   @Override
-  public @Nonnull Object getPrincipal() {
+  public @NonNull Object getPrincipal() {
     return this.authnInputToken.getPrincipal();
   }
 
@@ -250,7 +250,7 @@ public class RedirectForAuthenticationToken implements Authentication {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String toString() {
+  public @NonNull String toString() {
     return "authn-id: '%s', %s".formatted(this.authnId, this.authnInputToken.getLogString());
   }
 
@@ -261,7 +261,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * @param name the name of the path, for the error message
    * @return the trimmed path
    */
-  private static @Nonnull String requirePath(final @Nullable String path, final @Nonnull String name) {
+  private static @NonNull String requirePath(final @Nullable String path, final @NonNull String name) {
     final String trimmed = path != null ? path.trim() : "";
     if (!trimmed.startsWith("/") || trimmed.indexOf('?') >= 0) {
       throw new IllegalArgumentException(name + " must be set, begin with a '/' and carry no query string");
@@ -275,7 +275,7 @@ public class RedirectForAuthenticationToken implements Authentication {
    * @param authnId the identifier to check
    * @return the identifier
    */
-  private static @Nonnull String requireId(final @Nullable String authnId) {
+  private static @NonNull String requireId(final @Nullable String authnId) {
     if (!StringUtils.hasText(authnId)) {
       throw new IllegalArgumentException("authnId must be set");
     }

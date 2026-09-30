@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeDefinitionRegistry;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
@@ -42,14 +42,14 @@ public interface ToProtocolMappingContext {
    *
    * @return an {@link AttributeDefinitionRegistry}
    */
-  @Nonnull AttributeDefinitionRegistry getDefinitions();
+  @NonNull AttributeDefinitionRegistry getDefinitions();
 
   /**
    * Gets every attribute of the mapping operation, not only those handed to the mapper.
    *
    * @return all attributes of the operation
    */
-  @Nonnull List<GenericAttribute<? extends Serializable>> getAllAttributes();
+  @NonNull List<GenericAttribute<? extends Serializable>> getAllAttributes();
 
   /**
    * Gets the attribute having the supplied identifier.
@@ -57,7 +57,7 @@ public interface ToProtocolMappingContext {
    * @param identifier the attribute identifier
    * @return the attribute, or {@code null} if it is not part of the operation
    */
-  @Nullable GenericAttribute<? extends Serializable> getAttribute(final @Nonnull String identifier);
+  @Nullable GenericAttribute<? extends Serializable> getAttribute(final @NonNull String identifier);
 
   /**
    * Gets the first string value of the attribute having the supplied identifier.
@@ -65,14 +65,14 @@ public interface ToProtocolMappingContext {
    * @param identifier the attribute identifier
    * @return the value, or {@code null} if the attribute is not part of the operation
    */
-  @Nullable String getStringValue(final @Nonnull String identifier);
+  @Nullable String getStringValue(final @NonNull String identifier);
 
   /**
    * Gets the requested attributes of the operation.
    *
    * @return the requested attributes, possibly empty
    */
-  @Nonnull List<GenericRequestedAttribute> getRequestedAttributes();
+  @NonNull List<GenericRequestedAttribute> getRequestedAttributes();
 
   /**
    * Gets the requested attribute having the supplied identifier.
@@ -80,6 +80,6 @@ public interface ToProtocolMappingContext {
    * @param identifier the attribute identifier
    * @return the requested attribute, or {@code null} if the attribute was not requested
    */
-  @Nullable GenericRequestedAttribute getRequestedAttribute(final @Nonnull String identifier);
+  @Nullable GenericRequestedAttribute getRequestedAttribute(final @NonNull String identifier);
 
 }

@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
@@ -28,6 +26,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -71,7 +71,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    *
    * @param maxAge the maximum age
    */
-  public void setMaxAge(final @Nonnull Duration maxAge) {
+  public void setMaxAge(final @NonNull Duration maxAge) {
     Objects.requireNonNull(maxAge, "maxAge must not be null");
     if (maxAge.isNegative() || maxAge.isZero()) {
       throw new IllegalArgumentException("maxAge must be positive");
@@ -84,14 +84,14 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    *
    * @return the maximum age
    */
-  public @Nonnull Duration getMaxAge() {
+  public @NonNull Duration getMaxAge() {
     return this.maxAge;
   }
 
   /** {@inheritDoc} */
   @Override
-  public void start(final @Nonnull RedirectForAuthenticationToken token,
-      final @Nonnull HttpServletRequest request) {
+  public void start(final @NonNull RedirectForAuthenticationToken token,
+      final @NonNull HttpServletRequest request) {
     Objects.requireNonNull(token, "token must not be null");
     final HttpSession session = Objects.requireNonNull(request, "request must not be null").getSession();
     synchronized (WebUtils.getSessionMutex(session)) {
@@ -106,14 +106,14 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable AuthenticationProtocol getProtocol(final @Nonnull HttpServletRequest request) {
+  public @Nullable AuthenticationProtocol getProtocol(final @NonNull HttpServletRequest request) {
     final RedirectAuthenticationState state = this.find(request);
     return state != null ? state.getProtocol() : null;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull ResumedAuthenticationToken resume(final @Nonnull HttpServletRequest request)
+  public @NonNull ResumedAuthenticationToken resume(final @NonNull HttpServletRequest request)
       throws UnrecoverableErrorException {
 
     final String authnId = RedirectForAuthenticationToken.getAuthnId(request);
@@ -151,7 +151,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
 
   /** {@inheritDoc} */
   @Override
-  public void clear(final @Nonnull HttpServletRequest request) {
+  public void clear(final @NonNull HttpServletRequest request) {
     final String authnId = RedirectForAuthenticationToken.getAuthnId(request);
     final HttpSession session = Objects.requireNonNull(request, "request must not be null").getSession(false);
     if (authnId == null || session == null) {
@@ -167,14 +167,14 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable RedirectForAuthenticationToken getInputToken(final @Nonnull HttpServletRequest request) {
+  public @Nullable RedirectForAuthenticationToken getInputToken(final @NonNull HttpServletRequest request) {
     final RedirectAuthenticationState state = this.find(request);
     return state != null ? state.getRedirectToken() : null;
   }
 
   /** {@inheritDoc} */
   @Override
-  public void complete(final @Nonnull Authentication result, final @Nonnull HttpServletRequest request)
+  public void complete(final @NonNull Authentication result, final @NonNull HttpServletRequest request)
       throws IllegalStateException {
     Objects.requireNonNull(result, "result must not be null");
     this.complete(request, state -> state.complete(result));
@@ -182,7 +182,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
 
   /** {@inheritDoc} */
   @Override
-  public void complete(final @Nonnull AuthenticationErrorException error, final @Nonnull HttpServletRequest request)
+  public void complete(final @NonNull AuthenticationErrorException error, final @NonNull HttpServletRequest request)
       throws IllegalStateException {
     Objects.requireNonNull(error, "error must not be null");
     this.complete(request, state -> state.complete(error));
@@ -195,8 +195,8 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    * @param outcome what to record on the state
    * @throws IllegalStateException if there is no such authentication
    */
-  private void complete(final @Nonnull HttpServletRequest request,
-      final @Nonnull Consumer<RedirectAuthenticationState> outcome) {
+  private void complete(final @NonNull HttpServletRequest request,
+      final @NonNull Consumer<RedirectAuthenticationState> outcome) {
     final String authnId = RedirectForAuthenticationToken.getAuthnId(request);
     final HttpSession session = Objects.requireNonNull(request, "request must not be null").getSession(false);
     if (authnId == null || session == null) {
@@ -219,7 +219,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    * @param request the HTTP servlet request
    * @return the state, or {@code null} if there is none
    */
-  private @Nullable RedirectAuthenticationState find(final @Nonnull HttpServletRequest request) {
+  private @Nullable RedirectAuthenticationState find(final @NonNull HttpServletRequest request) {
     final String authnId = RedirectForAuthenticationToken.getAuthnId(request);
     final HttpSession session = Objects.requireNonNull(request, "request must not be null").getSession(false);
     if (authnId == null || session == null) {
@@ -239,7 +239,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    * @return the authentications in progress, keyed by identifier
    */
   @SuppressWarnings("unchecked")
-  private @Nonnull Map<String, RedirectAuthenticationState> states(final @Nonnull HttpSession session) {
+  private @NonNull Map<String, RedirectAuthenticationState> states(final @NonNull HttpSession session) {
     final Object attribute = session.getAttribute(SESSION_KEY);
     if (attribute instanceof final Map<?, ?> map) {
       return (Map<String, RedirectAuthenticationState>) map;
@@ -252,7 +252,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    *
    * @param states the authentications in progress
    */
-  private void removeExpired(final @Nonnull Map<String, RedirectAuthenticationState> states) {
+  private void removeExpired(final @NonNull Map<String, RedirectAuthenticationState> states) {
     states.entrySet().removeIf(entry -> {
       if (entry.getValue().isExpired(this.maxAge)) {
         log.debug("Removing expired redirect authentication '{}'", entry.getKey());
@@ -268,7 +268,7 @@ public class SessionBasedRedirectAuthenticationRepository implements RedirectAut
    * @param message a message for logs
    * @return an {@link UnrecoverableErrorException}
    */
-  private static @Nonnull UnrecoverableErrorException invalidSession(final @Nonnull String message) {
+  private static @NonNull UnrecoverableErrorException invalidSession(final @NonNull String message) {
     log.info("Can not resume redirect authentication: {}", message);
     return new UnrecoverableErrorException(CommonUnrecoverableError.INVALID_SESSION, message);
   }

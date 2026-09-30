@@ -18,12 +18,11 @@ package se.swedenconnect.spring.authnserver.oidc.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
@@ -176,17 +175,17 @@ class OidcClientBackendsTest {
   private record StubBackend(String name, OidcClientRecord client) implements ClientRegistryBackend {
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return this.name;
     }
 
     @Override
-    public @Nonnull AuthenticationProtocol getProtocol() {
+    public @NonNull AuthenticationProtocol getProtocol() {
       return AuthenticationProtocol.OIDC;
     }
 
     @Override
-    public @Nullable RequesterRecord lookup(final @Nonnull String identifier) {
+    public @Nullable RequesterRecord lookup(final @NonNull String identifier) {
       return this.client.clientId().equals(identifier) ? this.client.toRequesterRecord() : null;
     }
 

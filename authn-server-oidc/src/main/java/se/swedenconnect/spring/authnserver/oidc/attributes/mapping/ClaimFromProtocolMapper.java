@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -24,6 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeValues;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
@@ -58,7 +58,7 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
    * @param claimName the claim name
    * @param identifiers the generic attribute identifiers that the claim maps to
    */
-  public ClaimFromProtocolMapper(final @Nonnull String claimName, final @Nonnull String... identifiers) {
+  public ClaimFromProtocolMapper(final @NonNull String claimName, final @NonNull String... identifiers) {
     this(claimName, false, identifiers);
   }
 
@@ -70,8 +70,8 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
    *     what a claim whose value is an object calls for
    * @param identifiers the generic attribute identifiers that the claim maps to
    */
-  public ClaimFromProtocolMapper(final @Nonnull String claimName, final boolean ignoreValues,
-      final @Nonnull String... identifiers) {
+  public ClaimFromProtocolMapper(final @NonNull String claimName, final boolean ignoreValues,
+      final @NonNull String... identifiers) {
     this.claimName = Objects.requireNonNull(claimName, "claimName must not be null");
     this.ignoreValues = ignoreValues;
     this.identifiers = List.of(identifiers);
@@ -88,21 +88,21 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
    * @param identifiers the generic attribute identifiers that the claim maps to
    * @return a {@link ClaimFromProtocolMapper}
    */
-  public static @Nonnull ClaimFromProtocolMapper withoutValues(final @Nonnull String claimName,
-      final @Nonnull String... identifiers) {
+  public static @NonNull ClaimFromProtocolMapper withoutValues(final @NonNull String claimName,
+      final @NonNull String... identifiers) {
     return new ClaimFromProtocolMapper(claimName, true, identifiers);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedNames() {
+  public @NonNull Collection<String> getSupportedNames() {
     return List.of(this.claimName);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<GenericRequestedAttribute> map(final @Nonnull List<RequestedClaim> inputs,
-      final @Nonnull FromProtocolMappingContext<RequestedClaim> context) {
+  public @NonNull List<GenericRequestedAttribute> map(final @NonNull List<RequestedClaim> inputs,
+      final @NonNull FromProtocolMappingContext<RequestedClaim> context) {
 
     final boolean essential = inputs.stream().anyMatch(RequestedClaim::essential);
     final ClaimDeliveryTarget target = deliveryTarget(inputs);
@@ -136,7 +136,7 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
    * @param inputs the requested claims
    * @return a {@link ClaimDeliveryTarget}
    */
-  static @Nonnull ClaimDeliveryTarget deliveryTarget(final @Nonnull List<RequestedClaim> inputs) {
+  static @NonNull ClaimDeliveryTarget deliveryTarget(final @NonNull List<RequestedClaim> inputs) {
     return inputs.stream()
         .map(RequestedClaim::target)
         .reduce(ClaimDeliveryTarget::combine)
@@ -148,7 +148,7 @@ public class ClaimFromProtocolMapper implements FromProtocolAttributeMapper<Requ
    *
    * @return the attribute identifiers
    */
-  public @Nonnull List<String> getIdentifiers() {
+  public @NonNull List<String> getIdentifiers() {
     return this.identifiers;
   }
 

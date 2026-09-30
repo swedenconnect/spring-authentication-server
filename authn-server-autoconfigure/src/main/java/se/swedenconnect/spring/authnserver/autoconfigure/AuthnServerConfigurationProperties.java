@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
@@ -93,7 +92,7 @@ public class AuthnServerConfigurationProperties {
    *
    * @return the single sign-on properties
    */
-  public @Nonnull SsoProperties getSso() {
+  public @NonNull SsoProperties getSso() {
     return this.sso;
   }
 
@@ -138,7 +137,7 @@ public class AuthnServerConfigurationProperties {
    *
    * @return the subject identifier properties
    */
-  public @Nonnull SubjectIdentifierProperties getSubjectIdentifier() {
+  public @NonNull SubjectIdentifierProperties getSubjectIdentifier() {
     return this.subjectIdentifier;
   }
 
@@ -166,7 +165,7 @@ public class AuthnServerConfigurationProperties {
    *
    * @param configurer the configurer
    */
-  public void applyTo(final @Nonnull AuthnServerConfigurer configurer) {
+  public void applyTo(final @NonNull AuthnServerConfigurer configurer) {
     if (this.baseUrl != null) {
       configurer.baseUrl(this.baseUrl);
     }
@@ -283,7 +282,7 @@ public class AuthnServerConfigurationProperties {
      * @return a new policy
      * @throws IllegalArgumentException if the time limit is not positive
      */
-    public @Nonnull SsoPolicy toPolicy(final @Nonnull SsoPolicy base, final @Nonnull String prefix) {
+    public @NonNull SsoPolicy toPolicy(final @NonNull SsoPolicy base, final @NonNull String prefix) {
       if (this.timeLimit != null && (this.timeLimit.isZero() || this.timeLimit.isNegative())) {
         throw new IllegalArgumentException(
             "%s.time-limit must be positive - to turn single sign-on off, set %s.enabled to false"
@@ -337,7 +336,7 @@ public class AuthnServerConfigurationProperties {
      *
      * @return the UTF-8 bytes of the secret, or {@code null}
      */
-    public @Nullable byte[] getSecretBytes() {
+    public byte @Nullable [] getSecretBytes() {
       return this.secret != null ? this.secret.getBytes(StandardCharsets.UTF_8) : null;
     }
 

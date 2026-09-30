@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.scope;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.oidc.nimbus.claims.OidcScopeValue;
 
@@ -40,20 +40,20 @@ public interface ScopeRegistry {
    * @param value the scope value, for example {@code profile}
    * @return an {@link OidcScopeValue}, or {@code null} if no scope has been registered for the value
    */
-  @Nullable OidcScopeValue getScope(final @Nonnull String value);
+  @Nullable OidcScopeValue getScope(final @NonNull String value);
 
   /**
    * Gets all registered scopes.
    *
    * @return all {@link OidcScopeValue}s
    */
-  @Nonnull Collection<OidcScopeValue> getScopes();
+  @NonNull Collection<OidcScopeValue> getScopes();
 
   /**
    * Registers a scope. A scope whose value is already registered replaces the previous one.
    *
    * @param scope the scope to register
    */
-  void register(final @Nonnull OidcScopeValue scope);
+  void register(final @NonNull OidcScopeValue scope);
 
 }

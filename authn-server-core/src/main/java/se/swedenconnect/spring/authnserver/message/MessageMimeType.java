@@ -15,9 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.message;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
@@ -56,7 +55,7 @@ public enum MessageMimeType {
    *
    * @return the MIME type
    */
-  public @Nonnull String getMimeType() {
+  public @NonNull String getMimeType() {
     return this.mimeType;
   }
 
@@ -69,7 +68,7 @@ public enum MessageMimeType {
    * @return a {@link MessageMimeType}
    * @throws IllegalArgumentException if the MIME type is not supported
    */
-  public static @Nonnull MessageMimeType parse(final @Nullable String mimeType) {
+  public static @NonNull MessageMimeType parse(final @Nullable String mimeType) {
     if (!StringUtils.hasText(mimeType)) {
       return TEXT_PLAIN;
     }

@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider.redirect;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -69,8 +68,8 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    * @param authnPath the path that the user is sent to for authentication
    * @param resumeAuthnPath the path that the module sends the user back to when the authentication is done
    */
-  protected AbstractUserRedirectAuthenticationProvider(final @Nonnull String authnPath,
-      final @Nonnull String resumeAuthnPath) {
+  protected AbstractUserRedirectAuthenticationProvider(final @NonNull String authnPath,
+      final @NonNull String resumeAuthnPath) {
     this.authnPath = requirePath(authnPath, "authnPath");
     this.resumeAuthnPath = requirePath(resumeAuthnPath, "resumeAuthnPath");
   }
@@ -80,8 +79,8 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    * {@link #getAuthnPath()}.
    */
   @Override
-  protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-      final @Nonnull List<String> authnContextUris) throws AuthenticationErrorException {
+  protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+      final @NonNull List<String> authnContextUris) throws AuthenticationErrorException {
 
     final RedirectForAuthenticationToken redirectToken = new RedirectForAuthenticationToken(this.generateAuthnId(),
         token, authnContextUris, this.authnPath, this.resumeAuthnPath);
@@ -95,7 +94,7 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    * {@link UserAuthentication} and runs the post-authentication processing on it.
    */
   @Override
-  public @Nonnull UserAuthentication resumeAuthentication(final @Nonnull ResumedAuthenticationToken token)
+  public @NonNull UserAuthentication resumeAuthentication(final @NonNull ResumedAuthenticationToken token)
       throws AuthenticationErrorException {
 
     Objects.requireNonNull(token, "token must not be null");
@@ -128,8 +127,8 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    * @return the authentication result
    * @throws AuthenticationErrorException if the result cannot be used
    */
-  @Nonnull
-  protected abstract UserAuthentication createUserAuthentication(@Nonnull final ResumedAuthenticationToken token)
+  protected abstract @NonNull UserAuthentication createUserAuthentication(
+      final @NonNull ResumedAuthenticationToken token)
       throws AuthenticationErrorException;
 
   /**
@@ -138,19 +137,19 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    *
    * @return an identifier
    */
-  protected @Nonnull String generateAuthnId() {
+  protected @NonNull String generateAuthnId() {
     return AUTHN_ID_GENERATOR.generateKey();
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull RedirectAuthenticatorRepository getAuthenticatorRepository() {
+  public @NonNull RedirectAuthenticatorRepository getAuthenticatorRepository() {
     return this.repository;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull RedirectFlowRepository getFlowRepository() {
+  public @NonNull RedirectFlowRepository getFlowRepository() {
     return this.repository;
   }
 
@@ -160,19 +159,19 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    *
    * @param repository the storage
    */
-  public void setRepository(final @Nonnull RedirectAuthenticationRepository repository) {
+  public void setRepository(final @NonNull RedirectAuthenticationRepository repository) {
     this.repository = Objects.requireNonNull(repository, "repository must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getAuthnPath() {
+  public @NonNull String getAuthnPath() {
     return this.authnPath;
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String getResumeAuthnPath() {
+  public @NonNull String getResumeAuthnPath() {
     return this.resumeAuthnPath;
   }
 
@@ -183,7 +182,7 @@ public abstract class AbstractUserRedirectAuthenticationProvider extends Abstrac
    * @param name the name of the path, for the error message
    * @return the trimmed path
    */
-  private static @Nonnull String requirePath(final String path, final @Nonnull String name) {
+  private static @NonNull String requirePath(final String path, final @NonNull String name) {
     final String trimmed = path != null ? path.trim() : "";
     if (!trimmed.startsWith("/") || trimmed.indexOf('?') >= 0) {
       throw new IllegalArgumentException(name + " must be set, begin with a '/' and carry no query string");

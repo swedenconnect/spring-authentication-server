@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.scope;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.oidc.nimbus.claims.OidcScopeValue;
 
@@ -59,25 +59,25 @@ public class DefaultScopeRegistry implements ScopeRegistry {
    *
    * @param scopes the scopes to register
    */
-  public DefaultScopeRegistry(final @Nonnull Collection<OidcScopeValue> scopes) {
+  public DefaultScopeRegistry(final @NonNull Collection<OidcScopeValue> scopes) {
     Objects.requireNonNull(scopes, "scopes must not be null").forEach(this::register);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable OidcScopeValue getScope(final @Nonnull String value) {
+  public @Nullable OidcScopeValue getScope(final @NonNull String value) {
     return this.scopes.get(Objects.requireNonNull(value, "value must not be null"));
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<OidcScopeValue> getScopes() {
+  public @NonNull Collection<OidcScopeValue> getScopes() {
     return Collections.unmodifiableCollection(this.scopes.values());
   }
 
   /** {@inheritDoc} */
   @Override
-  public void register(final @Nonnull OidcScopeValue scope) {
+  public void register(final @NonNull OidcScopeValue scope) {
     Objects.requireNonNull(scope, "scope must not be null");
     this.scopes.put(scope.getValue(), scope);
   }

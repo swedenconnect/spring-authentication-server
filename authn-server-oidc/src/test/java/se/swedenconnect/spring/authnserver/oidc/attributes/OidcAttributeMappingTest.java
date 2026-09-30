@@ -17,14 +17,13 @@ package se.swedenconnect.spring.authnserver.oidc.attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -419,14 +418,14 @@ class OidcAttributeMappingTest {
     this.mapping.getToProtocolMapping().register(new ToProtocolAttributeMapper<>() {
 
       @Override
-      public @Nonnull Collection<String> getSupportedIdentifiers() {
+      public @NonNull Collection<String> getSupportedIdentifiers() {
         return List.of(AttributeIdentifiers.SURNAME);
       }
 
       @Override
-      public @Nonnull List<UserClaim> map(
-          final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-          final @Nonnull ToProtocolMappingContext context) {
+      public @NonNull List<UserClaim> map(
+          final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+          final @NonNull ToProtocolMappingContext context) {
         return List.of(UserClaim.of("https://example.com/claim/surname",
             attributes.getFirst().getStringValues().getFirst()));
       }
@@ -488,13 +487,13 @@ class OidcAttributeMappingTest {
     this.mapping.getToProtocolMapping().register(new ToProtocolAttributeMapper<UserClaim>() {
 
       @Override
-      public @Nonnull Collection<String> getSupportedIdentifiers() {
+      public @NonNull Collection<String> getSupportedIdentifiers() {
         return List.of("attribute.employee-number");
       }
 
       @Override
-      public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-          final @Nonnull ToProtocolMappingContext context) {
+      public @NonNull List<UserClaim> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+          final @NonNull ToProtocolMappingContext context) {
         return List.of();
       }
     });

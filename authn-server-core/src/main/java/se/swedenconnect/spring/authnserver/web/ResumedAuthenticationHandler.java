@@ -15,12 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.ResumedAuthenticationToken;
@@ -43,7 +44,7 @@ public interface ResumedAuthenticationHandler {
    *
    * @return the protocol
    */
-  @Nonnull AuthenticationProtocol getProtocol();
+  @NonNull AuthenticationProtocol getProtocol();
 
   /**
    * Continues the flow and answers the requester.
@@ -54,7 +55,7 @@ public interface ResumedAuthenticationHandler {
    * @throws IOException for errors writing the response
    * @throws ServletException for other errors
    */
-  void resume(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull ResumedAuthenticationToken token) throws IOException, ServletException;
+  void resume(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull ResumedAuthenticationToken token) throws IOException, ServletException;
 
 }

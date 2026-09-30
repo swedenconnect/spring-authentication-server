@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Duration;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -65,7 +65,7 @@ public class SsoPolicy implements Serializable {
    *
    * @return an {@link SsoPolicy}
    */
-  public static @Nonnull SsoPolicy defaultPolicy() {
+  public static @NonNull SsoPolicy defaultPolicy() {
     return new SsoPolicy();
   }
 
@@ -74,7 +74,7 @@ public class SsoPolicy implements Serializable {
    *
    * @return an {@link SsoPolicy}
    */
-  public static @Nonnull SsoPolicy none() {
+  public static @NonNull SsoPolicy none() {
     final SsoPolicy policy = new SsoPolicy();
     policy.setEnabled(false);
     return policy;
@@ -85,7 +85,7 @@ public class SsoPolicy implements Serializable {
    *
    * @return an {@link SsoPolicy}
    */
-  public static @Nonnull SsoPolicy forSessionLifetime() {
+  public static @NonNull SsoPolicy forSessionLifetime() {
     final SsoPolicy policy = new SsoPolicy();
     policy.setTimeLimit(null);
     policy.setSameRequesterRequired(false);

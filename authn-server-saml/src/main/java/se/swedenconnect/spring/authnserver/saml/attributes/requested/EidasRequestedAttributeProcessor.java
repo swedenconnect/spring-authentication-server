@@ -15,10 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,8 +37,8 @@ public class EidasRequestedAttributeProcessor implements RequestedAttributeProce
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<SamlRequestedAttribute> extractRequestedAttributes(
-      final @Nonnull RequestedAttributeContext context) {
+  public @NonNull List<SamlRequestedAttribute> extractRequestedAttributes(
+      final @NonNull RequestedAttributeContext context) {
 
     final RequestedAttributes extension = RequestExtensions.getExtension(
         context.authnRequest(), RequestedAttributes.DEFAULT_ELEMENT_NAME, RequestedAttributes.class);

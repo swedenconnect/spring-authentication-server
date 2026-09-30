@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -77,9 +77,9 @@ public class Saml2AuthnRequestProcessingFilter extends OncePerRequestFilter {
    * @param converter decodes the request
    * @param provider validates the request and builds the authentication requirements
    */
-  public Saml2AuthnRequestProcessingFilter(final @Nonnull RequestMatcher requestMatcher,
-      final @Nonnull Saml2AuthnRequestAuthenticationConverter converter,
-      final @Nonnull Saml2AuthnRequestAuthenticationProvider provider) {
+  public Saml2AuthnRequestProcessingFilter(final @NonNull RequestMatcher requestMatcher,
+      final @NonNull Saml2AuthnRequestAuthenticationConverter converter,
+      final @NonNull Saml2AuthnRequestAuthenticationProvider provider) {
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
     this.converter = Objects.requireNonNull(converter, "converter must not be null");
     this.provider = Objects.requireNonNull(provider, "provider must not be null");
@@ -87,8 +87,8 @@ public class Saml2AuthnRequestProcessingFilter extends OncePerRequestFilter {
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {
@@ -113,7 +113,7 @@ public class Saml2AuthnRequestProcessingFilter extends OncePerRequestFilter {
    *
    * @param successHandler the handler
    */
-  public void setSuccessHandler(final @Nonnull AuthenticationSuccessHandler successHandler) {
+  public void setSuccessHandler(final @NonNull AuthenticationSuccessHandler successHandler) {
     this.successHandler = Objects.requireNonNull(successHandler, "successHandler must not be null");
   }
 

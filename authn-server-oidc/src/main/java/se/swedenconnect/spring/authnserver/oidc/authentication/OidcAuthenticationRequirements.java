@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
@@ -63,7 +63,7 @@ public class OidcAuthenticationRequirements extends AuthenticationRequirements {
    *
    * @param requirements the generic requirements
    */
-  public OidcAuthenticationRequirements(final @Nonnull AuthenticationRequirements requirements) {
+  public OidcAuthenticationRequirements(final @NonNull AuthenticationRequirements requirements) {
     super(requirements);
   }
 
@@ -72,7 +72,7 @@ public class OidcAuthenticationRequirements extends AuthenticationRequirements {
    *
    * @return the scopes, possibly empty
    */
-  public @Nonnull List<String> getScopes() {
+  public @NonNull List<String> getScopes() {
     return this.scopes;
   }
 
@@ -109,7 +109,7 @@ public class OidcAuthenticationRequirements extends AuthenticationRequirements {
    *
    * @return the language tags, possibly empty
    */
-  public @Nonnull List<String> getUiLocales() {
+  public @NonNull List<String> getUiLocales() {
     return this.uiLocales;
   }
 

@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.subject;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -49,8 +49,7 @@ public interface SubjectIdentifierGenerator extends Serializable {
    * @return the subject identifier
    * @throws UnrecoverableErrorException if the identifier can not be generated
    */
-  @Nonnull
-  String getSubjectIdentifier(final @Nonnull AuthenticatedUser user, final @Nonnull Requester requester)
+  @NonNull String getSubjectIdentifier(final @NonNull AuthenticatedUser user, final @NonNull Requester requester)
       throws UnrecoverableErrorException;
 
 }

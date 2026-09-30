@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.error;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.oauth2.sdk.ErrorObject;
 import com.nimbusds.oauth2.sdk.OAuth2Error;
@@ -47,7 +47,7 @@ public class OidcErrorMapping {
    * @param exception the exception from the authentication step
    * @return an {@link ErrorObject} carrying the error code and a description for the requester's logs
    */
-  public static @Nonnull ErrorObject of(final @Nonnull AuthenticationErrorException exception) {
+  public static @NonNull ErrorObject of(final @NonNull AuthenticationErrorException exception) {
     Objects.requireNonNull(exception, "exception must not be null");
     return of(exception.getError(), exception.getSsoDenialReason())
         .setDescription(exception.getDescription());
@@ -61,7 +61,7 @@ public class OidcErrorMapping {
    *          {@link AuthenticationError#PASSIVE_NOT_POSSIBLE}. May be {@code null}
    * @return an {@link ErrorObject} carrying the error code and the default description of the error
    */
-  public static @Nonnull ErrorObject of(final @Nonnull AuthenticationError error,
+  public static @NonNull ErrorObject of(final @NonNull AuthenticationError error,
       final @Nullable SsoDenialReason ssoDenialReason) {
     Objects.requireNonNull(error, "error must not be null");
     final ErrorObject errorObject = switch (error) {

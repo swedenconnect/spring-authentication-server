@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -32,8 +32,8 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param description a short description of the attribute
  * @author Martin Lindström
  */
-public record AttributeDefinition(@Nonnull String identifier, @Nonnull Class<? extends Serializable> valueType,
-    boolean multiValued, @Nonnull String description) implements Serializable {
+public record AttributeDefinition(@NonNull String identifier, @NonNull Class<? extends Serializable> valueType,
+    boolean multiValued, @NonNull String description) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -59,8 +59,8 @@ public record AttributeDefinition(@Nonnull String identifier, @Nonnull Class<? e
    * @param description a short description of the attribute
    * @return an {@link AttributeDefinition}
    */
-  public static @Nonnull AttributeDefinition ofString(final @Nonnull String identifier,
-      final @Nonnull String description) {
+  public static @NonNull AttributeDefinition ofString(final @NonNull String identifier,
+      final @NonNull String description) {
     return new AttributeDefinition(identifier, String.class, false, description);
   }
 
@@ -70,7 +70,7 @@ public record AttributeDefinition(@Nonnull String identifier, @Nonnull Class<? e
    * @param value the value to check
    * @return {@code true} if the value matches the declared value type and {@code false} otherwise
    */
-  public boolean isValidValue(final @Nonnull Serializable value) {
+  public boolean isValidValue(final @NonNull Serializable value) {
     return this.valueType.isInstance(value);
   }
 

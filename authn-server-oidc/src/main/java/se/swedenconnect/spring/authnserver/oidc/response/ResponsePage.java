@@ -15,12 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.response;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.util.Map;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * Writes the page that posts a response to the client, for the {@code form_post} response mode.
@@ -39,8 +40,8 @@ public interface ResponsePage {
    * @param parameters the response parameters
    * @throws IOException for errors writing the page
    */
-  void sendResponse(final @Nonnull HttpServletRequest httpServletRequest,
-      final @Nonnull HttpServletResponse httpServletResponse, final @Nonnull String destination,
-      final @Nonnull Map<String, String> parameters) throws IOException;
+  void sendResponse(final @NonNull HttpServletRequest httpServletRequest,
+      final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
+      final @NonNull Map<String, String> parameters) throws IOException;
 
 }

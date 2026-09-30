@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.nameid;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.NameID;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -40,7 +39,7 @@ public class PersistentNameIDGenerator extends AbstractNameIDGenerator {
    *
    * @param nameQualifier the name qualifier, normally the IdP entityID
    */
-  public PersistentNameIDGenerator(final @Nonnull String nameQualifier) {
+  public PersistentNameIDGenerator(final @NonNull String nameQualifier) {
     super(nameQualifier);
   }
 
@@ -50,7 +49,7 @@ public class PersistentNameIDGenerator extends AbstractNameIDGenerator {
    * @param nameQualifier the name qualifier, normally the IdP entityID
    * @param spNameQualifier the SP name qualifier, may be {@code null}
    */
-  public PersistentNameIDGenerator(final @Nonnull String nameQualifier, final @Nullable String spNameQualifier) {
+  public PersistentNameIDGenerator(final @NonNull String nameQualifier, final @Nullable String spNameQualifier) {
     super(nameQualifier, spNameQualifier);
   }
 
@@ -58,7 +57,7 @@ public class PersistentNameIDGenerator extends AbstractNameIDGenerator {
    * Returns {@value NameID#PERSISTENT}.
    */
   @Override
-  public @Nonnull String getFormat() {
+  public @NonNull String getFormat() {
     return NameID.PERSISTENT;
   }
 

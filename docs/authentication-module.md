@@ -33,18 +33,18 @@ implement three methods:
 public class MyAuthenticationProvider extends AbstractUserAuthenticationProvider {
 
   @Override
-  public @Nonnull String getName() {
+  public @NonNull String getName() {
     return "my-provider";
   }
 
   @Override
-  public @Nonnull List<String> getSupportedAuthnContextUris() {
+  public @NonNull List<String> getSupportedAuthnContextUris() {
     return List.of(LOA3, LOA4);
   }
 
   @Override
-  protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-      final @Nonnull List<String> authnContextUris) {
+  protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+      final @NonNull List<String> authnContextUris) {
     ...
     return new UserAuthentication(user);
   }
@@ -90,7 +90,7 @@ the SAML metadata and in the OpenID Connect discovery document. Each has a defau
 
 ```java
 @Override
-public @Nonnull List<String> getSupportedAttributes() {
+public @NonNull List<String> getSupportedAttributes() {
   return List.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, AttributeIdentifiers.GIVEN_NAME,
       AttributeIdentifiers.SURNAME, AttributeIdentifiers.DISPLAY_NAME, AttributeIdentifiers.DATE_OF_BIRTH);
 }
@@ -508,7 +508,7 @@ public class MyAuthenticationProvider extends AbstractUserRedirectAuthentication
   }
 
   @Override
-  protected @Nonnull UserAuthentication createUserAuthentication(final @Nonnull ResumedAuthenticationToken token) {
+  protected @NonNull UserAuthentication createUserAuthentication(final @NonNull ResumedAuthenticationToken token) {
     return (UserAuthentication) token.getAuthnToken();
   }
 }
@@ -594,7 +594,7 @@ public class MyAuthenticationController extends AbstractAuthenticationController
   }
 
   @Override
-  protected @Nonnull MyAuthenticationProvider getProvider() {
+  protected @NonNull MyAuthenticationProvider getProvider() {
     return this.provider;
   }
 }

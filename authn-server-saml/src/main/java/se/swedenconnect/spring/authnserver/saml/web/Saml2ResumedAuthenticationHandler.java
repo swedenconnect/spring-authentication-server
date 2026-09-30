@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,22 +63,22 @@ public class Saml2ResumedAuthenticationHandler implements ResumedAuthenticationH
    * @param flow turns the outcome into a result
    * @param responder answers the Service Provider
    */
-  public Saml2ResumedAuthenticationHandler(final @Nonnull UserAuthenticationFlow flow,
-      final @Nonnull Saml2UserAuthenticationResponder responder) {
+  public Saml2ResumedAuthenticationHandler(final @NonNull UserAuthenticationFlow flow,
+      final @NonNull Saml2UserAuthenticationResponder responder) {
     this.flow = Objects.requireNonNull(flow, "flow must not be null");
     this.responder = Objects.requireNonNull(responder, "responder must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.SAML;
   }
 
   /** {@inheritDoc} */
   @Override
-  public void resume(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull ResumedAuthenticationToken token) {
+  public void resume(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull ResumedAuthenticationToken token) {
 
     final UserAuthenticationInputToken inputToken = token.getAuthnInputToken();
     final Saml2AuthnRequestData requestData = Saml2UserAuthenticationResponder.getRequestData(inputToken);

@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,8 +82,8 @@ public class OidcRequestedAttributeResolver {
    * @param attributeMapping the mapping between claims and the generic attribute model
    * @param scopeRegistry the scopes that the OpenID Provider knows about
    */
-  public OidcRequestedAttributeResolver(final @Nonnull OidcAttributeMapping attributeMapping,
-      final @Nonnull ScopeRegistry scopeRegistry) {
+  public OidcRequestedAttributeResolver(final @NonNull OidcAttributeMapping attributeMapping,
+      final @NonNull ScopeRegistry scopeRegistry) {
     this.attributeMapping = Objects.requireNonNull(attributeMapping, "attributeMapping must not be null");
     this.scopeRegistry = Objects.requireNonNull(scopeRegistry, "scopeRegistry must not be null");
   }
@@ -97,8 +96,8 @@ public class OidcRequestedAttributeResolver {
    * @param logString the log string of the request
    * @return the generic requested attributes, possibly empty
    */
-  public @Nonnull List<GenericRequestedAttribute> resolve(final @Nullable Scope scope,
-      final @Nullable OIDCClaimsRequest claimsRequest, final @Nonnull String logString) {
+  public @NonNull List<GenericRequestedAttribute> resolve(final @Nullable Scope scope,
+      final @Nullable OIDCClaimsRequest claimsRequest, final @NonNull String logString) {
 
     final List<GenericRequestedAttribute> attributes =
         this.attributeMapping.toGeneric(this.getRequestedClaims(scope, claimsRequest, logString));
@@ -117,8 +116,8 @@ public class OidcRequestedAttributeResolver {
    * @param logString the log string of the request
    * @return the requested claims, possibly empty
    */
-  public @Nonnull List<RequestedClaim> getRequestedClaims(final @Nullable Scope scope,
-      final @Nullable OIDCClaimsRequest claimsRequest, final @Nonnull String logString) {
+  public @NonNull List<RequestedClaim> getRequestedClaims(final @Nullable Scope scope,
+      final @Nullable OIDCClaimsRequest claimsRequest, final @NonNull String logString) {
 
     final List<RequestedClaim> requestedClaims = new ArrayList<>();
     this.addScopeClaims(requestedClaims, scope, logString);
@@ -131,7 +130,7 @@ public class OidcRequestedAttributeResolver {
    *
    * @return a {@link ScopeRegistry}
    */
-  public @Nonnull ScopeRegistry getScopeRegistry() {
+  public @NonNull ScopeRegistry getScopeRegistry() {
     return this.scopeRegistry;
   }
 
@@ -140,7 +139,7 @@ public class OidcRequestedAttributeResolver {
    *
    * @return an {@link OidcAttributeMapping}
    */
-  public @Nonnull OidcAttributeMapping getAttributeMapping() {
+  public @NonNull OidcAttributeMapping getAttributeMapping() {
     return this.attributeMapping;
   }
 
@@ -151,8 +150,8 @@ public class OidcRequestedAttributeResolver {
    * @param scope the requested scopes, may be {@code null}
    * @param logString the log string of the request
    */
-  private void addScopeClaims(final @Nonnull List<RequestedClaim> requestedClaims, final @Nullable Scope scope,
-      final @Nonnull String logString) {
+  private void addScopeClaims(final @NonNull List<RequestedClaim> requestedClaims, final @Nullable Scope scope,
+      final @NonNull String logString) {
 
     if (scope == null) {
       return;
@@ -184,7 +183,7 @@ public class OidcRequestedAttributeResolver {
    * @param requestedClaims the list to add to
    * @param claimsRequest the claims request parameter, may be {@code null}
    */
-  private static void addClaimsRequestEntries(final @Nonnull List<RequestedClaim> requestedClaims,
+  private static void addClaimsRequestEntries(final @NonNull List<RequestedClaim> requestedClaims,
       final @Nullable OIDCClaimsRequest claimsRequest) {
 
     if (claimsRequest == null) {
@@ -201,8 +200,8 @@ public class OidcRequestedAttributeResolver {
    * @param claimsSetRequest the claims set request, may be {@code null}
    * @param target the delivery target
    */
-  private static void addEntries(final @Nonnull List<RequestedClaim> requestedClaims,
-      final @Nullable ClaimsSetRequest claimsSetRequest, final @Nonnull ClaimDeliveryTarget target) {
+  private static void addEntries(final @NonNull List<RequestedClaim> requestedClaims,
+      final @Nullable ClaimsSetRequest claimsSetRequest, final @NonNull ClaimDeliveryTarget target) {
 
     if (claimsSetRequest == null) {
       return;

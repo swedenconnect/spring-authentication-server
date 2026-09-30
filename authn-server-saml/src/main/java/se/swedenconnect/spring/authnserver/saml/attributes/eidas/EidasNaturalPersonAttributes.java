@@ -15,11 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.schema.XSString;
 
 import se.swedenconnect.opensaml.eidas.ext.attributes.AttributeConstants;
@@ -140,7 +139,7 @@ public class EidasNaturalPersonAttributes {
    *
    * @return an immutable list of {@link EidasAttributeTemplate}s
    */
-  public static @Nonnull List<EidasAttributeTemplate> getAll() {
+  public static @NonNull List<EidasAttributeTemplate> getAll() {
     return ALL;
   }
 

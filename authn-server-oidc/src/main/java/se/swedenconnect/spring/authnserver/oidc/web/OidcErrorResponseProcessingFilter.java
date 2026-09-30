@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -78,16 +78,16 @@ public class OidcErrorResponseProcessingFilter extends OncePerRequestFilter {
    * @param requestMatcher the matcher for the authorization endpoint
    * @param responseSender sends the error response
    */
-  public OidcErrorResponseProcessingFilter(final @Nonnull RequestMatcher requestMatcher,
-      final @Nonnull OidcResponseSender responseSender) {
+  public OidcErrorResponseProcessingFilter(final @NonNull RequestMatcher requestMatcher,
+      final @NonNull OidcResponseSender responseSender) {
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
     this.responseSender = Objects.requireNonNull(responseSender, "responseSender must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {

@@ -15,10 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest.validation;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,13 +45,13 @@ public class AuthnRequestReplayValidator implements AuthnRequestValidator {
    *
    * @param replayChecker the replay checker
    */
-  public AuthnRequestReplayValidator(final @Nonnull MessageReplayChecker replayChecker) {
+  public AuthnRequestReplayValidator(final @NonNull MessageReplayChecker replayChecker) {
     this.replayChecker = Objects.requireNonNull(replayChecker, "replayChecker must not be null");
   }
 
   /** {@inheritDoc} */
   @Override
-  public void validate(final @Nonnull Saml2AuthnRequestAuthenticationToken token) {
+  public void validate(final @NonNull Saml2AuthnRequestAuthenticationToken token) {
     try {
       this.replayChecker.checkReplay(token.getAuthnRequest().getID());
       log.debug("Replay check was successful [{}]", token.getLogString());

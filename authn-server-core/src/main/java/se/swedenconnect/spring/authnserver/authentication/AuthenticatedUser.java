@@ -15,15 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.StringUtils;
@@ -82,9 +81,9 @@ public class AuthenticatedUser implements UserDetails {
    * @param authnInstant the authentication instant
    * @param clientIpAddress the IP address of the client that the user was authenticated from
    */
-  public AuthenticatedUser(final @Nonnull Collection<GenericAttribute<?>> attributes,
-      final @Nonnull String primaryAttribute, final @Nonnull String authnContextUri,
-      final @Nonnull Instant authnInstant, final @Nonnull String clientIpAddress) {
+  public AuthenticatedUser(final @NonNull Collection<GenericAttribute<?>> attributes,
+      final @NonNull String primaryAttribute, final @NonNull String authnContextUri,
+      final @NonNull Instant authnInstant, final @NonNull String clientIpAddress) {
 
     Objects.requireNonNull(attributes, "attributes must not be null");
     if (attributes.isEmpty()) {
@@ -113,7 +112,7 @@ public class AuthenticatedUser implements UserDetails {
    * @return the user name
    */
   @Override
-  public @Nonnull String getUsername() {
+  public @NonNull String getUsername() {
     return String.valueOf(Objects.requireNonNull(this.getAttribute(this.primaryAttribute)).getValue());
   }
 
@@ -122,7 +121,7 @@ public class AuthenticatedUser implements UserDetails {
    *
    * @return the user attributes
    */
-  public @Nonnull List<GenericAttribute<?>> getAttributes() {
+  public @NonNull List<GenericAttribute<?>> getAttributes() {
     return this.attributes;
   }
 
@@ -132,7 +131,7 @@ public class AuthenticatedUser implements UserDetails {
    * @param identifier the attribute identifier
    * @return the attribute, or {@code null} if the user does not have it
    */
-  public @Nullable GenericAttribute<?> getAttribute(final @Nonnull String identifier) {
+  public @Nullable GenericAttribute<?> getAttribute(final @NonNull String identifier) {
     return this.attributes.stream()
         .filter(a -> Objects.equals(a.getIdentifier(), identifier))
         .findFirst()
@@ -144,7 +143,7 @@ public class AuthenticatedUser implements UserDetails {
    *
    * @return the identifier of the primary attribute
    */
-  public @Nonnull String getPrimaryAttribute() {
+  public @NonNull String getPrimaryAttribute() {
     return this.primaryAttribute;
   }
 
@@ -154,7 +153,7 @@ public class AuthenticatedUser implements UserDetails {
    *
    * @return the authentication context URI
    */
-  public @Nonnull String getAuthnContextUri() {
+  public @NonNull String getAuthnContextUri() {
     return this.authnContextUri;
   }
 
@@ -163,7 +162,7 @@ public class AuthenticatedUser implements UserDetails {
    *
    * @return the authentication instant
    */
-  public @Nonnull Instant getAuthnInstant() {
+  public @NonNull Instant getAuthnInstant() {
     return this.authnInstant;
   }
 
@@ -172,7 +171,7 @@ public class AuthenticatedUser implements UserDetails {
    *
    * @return the client IP address
    */
-  public @Nonnull String getClientIpAddress() {
+  public @NonNull String getClientIpAddress() {
     return this.clientIpAddress;
   }
 
@@ -211,7 +210,7 @@ public class AuthenticatedUser implements UserDetails {
    * Always returns an empty collection.
    */
   @Override
-  public @Nonnull Collection<? extends GrantedAuthority> getAuthorities() {
+  public @NonNull Collection<? extends GrantedAuthority> getAuthorities() {
     return List.of();
   }
 
@@ -219,7 +218,7 @@ public class AuthenticatedUser implements UserDetails {
    * Always returns the empty string.
    */
   @Override
-  public @Nonnull String getPassword() {
+  public @NonNull String getPassword() {
     return "";
   }
 

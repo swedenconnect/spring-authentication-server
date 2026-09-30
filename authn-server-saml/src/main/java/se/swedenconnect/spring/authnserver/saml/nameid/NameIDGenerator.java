@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.saml.nameid;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.NameID;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
@@ -43,8 +42,7 @@ public interface NameIDGenerator extends SubjectIdentifierGenerator {
    * @return a {@link NameID}
    * @throws UnrecoverableErrorException if the {@code NameID} can not be generated
    */
-  @Nonnull
-  NameID getNameID(final @Nonnull AuthenticatedUser user, final @Nonnull Requester requester)
+  @NonNull NameID getNameID(final @NonNull AuthenticatedUser user, final @NonNull Requester requester)
       throws UnrecoverableErrorException;
 
   /**
@@ -52,7 +50,6 @@ public interface NameIDGenerator extends SubjectIdentifierGenerator {
    *
    * @return the format URI
    */
-  @Nonnull
-  String getFormat();
+  @NonNull String getFormat();
 
 }

@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.security.cert.X509Certificate;
@@ -24,6 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import net.shibboleth.shared.component.ComponentInitializationException;
+import org.jspecify.annotations.NonNull;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.io.MarshallingException;
 import org.opensaml.core.xml.io.UnmarshallingException;
@@ -106,9 +106,9 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
    * @param clockSkew the allowed clock skew
    * @param maxMessageAge the maximum age of a received message
    */
-  public Saml2AuthnRequestAuthenticationConverter(final @Nonnull ClientRegistry clientRegistry,
-      final @Nonnull RequestMatcher holderOfKeyMatcher, final @Nonnull Duration clockSkew,
-      final @Nonnull Duration maxMessageAge) {
+  public Saml2AuthnRequestAuthenticationConverter(final @NonNull ClientRegistry clientRegistry,
+      final @NonNull RequestMatcher holderOfKeyMatcher, final @NonNull Duration clockSkew,
+      final @NonNull Duration maxMessageAge) {
     this.clientRegistry = Objects.requireNonNull(clientRegistry, "clientRegistry must not be null");
     this.holderOfKeyMatcher = Objects.requireNonNull(holderOfKeyMatcher, "holderOfKeyMatcher must not be null");
     this.clockSkew = Objects.requireNonNull(clockSkew, "clockSkew must not be null");
@@ -138,7 +138,7 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
    * @throws UnrecoverableErrorException if the request cannot be processed
    */
   @Override
-  public @Nonnull Saml2AuthnRequestAuthenticationToken convert(final @Nonnull HttpServletRequest request)
+  public @NonNull Saml2AuthnRequestAuthenticationToken convert(final @NonNull HttpServletRequest request)
       throws UnrecoverableErrorException {
 
     final MessageContext msgContext;
@@ -287,7 +287,7 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
    * @return a {@link SAMLMessageDecoder}
    * @throws UnrecoverableErrorException for unsupported HTTP methods
    */
-  protected @Nonnull SAMLMessageDecoder getDecoder(final @Nonnull HttpServletRequest request) {
+  protected @NonNull SAMLMessageDecoder getDecoder(final @NonNull HttpServletRequest request) {
     try {
       if ("GET".equals(request.getMethod())) {
         final HTTPRedirectDeflateDecoder decoder = new HTTPRedirectDeflateDecoder();

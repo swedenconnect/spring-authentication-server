@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link ClientRepository} that holds its clients in memory. Useful for tests and for deployments with a small and
@@ -46,13 +46,13 @@ public class InMemoryClientRepository implements ClientRepository {
    *
    * @param clients the clients
    */
-  public InMemoryClientRepository(final @Nonnull Collection<OidcClientRecord> clients) {
+  public InMemoryClientRepository(final @NonNull Collection<OidcClientRecord> clients) {
     Objects.requireNonNull(clients, "clients must not be null").forEach(this::save);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nullable OidcClientRecord findByClientId(final @Nonnull String clientId) {
+  public @Nullable OidcClientRecord findByClientId(final @NonNull String clientId) {
     return this.clients.get(Objects.requireNonNull(clientId, "clientId must not be null"));
   }
 
@@ -61,7 +61,7 @@ public class InMemoryClientRepository implements ClientRepository {
    *
    * @param client the client
    */
-  public void save(final @Nonnull OidcClientRecord client) {
+  public void save(final @NonNull OidcClientRecord client) {
     Objects.requireNonNull(client, "client must not be null");
     this.clients.put(client.clientId(), client);
   }
@@ -71,7 +71,7 @@ public class InMemoryClientRepository implements ClientRepository {
    *
    * @param clientId the {@code client_id} of the client
    */
-  public void remove(final @Nonnull String clientId) {
+  public void remove(final @NonNull String clientId) {
     this.clients.remove(Objects.requireNonNull(clientId, "clientId must not be null"));
   }
 
@@ -80,7 +80,7 @@ public class InMemoryClientRepository implements ClientRepository {
    *
    * @return the clients
    */
-  public @Nonnull List<OidcClientRecord> findAll() {
+  public @NonNull List<OidcClientRecord> findAll() {
     return List.copyOf(this.clients.values());
   }
 

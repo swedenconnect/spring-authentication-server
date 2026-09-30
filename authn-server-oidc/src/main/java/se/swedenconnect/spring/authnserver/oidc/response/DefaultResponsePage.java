@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.response;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -23,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.web.util.HtmlUtils;
 
 /**
@@ -38,9 +38,9 @@ public class DefaultResponsePage implements ResponsePage {
 
   /** {@inheritDoc} */
   @Override
-  public void sendResponse(final @Nonnull HttpServletRequest httpServletRequest,
-      final @Nonnull HttpServletResponse httpServletResponse, final @Nonnull String destination,
-      final @Nonnull Map<String, String> parameters) throws IOException {
+  public void sendResponse(final @NonNull HttpServletRequest httpServletRequest,
+      final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
+      final @NonNull Map<String, String> parameters) throws IOException {
 
     final String page = generateResponsePage(destination, parameters);
     httpServletResponse.setContentType("text/html;charset=UTF-8");
@@ -57,8 +57,8 @@ public class DefaultResponsePage implements ResponsePage {
    * @param parameters the response parameters
    * @return the HTML page
    */
-  public static @Nonnull String generateResponsePage(final @Nonnull String destination,
-      final @Nonnull Map<String, String> parameters) {
+  public static @NonNull String generateResponsePage(final @NonNull String destination,
+      final @NonNull Map<String, String> parameters) {
 
     final StringBuilder builder = new StringBuilder();
     builder.append("<!DOCTYPE html>").append(NEWLINE);
@@ -90,7 +90,7 @@ public class DefaultResponsePage implements ResponsePage {
    * @param value the value
    * @return the escaped value
    */
-  private static @Nonnull String escape(final @Nonnull String value) {
+  private static @NonNull String escape(final @NonNull String value) {
     return HtmlUtils.htmlEscape(value, StandardCharsets.UTF_8.name());
   }
 

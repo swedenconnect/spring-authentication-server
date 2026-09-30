@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
 
@@ -43,13 +43,13 @@ public class PhoneNumberToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.TELEPHONE_NUMBER, AttributeIdentifiers.MOBILE_NUMBER);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+  public @NonNull Collection<String> getClaimNames(final @NonNull String identifier) {
     if (AttributeIdentifiers.MOBILE_NUMBER.equals(identifier)) {
       return List.of(PersonClaims.PHONE_NUMBER_CLAIM_NAME, PersonClaims.MSISDN_CLAIM_NAME);
     }
@@ -60,8 +60,8 @@ public class PhoneNumberToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<UserClaim> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
 
     final String mobile = context.getStringValue(AttributeIdentifiers.MOBILE_NUMBER);
     final String telephone = context.getStringValue(AttributeIdentifiers.TELEPHONE_NUMBER);

@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Attribute;
 
 import se.swedenconnect.opensaml.sweid.saml2.attribute.AttributeConstants;
@@ -45,15 +44,15 @@ public class PlaceOfBirthToSamlMapper implements ToProtocolAttributeMapper<Attri
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.PLACE_OF_BIRTH, AttributeIdentifiers.PLACE_OF_BIRTH_LOCALITY,
         AttributeIdentifiers.PLACE_OF_BIRTH_REGION, AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<Attribute> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<Attribute> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
 
     String placeOfBirth = context.getStringValue(AttributeIdentifiers.PLACE_OF_BIRTH);
     if (placeOfBirth == null) {

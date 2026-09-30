@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.web;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -24,6 +22,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -85,7 +85,7 @@ public class UserAuthenticationFlow {
    *
    * @param providers the authentication providers, asked in order
    */
-  public UserAuthenticationFlow(final @Nonnull List<UserAuthenticationProvider> providers) {
+  public UserAuthenticationFlow(final @NonNull List<UserAuthenticationProvider> providers) {
     this.providers = List.copyOf(Objects.requireNonNull(providers, "providers must not be null"));
   }
 
@@ -111,8 +111,8 @@ public class UserAuthenticationFlow {
    * @throws UnrecoverableErrorException if a provider returns something that cannot be used
    * @throws IOException if the redirect cannot be sent
    */
-  public @Nullable UserAuthentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-      final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response)
+  public @Nullable UserAuthentication authenticate(final @NonNull UserAuthenticationInputToken token,
+      final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response)
       throws AuthenticationErrorException, UnrecoverableErrorException, IOException {
 
     token.setPreviousAuthentication(this.getSessionAuthentication());
@@ -167,8 +167,8 @@ public class UserAuthenticationFlow {
    *     been removed
    * @throws UnrecoverableErrorException if no provider can use what the module delivered
    */
-  public @Nonnull UserAuthentication resume(final @Nonnull ResumedAuthenticationToken token,
-      final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response)
+  public @NonNull UserAuthentication resume(final @NonNull ResumedAuthenticationToken token,
+      final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response)
       throws AuthenticationErrorException, UnrecoverableErrorException {
 
     final UserAuthenticationInputToken inputToken = token.getAuthnInputToken();
@@ -205,8 +205,8 @@ public class UserAuthenticationFlow {
    * @param request the HTTP servlet request
    * @param response the HTTP servlet response
    */
-  public void saveAuthentication(final @Nonnull UserAuthentication authentication,
-      final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response) {
+  public void saveAuthentication(final @NonNull UserAuthentication authentication,
+      final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response) {
 
     authentication.clearAuthnRequirements();
     authentication.clearProtocolRequestData();
@@ -241,8 +241,8 @@ public class UserAuthenticationFlow {
    * @param response the HTTP servlet response
    * @param error the error
    */
-  public void failAuthentication(final @Nonnull HttpServletRequest request, final @Nonnull HttpServletResponse response,
-      final @Nonnull AuthenticationErrorException error) {
+  public void failAuthentication(final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response,
+      final @NonNull AuthenticationErrorException error) {
     if (error.getError() == AuthenticationError.NO_AUTHN_CONTEXT
         || error.getError() == AuthenticationError.PASSIVE_NOT_POSSIBLE) {
       return;
@@ -260,7 +260,7 @@ public class UserAuthenticationFlow {
    *
    * @return the providers, in the order they are asked
    */
-  public @Nonnull List<UserAuthenticationProvider> getProviders() {
+  public @NonNull List<UserAuthenticationProvider> getProviders() {
     return this.providers;
   }
 
@@ -269,7 +269,7 @@ public class UserAuthenticationFlow {
    *
    * @return the redirect providers
    */
-  public @Nonnull List<UserRedirectAuthenticationProvider> getRedirectProviders() {
+  public @NonNull List<UserRedirectAuthenticationProvider> getRedirectProviders() {
     return this.providers.stream()
         .filter(UserRedirectAuthenticationProvider.class::isInstance)
         .map(UserRedirectAuthenticationProvider.class::cast)
@@ -281,7 +281,7 @@ public class UserAuthenticationFlow {
    *
    * @param securityContextRepository the repository
    */
-  public void setSecurityContextRepository(final @Nonnull SecurityContextRepository securityContextRepository) {
+  public void setSecurityContextRepository(final @NonNull SecurityContextRepository securityContextRepository) {
     this.securityContextRepository =
         Objects.requireNonNull(securityContextRepository, "securityContextRepository must not be null");
   }
@@ -292,7 +292,7 @@ public class UserAuthenticationFlow {
    *
    * @param redirectStrategy the redirect strategy
    */
-  public void setRedirectStrategy(final @Nonnull RedirectStrategy redirectStrategy) {
+  public void setRedirectStrategy(final @NonNull RedirectStrategy redirectStrategy) {
     this.redirectStrategy = Objects.requireNonNull(redirectStrategy, "redirectStrategy must not be null");
   }
 
@@ -314,8 +314,8 @@ public class UserAuthenticationFlow {
    * @param token the processed request
    * @return the result
    */
-  private static @Nonnull UserAuthentication prepare(final @Nonnull UserAuthentication authentication,
-      final @Nonnull UserAuthenticationInputToken token) {
+  private static @NonNull UserAuthentication prepare(final @NonNull UserAuthentication authentication,
+      final @NonNull UserAuthenticationInputToken token) {
     authentication.setAuthnRequirements(token.getAuthnRequirements());
     authentication.setProtocolRequestData(token.getProtocolRequestData());
     return authentication;

@@ -15,7 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.attributes;
 
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Helper for telling a Swedish personal identity number ("personnummer") from a Swedish coordination number

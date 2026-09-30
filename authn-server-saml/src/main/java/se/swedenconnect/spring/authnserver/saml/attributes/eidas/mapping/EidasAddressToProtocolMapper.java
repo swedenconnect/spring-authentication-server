@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Attribute;
 
 import se.swedenconnect.opensaml.eidas.ext.attributes.AttributeUtils;
@@ -42,14 +41,14 @@ public class EidasAddressToProtocolMapper implements ToProtocolAttributeMapper<A
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return EidasNaturalPersonAddress.getIdentifiers();
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<Attribute> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<Attribute> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
 
     final Map<String, String> parts = new LinkedHashMap<>();
     for (final GenericAttribute<? extends Serializable> attribute : attributes) {

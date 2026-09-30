@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.registry.acceptance;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -24,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,8 +63,8 @@ public class RequiredMarksRequesterPredicate implements RequesterPredicate {
    * @param protocol the protocol that the predicate applies to
    * @param groups the groups of marks, where every group must be satisfied by any one of its marks
    */
-  public RequiredMarksRequesterPredicate(final @Nonnull AuthenticationProtocol protocol,
-      final @Nonnull Collection<? extends Collection<String>> groups) {
+  public RequiredMarksRequesterPredicate(final @NonNull AuthenticationProtocol protocol,
+      final @NonNull Collection<? extends Collection<String>> groups) {
     this.protocol = Objects.requireNonNull(protocol, "protocol must not be null");
     this.groups = Objects.requireNonNull(groups, "groups must not be null").stream()
         .map(g -> Collections.unmodifiableSet(new LinkedHashSet<>(g)))
@@ -77,7 +76,7 @@ public class RequiredMarksRequesterPredicate implements RequesterPredicate {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return this.protocol;
   }
 
@@ -85,7 +84,7 @@ public class RequiredMarksRequesterPredicate implements RequesterPredicate {
    * Accepts the requester if every group is satisfied, asking the registry for missing marks first.
    */
   @Override
-  public boolean test(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry)
+  public boolean test(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry)
       throws ClientRegistryException {
     RequesterRecord current = record;
     for (final Set<String> group : this.groups) {
@@ -116,7 +115,7 @@ public class RequiredMarksRequesterPredicate implements RequesterPredicate {
    *
    * @return the groups
    */
-  public @Nonnull List<Set<String>> getGroups() {
+  public @NonNull List<Set<String>> getGroups() {
     return this.groups;
   }
 

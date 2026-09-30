@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -26,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.storage.ReplayCache;
 import org.springframework.boot.ssl.SslBundles;
@@ -249,7 +248,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull AuthenticationProtocol getProtocol() {
+  public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.SAML;
   }
 
@@ -259,7 +258,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param entityId the entity ID, or {@code null} for the default
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer entityId(final @Nullable String entityId) {
+  public @NonNull Saml2IdpConfigurer entityId(final @Nullable String entityId) {
     this.entityId = entityId;
     return this;
   }
@@ -269,7 +268,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the entity ID
    */
-  public @Nonnull String getEntityId() {
+  public @NonNull String getEntityId() {
     return this.entityId != null ? this.entityId : Objects.requireNonNull(this.getServer().getBaseUrl());
   }
 
@@ -280,7 +279,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param hokBaseUrl the Holder-of-key base URL, or {@code null} to use the base URL
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer hokBaseUrl(final @Nullable String hokBaseUrl) {
+  public @NonNull Saml2IdpConfigurer hokBaseUrl(final @Nullable String hokBaseUrl) {
     this.hokBaseUrl = hokBaseUrl;
     return this;
   }
@@ -300,7 +299,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param requiresSignedRequests whether signed authentication requests are required
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer requiresSignedRequests(final boolean requiresSignedRequests) {
+  public @NonNull Saml2IdpConfigurer requiresSignedRequests(final boolean requiresSignedRequests) {
     this.requiresSignedRequests = requiresSignedRequests;
     return this;
   }
@@ -321,7 +320,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param defaultCredential the default credential
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer defaultCredential(final @Nullable PkiCredential defaultCredential) {
+  public @NonNull Saml2IdpConfigurer defaultCredential(final @Nullable PkiCredential defaultCredential) {
     this.defaultCredential = defaultCredential;
     return this;
   }
@@ -341,7 +340,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param signCredential the signing credential
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer signCredential(final @Nullable PkiCredential signCredential) {
+  public @NonNull Saml2IdpConfigurer signCredential(final @Nullable PkiCredential signCredential) {
     this.signCredential = signCredential;
     return this;
   }
@@ -362,7 +361,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param futureSignCertificate the future signing certificate
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer futureSignCertificate(final @Nullable X509Certificate futureSignCertificate) {
+  public @NonNull Saml2IdpConfigurer futureSignCertificate(final @Nullable X509Certificate futureSignCertificate) {
     this.futureSignCertificate = futureSignCertificate;
     return this;
   }
@@ -383,7 +382,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param encryptCredential the encryption credential
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer encryptCredential(final @Nullable PkiCredential encryptCredential) {
+  public @NonNull Saml2IdpConfigurer encryptCredential(final @Nullable PkiCredential encryptCredential) {
     this.encryptCredential = encryptCredential;
     return this;
   }
@@ -404,7 +403,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param previousEncryptCredential the previous encryption credential
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer previousEncryptCredential(
+  public @NonNull Saml2IdpConfigurer previousEncryptCredential(
       final @Nullable PkiCredential previousEncryptCredential) {
     this.previousEncryptCredential = previousEncryptCredential;
     return this;
@@ -425,7 +424,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param metadataSignCredential the metadata signing credential
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer metadataSignCredential(final @Nullable PkiCredential metadataSignCredential) {
+  public @NonNull Saml2IdpConfigurer metadataSignCredential(final @Nullable PkiCredential metadataSignCredential) {
     this.metadataSignCredential = metadataSignCredential;
     return this;
   }
@@ -446,7 +445,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer redirectAuthnEndpoint(final @Nonnull String endpoint) {
+  public @NonNull Saml2IdpConfigurer redirectAuthnEndpoint(final @NonNull String endpoint) {
     this.redirectAuthnEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
     return this;
   }
@@ -456,7 +455,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the endpoint
    */
-  public @Nonnull String getRedirectAuthnEndpoint() {
+  public @NonNull String getRedirectAuthnEndpoint() {
     return this.redirectAuthnEndpoint;
   }
 
@@ -467,7 +466,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer postAuthnEndpoint(final @Nonnull String endpoint) {
+  public @NonNull Saml2IdpConfigurer postAuthnEndpoint(final @NonNull String endpoint) {
     this.postAuthnEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
     return this;
   }
@@ -477,7 +476,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the endpoint
    */
-  public @Nonnull String getPostAuthnEndpoint() {
+  public @NonNull String getPostAuthnEndpoint() {
     return this.postAuthnEndpoint;
   }
 
@@ -488,7 +487,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer hokRedirectAuthnEndpoint(final @Nullable String endpoint) {
+  public @NonNull Saml2IdpConfigurer hokRedirectAuthnEndpoint(final @Nullable String endpoint) {
     this.hokRedirectAuthnEndpoint = endpoint;
     return this;
   }
@@ -509,7 +508,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer hokPostAuthnEndpoint(final @Nullable String endpoint) {
+  public @NonNull Saml2IdpConfigurer hokPostAuthnEndpoint(final @Nullable String endpoint) {
     this.hokPostAuthnEndpoint = endpoint;
     return this;
   }
@@ -530,7 +529,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer metadataEndpoint(final @Nonnull String endpoint) {
+  public @NonNull Saml2IdpConfigurer metadataEndpoint(final @NonNull String endpoint) {
     this.metadataEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
     return this;
   }
@@ -540,7 +539,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the endpoint
    */
-  public @Nonnull String getMetadataEndpoint() {
+  public @NonNull String getMetadataEndpoint() {
     return this.metadataEndpoint;
   }
 
@@ -552,7 +551,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param nameIdGeneratorFactory the factory
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer nameIdGeneratorFactory(
+  public @NonNull Saml2IdpConfigurer nameIdGeneratorFactory(
       final @Nullable NameIDGeneratorFactory nameIdGeneratorFactory) {
     this.nameIdGeneratorFactory = nameIdGeneratorFactory;
     return this;
@@ -573,7 +572,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param maxMessageAge the maximum age
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer maxMessageAge(final @Nonnull Duration maxMessageAge) {
+  public @NonNull Saml2IdpConfigurer maxMessageAge(final @NonNull Duration maxMessageAge) {
     this.maxMessageAge = Objects.requireNonNull(maxMessageAge, "maxMessageAge must not be null");
     return this;
   }
@@ -583,7 +582,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the maximum age
    */
-  public @Nonnull Duration getMaxMessageAge() {
+  public @NonNull Duration getMaxMessageAge() {
     return this.maxMessageAge;
   }
 
@@ -594,7 +593,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param encryptAssertions whether assertions are encrypted
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer encryptAssertions(final boolean encryptAssertions) {
+  public @NonNull Saml2IdpConfigurer encryptAssertions(final boolean encryptAssertions) {
     this.encryptAssertions = encryptAssertions;
     return this;
   }
@@ -615,7 +614,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param notOnOrAfter the duration
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer assertionNotOnOrAfter(final @Nonnull Duration notOnOrAfter) {
+  public @NonNull Saml2IdpConfigurer assertionNotOnOrAfter(final @NonNull Duration notOnOrAfter) {
     this.assertionNotOnOrAfter = Objects.requireNonNull(notOnOrAfter, "notOnOrAfter must not be null");
     return this;
   }
@@ -627,7 +626,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param notBefore the duration
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer assertionNotBefore(final @Nonnull Duration notBefore) {
+  public @NonNull Saml2IdpConfigurer assertionNotBefore(final @NonNull Duration notBefore) {
     this.assertionNotBefore = Objects.requireNonNull(notBefore, "notBefore must not be null");
     return this;
   }
@@ -637,7 +636,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the duration
    */
-  public @Nonnull Duration getAssertionNotOnOrAfter() {
+  public @NonNull Duration getAssertionNotOnOrAfter() {
     return this.assertionNotOnOrAfter;
   }
 
@@ -646,7 +645,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the duration
    */
-  public @Nonnull Duration getAssertionNotBefore() {
+  public @NonNull Duration getAssertionNotBefore() {
     return this.assertionNotBefore;
   }
 
@@ -658,7 +657,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param attributeMapping the mapping, or {@code null} for the default
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer attributeMapping(final @Nullable SamlAttributeMapping attributeMapping) {
+  public @NonNull Saml2IdpConfigurer attributeMapping(final @Nullable SamlAttributeMapping attributeMapping) {
     this.attributeMapping = attributeMapping;
     return this;
   }
@@ -669,7 +668,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the mapping
    */
-  public @Nonnull SamlAttributeMapping getAttributeMapping() {
+  public @NonNull SamlAttributeMapping getAttributeMapping() {
     if (this.attributeMapping == null) {
       this.attributeMapping = new SamlAttributeMapping();
     }
@@ -685,7 +684,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param maximumMapping the mapping for maximum comparison, or {@code null}
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer authnContextMappings(final @Nullable Map<String, List<String>> minimumMapping,
+  public @NonNull Saml2IdpConfigurer authnContextMappings(final @Nullable Map<String, List<String>> minimumMapping,
       final @Nullable Map<String, List<String>> betterMapping,
       final @Nullable Map<String, List<String>> maximumMapping) {
     this.authnContextMinimumMapping = minimumMapping;
@@ -701,7 +700,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param replayCache the replay cache
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer replayCache(final @Nullable ReplayCache replayCache) {
+  public @NonNull Saml2IdpConfigurer replayCache(final @Nullable ReplayCache replayCache) {
     this.replayCache = replayCache;
     return this;
   }
@@ -713,7 +712,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param replayExpiration the expiration time
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer replayExpiration(final @Nonnull Duration replayExpiration) {
+  public @NonNull Saml2IdpConfigurer replayExpiration(final @NonNull Duration replayExpiration) {
     this.replayExpiration = Objects.requireNonNull(replayExpiration, "replayExpiration must not be null");
     return this;
   }
@@ -725,7 +724,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param replayContext the context name
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer replayContext(final @Nonnull String replayContext) {
+  public @NonNull Saml2IdpConfigurer replayContext(final @NonNull String replayContext) {
     this.replayContext = Objects.requireNonNull(replayContext, "replayContext must not be null");
     return this;
   }
@@ -737,7 +736,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param metadataSources the metadata sources
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer metadataSources(final @Nullable List<MetadataSource> metadataSources) {
+  public @NonNull Saml2IdpConfigurer metadataSources(final @Nullable List<MetadataSource> metadataSources) {
     this.metadataSources = metadataSources;
     return this;
   }
@@ -748,7 +747,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param sslBundles the SSL bundles
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer sslBundles(final @Nullable SslBundles sslBundles) {
+  public @NonNull Saml2IdpConfigurer sslBundles(final @Nullable SslBundles sslBundles) {
     this.sslBundles = sslBundles;
     return this;
   }
@@ -760,7 +759,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param metadataResolver the metadata resolver
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer metadataResolver(final @Nullable MetadataResolver metadataResolver) {
+  public @NonNull Saml2IdpConfigurer metadataResolver(final @Nullable MetadataResolver metadataResolver) {
     this.metadataResolver = metadataResolver;
     return this;
   }
@@ -771,8 +770,8 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer authnRequestProcessor(
-      final @Nonnull Customizer<Saml2AuthnRequestProcessorConfigurer> customizer) {
+  public @NonNull Saml2IdpConfigurer authnRequestProcessor(
+      final @NonNull Customizer<Saml2AuthnRequestProcessorConfigurer> customizer) {
     customizer.customize(this.authnRequestProcessorConfigurer);
     return this;
   }
@@ -783,8 +782,8 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param customizer the customizer
    * @return this configurer
    */
-  public @Nonnull Saml2IdpConfigurer idpMetadataEndpoint(
-      final @Nonnull Customizer<Saml2IdpMetadataEndpointConfigurer> customizer) {
+  public @NonNull Saml2IdpConfigurer idpMetadataEndpoint(
+      final @NonNull Customizer<Saml2IdpMetadataEndpointConfigurer> customizer) {
     customizer.customize(this.metadataEndpointConfigurer);
     return this;
   }
@@ -795,13 +794,13 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint, relative to the SAML path
    * @return the URL
    */
-  public @Nonnull String getHokEndpointUrl(final @Nonnull String endpoint) {
+  public @NonNull String getHokEndpointUrl(final @NonNull String endpoint) {
     return this.hokBaseUrl != null ? this.hokBaseUrl + this.getEndpointPath(endpoint) : this.getEndpointUrl(endpoint);
   }
 
   /** {@inheritDoc} */
   @Override
-  protected void init(final @Nonnull HttpSecurity http) {
+  protected void init(final @NonNull HttpSecurity http) {
     this.validate();
 
     final List<RequestMatcher> authnMatchers = new ArrayList<>();
@@ -847,7 +846,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** {@inheritDoc} */
   @Override
-  protected void configure(final @Nonnull HttpSecurity http) {
+  protected void configure(final @NonNull HttpSecurity http) {
     this.metadataEndpointConfigurer.configure(http);
 
     final Saml2AuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
@@ -937,7 +936,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** {@inheritDoc} */
   @Override
-  protected @Nonnull List<ClientRegistryBackend> getClientRegistryBackends() {
+  protected @NonNull List<ClientRegistryBackend> getClientRegistryBackends() {
     return this.metadataBackend != null ? List.of(this.metadataBackend) : List.of();
   }
 
@@ -949,7 +948,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** {@inheritDoc} */
   @Override
-  protected @Nonnull String getMissingClientRegistryBackendHint() {
+  protected @NonNull String getMissingClientRegistryBackendHint() {
     return "assign SP metadata sources (authn-server.saml.metadata-providers) or a metadata resolver";
   }
 
@@ -959,8 +958,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the factory
    */
-  @Nonnull
-  NameIDGeneratorFactory getActiveNameIdGeneratorFactory() {
+  @NonNull NameIDGeneratorFactory getActiveNameIdGeneratorFactory() {
     return Objects.requireNonNull(this.activeNameIdGeneratorFactory, "The configurer has not been initialized");
   }
 
@@ -969,7 +967,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the replay checker
    */
-  private @Nonnull MessageReplayChecker getMessageReplayChecker() {
+  private @NonNull MessageReplayChecker getMessageReplayChecker() {
     if (this.authnRequestProcessorConfigurer.getMessageReplayChecker() != null) {
       return this.authnRequestProcessorConfigurer.getMessageReplayChecker();
     }
@@ -984,7 +982,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the entity categories
    */
-  private @Nonnull List<String> getDeclaredEntityCategories() {
+  private @NonNull List<String> getDeclaredEntityCategories() {
     return this.getServer().getAuthenticationProviders().stream()
         .map(UserAuthenticationProvider::getEntityCategories)
         .flatMap(Collection::stream)
@@ -997,7 +995,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the decryption credentials
    */
-  private @Nonnull List<PkiCredential> getDecryptionCredentials() {
+  private @NonNull List<PkiCredential> getDecryptionCredentials() {
     final List<PkiCredential> credentials = new ArrayList<>();
     if (this.getEncryptCredential() != null) {
       credentials.add(this.getEncryptCredential());
@@ -1010,7 +1008,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** {@inheritDoc} */
   @Override
-  protected @Nonnull RequestMatcher getRequestMatcher() {
+  protected @NonNull RequestMatcher getRequestMatcher() {
     return Objects.requireNonNull(this.requestMatcher, "The configurer has not been initialized");
   }
 
@@ -1019,8 +1017,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the signing credential, or {@code null}
    */
-  @Nullable
-  PkiCredential getAssignedSignCredential() {
+  @Nullable PkiCredential getAssignedSignCredential() {
     return this.signCredential;
   }
 
@@ -1029,8 +1026,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    *
    * @return the encryption credential, or {@code null}
    */
-  @Nullable
-  PkiCredential getAssignedEncryptCredential() {
+  @Nullable PkiCredential getAssignedEncryptCredential() {
     return this.encryptCredential;
   }
 
@@ -1041,8 +1037,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param <O> the type
    * @return the processed object
    */
-  @Nonnull
-  <O> O postProcessObject(final @Nonnull O object) {
+  <O> @NonNull O postProcessObject(final @NonNull O object) {
     return this.postProcess(object);
   }
 
@@ -1096,7 +1091,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
    * @param endpoint the endpoint
    * @param name the name of the endpoint, for the error message
    */
-  private static void assertEndpoint(final @Nonnull String endpoint, final @Nonnull String name) {
+  private static void assertEndpoint(final @NonNull String endpoint, final @NonNull String name) {
     if (!endpoint.startsWith("/")) {
       throw new IllegalArgumentException(
           "Invalid SAML %s endpoint '%s' - it must begin with /".formatted(name, endpoint));

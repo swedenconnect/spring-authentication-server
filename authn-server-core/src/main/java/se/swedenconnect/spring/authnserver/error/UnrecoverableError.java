@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.error;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
 
 /**
@@ -35,15 +34,13 @@ public interface UnrecoverableError {
    *
    * @return the message code
    */
-  @Nonnull
-  String getMessageCode();
+  @NonNull String getMessageCode();
 
   /**
    * Gets a description of the error, for logs.
    *
    * @return the description
    */
-  @Nonnull
-  String getDescription();
+  @NonNull String getDescription();
 
 }

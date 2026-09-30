@@ -15,10 +15,10 @@
  */
 package se.swedenconnect.spring.authnserver.attributes.release;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.function.BiFunction;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -42,8 +42,8 @@ public interface AttributeReleaseVoter
    * Maps to {@link #vote(UserAuthentication, GenericAttribute)}.
    */
   @Override
-  default @Nonnull AttributeReleaseVote apply(final @Nonnull UserAuthentication userAuthentication,
-      final @Nonnull GenericAttribute<? extends Serializable> attribute) {
+  default @NonNull AttributeReleaseVote apply(final @NonNull UserAuthentication userAuthentication,
+      final @NonNull GenericAttribute<? extends Serializable> attribute) {
     return this.vote(userAuthentication, attribute);
   }
 
@@ -54,7 +54,7 @@ public interface AttributeReleaseVoter
    * @param attribute the attribute to vote on
    * @return an {@link AttributeReleaseVote}
    */
-  @Nonnull AttributeReleaseVote vote(final @Nonnull UserAuthentication userAuthentication,
-      final @Nonnull GenericAttribute<? extends Serializable> attribute);
+  @NonNull AttributeReleaseVote vote(final @NonNull UserAuthentication userAuthentication,
+      final @NonNull GenericAttribute<? extends Serializable> attribute);
 
 }

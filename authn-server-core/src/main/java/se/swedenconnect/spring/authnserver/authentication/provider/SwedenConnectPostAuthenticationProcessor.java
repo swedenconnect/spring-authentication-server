@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.authentication.provider;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +44,7 @@ public class SwedenConnectPostAuthenticationProcessor implements PostAuthenticat
 
   /** {@inheritDoc} */
   @Override
-  public void process(final @Nonnull UserAuthentication authentication) throws AuthenticationErrorException {
+  public void process(final @NonNull UserAuthentication authentication) throws AuthenticationErrorException {
     final AuthenticationRequirements requirements = authentication.getAuthnRequirements();
     if (requirements == null) {
       return;

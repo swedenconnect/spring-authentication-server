@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.schema.XSURI;
 import org.opensaml.saml.saml2.core.AuthnContextComparisonTypeEnumeration;
 import org.opensaml.saml.saml2.core.RequestedAuthnContext;
@@ -65,8 +64,8 @@ public class AuthnContextResolver {
    * @return the acceptable authentication context URIs, empty if none were requested
    * @throws SamlErrorStatusException if the requested authentication context cannot be resolved
    */
-  public @Nonnull List<String> resolve(final @Nullable RequestedAuthnContext requestedAuthnContext,
-      final @Nonnull String logString) throws SamlErrorStatusException {
+  public @NonNull List<String> resolve(final @Nullable RequestedAuthnContext requestedAuthnContext,
+      final @NonNull String logString) throws SamlErrorStatusException {
 
     if (requestedAuthnContext == null) {
       return List.of();
@@ -175,8 +174,8 @@ public class AuthnContextResolver {
    * @param logString the log string of the request
    * @return a {@link SamlErrorStatusException}
    */
-  private static @Nonnull SamlErrorStatusException invalid(final @Nonnull String reason,
-      final @Nonnull String logString) {
+  private static @NonNull SamlErrorStatusException invalid(final @NonNull String reason,
+      final @NonNull String logString) {
     final String msg = "Invalid AuthnRequest - " + reason;
     log.info("{} [{}]", msg, logString);
     return new SamlErrorStatusException(SamlErrorStatus.INVALID_REQUEST, SamlErrorStatus.INVALID_REQUEST_MESSAGE_CODE,

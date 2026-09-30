@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.security.cert.X509Certificate;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 
 import se.swedenconnect.opensaml.common.utils.SerializableOpenSamlObject;
@@ -44,9 +43,9 @@ import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseAttributes
  *     Holder-of-key subject confirmation is built from. {@code null} when the request was not a Holder-of-key request
  * @author Martin Lindström
  */
-public record Saml2AuthnRequestData(@Nonnull SerializableOpenSamlObject<AuthnRequest> authnRequest,
-    @Nonnull Saml2ResponseAttributes responseAttributes, boolean holderOfKey,
-    @Nonnull NameIDGenerator nameIdGenerator, @Nullable X509Certificate holderOfKeyCertificate)
+public record Saml2AuthnRequestData(@NonNull SerializableOpenSamlObject<AuthnRequest> authnRequest,
+    @NonNull Saml2ResponseAttributes responseAttributes, boolean holderOfKey,
+    @NonNull NameIDGenerator nameIdGenerator, @Nullable X509Certificate holderOfKeyCertificate)
     implements Serializable {
 
   @Serial
@@ -79,7 +78,7 @@ public record Saml2AuthnRequestData(@Nonnull SerializableOpenSamlObject<AuthnReq
    *
    * @return the authentication request
    */
-  public @Nonnull AuthnRequest getAuthnRequest() {
+  public @NonNull AuthnRequest getAuthnRequest() {
     return this.authnRequest.get();
   }
 

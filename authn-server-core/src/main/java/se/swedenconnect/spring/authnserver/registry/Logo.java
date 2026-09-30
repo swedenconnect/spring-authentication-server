@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.registry;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -39,7 +38,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param width the width in pixels, or {@code null} if the metadata does not give it
  * @author Martin Lindström
  */
-public record Logo(@Nullable String language, @Nonnull String url, @Nullable Integer height, @Nullable Integer width)
+public record Logo(@Nullable String language, @NonNull String url, @Nullable Integer height, @Nullable Integer width)
     implements Serializable {
 
   @Serial
@@ -79,7 +78,7 @@ public record Logo(@Nullable String language, @Nonnull String url, @Nullable Int
    * @param url the URL of the logotype
    * @return a {@link Logo}
    */
-  public static @Nonnull Logo of(final @Nonnull String url) {
+  public static @NonNull Logo of(final @NonNull String url) {
     return new Logo(null, url, null, null);
   }
 

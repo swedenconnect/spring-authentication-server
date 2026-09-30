@@ -25,8 +25,7 @@ import static se.swedenconnect.spring.authnserver.attributes.release.AttributeRe
 import java.time.Instant;
 import java.util.List;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 
@@ -54,18 +53,18 @@ class AttributeProducerTest {
   private static class TestProvider extends AbstractUserAuthenticationProvider {
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test-provider";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return List.of(AuthenticationTestSupport.LOA3);
     }
 
     @Override
-    protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-        final @Nonnull List<String> authnContextUris) {
+    protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+        final @NonNull List<String> authnContextUris) {
       return new UserAuthentication(
           AuthenticationTestSupport.user(authnContextUris.getFirst(), Instant.now()));
     }

@@ -15,7 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.web;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.core.xml.io.MarshallingException;
 import org.opensaml.xmlsec.signature.support.SignatureException;
 import org.slf4j.Logger;
@@ -65,8 +65,8 @@ public class Saml2IdpMetadataEndpointFilter extends OncePerRequestFilter {
    * @param entityDescriptorContainer the IdP metadata container
    * @param requestMatcher the request matcher for the metadata endpoint
    */
-  public Saml2IdpMetadataEndpointFilter(final @Nonnull EntityDescriptorContainer entityDescriptorContainer,
-      final @Nonnull RequestMatcher requestMatcher) {
+  public Saml2IdpMetadataEndpointFilter(final @NonNull EntityDescriptorContainer entityDescriptorContainer,
+      final @NonNull RequestMatcher requestMatcher) {
     this.entityDescriptorContainer =
         Objects.requireNonNull(entityDescriptorContainer, "entityDescriptorContainer must not be null");
     this.requestMatcher = Objects.requireNonNull(requestMatcher, "requestMatcher must not be null");
@@ -74,8 +74,8 @@ public class Saml2IdpMetadataEndpointFilter extends OncePerRequestFilter {
 
   /** {@inheritDoc} */
   @Override
-  protected void doFilterInternal(final @Nonnull HttpServletRequest request,
-      final @Nonnull HttpServletResponse response, final @Nonnull FilterChain filterChain)
+  protected void doFilterInternal(final @NonNull HttpServletRequest request,
+      final @NonNull HttpServletResponse response, final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
     if (!this.requestMatcher.matches(request)) {

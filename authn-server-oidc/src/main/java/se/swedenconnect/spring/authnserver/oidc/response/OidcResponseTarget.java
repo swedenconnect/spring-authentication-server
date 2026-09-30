@@ -15,13 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.oauth2.sdk.ResponseMode;
 
@@ -42,8 +43,8 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param state the {@code state} of the request, or {@code null} if the request had none
  * @author Martin Lindström
  */
-public record OidcResponseTarget(@Nonnull String clientId, @Nonnull String redirectUri,
-    @Nonnull String responseMode, @Nullable String state) implements Serializable {
+public record OidcResponseTarget(@NonNull String clientId, @NonNull String redirectUri,
+    @NonNull String responseMode, @Nullable String state) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -80,7 +81,7 @@ public record OidcResponseTarget(@Nonnull String clientId, @Nonnull String redir
    * @param request the HTTP request
    * @param target the response target
    */
-  public static void setOnRequest(final @Nonnull HttpServletRequest request, final @Nonnull OidcResponseTarget target) {
+  public static void setOnRequest(final @NonNull HttpServletRequest request, final @NonNull OidcResponseTarget target) {
     request.setAttribute(REQUEST_ATTRIBUTE, target);
   }
 
@@ -90,7 +91,7 @@ public record OidcResponseTarget(@Nonnull String clientId, @Nonnull String redir
    * @param request the HTTP request
    * @return the response target, or {@code null} if none has been established
    */
-  public static @Nullable OidcResponseTarget fromRequest(final @Nonnull HttpServletRequest request) {
+  public static @Nullable OidcResponseTarget fromRequest(final @NonNull HttpServletRequest request) {
     return request.getAttribute(REQUEST_ATTRIBUTE) instanceof final OidcResponseTarget target ? target : null;
   }
 

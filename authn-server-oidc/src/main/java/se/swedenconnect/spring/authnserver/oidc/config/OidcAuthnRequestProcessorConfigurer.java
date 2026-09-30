@@ -15,9 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.config;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 import se.swedenconnect.spring.authnserver.oidc.attributes.requested.OidcRequestedAttributeResolver;
@@ -63,7 +62,7 @@ public class OidcAuthnRequestProcessorConfigurer {
    * @param requestedAttributeResolver the resolver
    * @return this configurer
    */
-  public @Nonnull OidcAuthnRequestProcessorConfigurer requestedAttributeResolver(
+  public @NonNull OidcAuthnRequestProcessorConfigurer requestedAttributeResolver(
       final @Nullable OidcRequestedAttributeResolver requestedAttributeResolver) {
     this.requestedAttributeResolver = requestedAttributeResolver;
     return this;
@@ -85,7 +84,7 @@ public class OidcAuthnRequestProcessorConfigurer {
    * @param clientKeyResolver the resolver
    * @return this configurer
    */
-  public @Nonnull OidcAuthnRequestProcessorConfigurer clientKeyResolver(
+  public @NonNull OidcAuthnRequestProcessorConfigurer clientKeyResolver(
       final @Nullable ClientKeyResolver clientKeyResolver) {
     this.clientKeyResolver = clientKeyResolver;
     return this;
@@ -107,7 +106,7 @@ public class OidcAuthnRequestProcessorConfigurer {
    * @param requestUriFetcher the fetcher
    * @return this configurer
    */
-  public @Nonnull OidcAuthnRequestProcessorConfigurer requestUriFetcher(
+  public @NonNull OidcAuthnRequestProcessorConfigurer requestUriFetcher(
       final @Nullable RequestUriFetcher requestUriFetcher) {
     this.requestUriFetcher = requestUriFetcher;
     return this;
@@ -128,7 +127,7 @@ public class OidcAuthnRequestProcessorConfigurer {
    * @param responsePage the response page
    * @return this configurer
    */
-  public @Nonnull OidcAuthnRequestProcessorConfigurer responsePage(final @Nullable ResponsePage responsePage) {
+  public @NonNull OidcAuthnRequestProcessorConfigurer responsePage(final @Nullable ResponsePage responsePage) {
     this.responsePage = responsePage;
     return this;
   }
@@ -151,7 +150,7 @@ public class OidcAuthnRequestProcessorConfigurer {
    * @param successHandler the handler
    * @return this configurer
    */
-  public @Nonnull OidcAuthnRequestProcessorConfigurer successHandler(
+  public @NonNull OidcAuthnRequestProcessorConfigurer successHandler(
       final @Nullable AuthenticationSuccessHandler successHandler) {
     this.successHandler = successHandler;
     return this;

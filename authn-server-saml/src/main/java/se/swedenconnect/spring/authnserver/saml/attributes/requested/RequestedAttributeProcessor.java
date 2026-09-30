@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.requested;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.swedenconnect.spring.authnserver.saml.attributes.SamlRequestedAttribute;
 
@@ -39,6 +39,6 @@ public interface RequestedAttributeProcessor {
    * @param context the authentication request and the metadata of the Service Provider that sent it
    * @return the requested attributes, possibly empty
    */
-  @Nonnull List<SamlRequestedAttribute> extractRequestedAttributes(final @Nonnull RequestedAttributeContext context);
+  @NonNull List<SamlRequestedAttribute> extractRequestedAttributes(final @NonNull RequestedAttributeContext context);
 
 }

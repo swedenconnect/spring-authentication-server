@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.attributes.eidas.mapping;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.Attribute;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
@@ -43,14 +42,14 @@ public class EidasGenderToProtocolMapper implements ToProtocolAttributeMapper<At
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.GENDER);
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<Attribute> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<Attribute> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
     final Attribute attribute = EidasAttributeValues.createAttribute(
         EidasNaturalPersonAttributes.GENDER, List.of(String.valueOf(attributes.get(0).getValue())));
     return attribute != null ? List.of(attribute) : List.of();

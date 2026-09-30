@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.web;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
@@ -35,8 +34,8 @@ public class OidcDiscoveryEndpointFilter extends JsonDocumentEndpointFilter {
    * @param metadata the OpenID Provider metadata
    * @param requestMatcher the request matcher for the discovery endpoint
    */
-  public OidcDiscoveryEndpointFilter(final @Nonnull OIDCProviderMetadata metadata,
-      final @Nonnull RequestMatcher requestMatcher) {
+  public OidcDiscoveryEndpointFilter(final @NonNull OIDCProviderMetadata metadata,
+      final @NonNull RequestMatcher requestMatcher) {
     super(requestMatcher, metadata.toJSONObject().toJSONString(), "discovery document");
   }
 

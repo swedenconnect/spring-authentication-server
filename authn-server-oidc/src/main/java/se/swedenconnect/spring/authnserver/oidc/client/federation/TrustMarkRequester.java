@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.time.Instant;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
@@ -41,7 +40,7 @@ public interface TrustMarkRequester {
    *           issued the trust mark to the client
    * @throws ClientRegistryException if the call to the issuer fails or the trust mark does not verify
    */
-  @Nullable TrustMark request(final @Nonnull String clientId, final @Nonnull String trustMarkType)
+  @Nullable TrustMark request(final @NonNull String clientId, final @NonNull String trustMarkType)
       throws ClientRegistryException;
 
   /**
@@ -50,7 +49,7 @@ public interface TrustMarkRequester {
    * @param type the trust mark type
    * @param expiresAt when the trust mark is no longer valid, or {@code null} if it does not expire
    */
-  record TrustMark(@Nonnull String type, @Nullable Instant expiresAt) {
+  record TrustMark(@NonNull String type, @Nullable Instant expiresAt) {
 
     /**
      * Constructor.

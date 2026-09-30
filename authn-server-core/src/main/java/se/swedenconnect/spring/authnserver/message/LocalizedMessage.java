@@ -15,15 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.message;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -40,7 +39,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param message the Base64 encoding of the UTF-8 message
  * @author Martin Lindström
  */
-public record LocalizedMessage(@Nullable String language, @Nonnull String message) implements Serializable {
+public record LocalizedMessage(@Nullable String language, @NonNull String message) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -73,7 +72,7 @@ public record LocalizedMessage(@Nullable String language, @Nonnull String messag
    * @param text the message text
    * @return a {@link LocalizedMessage}
    */
-  public static @Nonnull LocalizedMessage ofText(final @Nullable String language, final @Nonnull String text) {
+  public static @NonNull LocalizedMessage ofText(final @Nullable String language, final @NonNull String text) {
     Objects.requireNonNull(text, "text must not be null");
     return new LocalizedMessage(language,
         Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8)));
@@ -84,7 +83,7 @@ public record LocalizedMessage(@Nullable String language, @Nonnull String messag
    *
    * @return the message text
    */
-  public @Nonnull String getText() {
+  public @NonNull String getText() {
     return new String(Base64.getDecoder().decode(this.message), StandardCharsets.UTF_8);
   }
 

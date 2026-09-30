@@ -17,7 +17,6 @@ package se.swedenconnect.spring.authnserver.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import jakarta.annotation.Nonnull;
 import jakarta.servlet.Filter;
 
 import java.io.ByteArrayInputStream;
@@ -26,6 +25,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.util.XMLObjectSupport;
@@ -111,18 +111,18 @@ class AuthnServerAutoConfigurationTest {
   static class TestProvider extends AbstractUserAuthenticationProvider {
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return List.of("http://id.elegnamnden.se/loa/1.0/loa3");
     }
 
     @Override
-    protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-        final @Nonnull List<String> authnContextUris) {
+    protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+        final @NonNull List<String> authnContextUris) {
       throw new UnsupportedOperationException();
     }
   }
@@ -154,12 +154,12 @@ class AuthnServerAutoConfigurationTest {
       return (http, configurer) -> configurer.configurableRequesterAcceptance().addPredicate(new RequesterPredicate() {
 
         @Override
-        public @Nonnull AuthenticationProtocol getProtocol() {
+        public @NonNull AuthenticationProtocol getProtocol() {
           return AuthenticationProtocol.SAML;
         }
 
         @Override
-        public boolean test(final @Nonnull RequesterRecord record, final @Nonnull ClientRegistry registry) {
+        public boolean test(final @NonNull RequesterRecord record, final @NonNull ClientRegistry registry) {
           return false;
         }
       });

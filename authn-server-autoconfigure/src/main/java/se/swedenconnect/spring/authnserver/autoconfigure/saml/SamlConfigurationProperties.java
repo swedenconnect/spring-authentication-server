@@ -15,15 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.saml;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.File;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.io.Resource;
 
@@ -231,7 +230,7 @@ public class SamlConfigurationProperties {
    *
    * @return the single sign-on properties
    */
-  public @Nonnull SsoProperties getSso() {
+  public @NonNull SsoProperties getSso() {
     return this.sso;
   }
 
@@ -276,7 +275,7 @@ public class SamlConfigurationProperties {
    *
    * @return the subject identifier properties
    */
-  public @Nonnull SubjectIdentifierProperties getSubjectIdentifier() {
+  public @NonNull SubjectIdentifierProperties getSubjectIdentifier() {
     return this.subjectIdentifier;
   }
 
@@ -285,7 +284,7 @@ public class SamlConfigurationProperties {
    *
    * @return the credential properties
    */
-  public @Nonnull CredentialProperties getCredentials() {
+  public @NonNull CredentialProperties getCredentials() {
     return this.credentials;
   }
 
@@ -294,7 +293,7 @@ public class SamlConfigurationProperties {
    *
    * @return the endpoint properties
    */
-  public @Nonnull EndpointProperties getEndpoints() {
+  public @NonNull EndpointProperties getEndpoints() {
     return this.endpoints;
   }
 
@@ -303,7 +302,7 @@ public class SamlConfigurationProperties {
    *
    * @return the metadata properties
    */
-  public @Nonnull MetadataProperties getMetadata() {
+  public @NonNull MetadataProperties getMetadata() {
     return this.metadata;
   }
 
@@ -330,7 +329,7 @@ public class SamlConfigurationProperties {
    *
    * @return the authentication context properties
    */
-  public @Nonnull AuthnContextProperties getAuthnContext() {
+  public @NonNull AuthnContextProperties getAuthnContext() {
     return this.authnContext;
   }
 
@@ -339,7 +338,7 @@ public class SamlConfigurationProperties {
    *
    * @return the assertion properties
    */
-  public @Nonnull AssertionProperties getAssertions() {
+  public @NonNull AssertionProperties getAssertions() {
     return this.assertions;
   }
 
@@ -348,7 +347,7 @@ public class SamlConfigurationProperties {
    *
    * @return the replay properties
    */
-  public @Nonnull ReplayProperties getReplay() {
+  public @NonNull ReplayProperties getReplay() {
     return this.replay;
   }
 
@@ -375,7 +374,7 @@ public class SamlConfigurationProperties {
    *
    * @return the requester acceptance properties
    */
-  public @Nonnull RequesterAcceptanceProperties getRequesterAcceptance() {
+  public @NonNull RequesterAcceptanceProperties getRequesterAcceptance() {
     return this.requesterAcceptance;
   }
 
@@ -900,7 +899,7 @@ public class SamlConfigurationProperties {
      *
      * @return the combination mode
      */
-    public @Nullable ConfigurableRequesterAcceptance.Mode getMode() {
+    public ConfigurableRequesterAcceptance.@Nullable Mode getMode() {
       return this.mode;
     }
 
@@ -909,7 +908,7 @@ public class SamlConfigurationProperties {
      *
      * @param mode the combination mode
      */
-    public void setMode(final @Nullable ConfigurableRequesterAcceptance.Mode mode) {
+    public void setMode(final ConfigurableRequesterAcceptance.@Nullable Mode mode) {
       this.mode = mode;
     }
 

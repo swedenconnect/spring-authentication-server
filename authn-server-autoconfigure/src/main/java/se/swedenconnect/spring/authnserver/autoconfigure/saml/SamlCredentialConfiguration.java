@@ -15,10 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.saml;
 
-import jakarta.annotation.Nullable;
-
 import java.security.cert.X509Certificate;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

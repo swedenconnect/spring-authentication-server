@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.Serial;
@@ -25,6 +23,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.messaging.context.MessageContext;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.Issuer;
@@ -86,8 +86,8 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    * @param bindingUri the binding that the request was received with
    * @param holderOfKey whether the request was received on a Holder-of-key endpoint
    */
-  public Saml2AuthnRequestAuthenticationToken(final @Nonnull AuthnRequest authnRequest,
-      final @Nullable String relayState, final @Nonnull String bindingUri, final boolean holderOfKey) {
+  public Saml2AuthnRequestAuthenticationToken(final @NonNull AuthnRequest authnRequest,
+      final @Nullable String relayState, final @NonNull String bindingUri, final boolean holderOfKey) {
     super(List.of());
     this.authnRequest = new SerializableOpenSamlObject<>(
         Objects.requireNonNull(authnRequest, "authnRequest must not be null"));
@@ -99,7 +99,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Object getCredentials() {
+  public @NonNull Object getCredentials() {
     return "";
   }
 
@@ -125,7 +125,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    *
    * @return the authentication request
    */
-  public @Nonnull AuthnRequest getAuthnRequest() {
+  public @NonNull AuthnRequest getAuthnRequest() {
     return this.authnRequest.get();
   }
 
@@ -143,7 +143,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    *
    * @return the binding URI
    */
-  public @Nonnull String getBindingUri() {
+  public @NonNull String getBindingUri() {
     return this.bindingUri;
   }
 
@@ -189,7 +189,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    *
    * @param peerMetadata the metadata
    */
-  public void setPeerMetadata(final @Nonnull EntityDescriptor peerMetadata) {
+  public void setPeerMetadata(final @NonNull EntityDescriptor peerMetadata) {
     this.peerMetadata = new SerializableOpenSamlObject<>(peerMetadata);
   }
 
@@ -207,7 +207,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    *
    * @param requesterRecord the record
    */
-  public void setRequesterRecord(final @Nonnull RequesterRecord requesterRecord) {
+  public void setRequesterRecord(final @NonNull RequesterRecord requesterRecord) {
     this.requesterRecord = requesterRecord;
   }
 
@@ -238,7 +238,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    *
    * @param assertionConsumerServiceUrl the URL
    */
-  public void setAssertionConsumerServiceUrl(final @Nonnull String assertionConsumerServiceUrl) {
+  public void setAssertionConsumerServiceUrl(final @NonNull String assertionConsumerServiceUrl) {
     this.assertionConsumerServiceUrl =
         Objects.requireNonNull(assertionConsumerServiceUrl, "assertionConsumerServiceUrl must not be null");
   }
@@ -284,7 +284,7 @@ public class Saml2AuthnRequestAuthenticationToken extends AbstractAuthentication
    *
    * @return the log string
    */
-  public @Nonnull String getLogString() {
+  public @NonNull String getLogString() {
     return "entity-id: '%s', authn-request: '%s'".formatted(
         Optional.ofNullable(this.getEntityId()).orElse("unknown"),
         Optional.ofNullable(this.getAuthnRequest().getID()).orElse("unknown"));

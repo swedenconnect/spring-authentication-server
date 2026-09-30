@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.metadata;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,6 +30,8 @@ import javax.net.ssl.TrustManager;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.ssl.DefaultHostnameVerifier;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.slf4j.Logger;
@@ -79,8 +78,8 @@ public class MetadataProviderFactory {
    * @param sslBundles the SSL bundles of the application, needed if a source names one, otherwise {@code null}
    * @return an initialized {@link MetadataProvider}
    */
-  public static @Nonnull MetadataProvider createMetadataProvider(
-      final @Nonnull List<MetadataSource> sources, final @Nullable SslBundles sslBundles) {
+  public static @NonNull MetadataProvider createMetadataProvider(
+      final @NonNull List<MetadataSource> sources, final @Nullable SslBundles sslBundles) {
 
     Objects.requireNonNull(sources, "sources must not be null");
     if (sources.isEmpty()) {
@@ -113,8 +112,8 @@ public class MetadataProviderFactory {
    * @param sslBundles the SSL bundles of the application, needed if a source names one, otherwise {@code null}
    * @return a {@link MetadataResolver}
    */
-  public static @Nonnull MetadataResolver createMetadataResolver(
-      final @Nonnull List<MetadataSource> sources, final @Nullable SslBundles sslBundles) {
+  public static @NonNull MetadataResolver createMetadataResolver(
+      final @NonNull List<MetadataSource> sources, final @Nullable SslBundles sslBundles) {
     return createMetadataProvider(sources, sslBundles).getMetadataResolver();
   }
 
@@ -128,8 +127,8 @@ public class MetadataProviderFactory {
    * @throws IOException if the location cannot be read
    * @throws XMLParserException if the metadata cannot be parsed
    */
-  private static @Nonnull AbstractMetadataProvider createProvider(
-      final @Nonnull MetadataSource source, final @Nullable SslBundles sslBundles)
+  private static @NonNull AbstractMetadataProvider createProvider(
+      final @NonNull MetadataSource source, final @Nullable SslBundles sslBundles)
       throws ResolverException, IOException, XMLParserException {
 
     if (source.location() instanceof final UrlResource urlResource && !urlResource.isFile()) {
@@ -170,8 +169,8 @@ public class MetadataProviderFactory {
    * @param sslBundles the SSL bundles of the application
    * @return an {@link HttpClient}
    */
-  private static @Nonnull HttpClient createHttpClient(
-      final @Nonnull MetadataSource source, final @Nullable SslBundles sslBundles) {
+  private static @NonNull HttpClient createHttpClient(
+      final @NonNull MetadataSource source, final @Nullable SslBundles sslBundles) {
     try {
       final List<TrustManager> managers;
       if (source.httpsTrustBundle() != null) {

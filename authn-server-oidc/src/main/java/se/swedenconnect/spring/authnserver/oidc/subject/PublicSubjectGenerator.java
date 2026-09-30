@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.subject;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.Serial;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.SubjectType;
 
@@ -44,7 +44,7 @@ public class PublicSubjectGenerator extends AbstractSubjectIdentifierGenerator i
    *
    * @param issuer the OpenID Provider issuer identifier
    */
-  public PublicSubjectGenerator(final @Nonnull String issuer) {
+  public PublicSubjectGenerator(final @NonNull String issuer) {
     super(issuer);
   }
 
@@ -52,7 +52,7 @@ public class PublicSubjectGenerator extends AbstractSubjectIdentifierGenerator i
    * Returns {@link SubjectType#PUBLIC}.
    */
   @Override
-  public @Nonnull SubjectType getSubjectType() {
+  public @NonNull SubjectType getSubjectType() {
     return SubjectType.PUBLIC;
   }
 

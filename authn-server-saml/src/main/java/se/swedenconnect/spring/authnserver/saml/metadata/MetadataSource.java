@@ -15,13 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.saml.metadata;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.File;
 import java.security.cert.X509Certificate;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 /**
@@ -47,7 +46,7 @@ import org.springframework.core.io.Resource;
  * @author Martin Lindström
  */
 public record MetadataSource(
-    @Nonnull Resource location,
+    @NonNull Resource location,
     @Nullable String httpsTrustBundle,
     boolean skipHostnameVerification,
     @Nullable File backupLocation,
@@ -76,7 +75,7 @@ public record MetadataSource(
    * @param location where the metadata is found
    * @return a {@link Builder}
    */
-  public static @Nonnull Builder builder(final @Nonnull Resource location) {
+  public static @NonNull Builder builder(final @NonNull Resource location) {
     return new Builder(location);
   }
 
@@ -88,7 +87,7 @@ public record MetadataSource(
    * @param userName the user name, or {@code null} if the proxy needs no authentication
    * @param password the password, or {@code null} if the proxy needs no authentication
    */
-  public record HttpProxy(@Nonnull String host, int port, @Nullable String userName, @Nullable String password) {
+  public record HttpProxy(@NonNull String host, int port, @Nullable String userName, @Nullable String password) {
 
     /**
      * Constructor.
@@ -138,7 +137,7 @@ public record MetadataSource(
      *
      * @param location where the metadata is found
      */
-    private Builder(final @Nonnull Resource location) {
+    private Builder(final @NonNull Resource location) {
       this.location = Objects.requireNonNull(location, "location must not be null");
     }
 
@@ -148,7 +147,7 @@ public record MetadataSource(
      * @param httpsTrustBundle the bundle name
      * @return the builder
      */
-    public @Nonnull Builder httpsTrustBundle(final @Nullable String httpsTrustBundle) {
+    public @NonNull Builder httpsTrustBundle(final @Nullable String httpsTrustBundle) {
       this.httpsTrustBundle = httpsTrustBundle;
       return this;
     }
@@ -159,7 +158,7 @@ public record MetadataSource(
      * @param skipHostnameVerification whether verification is skipped
      * @return the builder
      */
-    public @Nonnull Builder skipHostnameVerification(final boolean skipHostnameVerification) {
+    public @NonNull Builder skipHostnameVerification(final boolean skipHostnameVerification) {
       this.skipHostnameVerification = skipHostnameVerification;
       return this;
     }
@@ -170,7 +169,7 @@ public record MetadataSource(
      * @param backupLocation a file for a federation metadata source and a directory for an MDQ source
      * @return the builder
      */
-    public @Nonnull Builder backupLocation(final @Nullable File backupLocation) {
+    public @NonNull Builder backupLocation(final @Nullable File backupLocation) {
       this.backupLocation = backupLocation;
       return this;
     }
@@ -181,7 +180,7 @@ public record MetadataSource(
      * @param mdq whether MDQ is used
      * @return the builder
      */
-    public @Nonnull Builder mdq(final boolean mdq) {
+    public @NonNull Builder mdq(final boolean mdq) {
       this.mdq = mdq;
       return this;
     }
@@ -192,7 +191,7 @@ public record MetadataSource(
      * @param validationCertificate the validation certificate
      * @return the builder
      */
-    public @Nonnull Builder validationCertificate(final @Nullable X509Certificate validationCertificate) {
+    public @NonNull Builder validationCertificate(final @Nullable X509Certificate validationCertificate) {
       this.validationCertificate = validationCertificate;
       return this;
     }
@@ -203,7 +202,7 @@ public record MetadataSource(
      * @param httpProxy the proxy
      * @return the builder
      */
-    public @Nonnull Builder httpProxy(final @Nullable HttpProxy httpProxy) {
+    public @NonNull Builder httpProxy(final @Nullable HttpProxy httpProxy) {
       this.httpProxy = httpProxy;
       return this;
     }
@@ -213,7 +212,7 @@ public record MetadataSource(
      *
      * @return a {@link MetadataSource}
      */
-    public @Nonnull MetadataSource build() {
+    public @NonNull MetadataSource build() {
       return new MetadataSource(this.location, this.httpsTrustBundle, this.skipHostnameVerification,
           this.backupLocation, this.mdq, this.validationCertificate, this.httpProxy);
     }

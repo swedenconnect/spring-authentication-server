@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.KeySourceException;
@@ -46,8 +46,8 @@ public class DefaultClientKeyResolver implements ClientKeyResolver {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<JWK> resolve(final @Nonnull String clientId, final @Nonnull OIDCClientMetadata metadata,
-      final @Nonnull JWSHeader header) throws KeySourceException {
+  public @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
+      final @NonNull JWSHeader header) throws KeySourceException {
 
     final JWKSelector selector = new JWKSelector(JWKMatcher.forJWSHeader(header));
     if (metadata.getJWKSet() != null) {
@@ -66,7 +66,7 @@ public class DefaultClientKeyResolver implements ClientKeyResolver {
    * @return the key source
    * @throws KeySourceException for an invalid URI
    */
-  private @Nonnull JWKSource<SecurityContext> getRemoteSource(final @Nonnull URI jwksUri) throws KeySourceException {
+  private @NonNull JWKSource<SecurityContext> getRemoteSource(final @NonNull URI jwksUri) throws KeySourceException {
     try {
       final JWKSource<SecurityContext> source = this.remoteSources.get(jwksUri);
       if (source != null) {

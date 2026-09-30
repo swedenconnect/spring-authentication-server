@@ -15,14 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.IDPEntry;
 import org.opensaml.saml.saml2.core.RequesterID;
@@ -137,15 +136,15 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * @param supportsUserMessage whether user messages are supported
    */
   public Saml2AuthnRequestAuthenticationProvider(
-      final @Nonnull AuthnRequestValidator replayValidator,
-      final @Nonnull AuthnRequestValidator assertionConsumerServiceValidator,
-      final @Nonnull AuthnRequestValidator signatureValidator,
-      final @Nonnull AuthnRequestValidator encryptCapabilitiesValidator,
-      final @Nonnull ClientRegistry clientRegistry,
-      final @Nonnull RequesterAcceptance requesterAcceptance,
-      final @Nonnull NameIDGeneratorFactory nameIdGeneratorFactory,
-      final @Nonnull SamlRequestedAttributeResolver requestedAttributeResolver,
-      final @Nonnull AuthnContextResolver authnContextResolver,
+      final @NonNull AuthnRequestValidator replayValidator,
+      final @NonNull AuthnRequestValidator assertionConsumerServiceValidator,
+      final @NonNull AuthnRequestValidator signatureValidator,
+      final @NonNull AuthnRequestValidator encryptCapabilitiesValidator,
+      final @NonNull ClientRegistry clientRegistry,
+      final @NonNull RequesterAcceptance requesterAcceptance,
+      final @NonNull NameIDGeneratorFactory nameIdGeneratorFactory,
+      final @NonNull SamlRequestedAttributeResolver requestedAttributeResolver,
+      final @NonNull AuthnContextResolver authnContextResolver,
       final @Nullable SignMessageExtractor signMessageExtractor,
       final boolean supportsUserMessage) {
     this.replayValidator = Objects.requireNonNull(replayValidator, "replayValidator must not be null");
@@ -172,7 +171,7 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * @throws SamlErrorStatusException for errors that are reported to the Service Provider
    */
   @Override
-  public @Nonnull Authentication authenticate(final @Nonnull Authentication authentication)
+  public @NonNull Authentication authenticate(final @NonNull Authentication authentication)
       throws UnrecoverableErrorException, SamlErrorStatusException {
 
     final Saml2AuthnRequestAuthenticationToken token = (Saml2AuthnRequestAuthenticationToken) authentication;
@@ -247,7 +246,7 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * Supports {@link Saml2AuthnRequestAuthenticationToken}.
    */
   @Override
-  public boolean supports(final @Nonnull Class<?> authentication) {
+  public boolean supports(final @NonNull Class<?> authentication) {
     return Saml2AuthnRequestAuthenticationToken.class.isAssignableFrom(authentication);
   }
 
@@ -258,8 +257,8 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * @return the authentication requirements
    * @throws SamlErrorStatusException for errors that are reported to the Service Provider
    */
-  protected @Nonnull SamlAuthenticationRequirements createAuthenticationRequirements(
-      final @Nonnull Saml2AuthnRequestAuthenticationToken token) throws SamlErrorStatusException {
+  protected @NonNull SamlAuthenticationRequirements createAuthenticationRequirements(
+      final @NonNull Saml2AuthnRequestAuthenticationToken token) throws SamlErrorStatusException {
 
     final AuthnRequest authnRequest = token.getAuthnRequest();
     final EntityDescriptor peerMetadata = Objects.requireNonNull(token.getPeerMetadata());
@@ -311,7 +310,7 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * @return the user message, or {@code null}
    * @throws SamlErrorStatusException for an invalid user message, when user messages are supported
    */
-  private @Nullable GenericUserMessage extractUserMessage(final @Nonnull Saml2AuthnRequestAuthenticationToken token)
+  private @Nullable GenericUserMessage extractUserMessage(final @NonNull Saml2AuthnRequestAuthenticationToken token)
       throws SamlErrorStatusException {
 
     final UserMessage userMessage = Optional.ofNullable(token.getAuthnRequest().getExtensions())
@@ -360,7 +359,7 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * @return the SAD request, or {@code null}
    * @throws SamlErrorStatusException for an invalid SAD request
    */
-  private @Nullable SadRequestExtension extractSadRequest(final @Nonnull Saml2AuthnRequestAuthenticationToken token)
+  private @Nullable SadRequestExtension extractSadRequest(final @NonNull Saml2AuthnRequestAuthenticationToken token)
       throws SamlErrorStatusException {
 
     final SADRequest sadRequest = Optional.ofNullable(token.getAuthnRequest().getExtensions())
@@ -406,8 +405,8 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
    * @param token the authentication request token
    * @return a {@link SamlErrorStatusException}
    */
-  private static @Nonnull SamlErrorStatusException invalid(final @Nonnull String reason,
-      final @Nonnull Saml2AuthnRequestAuthenticationToken token) {
+  private static @NonNull SamlErrorStatusException invalid(final @NonNull String reason,
+      final @NonNull Saml2AuthnRequestAuthenticationToken token) {
     final String msg = "Invalid AuthnRequest - " + reason;
     log.info("{} [{}]", msg, token.getLogString());
     return new SamlErrorStatusException(SamlErrorStatus.INVALID_REQUEST, SamlErrorStatus.INVALID_REQUEST_MESSAGE_CODE,

@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -25,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,8 +71,8 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
    * @param lookupTracker how often each client is looked up
    * @param settings the cache settings
    */
-  public FederationCacheRefresher(final @Nonnull FederationCache cache, final @Nonnull FederationResolver resolver,
-      final @Nonnull LookupTracker lookupTracker, final @Nonnull FederationCacheSettings settings) {
+  public FederationCacheRefresher(final @NonNull FederationCache cache, final @NonNull FederationResolver resolver,
+      final @NonNull LookupTracker lookupTracker, final @NonNull FederationCacheSettings settings) {
     this(cache, resolver, lookupTracker, settings, Clock.systemUTC());
   }
 
@@ -86,9 +85,9 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
    * @param settings the cache settings
    * @param clock the clock to use
    */
-  public FederationCacheRefresher(final @Nonnull FederationCache cache, final @Nonnull FederationResolver resolver,
-      final @Nonnull LookupTracker lookupTracker, final @Nonnull FederationCacheSettings settings,
-      final @Nonnull Clock clock) {
+  public FederationCacheRefresher(final @NonNull FederationCache cache, final @NonNull FederationResolver resolver,
+      final @NonNull LookupTracker lookupTracker, final @NonNull FederationCacheSettings settings,
+      final @NonNull Clock clock) {
     this.cache = Objects.requireNonNull(cache, "cache must not be null");
     this.resolver = Objects.requireNonNull(resolver, "resolver must not be null");
     this.lookupTracker = Objects.requireNonNull(lookupTracker, "lookupTracker must not be null");
@@ -167,7 +166,7 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
    * @return {@code true} if the entry was refreshed and {@code false} otherwise
    */
   private boolean refreshClient(
-      final @Nonnull String clientId, final @Nonnull CachedClientRecord current, final @Nonnull Instant now) {
+      final @NonNull String clientId, final @NonNull CachedClientRecord current, final @NonNull Instant now) {
     try {
       final ResolvedClient resolved = this.resolver.resolve(clientId);
       if (resolved == null) {

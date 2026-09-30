@@ -27,12 +27,11 @@ import static se.swedenconnect.spring.authnserver.authentication.provider.redire
 import static se.swedenconnect.spring.authnserver.authentication.provider.redirect.RedirectTestSupport.SP;
 import static se.swedenconnect.spring.authnserver.authentication.provider.redirect.RedirectTestSupport.redirectToken;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -70,12 +69,12 @@ class AbstractUserRedirectAuthenticationProviderTest {
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test-redirect-provider";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return List.of(LOA3, LOA4);
     }
 
@@ -85,8 +84,8 @@ class AbstractUserRedirectAuthenticationProviderTest {
     }
 
     @Override
-    protected @Nonnull UserAuthentication createUserAuthentication(
-        final @Nonnull ResumedAuthenticationToken token) {
+    protected @NonNull UserAuthentication createUserAuthentication(
+        final @NonNull ResumedAuthenticationToken token) {
       return (UserAuthentication) Objects.requireNonNull(token.getAuthnToken());
     }
   }

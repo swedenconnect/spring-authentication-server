@@ -15,9 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.security.cert.CertificateEncodingException;
 import java.time.Duration;
@@ -27,6 +24,8 @@ import java.util.Objects;
 
 import net.shibboleth.shared.security.IdentifierGenerationStrategy;
 import net.shibboleth.shared.security.impl.RandomIdentifierGenerationStrategy;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.core.Assertion;
@@ -133,9 +132,9 @@ public class Saml2AssertionBuilder {
    * @param attributeReleaseManager decides which attributes are released
    * @param attributeMapping maps the released attributes to SAML attributes
    */
-  public Saml2AssertionBuilder(final @Nonnull String issuer, final @Nonnull PkiCredential signingCredential,
-      final @Nonnull AttributeReleaseManager attributeReleaseManager,
-      final @Nonnull SamlAttributeMapping attributeMapping) {
+  public Saml2AssertionBuilder(final @NonNull String issuer, final @NonNull PkiCredential signingCredential,
+      final @NonNull AttributeReleaseManager attributeReleaseManager,
+      final @NonNull SamlAttributeMapping attributeMapping) {
     this.issuer = Objects.requireNonNull(issuer, "issuer must not be null");
     this.signingCredential =
         new OpenSamlCredential(Objects.requireNonNull(signingCredential, "signingCredential must not be null"));
@@ -155,8 +154,8 @@ public class Saml2AssertionBuilder {
    *     Provider
    * @throws UnrecoverableErrorException if the assertion cannot be built or signed
    */
-  public @Nonnull Assertion buildAssertion(final @Nonnull UserAuthentication authentication,
-      final @Nonnull Saml2AuthnRequestData requestData, final @Nonnull Requester requester)
+  public @NonNull Assertion buildAssertion(final @NonNull UserAuthentication authentication,
+      final @NonNull Saml2AuthnRequestData requestData, final @NonNull Requester requester)
       throws AuthenticationErrorException, UnrecoverableErrorException {
 
     final AuthenticatedUser user = authentication.getAuthenticatedUser();
@@ -241,7 +240,7 @@ public class Saml2AssertionBuilder {
    * @param authentication the authentication
    * @return the SAML attributes
    */
-  private @Nonnull List<Attribute> releaseAttributes(final @Nonnull UserAuthentication authentication) {
+  private @NonNull List<Attribute> releaseAttributes(final @NonNull UserAuthentication authentication) {
     final List<GenericAttribute<? extends Serializable>> released =
         this.attributeReleaseManager.releaseAttributes(authentication);
     final AuthenticationRequirements requirements = authentication.getAuthnRequirements();
@@ -256,8 +255,8 @@ public class Saml2AssertionBuilder {
    * @param now the issue instant
    * @return a {@link SubjectConfirmation}
    */
-  private @Nonnull SubjectConfirmation createSubjectConfirmation(final @Nonnull Saml2AuthnRequestData requestData,
-      final @Nonnull AuthenticatedUser user, final @Nonnull Instant now) {
+  private @NonNull SubjectConfirmation createSubjectConfirmation(final @NonNull Saml2AuthnRequestData requestData,
+      final @NonNull AuthenticatedUser user, final @NonNull Instant now) {
 
     final SubjectConfirmation subjectConfirmation =
         (SubjectConfirmation) XMLObjectSupport.buildXMLObject(SubjectConfirmation.DEFAULT_ELEMENT_NAME);
@@ -296,8 +295,8 @@ public class Saml2AssertionBuilder {
    * @param authentication the authentication, for logging
    * @throws UnrecoverableErrorException if the assertion cannot be signed
    */
-  private void signAssertion(final @Nonnull Assertion assertion, final @Nonnull Saml2AuthnRequestData requestData,
-      final @Nonnull UserAuthentication authentication) throws UnrecoverableErrorException {
+  private void signAssertion(final @NonNull Assertion assertion, final @NonNull Saml2AuthnRequestData requestData,
+      final @NonNull UserAuthentication authentication) throws UnrecoverableErrorException {
     try {
       SAMLObjectSigner.sign(assertion, this.signingCredential,
           SecurityConfigurationSupport.getGlobalSignatureSigningConfiguration(),
@@ -315,7 +314,7 @@ public class Saml2AssertionBuilder {
    *
    * @param notOnOrAfter the duration
    */
-  public void setNotOnOrAfter(final @Nonnull Duration notOnOrAfter) {
+  public void setNotOnOrAfter(final @NonNull Duration notOnOrAfter) {
     this.notOnOrAfter = Objects.requireNonNull(notOnOrAfter, "notOnOrAfter must not be null");
   }
 
@@ -324,7 +323,7 @@ public class Saml2AssertionBuilder {
    *
    * @param notBefore the duration
    */
-  public void setNotBefore(final @Nonnull Duration notBefore) {
+  public void setNotBefore(final @NonNull Duration notBefore) {
     this.notBefore = Objects.requireNonNull(notBefore, "notBefore must not be null");
   }
 
@@ -342,7 +341,7 @@ public class Saml2AssertionBuilder {
    *
    * @param idGenerator the generator
    */
-  public void setIdGenerator(final @Nonnull IdentifierGenerationStrategy idGenerator) {
+  public void setIdGenerator(final @NonNull IdentifierGenerationStrategy idGenerator) {
     this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator must not be null");
   }
 

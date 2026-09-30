@@ -32,8 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 
@@ -71,18 +70,18 @@ class AbstractUserAuthenticationProviderTest {
     boolean displaySignMessage = false;
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "test-provider";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return List.of(LOA3, LOA4);
     }
 
     @Override
-    protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-        final @Nonnull List<String> authnContextUris) {
+    protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+        final @NonNull List<String> authnContextUris) {
       this.authenticateCalls++;
       final UserAuthentication authentication =
           new UserAuthentication(user(authnContextUris.getFirst(), Instant.now()));

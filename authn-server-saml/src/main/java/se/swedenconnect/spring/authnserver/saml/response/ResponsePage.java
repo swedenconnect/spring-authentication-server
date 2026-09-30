@@ -15,12 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Writes the page that posts a SAML response to the Service Provider (the HTTP POST binding).
@@ -40,8 +41,8 @@ public interface ResponsePage {
    * @param relayState the relay state, or {@code null}
    * @throws IOException for errors writing the page
    */
-  void sendResponse(final @Nonnull HttpServletRequest httpServletRequest,
-      final @Nonnull HttpServletResponse httpServletResponse, final @Nonnull String destination,
-      final @Nonnull String samlResponse, final @Nullable String relayState) throws IOException;
+  void sendResponse(final @NonNull HttpServletRequest httpServletRequest,
+      final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
+      final @NonNull String samlResponse, final @Nullable String relayState) throws IOException;
 
 }

@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.subject;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.id.SectorID;
 
@@ -52,7 +52,7 @@ public final class SectorIdentifiers {
    * @throws UnrecoverableErrorException if the client is registered in a way that leaves the sector identifier
    *     undetermined
    */
-  public static @Nonnull SectorID resolve(final @Nullable URI sectorIdentifierUri,
+  public static @NonNull SectorID resolve(final @Nullable URI sectorIdentifierUri,
       final @Nullable Collection<URI> redirectUris) throws UnrecoverableErrorException {
 
     if (sectorIdentifierUri != null) {
@@ -86,7 +86,7 @@ public final class SectorIdentifiers {
    * @return the sector identifier
    * @throws UnrecoverableErrorException if the URI has no host component
    */
-  private static @Nonnull SectorID sectorId(final @Nonnull URI uri, final @Nonnull String message)
+  private static @NonNull SectorID sectorId(final @NonNull URI uri, final @NonNull String message)
       throws UnrecoverableErrorException {
     try {
       return new SectorID(uri);

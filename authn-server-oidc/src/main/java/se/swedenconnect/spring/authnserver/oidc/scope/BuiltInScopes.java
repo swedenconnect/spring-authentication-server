@@ -15,9 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.scope;
 
-import jakarta.annotation.Nonnull;
-
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 
 import se.oidc.nimbus.claims.OidcScopeValue;
 import se.oidc.nimbus.claims.OidcScopeValue.ClaimRequirement;
@@ -72,7 +72,7 @@ public class BuiltInScopes {
    *
    * @return the built-in scopes
    */
-  public static @Nonnull List<OidcScopeValue> getBuiltInScopes() {
+  public static @NonNull List<OidcScopeValue> getBuiltInScopes() {
     return List.of(
         OidcScopeValue.OPENID,
         OidcScopeValue.PROFILE,

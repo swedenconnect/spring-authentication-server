@@ -15,13 +15,13 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authentication;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
@@ -54,7 +54,7 @@ public class SamlAuthenticationRequirements extends AuthenticationRequirements {
    *
    * @param requirements the generic requirements
    */
-  public SamlAuthenticationRequirements(final @Nonnull AuthenticationRequirements requirements) {
+  public SamlAuthenticationRequirements(final @NonNull AuthenticationRequirements requirements) {
     super(requirements);
   }
 
@@ -64,7 +64,7 @@ public class SamlAuthenticationRequirements extends AuthenticationRequirements {
    *
    * @return the declared entity categories, possibly empty
    */
-  public @Nonnull List<String> getEntityCategories() {
+  public @NonNull List<String> getEntityCategories() {
     return this.entityCategories;
   }
 

@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.saml.response;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.metadata.EntityDescriptor;
 
 import se.swedenconnect.opensaml.common.utils.SerializableOpenSamlObject;
@@ -43,8 +43,8 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param peerMetadata the metadata of the Service Provider
  * @author Martin Lindström
  */
-public record Saml2ResponseAttributes(@Nonnull String destination, @Nonnull String inResponseTo,
-    @Nullable String relayState, @Nonnull SerializableOpenSamlObject<EntityDescriptor> peerMetadata)
+public record Saml2ResponseAttributes(@NonNull String destination, @NonNull String inResponseTo,
+    @Nullable String relayState, @NonNull SerializableOpenSamlObject<EntityDescriptor> peerMetadata)
     implements Serializable {
 
   @Serial
@@ -75,8 +75,8 @@ public record Saml2ResponseAttributes(@Nonnull String destination, @Nonnull Stri
    * @param relayState the relay state, or {@code null}
    * @param peerMetadata the metadata of the Service Provider
    */
-  public Saml2ResponseAttributes(final @Nonnull String destination, final @Nonnull String inResponseTo,
-      final @Nullable String relayState, final @Nonnull EntityDescriptor peerMetadata) {
+  public Saml2ResponseAttributes(final @NonNull String destination, final @NonNull String inResponseTo,
+      final @Nullable String relayState, final @NonNull EntityDescriptor peerMetadata) {
     this(destination, inResponseTo, relayState, new SerializableOpenSamlObject<>(peerMetadata));
   }
 
@@ -85,7 +85,7 @@ public record Saml2ResponseAttributes(@Nonnull String destination, @Nonnull Stri
    *
    * @return the metadata
    */
-  public @Nonnull EntityDescriptor getPeerMetadata() {
+  public @NonNull EntityDescriptor getPeerMetadata() {
     return this.peerMetadata.get();
   }
 
@@ -94,7 +94,7 @@ public record Saml2ResponseAttributes(@Nonnull String destination, @Nonnull Stri
    *
    * @return the entityID
    */
-  public @Nonnull String getEntityId() {
+  public @NonNull String getEntityId() {
     return this.getPeerMetadata().getEntityID();
   }
 
@@ -104,8 +104,8 @@ public record Saml2ResponseAttributes(@Nonnull String destination, @Nonnull Stri
    * @param request the HTTP request
    * @param attributes the response attributes
    */
-  public static void setOnRequest(final @Nonnull HttpServletRequest request,
-      final @Nonnull Saml2ResponseAttributes attributes) {
+  public static void setOnRequest(final @NonNull HttpServletRequest request,
+      final @NonNull Saml2ResponseAttributes attributes) {
     request.setAttribute(REQUEST_ATTRIBUTE, attributes);
   }
 
@@ -115,7 +115,7 @@ public record Saml2ResponseAttributes(@Nonnull String destination, @Nonnull Stri
    * @param request the HTTP request
    * @return the response attributes, or {@code null} if none have been established
    */
-  public static @Nullable Saml2ResponseAttributes fromRequest(final @Nonnull HttpServletRequest request) {
+  public static @Nullable Saml2ResponseAttributes fromRequest(final @NonNull HttpServletRequest request) {
     return request.getAttribute(REQUEST_ATTRIBUTE) instanceof final Saml2ResponseAttributes attributes
         ? attributes
         : null;

@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.error;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -42,7 +42,7 @@ public class UnrecoverableErrorException extends RuntimeException {
    *
    * @param error the error
    */
-  public UnrecoverableErrorException(final @Nonnull UnrecoverableError error) {
+  public UnrecoverableErrorException(final @NonNull UnrecoverableError error) {
     this(Objects.requireNonNull(error, "error must not be null"), error.getDescription(), null);
   }
 
@@ -52,7 +52,7 @@ public class UnrecoverableErrorException extends RuntimeException {
    * @param error the error
    * @param message a message for logs
    */
-  public UnrecoverableErrorException(final @Nonnull UnrecoverableError error, final @Nonnull String message) {
+  public UnrecoverableErrorException(final @NonNull UnrecoverableError error, final @NonNull String message) {
     this(error, message, null);
   }
 
@@ -63,7 +63,7 @@ public class UnrecoverableErrorException extends RuntimeException {
    * @param message a message for logs
    * @param cause the cause of the error, may be {@code null}
    */
-  public UnrecoverableErrorException(final @Nonnull UnrecoverableError error, final @Nonnull String message,
+  public UnrecoverableErrorException(final @NonNull UnrecoverableError error, final @NonNull String message,
       final @Nullable Throwable cause) {
     super(Objects.requireNonNull(message, "message must not be null"), cause);
     this.error = Objects.requireNonNull(error, "error must not be null");
@@ -74,7 +74,7 @@ public class UnrecoverableErrorException extends RuntimeException {
    *
    * @return the error
    */
-  public @Nonnull UnrecoverableError getError() {
+  public @NonNull UnrecoverableError getError() {
     return this.error;
   }
 
@@ -83,7 +83,7 @@ public class UnrecoverableErrorException extends RuntimeException {
    *
    * @return the message code
    */
-  public @Nonnull String getMessageCode() {
+  public @NonNull String getMessageCode() {
     return this.error.getMessageCode();
   }
 

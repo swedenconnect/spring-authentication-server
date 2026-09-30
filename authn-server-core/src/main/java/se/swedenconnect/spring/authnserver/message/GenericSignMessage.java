@@ -15,15 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.message;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -63,7 +62,7 @@ public class GenericSignMessage extends GenericMessage {
    * @param tbsData the Base64 encoding of the data to be signed, may be {@code null}. Only the OpenID Connect signing
    *          case carries it
    */
-  public GenericSignMessage(final @Nonnull Collection<LocalizedMessage> messages,
+  public GenericSignMessage(final @NonNull Collection<LocalizedMessage> messages,
       final @Nullable MessageMimeType mimeType, final boolean mustShow, final @Nullable String tbsData) {
     super(messages, mimeType);
     this.mustShow = mustShow;
@@ -88,7 +87,7 @@ public class GenericSignMessage extends GenericMessage {
    * @param text the message text
    * @return a {@link GenericSignMessage}
    */
-  public static @Nonnull GenericSignMessage ofText(final @Nullable String language, final @Nonnull String text) {
+  public static @NonNull GenericSignMessage ofText(final @Nullable String language, final @NonNull String text) {
     return new GenericSignMessage(List.of(LocalizedMessage.ofText(language, text)), MessageMimeType.TEXT_PLAIN, true,
         null);
   }
@@ -117,7 +116,7 @@ public class GenericSignMessage extends GenericMessage {
    *
    * @return the data to be signed, or {@code null} if it is not present
    */
-  public @Nullable byte[] getTbsDataBytes() {
+  public byte @Nullable [] getTbsDataBytes() {
     return this.tbsData != null ? Base64.getDecoder().decode(this.tbsData) : null;
   }
 

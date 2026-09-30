@@ -19,13 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
@@ -57,12 +56,12 @@ class ConfigurableRequesterAcceptanceTest {
     }
 
     @Override
-    public @Nullable RequesterRecord lookup(final @Nonnull Requester requester) {
+    public @Nullable RequesterRecord lookup(final @NonNull Requester requester) {
       return null;
     }
 
     @Override
-    public @Nullable RequesterRecord requestMark(final @Nonnull Requester requester, final @Nonnull String mark) {
+    public @Nullable RequesterRecord requestMark(final @NonNull Requester requester, final @NonNull String mark) {
       this.asked.add(mark);
       return this.obtainable.contains(mark) ? record(requester, Set.of(mark)) : record(requester, Set.of());
     }
@@ -133,7 +132,7 @@ class ConfigurableRequesterAcceptanceTest {
         List.of(List.of("A")));
     final ClientRegistry failing = new MarkGivingRegistry(Set.of()) {
       @Override
-      public @Nullable RequesterRecord requestMark(final @Nonnull Requester requester, final @Nonnull String mark)
+      public @Nullable RequesterRecord requestMark(final @NonNull Requester requester, final @NonNull String mark)
           throws ClientRegistryException {
         throw new ClientRegistryException("down");
       }

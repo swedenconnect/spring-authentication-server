@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.sso;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -32,7 +32,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param reason why single sign-on was refused, set only when the vote is {@link Vote#DENY}
  * @author Martin Lindström
  */
-public record SsoDecision(@Nonnull Vote vote, @Nullable SsoDenialReason reason) implements Serializable {
+public record SsoDecision(@NonNull Vote vote, @Nullable SsoDenialReason reason) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -72,7 +72,7 @@ public record SsoDecision(@Nonnull Vote vote, @Nullable SsoDenialReason reason) 
    *
    * @return an {@link SsoDecision}
    */
-  public static @Nonnull SsoDecision allow() {
+  public static @NonNull SsoDecision allow() {
     return new SsoDecision(Vote.ALLOW, null);
   }
 
@@ -82,7 +82,7 @@ public record SsoDecision(@Nonnull Vote vote, @Nullable SsoDenialReason reason) 
    *
    * @return an {@link SsoDecision}
    */
-  public static @Nonnull SsoDecision abstain() {
+  public static @NonNull SsoDecision abstain() {
     return new SsoDecision(Vote.ABSTAIN, null);
   }
 
@@ -92,7 +92,7 @@ public record SsoDecision(@Nonnull Vote vote, @Nullable SsoDenialReason reason) 
    * @param reason why it must not be reused
    * @return an {@link SsoDecision}
    */
-  public static @Nonnull SsoDecision deny(final @Nonnull SsoDenialReason reason) {
+  public static @NonNull SsoDecision deny(final @NonNull SsoDenialReason reason) {
     return new SsoDecision(Vote.DENY, Objects.requireNonNull(reason, "reason must not be null"));
   }
 

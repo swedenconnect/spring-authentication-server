@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.error;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Objects;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
 
 import com.nimbusds.oauth2.sdk.ErrorObject;
@@ -54,7 +53,7 @@ public class OidcErrorResponseException extends AuthenticationException {
    * @param description a description of what went wrong, sent as {@code error_description}. It must be suitable for
    *          the client's logs, and must not hold personal data
    */
-  public OidcErrorResponseException(final @Nonnull ErrorObject error, final @Nonnull String description) {
+  public OidcErrorResponseException(final @NonNull ErrorObject error, final @NonNull String description) {
     this(error, description, null);
   }
 
@@ -65,7 +64,7 @@ public class OidcErrorResponseException extends AuthenticationException {
    * @param description a description of what went wrong, sent as {@code error_description}
    * @param cause the cause of the error, may be {@code null}
    */
-  public OidcErrorResponseException(final @Nonnull ErrorObject error, final @Nonnull String description,
+  public OidcErrorResponseException(final @NonNull ErrorObject error, final @NonNull String description,
       final @Nullable Throwable cause) {
     super(Objects.requireNonNull(description, "description must not be null"));
     if (cause != null) {
@@ -80,7 +79,7 @@ public class OidcErrorResponseException extends AuthenticationException {
    *
    * @return the error code
    */
-  public @Nonnull String getErrorCode() {
+  public @NonNull String getErrorCode() {
     return this.errorCode;
   }
 
@@ -89,7 +88,7 @@ public class OidcErrorResponseException extends AuthenticationException {
    *
    * @return the description
    */
-  public @Nonnull String getDescription() {
+  public @NonNull String getDescription() {
     return this.getMessage();
   }
 
@@ -98,7 +97,7 @@ public class OidcErrorResponseException extends AuthenticationException {
    *
    * @return an {@link ErrorObject}
    */
-  public @Nonnull ErrorObject toErrorObject() {
+  public @NonNull ErrorObject toErrorObject() {
     return new ErrorObject(this.errorCode, this.getDescription());
   }
 

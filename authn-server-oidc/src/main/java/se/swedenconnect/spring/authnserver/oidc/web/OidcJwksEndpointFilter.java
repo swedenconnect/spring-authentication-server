@@ -15,8 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.web;
 
-import jakarta.annotation.Nonnull;
-
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
@@ -35,7 +34,7 @@ public class OidcJwksEndpointFilter extends JsonDocumentEndpointFilter {
    * @param keys the keys of the OpenID Provider
    * @param requestMatcher the request matcher for the JWKS endpoint
    */
-  public OidcJwksEndpointFilter(final @Nonnull OidcKeys keys, final @Nonnull RequestMatcher requestMatcher) {
+  public OidcJwksEndpointFilter(final @NonNull OidcKeys keys, final @NonNull RequestMatcher requestMatcher) {
     super(requestMatcher, keys.getPublishedKeys().toString(true), "JWKS");
   }
 

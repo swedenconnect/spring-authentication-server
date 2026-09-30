@@ -15,12 +15,12 @@
  */
 package se.swedenconnect.spring.authnserver.message;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serial;
 import java.util.Collection;
 import java.util.List;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -44,7 +44,7 @@ public class GenericUserMessage extends GenericMessage {
    * @param messages the message in each of the languages it was given in, must not be empty
    * @param mimeType the MIME type of all the messages, {@link MessageMimeType#TEXT_PLAIN} if {@code null}
    */
-  public GenericUserMessage(final @Nonnull Collection<LocalizedMessage> messages,
+  public GenericUserMessage(final @NonNull Collection<LocalizedMessage> messages,
       final @Nullable MessageMimeType mimeType) {
     super(messages, mimeType);
   }
@@ -56,7 +56,7 @@ public class GenericUserMessage extends GenericMessage {
    * @param text the message text
    * @return a {@link GenericUserMessage}
    */
-  public static @Nonnull GenericUserMessage ofText(final @Nullable String language, final @Nonnull String text) {
+  public static @NonNull GenericUserMessage ofText(final @Nullable String language, final @NonNull String text) {
     return new GenericUserMessage(List.of(LocalizedMessage.ofText(language, text)), MessageMimeType.TEXT_PLAIN);
   }
 

@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.attributes.mapping;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.claims.Address;
 import com.nimbusds.openid.connect.sdk.claims.PersonClaims;
@@ -51,7 +51,7 @@ public class AddressToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getSupportedIdentifiers() {
+  public @NonNull Collection<String> getSupportedIdentifiers() {
     return List.of(AttributeIdentifiers.FORMATTED_ADDRESS, AttributeIdentifiers.STREET_ADDRESS,
         AttributeIdentifiers.POST_OFFICE_BOX, AttributeIdentifiers.POSTAL_CODE, AttributeIdentifiers.LOCALITY,
         AttributeIdentifiers.REGION, AttributeIdentifiers.COUNTRY,
@@ -64,14 +64,14 @@ public class AddressToClaimMapper implements ToClaimMapper {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull Collection<String> getClaimNames(final @Nonnull String identifier) {
+  public @NonNull Collection<String> getClaimNames(final @NonNull String identifier) {
     return this.getSupportedIdentifiers().contains(identifier) ? List.of(PersonClaims.ADDRESS_CLAIM_NAME) : List.of();
   }
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull List<UserClaim> map(final @Nonnull List<GenericAttribute<? extends Serializable>> attributes,
-      final @Nonnull ToProtocolMappingContext context) {
+  public @NonNull List<UserClaim> map(final @NonNull List<GenericAttribute<? extends Serializable>> attributes,
+      final @NonNull ToProtocolMappingContext context) {
 
     final Address address = new Address();
     setIfPresent(context.getStringValue(AttributeIdentifiers.FORMATTED_ADDRESS), address::setFormatted);
@@ -106,7 +106,7 @@ public class AddressToClaimMapper implements ToClaimMapper {
    * @param context the mapping context
    * @return the lines, possibly empty
    */
-  private static @Nonnull List<String> genericStreetLines(final @Nonnull ToProtocolMappingContext context) {
+  private static @NonNull List<String> genericStreetLines(final @NonNull ToProtocolMappingContext context) {
     final List<String> lines = new ArrayList<>();
     addIfPresent(lines, context.getStringValue(AttributeIdentifiers.STREET_ADDRESS));
     addIfPresent(lines, context.getStringValue(AttributeIdentifiers.POST_OFFICE_BOX));
@@ -120,7 +120,7 @@ public class AddressToClaimMapper implements ToClaimMapper {
    * @param context the mapping context
    * @return the lines, possibly empty
    */
-  private static @Nonnull List<String> eidasStreetLines(final @Nonnull ToProtocolMappingContext context) {
+  private static @NonNull List<String> eidasStreetLines(final @NonNull ToProtocolMappingContext context) {
     final List<String> lines = new ArrayList<>();
     addIfPresent(lines, context.getStringValue(AttributeIdentifiers.EIDAS_ADDRESS_LOCATOR_NAME));
 
@@ -147,8 +147,8 @@ public class AddressToClaimMapper implements ToClaimMapper {
    * @param identifiers the attribute identifiers, in order of precedence
    * @return the value, or {@code null} if none of the attributes is present
    */
-  private static @Nullable String first(final @Nonnull ToProtocolMappingContext context,
-      final @Nonnull String... identifiers) {
+  private static @Nullable String first(final @NonNull ToProtocolMappingContext context,
+      final @NonNull String... identifiers) {
     for (final String identifier : identifiers) {
       final String value = context.getStringValue(identifier);
       if (hasText(value)) {
@@ -164,7 +164,7 @@ public class AddressToClaimMapper implements ToClaimMapper {
    * @param lines the lines
    * @param value the value
    */
-  private static void addIfPresent(final @Nonnull List<String> lines, final @Nullable String value) {
+  private static void addIfPresent(final @NonNull List<String> lines, final @Nullable String value) {
     if (hasText(value)) {
       lines.add(value);
     }
@@ -176,7 +176,7 @@ public class AddressToClaimMapper implements ToClaimMapper {
    * @param value the value
    * @param setter the setter to call
    */
-  private static void setIfPresent(final @Nullable String value, final @Nonnull Consumer<String> setter) {
+  private static void setIfPresent(final @Nullable String value, final @NonNull Consumer<String> setter) {
     if (hasText(value)) {
       setter.accept(value);
     }

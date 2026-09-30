@@ -15,8 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
@@ -38,6 +38,6 @@ public interface FederationResolver {
    * @return a {@link ResolvedClient}, or {@code null} if the federation does not know the client
    * @throws ClientRegistryException if the resolution fails
    */
-  @Nullable ResolvedClient resolve(final @Nonnull String clientId) throws ClientRegistryException;
+  @Nullable ResolvedClient resolve(final @NonNull String clientId) throws ClientRegistryException;
 
 }

@@ -15,14 +15,14 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.scope;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
 
@@ -53,7 +53,7 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
  * @param claims the supported claims
  * @author Martin Lindström
  */
-public record SupportedScopesAndClaims(@Nonnull List<String> scopes, @Nonnull List<String> claims) {
+public record SupportedScopesAndClaims(@NonNull List<String> scopes, @NonNull List<String> claims) {
 
   /**
    * The claims that the OpenID Provider itself puts in every ID token, {@code sub} and {@code auth_time}. They count as
@@ -84,9 +84,9 @@ public record SupportedScopesAndClaims(@Nonnull List<String> scopes, @Nonnull Li
    * @return the scopes and claims
    * @throws IllegalArgumentException if a declared or configured scope is not in the scope registry
    */
-  public static @Nonnull SupportedScopesAndClaims resolve(
-      final @Nonnull Collection<? extends UserAuthenticationProvider> providers,
-      final @Nonnull OidcAttributeMapping attributeMapping, final @Nonnull ScopeRegistry scopeRegistry,
+  public static @NonNull SupportedScopesAndClaims resolve(
+      final @NonNull Collection<? extends UserAuthenticationProvider> providers,
+      final @NonNull OidcAttributeMapping attributeMapping, final @NonNull ScopeRegistry scopeRegistry,
       final @Nullable List<String> configuredScopes, final @Nullable List<String> configuredClaims) {
 
     final List<String> addedClaims = configuredClaims != null ? configuredClaims : List.of();
@@ -147,7 +147,7 @@ public record SupportedScopesAndClaims(@Nonnull List<String> scopes, @Nonnull Li
    * @param available the available claims
    * @return {@code true} if the scope is offered and {@code false} otherwise
    */
-  private static boolean isOffered(final @Nonnull OidcScopeValue scope, final @Nonnull Set<String> available) {
+  private static boolean isOffered(final @NonNull OidcScopeValue scope, final @NonNull Set<String> available) {
     final Set<ClaimRequirement> requirements = scope.getClaimRequirements();
     if (requirements == null || requirements.isEmpty()) {
       return false;
@@ -168,8 +168,8 @@ public record SupportedScopesAndClaims(@Nonnull List<String> scopes, @Nonnull Li
    * @return the scope
    * @throws IllegalArgumentException if the scope is not registered
    */
-  private static @Nonnull OidcScopeValue getScope(final @Nonnull ScopeRegistry registry, final @Nonnull String value,
-      final @Nonnull String origin) {
+  private static @NonNull OidcScopeValue getScope(final @NonNull ScopeRegistry registry, final @NonNull String value,
+      final @NonNull String origin) {
     final OidcScopeValue scope = registry.getScope(value);
     if (scope == null) {
       throw new IllegalArgumentException("The scope '%s' %s is not in the scope registry".formatted(value, origin));

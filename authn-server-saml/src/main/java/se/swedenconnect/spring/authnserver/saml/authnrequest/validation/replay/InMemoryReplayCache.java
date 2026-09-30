@@ -15,12 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.saml.authnrequest.validation.replay;
 
-import jakarta.annotation.Nonnull;
-
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.jspecify.annotations.NonNull;
 import org.opensaml.storage.ReplayCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +42,7 @@ public class InMemoryReplayCache implements ReplayCache {
    * Checks the key and adds it if it is not present. Expired entries are removed first.
    */
   @Override
-  public boolean check(final @Nonnull String context, final @Nonnull String key, final @Nonnull Instant expires) {
+  public boolean check(final @NonNull String context, final @NonNull String key, final @NonNull Instant expires) {
     final long now = Instant.now().getEpochSecond();
     this.cache.entrySet().removeIf(e -> e.getValue() < now);
 

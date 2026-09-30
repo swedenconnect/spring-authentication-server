@@ -15,11 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import jakarta.annotation.Nonnull;
-
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
+
+import org.jspecify.annotations.NonNull;
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
@@ -33,10 +33,10 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @author Martin Lindström
  */
 public record ResolvedClient(
-    @Nonnull String clientId,
-    @Nonnull OIDCClientMetadata metadata,
-    @Nonnull Set<String> trustMarkTypes,
-    @Nonnull Instant expiresAt) {
+    @NonNull String clientId,
+    @NonNull OIDCClientMetadata metadata,
+    @NonNull Set<String> trustMarkTypes,
+    @NonNull Instant expiresAt) {
 
   /**
    * Constructor.

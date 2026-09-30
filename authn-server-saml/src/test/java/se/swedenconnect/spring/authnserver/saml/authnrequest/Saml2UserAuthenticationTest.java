@@ -34,8 +34,6 @@ import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestT
 import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestTestSupport.spMetadata;
 import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestTestSupport.toHttpRequest;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.Filter;
 
 import java.io.Serializable;
@@ -49,6 +47,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -948,8 +948,8 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     }
 
     @Override
-    protected @Nonnull Authentication authenticate(final @Nonnull UserAuthenticationInputToken token,
-        final @Nonnull List<String> authnContextUris) {
+    protected @NonNull Authentication authenticate(final @NonNull UserAuthenticationInputToken token,
+        final @NonNull List<String> authnContextUris) {
       this.calls++;
       if (this.error != null) {
         throw this.error;
@@ -962,17 +962,17 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return this.name;
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return this.authnContexts;
     }
 
     @Override
-    public @Nonnull List<String> getEntityCategories() {
+    public @NonNull List<String> getEntityCategories() {
       return List.of(LOA3_PNR);
     }
   }
@@ -993,22 +993,22 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     }
 
     @Override
-    protected @Nonnull UserAuthentication createUserAuthentication(final @Nonnull ResumedAuthenticationToken token) {
+    protected @NonNull UserAuthentication createUserAuthentication(final @NonNull ResumedAuthenticationToken token) {
       return (UserAuthentication) token.getAuthnToken();
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
       return "redirect";
     }
 
     @Override
-    public @Nonnull List<String> getSupportedAuthnContextUris() {
+    public @NonNull List<String> getSupportedAuthnContextUris() {
       return this.authnContexts;
     }
 
     @Override
-    public @Nonnull List<String> getEntityCategories() {
+    public @NonNull List<String> getEntityCategories() {
       return List.of(LOA3_PNR);
     }
   }

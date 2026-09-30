@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
-import jakarta.annotation.Nonnull;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -26,6 +24,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * A {@link RequestUriFetcher} that fetches the request object over HTTP with a GET request.
@@ -66,7 +66,7 @@ public class HttpRequestUriFetcher implements RequestUriFetcher {
    * @param timeout the timeout of a request
    * @param maxSize the maximum size of a request object, in bytes
    */
-  public HttpRequestUriFetcher(final @Nonnull HttpClient httpClient, final @Nonnull Duration timeout,
+  public HttpRequestUriFetcher(final @NonNull HttpClient httpClient, final @NonNull Duration timeout,
       final int maxSize) {
     this.httpClient = Objects.requireNonNull(httpClient, "httpClient must not be null");
     this.timeout = Objects.requireNonNull(timeout, "timeout must not be null");
@@ -78,7 +78,7 @@ public class HttpRequestUriFetcher implements RequestUriFetcher {
 
   /** {@inheritDoc} */
   @Override
-  public @Nonnull String fetch(final @Nonnull URI requestUri) throws IOException {
+  public @NonNull String fetch(final @NonNull URI requestUri) throws IOException {
     final HttpRequest request = HttpRequest.newBuilder(requestUri)
         .timeout(this.timeout)
         .header("Accept", "application/oauth-authz-req+jwt, application/jwt")
