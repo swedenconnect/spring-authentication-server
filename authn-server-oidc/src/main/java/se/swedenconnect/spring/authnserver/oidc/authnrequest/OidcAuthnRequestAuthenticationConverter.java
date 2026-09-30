@@ -36,6 +36,7 @@ import org.springframework.util.StringUtils;
 
 import com.nimbusds.oauth2.sdk.OAuth2Error;
 import com.nimbusds.oauth2.sdk.ResponseMode;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.util.JWTClaimsSetUtils;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
@@ -57,7 +58,8 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * 6.3.3, states. A {@code request_uri} is only fetched if it is one of the client's registered {@code request_uris}.
  * </p>
  * <p>
- * An unknown client, a failing client registry, and a missing or unregistered redirect URI end at the OpenID Provider
+ * An unknown client, a client registered with the token endpoint authentication method {@code none}, which is not
+ * supported, a failing client registry, and a missing or unregistered redirect URI end at the OpenID Provider
  * as an {@link UnrecoverableErrorException}, since there is nowhere safe to send a response. So does a response mode
  * other than {@code query} and {@code form_post}, which gives HTTP status 400. Once the redirect URI and the response
  * mode have been established, the {@link OidcResponseTarget} is kept on the HTTP request and a later failure is sent
@@ -137,6 +139,14 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
           "Client %s is not known".formatted(clientId));
     }
     log.debug("Client found in the client registry [{}]", logString);
+
+    // Public clients are not supported ...
+    //
+    if (ClientAuthenticationMethod.NONE.equals(metadata.getTokenEndpointAuthMethod())) {
+      log.warn("Client configuration error - token_endpoint_auth_method 'none' is not supported [{}]", logString);
+      throw new UnrecoverableErrorException(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION,
+          "The client is registered with token_endpoint_auth_method none, which is not supported");
+    }
 
     // Resolve a request object ...
     //

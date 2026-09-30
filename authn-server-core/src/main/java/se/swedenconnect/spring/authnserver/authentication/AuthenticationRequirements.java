@@ -66,6 +66,9 @@ public class AuthenticationRequirements implements Serializable {
   /** The acceptable authentication context URIs, in the requester's order of preference. */
   private List<String> authnContextRequirements = List.of();
 
+  /** Whether the requested authentication contexts are voluntary. */
+  private boolean voluntaryAuthnContexts = false;
+
   /** The authentication providers that the requester asks for. */
   private List<String> requestedAuthnProviders = List.of();
 
@@ -97,6 +100,7 @@ public class AuthenticationRequirements implements Serializable {
     this.consentRequired = other.consentRequired;
     this.requestedAttributes = other.requestedAttributes;
     this.authnContextRequirements = other.authnContextRequirements;
+    this.voluntaryAuthnContexts = other.voluntaryAuthnContexts;
     this.requestedAuthnProviders = other.requestedAuthnProviders;
     this.originalRequesters = other.originalRequesters;
     this.signMessage = other.signMessage;
@@ -230,6 +234,33 @@ public class AuthenticationRequirements implements Serializable {
   }
 
   /**
+   * Predicate telling whether the requested authentication contexts are voluntary.
+   * <p>
+   * Required contexts, which are the default, must be met: if no authentication provider supports any of them, the
+   * authentication fails with {@link se.swedenconnect.spring.authnserver.error.AuthenticationError#NO_AUTHN_CONTEXT
+   * NO_AUTHN_CONTEXT}. SAML requested contexts, and OpenID Connect {@code acr} values requested as essential, are
+   * required. Voluntary contexts are wishes: the supported ones are used in the requester's order of preference, and
+   * if none is supported, the authentication proceeds as if no context had been requested. OpenID Connect
+   * {@code acr_values} and the client's default {@code acr} values are voluntary.
+   * </p>
+   *
+   * @return {@code true} if the requested authentication contexts are voluntary and {@code false} if they are required
+   */
+  public boolean isVoluntaryAuthnContexts() {
+    return this.voluntaryAuthnContexts;
+  }
+
+  /**
+   * Assigns whether the requested authentication contexts are voluntary. Defaults to {@code false}.
+   *
+   * @param voluntaryAuthnContexts {@code true} if the requested authentication contexts are voluntary and
+   *          {@code false} if they are required
+   */
+  public void setVoluntaryAuthnContexts(final boolean voluntaryAuthnContexts) {
+    this.voluntaryAuthnContexts = voluntaryAuthnContexts;
+  }
+
+  /**
    * Gets the authentication providers that the requester asks for. It is the SAML {@code <saml2p:IDPList>} under
    * {@code <saml2p:Scoping>}, and the OpenID Connect {@code authnProvider} request parameter, which allows one value.
    *
@@ -315,6 +346,7 @@ public class AuthenticationRequirements implements Serializable {
     return this.forceAuthn == other.forceAuthn
         && this.passiveAuthn == other.passiveAuthn
         && this.consentRequired == other.consentRequired
+        && this.voluntaryAuthnContexts == other.voluntaryAuthnContexts
         && Objects.equals(this.maxAuthnAge, other.maxAuthnAge)
         && Objects.equals(this.requestedAttributes, other.requestedAttributes)
         && Objects.equals(this.authnContextRequirements, other.authnContextRequirements)
@@ -328,7 +360,8 @@ public class AuthenticationRequirements implements Serializable {
   @Override
   public int hashCode() {
     return Objects.hash(this.forceAuthn, this.maxAuthnAge, this.passiveAuthn, this.consentRequired,
-        this.requestedAttributes, this.authnContextRequirements, this.requestedAuthnProviders, this.originalRequesters,
+        this.requestedAttributes, this.authnContextRequirements, this.voluntaryAuthnContexts,
+        this.requestedAuthnProviders, this.originalRequesters,
         this.signMessage, this.userMessage);
   }
 
@@ -343,6 +376,9 @@ public class AuthenticationRequirements implements Serializable {
     sb.append(", consent-required=").append(this.consentRequired);
     if (!this.authnContextRequirements.isEmpty()) {
       sb.append(", authn-context-requirements=").append(this.authnContextRequirements);
+      if (this.voluntaryAuthnContexts) {
+        sb.append(" (voluntary)");
+      }
     }
     if (!this.requestedAttributes.isEmpty()) {
       sb.append(", requested-attributes=").append(this.requestedAttributes);

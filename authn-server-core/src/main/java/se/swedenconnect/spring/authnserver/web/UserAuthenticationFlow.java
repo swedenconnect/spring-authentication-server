@@ -19,8 +19,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -34,6 +37,7 @@ import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
@@ -98,6 +102,10 @@ public class UserAuthenticationFlow {
    * {@code null}.
    * </p>
    * <p>
+   * Voluntary authentication contexts that no provider supports are removed from the requirements before the providers
+   * are asked, see {@link AuthenticationRequirements#isVoluntaryAuthnContexts()}.
+   * </p>
+   * <p>
    * The result is given the requirements and the protocol data of the request, so that the protocol module can build
    * its response from it.
    * </p>
@@ -116,6 +124,7 @@ public class UserAuthenticationFlow {
       throws AuthenticationErrorException, UnrecoverableErrorException, IOException {
 
     token.setPreviousAuthentication(this.getSessionAuthentication());
+    this.resolveVoluntaryAuthnContexts(token);
 
     for (final UserAuthenticationProvider provider : this.providers) {
       final Authentication result;
@@ -153,6 +162,32 @@ public class UserAuthenticationFlow {
         token.getAuthnRequirements().getAuthnContextRequirements(), token.getLogString());
     throw new AuthenticationErrorException(AuthenticationError.NO_AUTHN_CONTEXT,
         "No authentication provider can deliver any of the requested authentication contexts");
+  }
+
+  /**
+   * Keeps only the voluntary authentication contexts that some provider supports, in the requester's order of
+   * preference. If no provider supports any of them, the requirements are left without authentication contexts, so
+   * that the authentication proceeds as if none had been requested. Required contexts are left as they are.
+   *
+   * @param token the processed request
+   */
+  private void resolveVoluntaryAuthnContexts(final @NonNull UserAuthenticationInputToken token) {
+    final AuthenticationRequirements requirements = token.getAuthnRequirements();
+    if (!requirements.isVoluntaryAuthnContexts() || requirements.getAuthnContextRequirements().isEmpty()) {
+      return;
+    }
+    final Set<String> supported = this.providers.stream()
+        .map(UserAuthenticationProvider::getSupportedAuthnContextUris)
+        .flatMap(Collection::stream)
+        .collect(Collectors.toSet());
+    final List<String> requested = requirements.getAuthnContextRequirements();
+    final List<String> usable = requested.stream().filter(supported::contains).toList();
+    if (usable.size() < requested.size()) {
+      log.debug("Voluntary authentication contexts {} are not supported and are ignored - using {} [{}]",
+          requested.stream().filter(u -> !supported.contains(u)).toList(), usable.isEmpty() ? "any" : usable,
+          token.getLogString());
+      requirements.setAuthnContextRequirements(usable);
+    }
   }
 
   /**

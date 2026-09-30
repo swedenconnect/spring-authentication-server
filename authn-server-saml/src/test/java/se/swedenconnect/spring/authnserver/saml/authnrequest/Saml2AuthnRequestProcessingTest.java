@@ -208,6 +208,7 @@ class Saml2AuthnRequestProcessingTest extends OpenSamlTestBase {
     assertThat(requirements.isForceAuthn()).isTrue();
     assertThat(requirements.isPassiveAuthn()).isFalse();
     assertThat(requirements.getAuthnContextRequirements()).containsExactly(LOA3, LOA4);
+    assertThat(requirements.isVoluntaryAuthnContexts()).isFalse();
     assertThat(requirements.getEntityCategories()).containsExactly(LOA3_PNR);
     assertThat(requirements.getRequestedAttributes())
         .extracting(GenericRequestedAttribute::getIdentifier)

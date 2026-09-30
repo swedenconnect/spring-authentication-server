@@ -617,8 +617,8 @@ public class OidcConfigurationProperties {
   public static class AuthorizationRequestProperties {
 
     /**
-     * Whether PKCE is required for all clients. Defaults to false, which means that PKCE is required for public
-     * clients only. The plain method is never accepted.
+     * Whether PKCE is required. Defaults to false, which means that PKCE is optional. The plain method is never
+     * accepted.
      */
     private Boolean requirePkce;
 
@@ -634,18 +634,18 @@ public class OidcConfigurationProperties {
     private Boolean requireState;
 
     /**
-     * Gets whether PKCE is required for all clients.
+     * Gets whether PKCE is required.
      *
-     * @return whether PKCE is required for all clients, or {@code null} for the default
+     * @return whether PKCE is required, or {@code null} for the default
      */
     public @Nullable Boolean getRequirePkce() {
       return this.requirePkce;
     }
 
     /**
-     * Assigns whether PKCE is required for all clients.
+     * Assigns whether PKCE is required.
      *
-     * @param requirePkce whether PKCE is required for all clients
+     * @param requirePkce whether PKCE is required
      */
     public void setRequirePkce(final @Nullable Boolean requirePkce) {
       this.requirePkce = requirePkce;

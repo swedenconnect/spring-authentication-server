@@ -70,6 +70,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
+import com.nimbusds.openid.connect.sdk.claims.ACR;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import net.minidev.json.JSONObject;
@@ -116,7 +117,11 @@ class OidcAuthnRequestProcessingTest {
 
   private static final String CLIENT_ID = "https://rp.example.com";
 
-  private static final String PUBLIC_CLIENT_ID = "https://app.example.com";
+  private static final String OTHER_CLIENT_ID = "https://app.example.com";
+
+  private static final String PUBLIC_CLIENT_ID = "https://public.example.com";
+
+  private static final String DEFAULT_ACR_CLIENT_ID = "https://default-acr.example.com";
 
   private static final String ALG_CLIENT_ID = "https://alg.example.com";
 
@@ -235,7 +240,8 @@ class OidcAuthnRequestProcessingTest {
     assertThat(token.getRequestId()).isNull();
     final OidcAuthenticationRequirements requirements = requirements(token);
     assertThat(requirements.getScopes()).containsExactly("openid", PNR_SCOPE);
-    assertThat(requirements.getAuthnContextRequirements()).containsExactly(LOA4, LOA3);
+    assertThat(requirements.getAuthnContextRequirements()).containsExactly(LOA4, UNSUPPORTED_LOA, LOA3);
+    assertThat(requirements.isVoluntaryAuthnContexts()).isTrue();
     assertThat(requirements.isForceAuthn()).isTrue();
     assertThat(requirements.isPassiveAuthn()).isFalse();
     assertThat(requirements.isConsentRequired()).isTrue();
@@ -355,7 +361,7 @@ class OidcAuthnRequestProcessingTest {
   @Test
   void aRequestUriFromAClientWithoutRegisteredRequestUrisIsNotFetched() throws Exception {
     this.start(c -> {});
-    final Map<String, String> params = params(PUBLIC_CLIENT_ID);
+    final Map<String, String> params = params(OTHER_CLIENT_ID);
     params.put("request_uri", REQUEST_URI);
 
     assertError(this.send(get(params)), "invalid_request_uri", "state-1");
@@ -440,19 +446,25 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void pkceIsRequiredForPublicClientsByDefault() throws Exception {
+  void pkceIsOptionalByDefault() throws Exception {
     this.start(c -> {});
-    assertError(this.send(get(params(PUBLIC_CLIENT_ID))), "invalid_request", "state-1");
+    this.process(get(params()));
 
-    final Map<String, String> params = params(PUBLIC_CLIENT_ID);
+    final Map<String, String> params = params();
     params.put("code_challenge", CHALLENGE);
     params.put("code_challenge_method", "S256");
     final OidcAuthnRequestData data = (OidcAuthnRequestData) this.process(get(params)).getProtocolRequestData();
     assertThat(data.codeChallenge()).isEqualTo(CHALLENGE);
     assertThat(data.codeChallengeMethod()).isEqualTo("S256");
+  }
 
-    // Optional for others
-    this.process(get(params()));
+  @Test
+  void aPublicClientIsAClientConfigurationError() {
+    this.start(c -> {});
+    final Map<String, String> params = params(PUBLIC_CLIENT_ID);
+    params.put("code_challenge", CHALLENGE);
+    params.put("code_challenge_method", "S256");
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION);
   }
 
   @Test
@@ -597,12 +609,51 @@ class OidcAuthnRequestProcessingTest {
   void essentialAcrValuesThatCannotBeMetAreRejected() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
-    params.put("claims", "{\"id_token\":{\"acr\":{\"essential\":true,\"values\":[\"" + UNSUPPORTED_LOA + "\"]}}}");
+    params.put("claims", acrClaim(true, UNSUPPORTED_LOA));
     assertError(this.send(get(params)), "unmet_authentication_requirements", "state-1");
 
-    // Voluntary values that are not supported are dropped
-    params.put("claims", "{\"id_token\":{\"acr\":{\"values\":[\"" + UNSUPPORTED_LOA + "\"]}}}");
-    assertThat(requirements(this.process(get(params))).getAuthnContextRequirements()).isEmpty();
+    // Essential values are required, and the unsupported ones are left out
+    params.put("claims", acrClaim(true, UNSUPPORTED_LOA, LOA4));
+    params.put("acr_values", LOA3);
+    final OidcAuthenticationRequirements requirements = requirements(this.process(get(params)));
+    assertThat(requirements.getAuthnContextRequirements()).containsExactly(LOA4);
+    assertThat(requirements.isVoluntaryAuthnContexts()).isFalse();
+  }
+
+  @Test
+  void acrValuesAreVoluntary() throws Exception {
+    this.start(c -> {});
+    final Map<String, String> params = params();
+    params.put("acr_values", UNSUPPORTED_LOA);
+    OidcAuthenticationRequirements requirements = requirements(this.process(get(params)));
+    assertThat(requirements.getAuthnContextRequirements()).containsExactly(UNSUPPORTED_LOA);
+    assertThat(requirements.isVoluntaryAuthnContexts()).isTrue();
+
+    // Values of the claims parameter that are not essential are also voluntary, and win over acr_values
+    params.put("claims", acrClaim(false, LOA4));
+    requirements = requirements(this.process(get(params)));
+    assertThat(requirements.getAuthnContextRequirements()).containsExactly(LOA4);
+    assertThat(requirements.isVoluntaryAuthnContexts()).isTrue();
+  }
+
+  @Test
+  void theDefaultAcrValuesOfTheClientApplyOnlyWithoutRequestedAcr() throws Exception {
+    this.start(c -> {});
+    OidcAuthenticationRequirements requirements = requirements(this.process(get(params(DEFAULT_ACR_CLIENT_ID))));
+    assertThat(requirements.getAuthnContextRequirements()).containsExactly(UNSUPPORTED_LOA, LOA4);
+    assertThat(requirements.isVoluntaryAuthnContexts()).isTrue();
+
+    final Map<String, String> params = params(DEFAULT_ACR_CLIENT_ID);
+    params.put("acr_values", LOA3);
+    assertThat(requirements(this.process(get(params))).getAuthnContextRequirements()).containsExactly(LOA3);
+
+    params.remove("acr_values");
+    params.put("claims", "{\"id_token\":{\"acr\":null}}");
+    requirements = requirements(this.process(get(params)));
+    assertThat(requirements.getAuthnContextRequirements()).isEmpty();
+
+    // A client without defaults gets no authentication contexts
+    assertThat(requirements(this.process(get(params()))).getAuthnContextRequirements()).isEmpty();
   }
 
   @Test
@@ -619,7 +670,7 @@ class OidcAuthnRequestProcessingTest {
     for (final String hint : List.of(
         idToken(BASE_URL, CLIENT_ID, OTHER_KEY, Instant.now().plusSeconds(60)),
         idToken("https://other.example.com", CLIENT_ID, OP_SIGN, Instant.now().plusSeconds(60)),
-        idToken(BASE_URL, PUBLIC_CLIENT_ID, OP_SIGN, Instant.now().plusSeconds(60)),
+        idToken(BASE_URL, OTHER_CLIENT_ID, OP_SIGN, Instant.now().plusSeconds(60)),
         new PlainJWT(new JWTClaimsSet.Builder().subject("s").build()).serialize())) {
       final Map<String, String> params = params();
       params.put("id_token_hint", hint);
@@ -744,7 +795,7 @@ class OidcAuthnRequestProcessingTest {
     this.start(c -> c.configurableRequesterAcceptance()
         .addPredicate(new WhitelistRequesterPredicate(AuthenticationProtocol.OIDC, List.of(CLIENT_ID))));
     this.process(get(params()));
-    final Map<String, String> params = params(PUBLIC_CLIENT_ID);
+    final Map<String, String> params = params(OTHER_CLIENT_ID);
     params.put("code_challenge", CHALLENGE);
     params.put("code_challenge_method", "S256");
     assertError(this.send(get(params)), "unauthorized_client", "state-1");
@@ -902,6 +953,15 @@ class OidcAuthnRequestProcessingTest {
     return jwt.serialize();
   }
 
+  private static String acrClaim(final boolean essential, final String... values) {
+    final JSONObject acr = new JSONObject();
+    if (essential) {
+      acr.put("essential", true);
+    }
+    acr.put("values", List.of(values));
+    return new JSONObject(Map.of("id_token", new JSONObject(Map.of("acr", acr)))).toJSONString();
+  }
+
   private static JSONObject userMessage() {
     final JSONObject message = new JSONObject();
     message.put("message#sv", encode("Hej"));
@@ -940,8 +1000,8 @@ class OidcAuthnRequestProcessingTest {
   }
 
   /**
-   * A client registry backend with a confidential client, a public client and a client that has registered a request
-   * object signing algorithm. Trust marks can be made obtainable on demand.
+   * A client registry backend with two confidential clients, a public client, a client that has registered a request
+   * object signing algorithm and a client with default acr values. Trust marks can be made obtainable on demand.
    */
   private static class TestBackend implements ClientRegistryBackend {
 
@@ -973,8 +1033,15 @@ class OidcAuthnRequestProcessingTest {
       return switch (identifier) {
         case CLIENT_ID -> new OidcClientRecord(CLIENT_ID,
             metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null, true), marks).toRequesterRecord();
+        case OTHER_CLIENT_ID -> new OidcClientRecord(OTHER_CLIENT_ID,
+            metadata(ClientAuthenticationMethod.CLIENT_SECRET_BASIC, null, false), marks).toRequesterRecord();
         case PUBLIC_CLIENT_ID -> new OidcClientRecord(PUBLIC_CLIENT_ID,
             metadata(ClientAuthenticationMethod.NONE, null, false), marks).toRequesterRecord();
+        case DEFAULT_ACR_CLIENT_ID -> {
+          final OIDCClientMetadata metadata = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null, false);
+          metadata.setDefaultACRs(List.of(new ACR(UNSUPPORTED_LOA), new ACR(LOA4)));
+          yield new OidcClientRecord(DEFAULT_ACR_CLIENT_ID, metadata, marks).toRequesterRecord();
+        }
         case ALG_CLIENT_ID -> new OidcClientRecord(ALG_CLIENT_ID,
             metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, JWSAlgorithm.RS256, false), marks)
             .toRequesterRecord();

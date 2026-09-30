@@ -71,6 +71,7 @@ class AuthenticationRequirementsTest {
     assertThat(requirements.getMaxAuthnAge()).isNull();
     assertThat(requirements.getRequestedAttributes()).isEmpty();
     assertThat(requirements.getAuthnContextRequirements()).isEmpty();
+    assertThat(requirements.isVoluntaryAuthnContexts()).isFalse();
     assertThat(requirements.getRequestedAuthnProviders()).isEmpty();
     assertThat(requirements.getOriginalRequesters()).isEmpty();
     assertThat(requirements.getSignMessage()).isNull();
@@ -153,6 +154,12 @@ class AuthenticationRequirementsTest {
     final AuthenticationRequirements other = requirements();
     other.setConsentRequired(false);
     assertThat(other).isNotEqualTo(requirements());
+
+    final AuthenticationRequirements voluntary = requirements();
+    voluntary.setVoluntaryAuthnContexts(true);
+    assertThat(voluntary).isNotEqualTo(requirements());
+    assertThat(voluntary.toString()).contains("(voluntary)");
+    assertThat(requirements().toString()).doesNotContain("(voluntary)");
     assertThat(requirements()).isNotEqualTo(null);
   }
 
@@ -163,6 +170,9 @@ class AuthenticationRequirementsTest {
 
     assertThat(restored).isEqualTo(requirements);
     assertThat(restored.getAuthnContextRequirements()).containsExactly(LOA4, LOA3);
+
+    requirements.setVoluntaryAuthnContexts(true);
+    assertThat(SerializationTestSupport.roundTrip(requirements).isVoluntaryAuthnContexts()).isTrue();
     assertThat(restored.getRequestedAttributes()).isEqualTo(requirements.getRequestedAttributes());
     assertThat(restored.getOriginalRequesters()).containsExactly(new OriginalRequester("client-42", "dG9rZW4="));
     assertThat(restored.getUserMessage()).isNotNull()

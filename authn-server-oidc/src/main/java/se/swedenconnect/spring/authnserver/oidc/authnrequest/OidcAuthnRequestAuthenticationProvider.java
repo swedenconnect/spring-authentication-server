@@ -40,7 +40,6 @@ import com.nimbusds.oauth2.sdk.ErrorObject;
 import com.nimbusds.oauth2.sdk.OAuth2Error;
 import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.Scope;
-import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
 import com.nimbusds.openid.connect.sdk.AuthenticationRequest;
@@ -134,7 +133,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
   /** Whether user messages are supported. */
   private boolean supportsUserMessage = false;
 
-  /** Whether PKCE is required for all clients, and not only for public clients. */
+  /** Whether PKCE is required. */
   private boolean requirePkce = false;
 
   /** Whether request objects must be signed. */
@@ -224,7 +223,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
           AuthenticationError.NOT_AUTHORIZED.getDefaultMessage());
     }
 
-    this.checkPkce(request, metadata, logString);
+    this.checkPkce(request, logString);
 
     final OidcAuthenticationRequirements requirements = this.createAuthenticationRequirements(request, token);
     log.debug("Authentication requirements: {} [{}]", requirements, logString);
@@ -300,7 +299,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
     requirements.setScopes(scopes);
     requirements.setRequestedAttributes(this.requestedAttributeResolver.resolve(
         new Scope(scopes.toArray(String[]::new)), request.getOIDCClaims(), logString));
-    requirements.setAuthnContextRequirements(this.resolveAuthnContexts(request, logString));
+    this.resolveAuthnContexts(request, token.getClientMetadata(), requirements, logString);
 
     // Extensions ...
     //
@@ -347,28 +346,25 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
   }
 
   /**
-   * Checks the PKCE parameters. The {@code plain} method is always rejected, and a challenge is required from a public
-   * client, and from every client when PKCE is required.
+   * Checks the PKCE parameters. The {@code plain} method, also when given by leaving out the method, is always
+   * rejected, and a challenge is required when PKCE is required.
    *
    * @param request the request
-   * @param metadata the client metadata
    * @param logString the log string
    * @throws OidcErrorResponseException with {@code invalid_request}
    */
-  private void checkPkce(final @NonNull AuthenticationRequest request, final @NonNull OIDCClientMetadata metadata,
-      final @NonNull String logString) throws OidcErrorResponseException {
+  private void checkPkce(final @NonNull AuthenticationRequest request, final @NonNull String logString) throws OidcErrorResponseException {
 
     if (request.getCodeChallenge() == null) {
-      if (request.getCodeChallengeMethod() != null) {
-        throw invalidRequest("code_challenge_method given without code_challenge", logString);
-      }
-      final boolean publicClient = ClientAuthenticationMethod.NONE.equals(metadata.getTokenEndpointAuthMethod());
-      if (this.requirePkce || publicClient) {
-        throw invalidRequest(publicClient
-            ? "PKCE is required for public clients - missing code_challenge"
-            : "PKCE is required - missing code_challenge", logString);
+      if (this.requirePkce) {
+        throw invalidRequest("PKCE is required - missing code_challenge", logString);
       }
       return;
+    }
+    if (request.getCodeChallengeMethod() == null) {
+      // RFC 7636, Section 4.3: no method means plain ...
+      throw invalidRequest("code_challenge_method is missing, which means plain - only S256 is supported",
+          logString);
     }
     if (!CodeChallengeMethod.S256.equals(request.getCodeChallengeMethod())) {
       throw invalidRequest("Only the S256 code_challenge_method is supported", logString);
@@ -433,39 +429,59 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
   }
 
   /**
-   * Works out the authentication contexts. Values of {@code acr} in the {@code claims} parameter win over
-   * {@code acr_values}. Values that the OpenID Provider does not support are left out. If essential values are
-   * requested and none of them is supported, the request fails with {@code unmet_authentication_requirements}.
+   * Works out the authentication contexts and whether they are voluntary.
+   * <ul>
+   * <li>{@code acr} in the {@code claims} parameter wins over {@code acr_values}. Values requested as essential are
+   * required: the values that no authentication provider supports are left out, and if none is left, the request
+   * fails with {@code unmet_authentication_requirements}. Values that are not essential are voluntary.</li>
+   * <li>{@code acr_values} are voluntary, as OpenID Connect Core, Section 3.1.2.1, states.</li>
+   * <li>When the request has neither, the client's {@code default_acr_values} are used, as voluntary values.</li>
+   * </ul>
+   * <p>
+   * Voluntary values are all kept; the ones that no provider supports are ignored when the user is authenticated.
+   * </p>
    *
    * @param request the request
+   * @param metadata the client metadata
+   * @param requirements the requirements to update
    * @param logString the log string
-   * @return the authentication context URIs, in the requester's order of preference
    * @throws OidcErrorResponseException for unmet essential values
    */
-  private @NonNull List<String> resolveAuthnContexts(final @NonNull AuthenticationRequest request,
+  private void resolveAuthnContexts(final @NonNull AuthenticationRequest request,
+      final @NonNull OIDCClientMetadata metadata, final @NonNull OidcAuthenticationRequirements requirements,
       final @NonNull String logString) throws OidcErrorResponseException {
 
-    List<String> requested = List.of();
-    boolean essential = false;
     final ClaimsSetRequest.Entry acrEntry = getAcrEntry(request.getOIDCClaims());
-    if (acrEntry != null && (acrEntry.getValue() != null || acrEntry.getValues() != null)) {
-      requested = acrEntry.getValues() != null ? acrEntry.getValues() : List.of(acrEntry.getValue());
-      essential = acrEntry.getClaimRequirement() == ClaimRequirement.ESSENTIAL;
+    if (acrEntry != null) {
+      final List<String> values = acrEntry.getValues() != null
+          ? acrEntry.getValues()
+          : acrEntry.getValue() != null ? List.of(acrEntry.getValue()) : List.of();
+      if (acrEntry.getClaimRequirement() == ClaimRequirement.ESSENTIAL && !values.isEmpty()) {
+        final List<String> supported = values.stream().filter(this.supportedAuthnContextUris::contains).toList();
+        if (supported.isEmpty()) {
+          log.info("None of the essential acr values {} is supported [{}]", values, logString);
+          throw new OidcErrorResponseException(OIDCError.UNMET_AUTHENTICATION_REQUIREMENTS,
+              "None of the essential acr values is supported");
+        }
+        requirements.setAuthnContextRequirements(supported);
+        requirements.setVoluntaryAuthnContexts(false);
+        return;
+      }
+      requirements.setAuthnContextRequirements(values);
+      requirements.setVoluntaryAuthnContexts(true);
+      return;
     }
-    else if (request.getACRValues() != null) {
-      requested = request.getACRValues().stream().map(ACR::getValue).toList();
+    if (request.getACRValues() != null && !request.getACRValues().isEmpty()) {
+      requirements.setAuthnContextRequirements(request.getACRValues().stream().map(ACR::getValue).toList());
+      requirements.setVoluntaryAuthnContexts(true);
+      return;
     }
-    final List<String> supported = requested.stream().filter(this.supportedAuthnContextUris::contains).toList();
-    if (essential && supported.isEmpty()) {
-      log.info("None of the essential acr values {} is supported [{}]", requested, logString);
-      throw new OidcErrorResponseException(OIDCError.UNMET_AUTHENTICATION_REQUIREMENTS,
-          "None of the essential acr values is supported");
+    if (metadata.getDefaultACRs() != null && !metadata.getDefaultACRs().isEmpty()) {
+      final List<String> defaults = metadata.getDefaultACRs().stream().map(ACR::getValue).toList();
+      log.debug("No acr requested - using the client's default_acr_values {} [{}]", defaults, logString);
+      requirements.setAuthnContextRequirements(defaults);
+      requirements.setVoluntaryAuthnContexts(true);
     }
-    if (supported.size() < requested.size()) {
-      log.debug("Unsupported acr values left out - requested: {}, supported: {} [{}]", requested, supported,
-          logString);
-    }
-    return supported;
   }
 
   /**
@@ -667,10 +683,9 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
   }
 
   /**
-   * Assigns whether PKCE is required for all clients. Defaults to {@code false}, meaning that PKCE is required for
-   * public clients only.
+   * Assigns whether PKCE is required. Defaults to {@code false}, meaning that PKCE is optional.
    *
-   * @param requirePkce whether PKCE is required for all clients
+   * @param requirePkce whether PKCE is required
    */
   public void setRequirePkce(final boolean requirePkce) {
     this.requirePkce = requirePkce;

@@ -585,7 +585,7 @@ in [The OpenID Provider](openid-provider.html#authentication-requests). These pr
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
-| `require-pkce` | Whether PKCE is required for all clients. When `false`, it is required for public clients only. The `plain` method is never accepted. | `false` |
+| `require-pkce` | Whether PKCE is required. When `false`, it is optional. The `plain` method is never accepted, and public clients are not supported. | `false` |
 | `require-signed-request-object` | Whether request objects must be signed. When `false`, an unsigned request object is accepted, unless the client has registered `request_object_signing_alg`. The discovery document declares `none` as a request object signing algorithm only when this is `false`. | `false` |
 | `require-state` | Whether authentication requests must carry `state`. When `false`, a request without `state` is accepted, and its response carries no `state`. | `true` |
 

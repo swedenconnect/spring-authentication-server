@@ -238,7 +238,8 @@ The request is processed in two parts, by
 
 The first part finds out where a response can be sent:
 
-1. The client is looked up by `client_id` in the [client registry](client-registry.html).
+1. The client is looked up by `client_id` in the [client registry](client-registry.html). A client registered with
+   the token endpoint authentication method `none` is not accepted, see [Clients](#clients).
 2. A request object, if the request has one, is fetched and decoded, and its parameters replace those of the request,
    see [Request objects](#request-objects).
 3. `redirect_uri` must be present and be one of the client's registered redirect URIs, compared as strings.
@@ -276,10 +277,15 @@ What the OpenID Provider reads from the client metadata when it processes a requ
 | `request_uris` | The only values of `request_uri` that are fetched. |
 | `jwks` or `jwks_uri` | Verifying signed request objects and signature requests. |
 | `request_object_signing_alg` | When set, request objects must be signed with this algorithm. |
-| `token_endpoint_auth_method` | A client with `none` is a public client, and must use PKCE. |
+| `token_endpoint_auth_method` | Public clients, with `none`, are not supported. |
+| `default_acr_values` | The authentication contexts, as voluntary values, when the request asks for none. |
 
 An unknown client and a client registry that fails end at the OpenID Provider, and are logged differently: the first
 at `INFO`, since it is a normal outcome, and the second at `ERROR`, since a dependency is not working.
+
+A client registered with the token endpoint authentication method `none`, a public client, is a client configuration
+error. The request ends at the OpenID Provider, without a redirect, and the error is logged at `WARN`, since the
+client registration needs to be corrected.
 
 <a name="request-objects"></a>
 ### Request objects
@@ -314,10 +320,10 @@ redirect URI and a supported response mode, and otherwise ends at the OpenID Pro
 <a name="pkce-state-and-response-modes"></a>
 ### PKCE, state and response modes
 
-**PKCE** (RFC 7636) is required for public clients, and optional for other clients. With
-`authn-server.oidc.authorization-request.require-pkce` set to `true` it is required for all clients. The only
-supported method is `S256`. A request with the method `plain`, or with a `code_challenge` and no method, which means
-`plain`, is always rejected.
+**PKCE** (RFC 7636) is optional by default. With `authn-server.oidc.authorization-request.require-pkce` set to
+`true` it is required. The only supported method is `S256`. A request with the method `plain`, or with a
+`code_challenge` and no method, which means `plain` (RFC 7636, Section 4.3), is always answered with
+`invalid_request`.
 
 **`state`** is required by default, as the Swedish OpenID Connect Profile, Section 2.1, requires. A request without it
 is answered with `invalid_request`. With `authn-server.oidc.authorization-request.require-state` set to `false`, such a
@@ -355,16 +361,24 @@ The result is the protocol-neutral authentication requirements, as an
 | `max_age` | The maximum authentication age. `max_age=0` is the same as `prompt=login`. |
 | `scope` | The requested scopes that the OpenID Provider offers. Other scopes are ignored, as OpenID Connect Core says for scopes that are not understood. |
 | `scope` and `claims` | The requested attributes. The offered scopes are expanded into their claims, the `claims` parameter is merged in, and the claims are mapped to generic attributes, see [What a request asks for](attributes.html#what-a-request-asks-for). |
-| `acr_values`, or `acr` in `claims` | The authentication contexts, in the client's order of preference. Values that no authentication provider supports are left out. |
+| `acr_values`, `acr` in `claims`, or the client's `default_acr_values` | The authentication contexts, in the client's order of preference, and whether they are voluntary or required. |
 | `login_hint` | The login hint. |
 | `ui_locales` | The preferred languages of the user interface. |
 | `id_token_hint` | The subject of the ID token. |
 
-**Authentication contexts.** `acr` in the `claims` parameter wins over `acr_values`, and the Swedish profile says a
-client should not send both. When `acr` is requested as essential, and none of its values is supported by an
-authentication provider, the request is answered with `unmet_authentication_requirements`, as the Swedish profile,
-Section 2.2, requires. Values of `acr_values` are voluntary, so if none of them is supported the requirement is left
-empty.
+**Authentication contexts.** The requirements tell voluntary authentication contexts from required ones, see
+[Which authentication contexts are acceptable](authentication-module.html#which-authentication-contexts-are-acceptable).
+
+- `acr_values` requests the `acr` claim as a voluntary claim (OpenID Connect Core, Sections 3.1.2.1 and 5.5.1.1).
+  The supported values are used in the client's order of preference, and if none is supported, the user is
+  authenticated as if no value had been requested. Such a request never fails because of its `acr_values`.
+- `acr` in the `claims` parameter wins over `acr_values`, and the Swedish profile says a client should not send both.
+  Values that are not essential are voluntary, as above.
+- Values of `acr` requested as essential are required. The values that no authentication provider supports are left
+  out, and if none is left, the request is answered with `unmet_authentication_requirements`, as the Swedish profile,
+  Section 2.2, requires.
+- When the request has neither `acr_values` nor `acr` in the `claims` parameter, the client's registered
+  `default_acr_values` are used, as voluntary values. A request that has either ignores the defaults.
 
 **`id_token_hint`** must be an ID token issued by this OpenID Provider: signed by one of its signing keys, with the
 issuer as `iss`, and with the client in `aud`. An expired token is accepted. Otherwise the request is answered with
@@ -408,6 +422,7 @@ response, with an `error_description` meant for the client's logs.
 | :--- | :--- |
 | `client_id` is missing | Unrecoverable (`INVALID_AUTHN_REQUEST`) |
 | The client is not known | Unrecoverable (`UNKNOWN_CLIENT`) |
+| The client is registered with the token endpoint authentication method `none` | Unrecoverable (`INVALID_CLIENT_CONFIGURATION`) |
 | The client registry fails when the client is looked up | Unrecoverable (`CLIENT_LOOKUP_FAILED`) |
 | `redirect_uri` is missing or not registered | Unrecoverable (`INVALID_REDIRECT_URI`) |
 | `response_mode` is not `query` or `form_post` | HTTP status 400 (`UNSUPPORTED_RESPONSE_MODE`) |
@@ -416,7 +431,7 @@ response, with an `error_description` meant for the client's logs.
 | The request object is invalid, not signed when it must be, or signed with the wrong algorithm | `invalid_request_object` |
 | `response_type` is not `code` | `unsupported_response_type` |
 | A parameter is missing or invalid, such as `scope` without `openid`, `state`, `prompt`, `max_age` or `id_token_hint` | `invalid_request` |
-| PKCE is missing when required, or uses `plain` | `invalid_request` |
+| PKCE is missing when required, or uses `plain`, also by leaving out `code_challenge_method` | `invalid_request` |
 | The client is not accepted | `unauthorized_client` |
 | The client registry fails during the acceptance check | Unrecoverable (`CLIENT_LOOKUP_FAILED`) |
 | None of the essential `acr` values is supported | `unmet_authentication_requirements` |

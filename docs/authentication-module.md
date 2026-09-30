@@ -146,6 +146,12 @@ the user without asking anything, for instance from a client certificate.
 preference, because that is how `acr_values` is defined. Sweden Connect uses the same URIs in SAML and in OpenID
 Connect, so this is one list for both protocols.
 
+The contexts are either required or voluntary, see `isVoluntaryAuthnContexts()`. Required contexts, which SAML always
+sends and OpenID Connect sends for an essential `acr`, must be met: if no provider supports any of them, the request
+fails with `NO_AUTHN_CONTEXT`. Voluntary contexts, such as OpenID Connect `acr_values`, are wishes: before the
+providers are asked, the contexts that no provider supports are removed, and if none is left, the providers are asked
+as if no context had been requested.
+
 A module does not read this list. It gets the contexts that are left after filtering, in the same order, as the second
 argument to `authenticate`. It picks the one it delivers and reports it as part of the authenticated user.
 

@@ -17,7 +17,9 @@ package se.swedenconnect.spring.authnserver.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.LOA2;
 import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.LOA3;
+import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.LOA4;
 import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.samlRequester;
 import static se.swedenconnect.spring.authnserver.AuthenticationTestSupport.user;
 
@@ -80,6 +82,47 @@ class UserAuthenticationFlowTest {
     assertThatExceptionOfType(AuthenticationErrorException.class)
         .isThrownBy(() -> flow.authenticate(token(), new MockHttpServletRequest(), new MockHttpServletResponse()))
         .satisfies(e -> assertThat(e.getError()).isEqualTo(AuthenticationError.NO_AUTHN_CONTEXT));
+  }
+
+  @Test
+  void voluntaryContextsThatNoProviderSupportsAreIgnored() throws Exception {
+    final List<List<String>> seen = new ArrayList<>();
+    final UserAuthentication result = new UserAuthentication(user());
+    final UserAuthenticationFlow flow =
+        new UserAuthenticationFlow(List.of(supporting("first", List.of(LOA3), seen, result)));
+    final UserAuthenticationInputToken token = token(true, LOA4);
+
+    assertThat(flow.authenticate(token, new MockHttpServletRequest(), new MockHttpServletResponse()))
+        .isSameAs(result);
+    assertThat(seen).containsExactly(List.of());
+    assertThat(token.getAuthnRequirements().isVoluntaryAuthnContexts()).isTrue();
+  }
+
+  @Test
+  void theSupportedVoluntaryContextsAreUsedInTheRequestersOrder() throws Exception {
+    final List<List<String>> seen = new ArrayList<>();
+    final UserAuthentication result = new UserAuthentication(user());
+    final UserAuthenticationFlow flow = new UserAuthenticationFlow(List.of(
+        supporting("first", List.of(LOA2), seen, null), supporting("second", List.of(LOA3), seen, result)));
+
+    assertThat(flow.authenticate(token(true, LOA4, LOA3, LOA2), new MockHttpServletRequest(),
+        new MockHttpServletResponse())).isSameAs(result);
+    // The first provider supports LOA2 but returns nothing, the second is asked with the same list
+    assertThat(seen).containsExactly(List.of(LOA3, LOA2), List.of(LOA3, LOA2));
+  }
+
+  @Test
+  void requiredContextsThatNoProviderSupportsGiveNoAuthnContext() {
+    final List<List<String>> seen = new ArrayList<>();
+    final UserAuthenticationFlow flow = new UserAuthenticationFlow(
+        List.of(supporting("first", List.of(LOA3), seen, new UserAuthentication(user()))));
+    final UserAuthenticationInputToken token = token(false, LOA4);
+
+    assertThatExceptionOfType(AuthenticationErrorException.class)
+        .isThrownBy(() -> flow.authenticate(token, new MockHttpServletRequest(), new MockHttpServletResponse()))
+        .satisfies(e -> assertThat(e.getError()).isEqualTo(AuthenticationError.NO_AUTHN_CONTEXT));
+    assertThat(seen).isEmpty();
+    assertThat(token.getAuthnRequirements().getAuthnContextRequirements()).containsExactly(LOA4);
   }
 
   @Test
@@ -186,6 +229,38 @@ class UserAuthenticationFlowTest {
     requirements.setAuthnContextRequirements(List.of(LOA3));
     return new UserAuthenticationInputToken(requirements, samlRequester("https://sp.example.com"), "_id",
         "request-data");
+  }
+
+  private static UserAuthenticationInputToken token(final boolean voluntary, final String... contexts) {
+    final AuthenticationRequirements requirements = new AuthenticationRequirements();
+    requirements.setAuthnContextRequirements(List.of(contexts));
+    requirements.setVoluntaryAuthnContexts(voluntary);
+    return new UserAuthenticationInputToken(requirements, samlRequester("https://sp.example.com"), "_id",
+        "request-data");
+  }
+
+  /**
+   * A provider that, like {@code AbstractUserAuthenticationProvider}, declines a request whose authentication contexts
+   * it supports none of. It records the contexts of the requests it handles.
+   */
+  private static UserAuthenticationProvider supporting(final String name, final List<String> supported,
+      final List<List<String>> seen, final @Nullable Authentication result) {
+    return new TestProvider(name) {
+      @Override
+      public @NonNull List<String> getSupportedAuthnContextUris() {
+        return supported;
+      }
+
+      @Override
+      public @Nullable Authentication authenticateUser(final @NonNull UserAuthenticationInputToken token) {
+        final List<String> requested = token.getAuthnRequirements().getAuthnContextRequirements();
+        if (!requested.isEmpty() && requested.stream().noneMatch(supported::contains)) {
+          return null;
+        }
+        seen.add(requested);
+        return result;
+      }
+    };
   }
 
   private static UserAuthenticationProvider provider(final String name, final List<String> asked,

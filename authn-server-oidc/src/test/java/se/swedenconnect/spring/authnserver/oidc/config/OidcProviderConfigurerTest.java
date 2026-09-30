@@ -147,7 +147,9 @@ class OidcProviderConfigurerTest {
   void theOidcSettingWinsForUserMessages() {
     this.server.supportsUserMessage(true);
     this.oidc.supportsUserMessage(false);
-    assertThat(this.build().getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME)).isNull();
+    final OIDCProviderMetadata metadata = this.build();
+    assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME)).isNull();
+    assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_MIMETYPES_PARAM_NAME)).isNull();
   }
 
   @Test

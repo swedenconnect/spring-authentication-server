@@ -107,7 +107,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** The authorization endpoint. */
   private String authorizationEndpoint = DEFAULT_AUTHORIZATION_ENDPOINT;
 
-  /** Whether PKCE is required for all clients. */
+  /** Whether PKCE is required. */
   private boolean requirePkce = false;
 
   /** Whether request objects must be signed. */
@@ -249,11 +249,11 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
-   * Assigns whether PKCE is required for all clients. Defaults to {@code false}, which means that PKCE is required for
-   * public clients (token endpoint authentication method {@code none}) and optional for others. The {@code plain}
-   * method is never accepted.
+   * Assigns whether PKCE is required. Defaults to {@code false}, which means that PKCE is optional. The {@code plain}
+   * method is never accepted. Public clients, with the token endpoint authentication method {@code none}, are not
+   * supported.
    *
-   * @param requirePkce whether PKCE is required for all clients
+   * @param requirePkce whether PKCE is required
    * @return this configurer
    */
   public @NonNull OidcProviderConfigurer requirePkce(final boolean requirePkce) {
@@ -262,9 +262,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
-   * Tells whether PKCE is required for all clients.
+   * Tells whether PKCE is required.
    *
-   * @return {@code true} if PKCE is required for all clients, and {@code false} if only for public clients
+   * @return {@code true} if PKCE is required, and {@code false} if it is optional
    */
   public boolean isRequirePkce() {
     return this.requirePkce;
