@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -28,6 +29,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
@@ -121,6 +124,28 @@ public class OidcAutoConfiguration {
     }
     if (properties.getEndpoints().getAuthorization() != null) {
       configurer.authorizationEndpoint(properties.getEndpoints().getAuthorization());
+    }
+    if (properties.getEndpoints().getToken() != null) {
+      configurer.tokenEndpoint(properties.getEndpoints().getToken());
+    }
+    final OidcConfigurationProperties.TokenProperties tokens = properties.getTokens();
+    if (tokens.getAuthorizationCodeLifetime() != null) {
+      configurer.authorizationCodeLifetime(tokens.getAuthorizationCodeLifetime());
+    }
+    if (tokens.getAccessTokenLifetime() != null) {
+      configurer.accessTokenLifetime(tokens.getAccessTokenLifetime());
+    }
+    if (tokens.getAccessTokenSingleUse() != null) {
+      configurer.singleUseAccessTokens(tokens.getAccessTokenSingleUse());
+    }
+    if (tokens.getIdTokenLifetime() != null) {
+      configurer.idTokenLifetime(tokens.getIdTokenLifetime());
+    }
+    if (properties.getClientAuthenticationMethods() != null) {
+      configurer.clientAuthenticationMethods(properties.getClientAuthenticationMethods().stream()
+          .map(String::trim)
+          .map(ClientAuthenticationMethod::parse)
+          .collect(Collectors.toSet()));
     }
     final OidcConfigurationProperties.AuthorizationRequestProperties authorizationRequest =
         properties.getAuthorizationRequest();

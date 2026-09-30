@@ -37,11 +37,13 @@ import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseTarget;
  * @param codeChallengeMethod the PKCE code challenge method, always {@code S256} when a challenge is present
  * @param scopes all requested scopes, including those that the OpenID Provider does not offer
  * @param claimsRequest the {@code claims} parameter as a JSON string, or {@code null}
+ * @param requestedAcrValues the authentication contexts as the request, or the client's defaults, gave them, before
+ *          any was found to be unsupported
  * @author Martin Lindström
  */
 public record OidcAuthnRequestData(@NonNull OidcResponseTarget responseTarget, @Nullable String nonce,
     @Nullable String codeChallenge, @Nullable String codeChallengeMethod, @NonNull List<String> scopes,
-    @Nullable String claimsRequest) implements Serializable {
+    @Nullable String claimsRequest, @NonNull List<String> requestedAcrValues) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -55,10 +57,13 @@ public record OidcAuthnRequestData(@NonNull OidcResponseTarget responseTarget, @
    * @param codeChallengeMethod the PKCE code challenge method, or {@code null}
    * @param scopes all requested scopes
    * @param claimsRequest the {@code claims} parameter as a JSON string, or {@code null}
+   * @param requestedAcrValues the requested authentication contexts
    */
   public OidcAuthnRequestData {
     Objects.requireNonNull(responseTarget, "responseTarget must not be null");
     scopes = List.copyOf(Objects.requireNonNull(scopes, "scopes must not be null"));
+    requestedAcrValues =
+        List.copyOf(Objects.requireNonNull(requestedAcrValues, "requestedAcrValues must not be null"));
   }
 
 }

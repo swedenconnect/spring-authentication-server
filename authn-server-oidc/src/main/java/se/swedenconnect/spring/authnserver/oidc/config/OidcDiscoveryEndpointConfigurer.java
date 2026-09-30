@@ -34,10 +34,12 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import com.nimbusds.langtag.LangTag;
 import com.nimbusds.langtag.LangTagException;
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.oauth2.sdk.GrantType;
 import com.nimbusds.oauth2.sdk.ParseException;
 import com.nimbusds.oauth2.sdk.ResponseMode;
 import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.Scope;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.openid.connect.sdk.claims.ACR;
@@ -50,6 +52,8 @@ import se.swedenconnect.spring.authnserver.message.MessageMimeType;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.scope.SupportedScopesAndClaims;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
+import se.swedenconnect.spring.authnserver.oidc.token.IdTokenBuilder;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcDiscoveryEndpointFilter;
 
 /**
@@ -67,6 +71,11 @@ import se.swedenconnect.spring.authnserver.oidc.web.OidcDiscoveryEndpointFilter;
  * parameters (a {@code request_uri} must be registered), the accepted request object signing algorithms, including
  * {@code none} only when unsigned request objects are accepted, the PKCE method {@code S256}, and support for the
  * {@code authnProvider} parameter of the Swedish OpenID Connect Profile.
+ * </p>
+ * <p>
+ * For the token endpoint, it holds the endpoint, the grant type {@code authorization_code}, the enabled client
+ * authentication methods and the algorithms accepted for client assertions, and the algorithms that ID tokens can be
+ * encrypted with.
  * </p>
  * <p>
  * Additional parameters are added to the built document, and may not replace a parameter that the OpenID Provider
@@ -225,6 +234,27 @@ public class OidcDiscoveryEndpointConfigurer {
     metadata.setRequestObjectJWSAlgs(requestObjectAlgorithms);
     metadata.setCodeChallengeMethods(List.of(CodeChallengeMethod.S256));
     metadata.setCustomParameter(ParameterConstants.REQUESTED_PROVIDER_SUPPORTED_PARAM_NAME, true);
+
+    // The token endpoint and the ID token ...
+    //
+    metadata.setTokenEndpointURI(URI.create(oidc.getEndpointUrl(oidc.getTokenEndpoint())));
+    metadata.setGrantTypes(List.of(GrantType.AUTHORIZATION_CODE));
+    final List<ClientAuthenticationMethod> methods = ClientAuthenticator.SUPPORTED_METHODS.stream()
+        .filter(oidc.getClientAuthenticationMethods()::contains)
+        .toList();
+    metadata.setTokenEndpointAuthMethods(methods);
+    final List<JWSAlgorithm> authAlgorithms = new ArrayList<>();
+    if (methods.contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT)) {
+      authAlgorithms.addAll(RequestObjectDecoder.SUPPORTED_SIGNING_ALGORITHMS);
+    }
+    if (methods.contains(ClientAuthenticationMethod.CLIENT_SECRET_JWT)) {
+      authAlgorithms.addAll(ClientAuthenticator.CLIENT_SECRET_JWT_ALGORITHMS);
+    }
+    if (!authAlgorithms.isEmpty()) {
+      metadata.setTokenEndpointJWSAlgs(authAlgorithms);
+    }
+    metadata.setIDTokenJWEAlgs(IdTokenBuilder.SUPPORTED_ENCRYPTION_ALGORITHMS);
+    metadata.setIDTokenJWEEncs(IdTokenBuilder.SUPPORTED_ENCRYPTION_METHODS);
 
     final OIDCProviderMetadata result = this.addParameters(metadata);
     this.providerMetadataCustomizer.customize(result);

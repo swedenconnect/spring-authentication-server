@@ -22,15 +22,29 @@ import org.jspecify.annotations.NonNull;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.KeySourceException;
 import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.JWKMatcher;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 /**
- * Finds the keys of a client that may have signed a JWT, such as a request object.
+ * Finds the keys of a client: the keys that may have signed a JWT, such as a request object or a client assertion,
+ * and the keys to encrypt for.
  *
  * @author Martin Lindström
  */
 @FunctionalInterface
 public interface ClientKeyResolver {
+
+  /**
+   * Finds the client's keys that match a matcher.
+   *
+   * @param clientId the {@code client_id} of the client
+   * @param metadata the client metadata
+   * @param matcher the matcher
+   * @return the matching keys, possibly empty
+   * @throws KeySourceException if the keys cannot be obtained
+   */
+  @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
+      final @NonNull JWKMatcher matcher) throws KeySourceException;
 
   /**
    * Finds the client's keys that match the header of a signed JWT.
@@ -41,7 +55,9 @@ public interface ClientKeyResolver {
    * @return the candidate keys, possibly empty
    * @throws KeySourceException if the keys cannot be obtained
    */
-  @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
-      final @NonNull JWSHeader header) throws KeySourceException;
+  default @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
+      final @NonNull JWSHeader header) throws KeySourceException {
+    return this.resolve(clientId, metadata, JWKMatcher.forJWSHeader(header));
+  }
 
 }

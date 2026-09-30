@@ -19,17 +19,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
+import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.langtag.LangTag;
+import com.nimbusds.oauth2.sdk.GrantType;
 import com.nimbusds.oauth2.sdk.ResponseMode;
 import com.nimbusds.oauth2.sdk.ResponseType;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.id.Identifier;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.openid.connect.sdk.SubjectType;
@@ -105,6 +111,42 @@ class OidcProviderConfigurerTest {
     assertThat(metadata.getCodeChallengeMethods()).containsExactly(CodeChallengeMethod.S256);
     assertThat(metadata.getCustomParameter(ParameterConstants.REQUESTED_PROVIDER_SUPPORTED_PARAM_NAME))
         .isEqualTo(true);
+    assertThat(metadata.getTokenEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/token"));
+    assertThat(metadata.getGrantTypes()).containsExactly(GrantType.AUTHORIZATION_CODE);
+    assertThat(metadata.getTokenEndpointAuthMethods()).containsExactly(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
+    assertThat(metadata.getTokenEndpointJWSAlgs()).contains(JWSAlgorithm.RS256, JWSAlgorithm.ES256)
+        .doesNotContain(JWSAlgorithm.HS256).extracting(JWSAlgorithm::getName).doesNotContain("none");
+    assertThat(metadata.getIDTokenJWEAlgs())
+        .containsExactly(JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.ECDH_ES);
+    assertThat(metadata.getIDTokenJWEEncs()).containsExactly(EncryptionMethod.A128CBC_HS256,
+        EncryptionMethod.A256CBC_HS512, EncryptionMethod.A128GCM, EncryptionMethod.A256GCM);
+  }
+
+  @Test
+  void theEnabledClientAuthenticationMethodsAreAdvertised() {
+    this.oidc.clientAuthenticationMethods(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+        ClientAuthenticationMethod.CLIENT_SECRET_JWT));
+    final OIDCProviderMetadata metadata = this.build();
+    assertThat(metadata.getTokenEndpointAuthMethods()).containsExactly(
+        ClientAuthenticationMethod.CLIENT_SECRET_BASIC, ClientAuthenticationMethod.CLIENT_SECRET_JWT);
+    assertThat(metadata.getTokenEndpointJWSAlgs())
+        .containsExactly(JWSAlgorithm.HS256, JWSAlgorithm.HS384, JWSAlgorithm.HS512);
+
+    assertThat(new OidcProviderConfigurerTest().buildWith(c -> c.clientAuthenticationMethods(
+        Set.of(ClientAuthenticationMethod.CLIENT_SECRET_POST))).getTokenEndpointJWSAlgs()).isNull();
+  }
+
+  @Test
+  void invalidTokenSettingsAreRejected() {
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(
+        c -> c.clientAuthenticationMethods(Set.of(ClientAuthenticationMethod.NONE))))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unsupported");
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.clientAuthenticationMethods(Set.of())))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.idTokenLifetime(Duration.ZERO)))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("ID token lifetime");
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.tokenEndpoint("token")))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("token endpoint");
   }
 
   @Test
@@ -244,6 +286,11 @@ class OidcProviderConfigurerTest {
   private OidcProviderConfigurer newConfigurer() {
     return new OidcProviderConfigurer()
         .signingKeys(List.of(SigningKey.active(KeyTestSupport.rsa("rsa", 2048))));
+  }
+
+  private OIDCProviderMetadata buildWith(final Consumer<OidcProviderConfigurer> customizer) {
+    customizer.accept(this.oidc);
+    return this.build();
   }
 
   private OIDCProviderMetadata build() {

@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.servlet.Filter;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.langtag.LangTag;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.id.Identifier;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 
@@ -284,6 +286,42 @@ class OidcAutoConfigurationTest {
           assertThat(chain.matches(request("GET", "/oidc/authz"))).isTrue();
           assertThat(chain.matches(request("POST", "/oidc/authz"))).isTrue();
         });
+  }
+
+  @Test
+  void theTokenPropertiesAreApplied() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.endpoints.token=/tokens",
+            "authn-server.oidc.tokens.authorization-code-lifetime=30s",
+            "authn-server.oidc.tokens.access-token-lifetime=2m",
+            "authn-server.oidc.tokens.access-token-single-use=false",
+            "authn-server.oidc.tokens.id-token-lifetime=3m",
+            "authn-server.oidc.client-authentication-methods=private_key_jwt,client_secret_basic")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final OidcProviderConfigurer oidc =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class);
+          assertThat(oidc.getAuthorizationCodeLifetime()).isEqualTo(Duration.ofSeconds(30));
+          assertThat(oidc.getAccessTokenLifetime()).isEqualTo(Duration.ofMinutes(2));
+          assertThat(oidc.isSingleUseAccessTokens()).isFalse();
+          assertThat(oidc.getIdTokenLifetime()).isEqualTo(Duration.ofMinutes(3));
+          assertThat(oidc.getClientAuthenticationMethods()).containsExactlyInAnyOrder(
+              ClientAuthenticationMethod.PRIVATE_KEY_JWT, ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+
+          final OIDCProviderMetadata metadata =
+              OIDCProviderMetadata.parse(get(context, DISCOVERY).getContentAsString());
+          assertThat(metadata.getTokenEndpointURI()).isEqualTo(URI.create(BASE_URL + "/oidc/tokens"));
+          assertThat(context.getBean(SecurityFilterChain.class).matches(request("POST", "/oidc/tokens"))).isTrue();
+        });
+  }
+
+  @Test
+  void anUnsupportedClientAuthenticationMethodFailsStartup() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.client-authentication-methods=none")
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause().hasMessageContaining("Unsupported OIDC client authentication method"));
   }
 
   @Test

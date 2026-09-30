@@ -193,6 +193,10 @@ a repository, the operator puts it in the client metadata:
 metadata.setCustomField("organization_identifier", "urn:glue:iso6523:0007:5566778899");
 ```
 
+A configured client, or a client in a repository, that authenticates with a client secret at the token endpoint has
+the secret in the `client_secret` field of its metadata, see
+[Client authentication](openid-provider.html#client-authentication).
+
 ## The federation backend
 
 The federation backend resolves a client through OpenID Federation, where the `client_id` of the client is its entity

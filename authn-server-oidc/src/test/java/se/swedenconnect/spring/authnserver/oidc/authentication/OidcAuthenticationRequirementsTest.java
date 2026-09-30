@@ -73,7 +73,7 @@ class OidcAuthenticationRequirementsTest {
   void theRequestDataSurvivesSerialization() throws Exception {
     final OidcAuthnRequestData data = new OidcAuthnRequestData(
         new OidcResponseTarget("client", "https://rp.example.com/cb", "query", "s"), "nonce", "challenge", "S256",
-        List.of("openid"), "{\"id_token\":{}}");
+        List.of("openid"), "{\"id_token\":{}}", List.of("http://id.elegnamnden.se/loa/1.0/loa3"));
     assertThat(roundTrip(data)).isEqualTo(data);
   }
 

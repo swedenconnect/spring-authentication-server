@@ -29,6 +29,7 @@ how the server is set up without Spring Boot.
     - [OIDC endpoints](#oidc-endpoints)
     - [Authorization requests](#oidc-authorization-requests)
     - [Requester acceptance](#oidc-requester-acceptance)
+    - [The token endpoint and tokens](#oidc-token-endpoint)
     - [Scopes and claims](#oidc-scopes-and-claims)
     - [The discovery document](#oidc-discovery)
 - [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
@@ -519,6 +520,8 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `endpoints.*` | The endpoints, see [OIDC endpoints](#oidc-endpoints). | See below |
 | `authorization-request.*` | The processing of authentication requests, see [Authorization requests](#oidc-authorization-requests). | See below |
 | `requester-acceptance.*` | Which clients are accepted, see [Requester acceptance](#oidc-requester-acceptance). | Every known client |
+| `tokens.*` | The lifetimes of codes and tokens, see [The token endpoint and tokens](#oidc-token-endpoint). | See below |
+| `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint, see [The token endpoint and tokens](#oidc-token-endpoint). | `private_key_jwt` |
 | `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. | `true` |
 | `scopes[]` | The offered scopes, see [Scopes and claims](#oidc-scopes-and-claims). | Derived from the authentication providers |
 | `claims[]` | Claims supported on top of those of the authentication providers, see [Scopes and claims](#oidc-scopes-and-claims). | - |
@@ -572,8 +575,10 @@ The endpoints are given relative to the OIDC path, see [URL layout](#url-layout)
 | :--- | :--- | :--- |
 | `jwks` | Where the JWKS is published. | `/jwks` |
 | `authorization` | Where authentication requests are received, with GET and POST. | `/authorize` |
+| `token` | Where token requests are received, with POST. | `/token` |
 
-With the default OIDC path, the JWKS is published at `/oidc/jwks` and the authorization endpoint is `/oidc/authorize`.
+With the default OIDC path, the JWKS is published at `/oidc/jwks`, the authorization endpoint is `/oidc/authorize` and
+the token endpoint is `/oidc/token`.
 The discovery document is not an endpoint under the OIDC path; it follows the issuer.
 
 <a name="oidc-authorization-requests"></a>
@@ -621,6 +626,35 @@ authn-server:
 ```
 
 A client that is not accepted gets the error `unauthorized_client`.
+
+<a name="oidc-token-endpoint"></a>
+### The token endpoint and tokens
+
+How the code flow, the token endpoint and the tokens work is described in
+[The OpenID Provider](openid-provider.html#the-code-flow).
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `tokens.authorization-code-lifetime` | How long an authorization code is valid. A lifetime above 10 minutes is logged as a warning. | 1 minute |
+| `tokens.access-token-lifetime` | How long an access token is valid. | 5 minutes |
+| `tokens.access-token-single-use` | Whether an access token may only be used once, at the UserInfo endpoint. | `true` |
+| `tokens.id-token-lifetime` | How long an ID token is valid. A lifetime above 5 minutes, which the Swedish OpenID Connect Profile does not allow, is logged as a warning. | 5 minutes |
+| `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint: `private_key_jwt`, `client_secret_basic`, `client_secret_post` and `client_secret_jwt`. `none` is not supported. | `private_key_jwt` |
+
+```yaml
+authn-server:
+  oidc:
+    tokens:
+      authorization-code-lifetime: 30s
+      access-token-single-use: false
+    client-authentication-methods:
+      - private_key_jwt
+      - client_secret_basic
+```
+
+:raised_hand: Codes, access tokens and used client assertions are kept in memory by default, which only serves the
+node they run on. A deployment with several nodes needs sticky sessions, or stores of its own, see
+[Where codes and tokens are kept](openid-provider.html#where-codes-and-tokens-are-kept).
 
 <a name="oidc-scopes-and-claims"></a>
 ### Scopes and claims

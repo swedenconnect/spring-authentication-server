@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.jspecify.annotations.NonNull;
 
-import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.KeySourceException;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKMatcher;
@@ -47,9 +46,9 @@ public class DefaultClientKeyResolver implements ClientKeyResolver {
   /** {@inheritDoc} */
   @Override
   public @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
-      final @NonNull JWSHeader header) throws KeySourceException {
+      final @NonNull JWKMatcher matcher) throws KeySourceException {
 
-    final JWKSelector selector = new JWKSelector(JWKMatcher.forJWSHeader(header));
+    final JWKSelector selector = new JWKSelector(matcher);
     if (metadata.getJWKSet() != null) {
       return selector.select(metadata.getJWKSet());
     }

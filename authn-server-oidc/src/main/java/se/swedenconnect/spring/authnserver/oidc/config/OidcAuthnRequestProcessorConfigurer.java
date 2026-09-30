@@ -25,9 +25,13 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.DefaultClientKeyRes
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetcher;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestUriFetcher;
 import se.swedenconnect.spring.authnserver.oidc.response.ResponsePage;
+import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
+import se.swedenconnect.spring.authnserver.oidc.token.AuthorizationCodeStore;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAssertionReplayCache;
 
 /**
- * Configurer for the components that process OpenID Connect authentication requests and send responses. Each
+ * Configurer for the components that process OpenID Connect authentication requests, send responses and serve the
+ * token endpoint, and for the stores of authorization codes, access tokens and client assertions. Each
  * component has a default, built from the values of the {@link OidcProviderConfigurer}; assign one here to replace it.
  *
  * @author Martin Lindström
@@ -48,6 +52,15 @@ public class OidcAuthnRequestProcessorConfigurer {
 
   /** The handler of processed requests. */
   private AuthenticationSuccessHandler successHandler;
+
+  /** The authorization code store. */
+  private AuthorizationCodeStore authorizationCodeStore;
+
+  /** The access token store. */
+  private AccessTokenStore accessTokenStore;
+
+  /** The client assertion replay cache. */
+  private ClientAssertionReplayCache clientAssertionReplayCache;
 
   /**
    * Constructor.
@@ -144,8 +157,8 @@ public class OidcAuthnRequestProcessorConfigurer {
   /**
    * Assigns the handler of processed requests, which gets the
    * {@link se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken
-   * UserAuthenticationInputToken}. Without one, the token is put in a request attribute and the filter chain
-   * continues. Meant for tests and special cases.
+   * UserAuthenticationInputToken}. Without one, the filter chain continues and the user is authenticated. A handler
+   * replaces the authentication of the user, and is meant for tests and special cases.
    *
    * @param successHandler the handler
    * @return this configurer
@@ -163,6 +176,75 @@ public class OidcAuthnRequestProcessorConfigurer {
    */
   public @Nullable AuthenticationSuccessHandler getSuccessHandler() {
     return this.successHandler;
+  }
+
+  /**
+   * Assigns the store for authorization codes. The default is an
+   * {@link se.swedenconnect.spring.authnserver.oidc.token.InMemoryAuthorizationCodeStore
+   * InMemoryAuthorizationCodeStore}, which only serves the node it runs on.
+   *
+   * @param authorizationCodeStore the store
+   * @return this configurer
+   */
+  public @NonNull OidcAuthnRequestProcessorConfigurer authorizationCodeStore(
+      final @Nullable AuthorizationCodeStore authorizationCodeStore) {
+    this.authorizationCodeStore = authorizationCodeStore;
+    return this;
+  }
+
+  /**
+   * Gets the store for authorization codes.
+   *
+   * @return the store, or {@code null} for the default
+   */
+  public @Nullable AuthorizationCodeStore getAuthorizationCodeStore() {
+    return this.authorizationCodeStore;
+  }
+
+  /**
+   * Assigns the store for access tokens. The default is an
+   * {@link se.swedenconnect.spring.authnserver.oidc.token.InMemoryAccessTokenStore InMemoryAccessTokenStore}, which
+   * only serves the node it runs on.
+   *
+   * @param accessTokenStore the store
+   * @return this configurer
+   */
+  public @NonNull OidcAuthnRequestProcessorConfigurer accessTokenStore(
+      final @Nullable AccessTokenStore accessTokenStore) {
+    this.accessTokenStore = accessTokenStore;
+    return this;
+  }
+
+  /**
+   * Gets the store for access tokens.
+   *
+   * @return the store, or {@code null} for the default
+   */
+  public @Nullable AccessTokenStore getAccessTokenStore() {
+    return this.accessTokenStore;
+  }
+
+  /**
+   * Assigns the cache that remembers used client assertions. The default is an
+   * {@link se.swedenconnect.spring.authnserver.oidc.token.InMemoryClientAssertionReplayCache
+   * InMemoryClientAssertionReplayCache}, which only serves the node it runs on.
+   *
+   * @param clientAssertionReplayCache the cache
+   * @return this configurer
+   */
+  public @NonNull OidcAuthnRequestProcessorConfigurer clientAssertionReplayCache(
+      final @Nullable ClientAssertionReplayCache clientAssertionReplayCache) {
+    this.clientAssertionReplayCache = clientAssertionReplayCache;
+    return this;
+  }
+
+  /**
+   * Gets the cache that remembers used client assertions.
+   *
+   * @return the cache, or {@code null} for the default
+   */
+  public @Nullable ClientAssertionReplayCache getClientAssertionReplayCache() {
+    return this.clientAssertionReplayCache;
   }
 
 }

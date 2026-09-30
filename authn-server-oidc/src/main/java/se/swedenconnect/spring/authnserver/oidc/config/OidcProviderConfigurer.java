@@ -15,9 +15,11 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.config;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -32,12 +34,15 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
+
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.config.AbstractProtocolConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
 import se.swedenconnect.spring.authnserver.oidc.attributes.requested.OidcRequestedAttributeResolver;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.ClientKeyResolver;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.DefaultClientKeyResolver;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetcher;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationConverter;
@@ -48,14 +53,29 @@ import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKeySelector;
 import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseSender;
+import se.swedenconnect.spring.authnserver.oidc.response.OidcUserAuthenticationResponder;
 import se.swedenconnect.spring.authnserver.oidc.scope.DefaultScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.scope.ScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.scope.SupportedScopesAndClaims;
 import se.swedenconnect.spring.authnserver.oidc.subject.DefaultSubjectGeneratorFactory;
 import se.swedenconnect.spring.authnserver.oidc.subject.SubjectGeneratorFactory;
+import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
+import se.swedenconnect.spring.authnserver.oidc.token.AuthorizationCodeStore;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAssertionReplayCache;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
+import se.swedenconnect.spring.authnserver.oidc.token.IdTokenBuilder;
+import se.swedenconnect.spring.authnserver.oidc.token.InMemoryAccessTokenStore;
+import se.swedenconnect.spring.authnserver.oidc.token.InMemoryAuthorizationCodeStore;
+import se.swedenconnect.spring.authnserver.oidc.token.InMemoryClientAssertionReplayCache;
+import se.swedenconnect.spring.authnserver.oidc.token.TokenRequestProcessor;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcAuthnRequestProcessingFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcErrorResponseProcessingFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcJwksEndpointFilter;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcResumedAuthenticationHandler;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcTokenEndpointFilter;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcUserAuthenticationProcessingFilter;
+import se.swedenconnect.spring.authnserver.web.ResumedAuthenticationHandler;
+import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
 
 /**
  * The protocol configurer for the OpenID Provider. Register it with the {@link AuthnServerConfigurer}.
@@ -81,6 +101,12 @@ import se.swedenconnect.spring.authnserver.oidc.web.OidcJwksEndpointFilter;
  * found in the client registry. The settings for PKCE, signed request objects and {@code state} are held here, and
  * the processing components can be replaced with {@link #authnRequestProcessor(Customizer)}.
  * </p>
+ * <p>
+ * A processed request is handed to the authentication providers through the {@link UserAuthenticationFlow}, and the
+ * client gets an authorization code, which it exchanges for an access token and an ID token at the token endpoint,
+ * {@code /oidc/token} by default. The OpenID Connect attribute producers and release voters come before the shared
+ * ones.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -97,6 +123,15 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** The default authorization endpoint, {@value}. */
   public static final String DEFAULT_AUTHORIZATION_ENDPOINT = "/authorize";
+
+  /** The default token endpoint, {@value}. */
+  public static final String DEFAULT_TOKEN_ENDPOINT = "/token";
+
+  /** The authorization code lifetime above which a warning is logged, 10 minutes (RFC 6749, Section 4.1.2). */
+  public static final Duration MAX_RECOMMENDED_CODE_LIFETIME = Duration.ofMinutes(10);
+
+  /** The ID token lifetime above which a warning is logged, 5 minutes (Swedish OpenID Connect Profile, 3.2.1). */
+  public static final Duration MAX_RECOMMENDED_ID_TOKEN_LIFETIME = Duration.ofMinutes(5);
 
   /** The issuer. */
   private String issuer;
@@ -115,6 +150,25 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** Whether {@code state} is required. */
   private boolean requireState = true;
+
+  /** The token endpoint. */
+  private String tokenEndpoint = DEFAULT_TOKEN_ENDPOINT;
+
+  /** The authorization code lifetime. */
+  private Duration authorizationCodeLifetime = OidcUserAuthenticationResponder.DEFAULT_CODE_LIFETIME;
+
+  /** The access token lifetime. */
+  private Duration accessTokenLifetime = TokenRequestProcessor.DEFAULT_ACCESS_TOKEN_LIFETIME;
+
+  /** Whether access tokens may only be used once. */
+  private boolean singleUseAccessTokens = true;
+
+  /** The ID token lifetime. */
+  private Duration idTokenLifetime = IdTokenBuilder.DEFAULT_LIFETIME;
+
+  /** The enabled client authentication methods. */
+  private Set<ClientAuthenticationMethod> clientAuthenticationMethods =
+      Set.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
 
   /** The signing keys. */
   private List<SigningKey> signingKeys;
@@ -168,6 +222,24 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** The matcher for the authorization endpoint. */
   private RequestMatcher authorizationRequestMatcher;
+
+  /** The matcher for the token endpoint. */
+  private RequestMatcher tokenRequestMatcher;
+
+  /** Finds the keys of clients, created at initialization. */
+  private ClientKeyResolver clientKeyResolver;
+
+  /** The authorization code store, created at initialization. */
+  private AuthorizationCodeStore authorizationCodeStore;
+
+  /** The access token store, created at initialization. */
+  private AccessTokenStore accessTokenStore;
+
+  /** The client assertion replay cache, created at initialization. */
+  private ClientAssertionReplayCache clientAssertionReplayCache;
+
+  /** Continues the OIDC flow on the resume paths, created when the configurer is applied. */
+  private ResumedAuthenticationHandler resumedAuthenticationHandler;
 
   /** The matcher for the OIDC endpoints. */
   private RequestMatcher requestMatcher;
@@ -311,6 +383,140 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    */
   public boolean isRequireState() {
     return this.requireState;
+  }
+
+  /**
+   * Assigns the token endpoint, relative to the OIDC path. Defaults to {@value #DEFAULT_TOKEN_ENDPOINT}.
+   *
+   * @param endpoint the endpoint
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer tokenEndpoint(final @NonNull String endpoint) {
+    this.tokenEndpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the token endpoint, relative to the OIDC path.
+   *
+   * @return the endpoint
+   */
+  public @NonNull String getTokenEndpoint() {
+    return this.tokenEndpoint;
+  }
+
+  /**
+   * Assigns the authorization code lifetime. Defaults to 1 minute. A lifetime above 10 minutes, the maximum that RFC
+   * 6749, Section 4.1.2, recommends, is logged as a warning at startup.
+   *
+   * @param lifetime the lifetime
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer authorizationCodeLifetime(final @NonNull Duration lifetime) {
+    this.authorizationCodeLifetime = Objects.requireNonNull(lifetime, "lifetime must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the authorization code lifetime.
+   *
+   * @return the lifetime
+   */
+  public @NonNull Duration getAuthorizationCodeLifetime() {
+    return this.authorizationCodeLifetime;
+  }
+
+  /**
+   * Assigns the access token lifetime. Defaults to 5 minutes.
+   *
+   * @param lifetime the lifetime
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer accessTokenLifetime(final @NonNull Duration lifetime) {
+    this.accessTokenLifetime = Objects.requireNonNull(lifetime, "lifetime must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the access token lifetime.
+   *
+   * @return the lifetime
+   */
+  public @NonNull Duration getAccessTokenLifetime() {
+    return this.accessTokenLifetime;
+  }
+
+  /**
+   * Assigns whether an access token may only be used once, at the UserInfo endpoint. Defaults to {@code true}.
+   *
+   * @param singleUseAccessTokens whether access tokens may only be used once
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer singleUseAccessTokens(final boolean singleUseAccessTokens) {
+    this.singleUseAccessTokens = singleUseAccessTokens;
+    return this;
+  }
+
+  /**
+   * Tells whether an access token may only be used once.
+   *
+   * @return {@code true} if access tokens may only be used once and {@code false} otherwise
+   */
+  public boolean isSingleUseAccessTokens() {
+    return this.singleUseAccessTokens;
+  }
+
+  /**
+   * Assigns the ID token lifetime. Defaults to 5 minutes. A lifetime above 5 minutes, the maximum of the Swedish
+   * OpenID Connect Profile, Section 3.2.1, is logged as a warning at startup.
+   *
+   * @param lifetime the lifetime
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer idTokenLifetime(final @NonNull Duration lifetime) {
+    this.idTokenLifetime = Objects.requireNonNull(lifetime, "lifetime must not be null");
+    return this;
+  }
+
+  /**
+   * Gets the ID token lifetime.
+   *
+   * @return the lifetime
+   */
+  public @NonNull Duration getIdTokenLifetime() {
+    return this.idTokenLifetime;
+  }
+
+  /**
+   * Assigns the client authentication methods that are enabled at the token endpoint. Defaults to
+   * {@code private_key_jwt}. The methods that can be enabled are {@code private_key_jwt}, {@code client_secret_basic},
+   * {@code client_secret_post} and {@code client_secret_jwt}; {@code none} is not supported.
+   *
+   * @param methods the methods
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer clientAuthenticationMethods(
+      final @NonNull Set<ClientAuthenticationMethod> methods) {
+    this.clientAuthenticationMethods = Set.copyOf(Objects.requireNonNull(methods, "methods must not be null"));
+    return this;
+  }
+
+  /**
+   * Gets the client authentication methods that are enabled at the token endpoint.
+   *
+   * @return the methods
+   */
+  public @NonNull Set<ClientAuthenticationMethod> getClientAuthenticationMethods() {
+    return this.clientAuthenticationMethods;
+  }
+
+  /**
+   * Gets the access token store. Available after initialization.
+   *
+   * @return the access token store
+   */
+  public @NonNull AccessTokenStore getAccessTokenStore() {
+    return Objects.requireNonNull(this.accessTokenStore, "The configurer has not been initialized");
   }
 
   /**
@@ -559,12 +765,34 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     this.authorizationRequestMatcher = new OrRequestMatcher(
         PathPatternRequestMatcher.pathPattern(HttpMethod.GET, this.getEndpointPath(this.authorizationEndpoint)),
         PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.authorizationEndpoint)));
+    this.tokenRequestMatcher =
+        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, this.getEndpointPath(this.tokenEndpoint));
     this.discoveryEndpointConfigurer.init();
     this.requestMatcher = new OrRequestMatcher(this.jwksRequestMatcher, this.authorizationRequestMatcher,
-        this.discoveryEndpointConfigurer.getRequestMatcher());
+        this.tokenRequestMatcher, this.discoveryEndpointConfigurer.getRequestMatcher());
 
-    log.info("OpenID Provider '{}' - signing keys: {}, decryption keys: {}", this.getIssuer(),
-        this.keys.getSigningKeys(), this.keys.getDecryptionKeys());
+    final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
+    this.clientKeyResolver =
+        Objects.requireNonNullElseGet(components.getClientKeyResolver(), DefaultClientKeyResolver::new);
+    this.authorizationCodeStore =
+        Objects.requireNonNullElseGet(components.getAuthorizationCodeStore(), InMemoryAuthorizationCodeStore::new);
+    this.accessTokenStore =
+        Objects.requireNonNullElseGet(components.getAccessTokenStore(), InMemoryAccessTokenStore::new);
+    this.clientAssertionReplayCache = Objects.requireNonNullElseGet(components.getClientAssertionReplayCache(),
+        InMemoryClientAssertionReplayCache::new);
+
+    if (this.authorizationCodeLifetime.compareTo(MAX_RECOMMENDED_CODE_LIFETIME) > 0) {
+      log.warn("The OIDC authorization code lifetime {} is longer than the 10 minutes that RFC 6749 recommends",
+          this.authorizationCodeLifetime);
+    }
+    if (this.idTokenLifetime.compareTo(MAX_RECOMMENDED_ID_TOKEN_LIFETIME) > 0) {
+      log.warn("The OIDC ID token lifetime {} is longer than the 5 minutes that the Swedish OpenID Connect Profile "
+          + "allows", this.idTokenLifetime);
+    }
+
+    log.info("OpenID Provider '{}' - signing keys: {}, decryption keys: {}, client authentication methods: {}",
+        this.getIssuer(), this.keys.getSigningKeys(), this.keys.getDecryptionKeys(),
+        this.clientAuthenticationMethods);
   }
 
   /** {@inheritDoc} */
@@ -576,6 +804,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
     final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
     final AuthnServerConfigurer server = this.getServer();
+    final IdTokenBuilder idTokenBuilder = new IdTokenBuilder(this.getIssuer(), this.signingKeySelector,
+        this.clientKeyResolver, this.idTokenLifetime);
 
     // Error responses ...
     //
@@ -589,8 +819,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
     // Request processing ...
     //
-    final RequestObjectDecoder requestObjectDecoder = new RequestObjectDecoder(this.keys,
-        Objects.requireNonNullElseGet(components.getClientKeyResolver(), DefaultClientKeyResolver::new),
+    final RequestObjectDecoder requestObjectDecoder = new RequestObjectDecoder(this.keys, this.clientKeyResolver,
         this.getIssuer(), this.getEndpointUrl(this.authorizationEndpoint), this.getClockSkew());
     final OidcAuthnRequestAuthenticationConverter converter = new OidcAuthnRequestAuthenticationConverter(
         server.getClientRegistry(), requestObjectDecoder,
@@ -604,6 +833,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     provider.setRequirePkce(this.requirePkce);
     provider.setRequireSignedRequestObject(this.requireSignedRequestObject);
     provider.setRequireState(this.requireState);
+    provider.setIdTokenBuilder(idTokenBuilder);
 
     final OidcAuthnRequestProcessingFilter processingFilter =
         new OidcAuthnRequestProcessingFilter(this.authorizationRequestMatcher, converter, provider);
@@ -611,6 +841,37 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
       processingFilter.setSuccessHandler(components.getSuccessHandler());
     }
     http.addFilterAfter(this.postProcess(processingFilter), OidcErrorResponseProcessingFilter.class);
+
+    // User authentication and the authorization code ...
+    //
+    final UserAuthenticationFlow flow = server.getUserAuthenticationFlow();
+    final OidcUserAuthenticationResponder responder = new OidcUserAuthenticationResponder(
+        server.getClientRegistry(), this.activeSubjectGeneratorFactory, this.createAttributeReleaseManager(),
+        this.getAttributeMapping(), this.authorizationCodeStore, responseSender, flow);
+    responder.setCodeLifetime(this.authorizationCodeLifetime);
+    responder.setCodeRetention(this.accessTokenLifetime);
+    final OidcUserAuthenticationProcessingFilter userAuthenticationFilter =
+        new OidcUserAuthenticationProcessingFilter(this.authorizationRequestMatcher, flow, responder);
+    http.addFilterAfter(this.postProcess(userAuthenticationFilter), OidcAuthnRequestProcessingFilter.class);
+    this.resumedAuthenticationHandler = new OidcResumedAuthenticationHandler(flow, responder, responseSender);
+
+    // The token endpoint ...
+    //
+    final ClientAuthenticator clientAuthenticator = new ClientAuthenticator(server.getClientRegistry(),
+        this.clientAuthenticationMethods, this.clientKeyResolver, this.clientAssertionReplayCache,
+        this.getEndpointUrl(this.tokenEndpoint), this.getIssuer(), this.getClockSkew());
+    final TokenRequestProcessor tokenRequestProcessor = new TokenRequestProcessor(clientAuthenticator,
+        this.authorizationCodeStore, this.accessTokenStore, idTokenBuilder);
+    tokenRequestProcessor.setAccessTokenLifetime(this.accessTokenLifetime);
+    tokenRequestProcessor.setSingleUseAccessTokens(this.singleUseAccessTokens);
+    http.addFilterBefore(this.postProcess(new OidcTokenEndpointFilter(this.tokenRequestMatcher, tokenRequestProcessor)),
+        AbstractPreAuthenticatedProcessingFilter.class);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected @Nullable ResumedAuthenticationHandler getResumedAuthenticationHandler() {
+    return this.resumedAuthenticationHandler;
   }
 
   /**
@@ -677,6 +938,32 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     if (!this.authorizationEndpoint.startsWith("/")) {
       throw new IllegalArgumentException(
           "Invalid OIDC authorization endpoint '%s' - it must begin with /".formatted(this.authorizationEndpoint));
+    }
+    if (!this.tokenEndpoint.startsWith("/")) {
+      throw new IllegalArgumentException(
+          "Invalid OIDC token endpoint '%s' - it must begin with /".formatted(this.tokenEndpoint));
+    }
+    assertPositive(this.authorizationCodeLifetime, "authorization code lifetime");
+    assertPositive(this.accessTokenLifetime, "access token lifetime");
+    assertPositive(this.idTokenLifetime, "ID token lifetime");
+    if (this.clientAuthenticationMethods.isEmpty()) {
+      throw new IllegalArgumentException("At least one OIDC client authentication method must be enabled");
+    }
+    if (!ClientAuthenticator.SUPPORTED_METHODS.containsAll(this.clientAuthenticationMethods)) {
+      throw new IllegalArgumentException("Unsupported OIDC client authentication method in %s - supported are %s"
+          .formatted(this.clientAuthenticationMethods, ClientAuthenticator.SUPPORTED_METHODS));
+    }
+  }
+
+  /**
+   * Checks that a duration is positive.
+   *
+   * @param duration the duration
+   * @param name the name of the value, for the error message
+   */
+  private static void assertPositive(final @NonNull Duration duration, final @NonNull String name) {
+    if (duration.isNegative() || duration.isZero()) {
+      throw new IllegalArgumentException("The OIDC %s must be positive".formatted(name));
     }
   }
 

@@ -42,8 +42,9 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAut
  * <p>
  * The result, a {@link se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken
  * UserAuthenticationInputToken}, is handed to an {@link AuthenticationSuccessHandler}. Without a handler, it is put in
- * the request attribute {@link #INPUT_TOKEN_ATTRIBUTE} and the filter chain continues. The security context is left
- * alone, since it holds the authentication that may be reused for single sign-on.
+ * the request attribute {@link #INPUT_TOKEN_ATTRIBUTE} and the filter chain continues, so that
+ * {@link OidcUserAuthenticationProcessingFilter} authenticates the user. The security context is left alone, since it
+ * holds the authentication that may be reused for single sign-on.
  * </p>
  *
  * @author Martin Lindström

@@ -9,7 +9,8 @@
 This page describes the OpenID Provider: where it publishes its discovery document and its keys, how the keys are
 configured and rolled over, how the key that a message to a client is signed with is chosen, how the offered scopes,
 the supported claims and the authentication contexts are worked out from the authentication providers, how
-authentication requests are processed, and how to extend the discovery document. The properties are described in
+authentication requests are processed, how the code flow completes with the authorization code, the token endpoint
+and the ID token, and how to extend the discovery document. The properties are described in
 [Configuration](configuration.html#the-openid-provider).
 
 Source links in this guide point to the `main` branch of the
@@ -32,6 +33,13 @@ Source links in this guide point to the `main` branch of the
     - [What the request is turned into](#what-the-request-is-turned-into)
     - [Swedish extensions](#swedish-extensions)
     - [Failures](#failures)
+- [The code flow](#the-code-flow)
+    - [Authentication and the authorization code](#authentication-and-the-authorization-code)
+    - [The token endpoint](#the-token-endpoint)
+    - [Client authentication](#client-authentication)
+    - [The access token](#the-access-token)
+    - [The ID token](#the-id-token)
+    - [Where codes and tokens are kept](#where-codes-and-tokens-are-kept)
 - [The discovery document](#the-discovery-document)
     - [Extending the document](#extending-the-document)
 
@@ -48,6 +56,7 @@ OIDC path, `/oidc` by default, see [URL layout](configuration.html#url-layout). 
 | Discovery document | `https://op.example.com/.well-known/openid-configuration` |
 | JWKS | `https://op.example.com/oidc/jwks` |
 | Authorization endpoint | `https://op.example.com/oidc/authorize` |
+| Token endpoint | `https://op.example.com/oidc/token` |
 
 The discovery document is always published at the issuer followed by `/.well-known/openid-configuration`, as OpenID
 Connect Discovery, Section 4, requires. It is therefore not under the OIDC path. An issuer with a path moves the
@@ -226,8 +235,8 @@ OpenID Connect Core, Section 3.1.2, and the
 [Swedish OpenID Connect Profile](https://www.oidc.se/specifications/swedish-oidc-profile-1_0.html), Section 2. Only the
 authorization code flow is supported, so `response_type` must be `code`.
 
-This page covers the processing of the request, up to the protocol-neutral authentication requirements. Handing the
-request to authentication, the authorization code response and the token endpoint are not yet in place.
+This section covers the processing of the request, up to the protocol-neutral authentication requirements. What
+happens next is described in [The code flow](#the-code-flow).
 
 <a name="how-a-request-is-processed"></a>
 ### How a request is processed
@@ -277,8 +286,13 @@ What the OpenID Provider reads from the client metadata when it processes a requ
 | `request_uris` | The only values of `request_uri` that are fetched. |
 | `jwks` or `jwks_uri` | Verifying signed request objects and signature requests. |
 | `request_object_signing_alg` | When set, request objects must be signed with this algorithm. |
-| `token_endpoint_auth_method` | Public clients, with `none`, are not supported. |
+| `token_endpoint_auth_method` | The method the client must authenticate with at the token endpoint, see [Client authentication](#client-authentication). Public clients, with `none`, are not supported. |
+| `token_endpoint_auth_signing_alg` | When set, the algorithm that client assertions must be signed with. |
+| `client_secret` | The client secret, for the secret-based client authentication methods. |
 | `default_acr_values` | The authentication contexts, as voluntary values, when the request asks for none. |
+| `subject_type` and `sector_identifier_uri` | How the `sub` is computed, see [Identifying the user](attributes.html#identifying-the-user). |
+| `id_token_signed_response_alg` | The algorithm the ID token is signed with, see [Choosing the signing key for a client](#choosing-the-signing-key-for-a-client). |
+| `id_token_encrypted_response_alg` and `id_token_encrypted_response_enc` | Whether and how the ID token is encrypted, see [The ID token](#the-id-token). |
 
 An unknown client and a client registry that fails end at the OpenID Provider, and are logged differently: the first
 at `INFO`, since it is a normal outcome, and the second at `ERROR`, since a dependency is not working.
@@ -427,6 +441,7 @@ response, with an `error_description` meant for the client's logs.
 | `redirect_uri` is missing or not registered | Unrecoverable (`INVALID_REDIRECT_URI`) |
 | `response_mode` is not `query` or `form_post` | HTTP status 400 (`UNSUPPORTED_RESPONSE_MODE`) |
 | The request object cannot be fetched or decoded, and the plain parameters give no redirect URI | Unrecoverable (`INVALID_AUTHN_REQUEST`) |
+| The client asks for an encrypted ID token with algorithms that are not allowed, or has no key for them | Unrecoverable (`INVALID_CLIENT_CONFIGURATION`) |
 | `request_uri` is not registered, or cannot be fetched | `invalid_request_uri` |
 | The request object is invalid, not signed when it must be, or signed with the wrong algorithm | `invalid_request_object` |
 | `response_type` is not `code` | `unsupported_response_type` |
@@ -439,6 +454,199 @@ response, with an `error_description` meant for the client's logs.
 
 The errors that the authentication step reports are mapped as described in
 [Errors](authentication-module.html#errors).
+
+<a name="the-code-flow"></a>
+## The code flow
+
+Once the authentication request has been processed, the code flow continues:
+
+1. The request is handed to the authentication providers, and the user is authenticated.
+2. The client gets an authorization code at its redirect URI, in the response mode of the request and with `state`.
+3. The client exchanges the code at the token endpoint for an access token and an ID token, authenticating itself.
+4. The client calls the UserInfo endpoint with the access token.
+
+<a name="authentication-and-the-authorization-code"></a>
+### Authentication and the authorization code
+
+The processed request goes to the authentication providers in the same way as a SAML request: the provider is chosen
+from the requested authentication contexts, a previous authentication may be reused for single sign-on, and a
+provider with pages of its own redirects the user and hands back on its resume path, see
+[Writing an authentication module](authentication-module.html). The single sign-on policy of the provider wins over
+the OpenID Connect policy, which wins over the shared one.
+
+When the user has been authenticated, and before the code is issued:
+
+- The `sub` of the user for the client is computed, public or pairwise, see
+  [Identifying the user](attributes.html#identifying-the-user). If the client asked for a `sub` with a value in the
+  `claims` parameter, or with `id_token_hint`, it must be the same. Otherwise the client gets `access_denied` and no
+  code.
+- The attributes are released, by the OpenID Connect producers and voters followed by the shared ones, see
+  [Releasing attributes](attributes.html#releasing-attributes), and turned into claims.
+
+The code is a random value that may only be used once. It is bound to the client, the redirect URI, the PKCE code
+challenge, the nonce, the requirements of the request, the authenticated user and the released claims. It is valid
+for 1 minute by default, `authn-server.oidc.tokens.authorization-code-lifetime`. A lifetime above 10 minutes, the
+maximum that RFC 6749, Section 4.1.2, recommends, is logged as a warning at startup, and the application still starts.
+
+Every error after the request was accepted, such as a failed or cancelled authentication or a failed attribute
+release, is sent to the redirect URI as an error response, in the response mode of the request and with `state`. The
+errors are mapped as described in [Errors](authentication-module.html#errors). A failed authentication removes the
+authentication from the session, as for SAML.
+
+<a name="the-token-endpoint"></a>
+### The token endpoint
+
+The token endpoint accepts POST requests with the `authorization_code` grant, as OpenID Connect Core, Section 3.1.3,
+and RFC 6749, Section 4.1.3, describe. No refresh tokens are issued, and `offline_access` is not offered. A request is
+checked in this order:
+
+1. The client is authenticated, see [Client authentication](#client-authentication).
+2. `grant_type` must be `authorization_code`.
+3. The code must be known, not expired, not used before, and issued to the client.
+4. `redirect_uri` must be identical to the one of the authentication request.
+5. When the request had a PKCE `code_challenge`, `code_verifier` must be present and match it (RFC 7636, Section
+   4.6). A `code_verifier` sent for a request without a challenge is rejected.
+
+A code that is used a second time is rejected, and the access token that was issued for it is revoked, as RFC 6749,
+Section 4.1.2, says. Every response, also an error response, carries `Cache-Control: no-store`.
+
+| Failure | Error |
+| :--- | :--- |
+| No client authentication, an unknown client, a wrong secret or signature, a method that is not enabled or not the registered one, or an invalid or reused client assertion | `invalid_client` (HTTP status 401) |
+| More than one client authentication method | `invalid_request` |
+| `grant_type` other than `authorization_code` | `unsupported_grant_type` |
+| `grant_type` or `code` missing | `invalid_request` |
+| The code is unknown, expired, used before or issued to another client | `invalid_grant` |
+| `redirect_uri` missing or not the one of the authentication request | `invalid_grant` |
+| `code_verifier` missing, not matching, or sent without a challenge | `invalid_grant` |
+| The ID token cannot be encrypted for the client | `invalid_client` |
+| The client registry fails | `server_error` (HTTP status 500) |
+
+<a name="client-authentication"></a>
+### Client authentication
+
+A client must authenticate with the method it has registered as `token_endpoint_auth_method`. When it has registered
+none, the default of OpenID Connect Dynamic Client Registration, `client_secret_basic`, applies. `none` is not
+supported, so there are no public clients.
+
+| Method | Enabled by default | How the client is verified |
+| :--- | :--- | :--- |
+| `private_key_jwt` | Yes | The client assertion is verified with the keys of the client, from `jwks` or `jwks_uri`. |
+| `client_secret_basic` | No | The client secret, in the `Authorization` header. |
+| `client_secret_post` | No | The client secret, as the `client_secret` parameter. |
+| `client_secret_jwt` | No | The client assertion is verified with the client secret, with `HS256`, `HS384` or `HS512`. |
+
+The methods are enabled with `authn-server.oidc.client-authentication-methods`, see
+[Configuration](configuration.html#oidc-token-endpoint):
+
+```yaml
+authn-server:
+  oidc:
+    client-authentication-methods:
+      - private_key_jwt
+      - client_secret_basic
+```
+
+A client assertion, for `private_key_jwt` and `client_secret_jwt`, must hold:
+
+- `iss` and `sub` equal to the `client_id`,
+- `aud` holding the URL of the token endpoint or the issuer, as the Swedish OpenID Connect Profile, Section 3.1.1,
+  recommends,
+- `exp`, which has not passed,
+- `iat`, which is not in the future,
+- `jti`, which has not been used before. The value is remembered until the assertion expires.
+
+The clock skew of the OpenID Provider applies. A `private_key_jwt` assertion may be signed with `RS256`, `RS384`,
+`RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384` or `ES512`. A client may have several keys, for example an RSA
+key and an EC key, or an old and a new key during a rollover; the `kid` of the assertion selects the key, and without a
+`kid` every matching key is tried. A client that has registered `token_endpoint_auth_signing_alg` must sign with that
+algorithm.
+
+The client secret is kept as the `client_secret` field of the client metadata, the name that OpenID Connect Dynamic
+Client Registration uses. A client resolved through OpenID Federation never has a secret:
+
+```java
+metadata.setCustomField(OidcClientRecord.CLIENT_SECRET, secret);
+```
+
+<a name="the-access-token"></a>
+### The access token
+
+The access token is an opaque random value. It reveals nothing about the user, and the OpenID Provider keeps what the
+UserInfo endpoint needs together with it: the client, the `sub`, the scopes and the claims to deliver from the UserInfo
+endpoint.
+
+| Setting | Default |
+| :--- | :--- |
+| `authn-server.oidc.tokens.access-token-lifetime` | 5 minutes |
+| `authn-server.oidc.tokens.access-token-single-use` | `true`, so that the first UserInfo call uses up the token |
+
+<a name="the-id-token"></a>
+### The ID token
+
+The ID token follows the Swedish OpenID Connect Profile, Section 3.2.1:
+
+| Claim | Value |
+| :--- | :--- |
+| `iss` | The issuer. |
+| `sub` | The `sub` of the user for the client, public or pairwise. |
+| `aud` | The `client_id`. |
+| `exp` and `iat` | The expiry and the issuance time. |
+| `auth_time` | The time the user was authenticated. When single sign-on was used, the time of the original authentication. |
+| `nonce` | The `nonce` of the request, when it had one. |
+| `acr` | The authentication context that was used. It is always present, also when `acr` was not requested and when requested voluntary values could not be met. The latter is logged at `INFO`. |
+
+**Identity claims** are only included when they were requested, following Section 4.2 of the profile:
+
+- A claim of the `claims` parameter goes where the parameter says, in the ID token or from the UserInfo endpoint.
+- A claim of a requested scope goes where the scope definition says, see
+  [The built-in scopes](attributes.html#the-built-in-scopes).
+- A claim asked for in the ID token by the `claims` parameter, which is also covered by a requested scope delivered
+  from the UserInfo endpoint, is delivered in both places.
+
+A request with only the `openid` scope and no `claims` parameter gets no identity claims.
+
+**Lifetime.** 5 minutes by default, `authn-server.oidc.tokens.id-token-lifetime`. The profile does not allow more than
+5 minutes, so a longer lifetime is logged as a warning at startup, and the application still starts.
+
+**Signing.** The ID token is always signed, with the key chosen for the client, see
+[Choosing the signing key for a client](#choosing-the-signing-key-for-a-client).
+
+**Encryption.** When the client has registered `id_token_encrypted_response_alg`, the signed ID token is encrypted
+for the client (nested JWT). The key is taken from the client's `jwks` or `jwks_uri`: an encryption key of the type
+the algorithm needs. Following
+[Sweden Connect Security Requirements](https://docs.swedenconnect.se/federation/security-requirements.html), Section
+3.2, the algorithms are:
+
+- `id_token_encrypted_response_alg`: `RSA-OAEP`, `RSA-OAEP-256` or `ECDH-ES`.
+- `id_token_encrypted_response_enc`: `A128CBC-HS256`, which is the default, `A256CBC-HS512`, `A128GCM` or `A256GCM`.
+
+A client that asks for other algorithms, or has no usable key, is a client configuration error: its authentication
+request ends at the OpenID Provider, and the error is logged at `WARN`.
+
+<a name="where-codes-and-tokens-are-kept"></a>
+### Where codes and tokens are kept
+
+Authorization codes, access tokens and the `jti` values of used client assertions are kept in stores:
+[`AuthorizationCodeStore`][AuthorizationCodeStore], [`AccessTokenStore`][AccessTokenStore] and
+[`ClientAssertionReplayCache`][ClientAssertionReplayCache]. The defaults keep them in memory.
+
+:raised_hand: The in-memory stores only serve the node they run on. A deployment with several nodes needs sticky
+sessions, so that the authentication request, the token request and the UserInfo request of a client reach the same
+node, or stores of its own. Stores backed by Redis will come with the support for Redis. Until then, stores are
+assigned in an [adapter](configuration.html#adjusting-the-configuration-in-code):
+
+```java
+@Bean
+AuthnServerConfigurerAdapter oidcStores(final AuthorizationCodeStore codes, final AccessTokenStore tokens,
+    final ClientAssertionReplayCache assertions) {
+  return (http, configurer) -> configurer.protocol(OidcProviderConfigurer.class, oidc -> oidc
+      .authnRequestProcessor(p -> p
+          .authorizationCodeStore(codes)
+          .accessTokenStore(tokens)
+          .clientAssertionReplayCache(assertions)));
+}
+```
 
 <a name="the-discovery-document"></a>
 ## The discovery document
@@ -468,6 +676,12 @@ The discovery document holds:
 | `https://id.oidc.se/disco/userMessageSupported` | `true` when user messages are supported for OpenID Connect, see [Authentication Request Parameter Extensions for the Swedish OpenID Connect Profile](https://www.oidc.se/specifications/request-parameter-extensions-1_1.html). Left out otherwise. |
 | `https://id.oidc.se/disco/userMessageSupportedMimeTypes` | `text/plain` and `text/markdown`, when user messages are supported. Left out otherwise. |
 | `https://id.oidc.se/disco/authnProviderSupported` | `true`. |
+| `token_endpoint` | The URL of the token endpoint. |
+| `grant_types_supported` | `authorization_code`. |
+| `token_endpoint_auth_methods_supported` | The enabled client authentication methods. |
+| `token_endpoint_auth_signing_alg_values_supported` | The algorithms accepted for client assertions: those of `private_key_jwt` and of `client_secret_jwt`, when enabled. Never `none`. Left out when neither method is enabled. |
+| `id_token_encryption_alg_values_supported` | `RSA-OAEP-256`, `RSA-OAEP` and `ECDH-ES`. |
+| `id_token_encryption_enc_values_supported` | `A128CBC-HS256`, `A256CBC-HS512`, `A128GCM` and `A256GCM`. |
 
 <a name="extending-the-document"></a>
 ### Extending the document
@@ -504,6 +718,9 @@ AuthnServerConfigurerAdapter discoveryAdjustments() {
 }
 ```
 
+[AccessTokenStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/AccessTokenStore.java
+[AuthorizationCodeStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/AuthorizationCodeStore.java
+[ClientAssertionReplayCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/ClientAssertionReplayCache.java
 [OidcAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authentication/OidcAuthenticationRequirements.java
 [OidcAuthnRequestAuthenticationConverter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationConverter.java
 [OidcAuthnRequestAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationProvider.java

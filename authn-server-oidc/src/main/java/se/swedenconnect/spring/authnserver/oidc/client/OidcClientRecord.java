@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import com.nimbusds.langtag.LangTag;
+import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
@@ -56,6 +57,14 @@ public record OidcClientRecord(
    * Identifier Metadata Parameter 1.0.
    */
   public static final String ORGANIZATION_IDENTIFIER = "organization_identifier";
+
+  /**
+   * The client metadata field holding the client secret, for the client authentication methods
+   * {@code client_secret_basic}, {@code client_secret_post} and {@code client_secret_jwt}. The name is the one that
+   * OpenID Connect Dynamic Client Registration uses in the registration response. A client resolved through OpenID
+   * Federation never has one.
+   */
+  public static final String CLIENT_SECRET = "client_secret";
 
   /**
    * Constructor.
@@ -100,6 +109,18 @@ public record OidcClientRecord(
         this.trustMarkTypes,
         organizationIdentifier(this.metadata),
         this.metadata);
+  }
+
+  /**
+   * Gets the client secret from client metadata.
+   *
+   * @param metadata the client metadata
+   * @return the client secret, or {@code null} if the client has none
+   */
+  public static @Nullable Secret getClientSecret(final @NonNull OIDCClientMetadata metadata) {
+    return metadata.getCustomField(CLIENT_SECRET) instanceof final String value && StringUtils.hasText(value)
+        ? new Secret(value)
+        : null;
   }
 
   /**

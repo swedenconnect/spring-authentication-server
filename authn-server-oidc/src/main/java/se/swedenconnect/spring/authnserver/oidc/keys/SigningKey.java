@@ -21,10 +21,17 @@ import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
 
+import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.crypto.ECDSASigner;
+import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.KeyUse;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 
 import se.swedenconnect.security.credential.PkiCredential;
 
@@ -212,6 +219,38 @@ public final class SigningKey {
    */
   public boolean supports(final @NonNull JWSAlgorithm algorithm) {
     return this.algorithms.contains(algorithm);
+  }
+
+  /**
+   * Signs a JWT with this key. The header holds the algorithm and the key ID.
+   *
+   * @param claims the claims of the JWT
+   * @param algorithm the algorithm, which the key must support
+   * @return the signed JWT
+   * @throws JOSEException if the JWT cannot be signed
+   */
+  public @NonNull SignedJWT sign(final @NonNull JWTClaimsSet claims, final @NonNull JWSAlgorithm algorithm)
+      throws JOSEException {
+    if (!this.supports(algorithm)) {
+      throw new JOSEException("Key '%s' does not support %s".formatted(this.getKeyId(), algorithm));
+    }
+    final SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(algorithm).keyID(this.getKeyId()).build(), claims);
+    jwt.sign(this.createSigner());
+    return jwt;
+  }
+
+  /**
+   * Creates a signer for the key.
+   *
+   * @return a {@link JWSSigner}
+   * @throws JOSEException if no signer can be created
+   */
+  private @NonNull JWSSigner createSigner() throws JOSEException {
+    if (this.credential.getPublicKey() instanceof RSAPublicKey) {
+      return new RSASSASigner(this.credential.getPrivateKey());
+    }
+    return new ECDSASigner(this.credential.getPrivateKey(),
+        Objects.requireNonNull(KeySupport.getCurve(this.credential.getPublicKey())));
   }
 
   /** {@inheritDoc} */

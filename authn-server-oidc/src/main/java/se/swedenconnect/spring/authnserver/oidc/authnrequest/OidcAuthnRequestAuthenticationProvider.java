@@ -71,6 +71,7 @@ import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.BuiltInScopes;
+import se.swedenconnect.spring.authnserver.oidc.token.IdTokenBuilder;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
@@ -141,6 +142,9 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
 
   /** Whether {@code state} is required. */
   private boolean requireState = true;
+
+  /** Checks that an ID token can be encrypted for the client, or {@code null}. */
+  private IdTokenBuilder idTokenBuilder;
 
   /**
    * Constructor.
@@ -224,6 +228,9 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
     }
 
     this.checkPkce(request, logString);
+    if (this.idTokenBuilder != null) {
+      this.idTokenBuilder.checkEncryption(token.getClientId(), metadata);
+    }
 
     final OidcAuthenticationRequirements requirements = this.createAuthenticationRequirements(request, token);
     log.debug("Authentication requirements: {} [{}]", requirements, logString);
@@ -233,7 +240,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
         request.getCodeChallenge() != null ? request.getCodeChallenge().getValue() : null,
         request.getCodeChallengeMethod() != null ? request.getCodeChallengeMethod().getValue() : null,
         request.getScope() != null ? request.getScope().toStringList() : List.of(),
-        request.getOIDCClaims() != null ? request.getOIDCClaims().toJSONString() : null);
+        request.getOIDCClaims() != null ? request.getOIDCClaims().toJSONString() : null,
+        requirements.getAuthnContextRequirements());
 
     token.setAuthenticated(true);
     return new UserAuthenticationInputToken(requirements, token.getRequesterRecord().requester(), null, requestData);
@@ -353,7 +361,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * @param logString the log string
    * @throws OidcErrorResponseException with {@code invalid_request}
    */
-  private void checkPkce(final @NonNull AuthenticationRequest request, final @NonNull String logString) throws OidcErrorResponseException {
+  private void checkPkce(final @NonNull AuthenticationRequest request, final @NonNull String logString)
+      throws OidcErrorResponseException {
 
     if (request.getCodeChallenge() == null) {
       if (this.requirePkce) {
@@ -699,6 +708,16 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    */
   public void setRequireSignedRequestObject(final boolean requireSignedRequestObject) {
     this.requireSignedRequestObject = requireSignedRequestObject;
+  }
+
+  /**
+   * Assigns the ID token builder, which checks that an ID token can be encrypted for a client that asks for encryption.
+   * A client for which it cannot is a client configuration error, and the request ends at the OpenID Provider.
+   *
+   * @param idTokenBuilder the ID token builder, or {@code null} for no check
+   */
+  public void setIdTokenBuilder(final @Nullable IdTokenBuilder idTokenBuilder) {
+    this.idTokenBuilder = idTokenBuilder;
   }
 
   /**

@@ -118,6 +118,17 @@ public class OidcConfigurationProperties {
   private final AuthorizationRequestProperties authorizationRequest = new AuthorizationRequestProperties();
 
   /**
+   * The lifetimes and use of authorization codes, access tokens and ID tokens.
+   */
+  private final TokenProperties tokens = new TokenProperties();
+
+  /**
+   * The client authentication methods that are enabled at the token endpoint: private_key_jwt, client_secret_basic,
+   * client_secret_post and client_secret_jwt. Defaults to private_key_jwt.
+   */
+  private List<String> clientAuthenticationMethods;
+
+  /**
    * The rules for which clients are accepted. Without rules, every client that the client registry knows is accepted.
    */
   private final RequesterAcceptanceProperties requesterAcceptance = new RequesterAcceptanceProperties();
@@ -339,6 +350,33 @@ public class OidcConfigurationProperties {
   }
 
   /**
+   * Gets the token properties.
+   *
+   * @return the token properties
+   */
+  public @NonNull TokenProperties getTokens() {
+    return this.tokens;
+  }
+
+  /**
+   * Gets the enabled client authentication methods.
+   *
+   * @return the methods, or {@code null} for the default
+   */
+  public @Nullable List<String> getClientAuthenticationMethods() {
+    return this.clientAuthenticationMethods;
+  }
+
+  /**
+   * Assigns the enabled client authentication methods.
+   *
+   * @param clientAuthenticationMethods the methods
+   */
+  public void setClientAuthenticationMethods(final @Nullable List<String> clientAuthenticationMethods) {
+    this.clientAuthenticationMethods = clientAuthenticationMethods;
+  }
+
+  /**
    * Gets the requester acceptance properties.
    *
    * @return the requester acceptance properties
@@ -543,6 +581,29 @@ public class OidcConfigurationProperties {
      * Where authentication requests are received. Defaults to /authorize.
      */
     private String authorization;
+
+    /**
+     * Where token requests are received. Defaults to /token.
+     */
+    private String token;
+
+    /**
+     * Gets the token endpoint.
+     *
+     * @return the token endpoint
+     */
+    public @Nullable String getToken() {
+      return this.token;
+    }
+
+    /**
+     * Assigns the token endpoint.
+     *
+     * @param token the token endpoint
+     */
+    public void setToken(final @Nullable String token) {
+      this.token = token;
+    }
 
     /**
      * Gets the authorization endpoint.
@@ -763,6 +824,104 @@ public class OidcConfigurationProperties {
      */
     public void setRequiredMarks(final @Nullable List<List<String>> requiredMarks) {
       this.requiredMarks = requiredMarks;
+    }
+  }
+
+  /**
+   * The lifetimes and use of authorization codes, access tokens and ID tokens.
+   */
+  public static class TokenProperties {
+
+    /**
+     * The authorization code lifetime. Defaults to 1 minute. A lifetime above 10 minutes is logged as a warning.
+     */
+    private Duration authorizationCodeLifetime;
+
+    /**
+     * The access token lifetime. Defaults to 5 minutes.
+     */
+    private Duration accessTokenLifetime;
+
+    /**
+     * Whether an access token may only be used once, at the UserInfo endpoint. Defaults to true.
+     */
+    private Boolean accessTokenSingleUse;
+
+    /**
+     * The ID token lifetime. Defaults to 5 minutes. A lifetime above 5 minutes is logged as a warning.
+     */
+    private Duration idTokenLifetime;
+
+    /**
+     * Gets the authorization code lifetime.
+     *
+     * @return the lifetime, or {@code null} for the default
+     */
+    public @Nullable Duration getAuthorizationCodeLifetime() {
+      return this.authorizationCodeLifetime;
+    }
+
+    /**
+     * Assigns the authorization code lifetime.
+     *
+     * @param authorizationCodeLifetime the lifetime
+     */
+    public void setAuthorizationCodeLifetime(final @Nullable Duration authorizationCodeLifetime) {
+      this.authorizationCodeLifetime = authorizationCodeLifetime;
+    }
+
+    /**
+     * Gets the access token lifetime.
+     *
+     * @return the lifetime, or {@code null} for the default
+     */
+    public @Nullable Duration getAccessTokenLifetime() {
+      return this.accessTokenLifetime;
+    }
+
+    /**
+     * Assigns the access token lifetime.
+     *
+     * @param accessTokenLifetime the lifetime
+     */
+    public void setAccessTokenLifetime(final @Nullable Duration accessTokenLifetime) {
+      this.accessTokenLifetime = accessTokenLifetime;
+    }
+
+    /**
+     * Gets whether an access token may only be used once.
+     *
+     * @return whether access tokens are single use, or {@code null} for the default
+     */
+    public @Nullable Boolean getAccessTokenSingleUse() {
+      return this.accessTokenSingleUse;
+    }
+
+    /**
+     * Assigns whether an access token may only be used once.
+     *
+     * @param accessTokenSingleUse whether access tokens are single use
+     */
+    public void setAccessTokenSingleUse(final @Nullable Boolean accessTokenSingleUse) {
+      this.accessTokenSingleUse = accessTokenSingleUse;
+    }
+
+    /**
+     * Gets the ID token lifetime.
+     *
+     * @return the lifetime, or {@code null} for the default
+     */
+    public @Nullable Duration getIdTokenLifetime() {
+      return this.idTokenLifetime;
+    }
+
+    /**
+     * Assigns the ID token lifetime.
+     *
+     * @param idTokenLifetime the lifetime
+     */
+    public void setIdTokenLifetime(final @Nullable Duration idTokenLifetime) {
+      this.idTokenLifetime = idTokenLifetime;
     }
   }
 
