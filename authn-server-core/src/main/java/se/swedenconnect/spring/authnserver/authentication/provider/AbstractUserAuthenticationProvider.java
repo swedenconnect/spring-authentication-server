@@ -21,7 +21,9 @@ import jakarta.annotation.Nullable;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -30,6 +32,7 @@ import org.springframework.security.core.Authentication;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -80,6 +83,10 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   /** The server default single sign-on policy. */
   private SsoPolicy serverSsoPolicy = SsoPolicy.defaultPolicy();
 
+  /** The server single sign-on policies of the protocols that override the server default. */
+  private final Map<AuthenticationProtocol, SsoPolicy> protocolSsoPolicies =
+      new EnumMap<>(AuthenticationProtocol.class);
+
   /** The provider's own single sign-on policy, overriding the server default. */
   private SsoPolicy ssoPolicy;
 
@@ -88,7 +95,8 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    */
   protected AbstractUserAuthenticationProvider() {
     this.ssoVoters = new ArrayList<>();
-    this.ssoVoters.add(new SsoPolicyVoter(this::getSsoPolicy));
+    this.ssoVoters.add(
+        new SsoPolicyVoter((final AuthenticationProtocol protocol) -> this.getSsoPolicy(protocol)));
     this.ssoVoters.add(new AuthnContextSsoVoter());
     this.ssoVoters.add(new RequestedAttributesSsoVoter());
     this.postAuthenticationProcessors = new ArrayList<>();
@@ -241,6 +249,20 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
   }
 
   /**
+   * Gets the single sign-on policy that applies to this provider for a request made with the given protocol. The order
+   * is: the provider's own policy, the server policy of the protocol, and the server default.
+   *
+   * @param protocol the protocol of the requester
+   * @return the single sign-on policy
+   */
+  public @Nonnull SsoPolicy getSsoPolicy(final @Nonnull AuthenticationProtocol protocol) {
+    if (this.ssoPolicy != null) {
+      return this.ssoPolicy;
+    }
+    return Objects.requireNonNullElse(this.protocolSsoPolicies.get(protocol), this.serverSsoPolicy);
+  }
+
+  /**
    * Assigns a single sign-on policy for this provider only. It takes precedence over the server default.
    *
    * @param ssoPolicy the policy, or {@code null} to follow the server default
@@ -256,6 +278,23 @@ public abstract class AbstractUserAuthenticationProvider implements UserAuthenti
    */
   public void setServerSsoPolicy(final @Nonnull SsoPolicy serverSsoPolicy) {
     this.serverSsoPolicy = Objects.requireNonNull(serverSsoPolicy, "serverSsoPolicy must not be null");
+  }
+
+  /**
+   * Assigns the server single sign-on policy for one protocol. It takes precedence over the server default for
+   * requests made with that protocol, but not over the provider's own policy.
+   *
+   * @param protocol the protocol
+   * @param ssoPolicy the policy, or {@code null} to follow the server default for this protocol
+   */
+  public void setServerSsoPolicy(final @Nonnull AuthenticationProtocol protocol, final @Nullable SsoPolicy ssoPolicy) {
+    Objects.requireNonNull(protocol, "protocol must not be null");
+    if (ssoPolicy != null) {
+      this.protocolSsoPolicies.put(protocol, ssoPolicy);
+    }
+    else {
+      this.protocolSsoPolicies.remove(protocol);
+    }
   }
 
   /**

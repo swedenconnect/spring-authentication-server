@@ -43,6 +43,11 @@ import se.swedenconnect.spring.authnserver.authentication.Requester;
  *          may appear, at most one
  * @param logos the logotypes that the requester may be presented by
  * @param marks the marks that the requester holds, see {@link ClientRegistry}
+ * @param organizationNumber the organisation number of the requester, exactly as its metadata publishes it, or
+ *          {@code null} if the metadata has none. SAML metadata holds it in the {@code mdorgext:OrganizationNumber}
+ *          extension, in whatever form the Service Provider gives it, and OpenID Connect metadata in
+ *          {@code organization_identifier}, as a GLUE URI such as {@code urn:glue:iso6523:0007:5566778899}. The two
+ *          forms differ, so code that compares requesters across protocols must handle both
  * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
  * @author Martin Lindström
  */
@@ -51,6 +56,7 @@ public record RequesterRecord(
     @Nonnull List<DisplayName> displayNames,
     @Nonnull List<Logo> logos,
     @Nonnull Set<String> marks,
+    @Nullable String organizationNumber,
     @Nonnull Object protocolMetadata) {
 
   /**
@@ -60,6 +66,7 @@ public record RequesterRecord(
    * @param displayNames the names that the requester may be presented by
    * @param logos the logotypes that the requester may be presented by
    * @param marks the marks that the requester holds
+   * @param organizationNumber the organisation number of the requester, as published, or {@code null}
    * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
    */
   public RequesterRecord {
@@ -68,6 +75,20 @@ public record RequesterRecord(
     displayNames = List.copyOf(Objects.requireNonNull(displayNames, "displayNames must not be null"));
     logos = List.copyOf(Objects.requireNonNull(logos, "logos must not be null"));
     marks = Set.copyOf(Objects.requireNonNull(marks, "marks must not be null"));
+  }
+
+  /**
+   * Constructor for a requester without an organisation number.
+   *
+   * @param requester the requester that the record describes
+   * @param displayNames the names that the requester may be presented by
+   * @param logos the logotypes that the requester may be presented by
+   * @param marks the marks that the requester holds
+   * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
+   */
+  public RequesterRecord(final @Nonnull Requester requester, final @Nonnull List<DisplayName> displayNames,
+      final @Nonnull List<Logo> logos, final @Nonnull Set<String> marks, final @Nonnull Object protocolMetadata) {
+    this(requester, displayNames, logos, marks, null, protocolMetadata);
   }
 
   /**
@@ -161,7 +182,8 @@ public record RequesterRecord(
     }
     final Set<String> all = new LinkedHashSet<>(this.marks);
     all.addAll(additionalMarks);
-    return new RequesterRecord(this.requester, this.displayNames, this.logos, all, this.protocolMetadata);
+    return new RequesterRecord(
+        this.requester, this.displayNames, this.logos, all, this.organizationNumber, this.protocolMetadata);
   }
 
   /**

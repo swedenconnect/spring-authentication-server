@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     xmlns:mdui="urn:oasis:names:tc:SAML:metadata:ui"
+                     entityID="https://template.example.com">
+  <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:Extensions>
+      <mdui:UIInfo>
+        <mdui:DisplayName xml:lang="en">Template IdP</mdui:DisplayName>
+      </mdui:UIInfo>
+    </md:Extensions>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                            Location="https://template.example.com/sso"/>
+  </md:IDPSSODescriptor>
+  <md:Organization>
+    <md:OrganizationName xml:lang="en">Template Org</md:OrganizationName>
+    <md:OrganizationDisplayName xml:lang="en">Template Org</md:OrganizationDisplayName>
+    <md:OrganizationURL xml:lang="en">https://template.example.com</md:OrganizationURL>
+  </md:Organization>
+</md:EntityDescriptor>

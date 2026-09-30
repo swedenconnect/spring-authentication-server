@@ -75,6 +75,10 @@ and the protocol data of the request, records its use, and runs the
 Several providers may be installed, each supporting its own authentication contexts. A provider is asked only about
 requests it can serve, so a module never has to check whether it is the right one.
 
+The supported authentication contexts are also published in the SAML metadata of the Identity Provider, as the
+assurance certification attribute. A provider that declares SAML entity categories overrides `getEntityCategories()`,
+and they are published in the metadata as well. See [Configuration](configuration.html#the-idp-metadata).
+
 A module that cannot authenticate the user inside this call, because it needs pages of its own, is written slightly
 differently, see [Modules with pages of their own](#modules-with-pages-of-their-own).
 
@@ -325,14 +329,17 @@ SsoPolicy.none();               // never
 SsoPolicy.forSessionLifetime(); // as long as the session lives, any requester
 ```
 
-The policy is set as a server default, and a provider may override it. The override wins:
+The policy is set as a server default, a protocol may have a policy of its own, and a provider may override both. The
+order is: provider, protocol, server default. For each request, the policy of the requester's protocol is used:
 
 ```java
-provider.setServerSsoPolicy(SsoPolicy.none());   // normally set by the auto-configuration
-provider.setSsoPolicy(myOwnPolicy);              // this provider only
+provider.setServerSsoPolicy(SsoPolicy.none());                                     // set by the configuration
+provider.setServerSsoPolicy(AuthenticationProtocol.SAML, SsoPolicy.defaultPolicy()); // set by the configuration
+provider.setSsoPolicy(myOwnPolicy);                                                // this provider only
 ```
 
-The properties that set the server default come with the auto-configuration.
+The server default and the protocol policies are set from the `authn-server.sso.*` and `authn-server.saml.sso.*`
+properties, see [Configuration](configuration.html#single-sign-on).
 
 ### Voters
 

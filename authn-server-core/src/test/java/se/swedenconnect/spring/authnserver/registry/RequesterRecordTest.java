@@ -93,6 +93,16 @@ class RequesterRecordTest {
   }
 
   @Test
+  void theOrganisationNumberIsOptionalAndKeptWhenMarksAreAdded() {
+    assertThat(record().organizationNumber()).isNull();
+
+    final RequesterRecord record =
+        new RequesterRecord(REQUESTER, List.of(), List.of(), Set.of("mark-1"), "556677-8899", "metadata");
+    assertThat(record.organizationNumber()).isEqualTo("556677-8899");
+    assertThat(record.withMarks(List.of("mark-2")).organizationNumber()).isEqualTo("556677-8899");
+  }
+
+  @Test
   void protocolMetadataInItsOwnType() {
     final RequesterRecord record = record();
     assertThat(record.getProtocolMetadata(String.class)).isEqualTo("metadata");

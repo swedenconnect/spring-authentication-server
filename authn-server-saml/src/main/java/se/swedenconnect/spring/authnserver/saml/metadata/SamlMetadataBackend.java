@@ -36,10 +36,12 @@ import org.opensaml.saml.saml2.metadata.Organization;
 import org.opensaml.saml.saml2.metadata.SPSSODescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
 import net.shibboleth.shared.resolver.CriteriaSet;
 import net.shibboleth.shared.resolver.ResolverException;
 import se.swedenconnect.opensaml.saml2.metadata.EntityDescriptorUtils;
+import se.swedenconnect.opensaml.sweid.saml2.metadata.ext.OrganizationNumber;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
@@ -124,7 +126,8 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
   }
 
   /**
-   * Creates the record for a Service Provider from its metadata.
+   * Creates the record for a Service Provider from its metadata. The organisation number is taken from the
+   * {@code mdorgext:OrganizationNumber} extension of {@code md:Organization}, as given.
    *
    * @param metadata the Service Provider metadata
    * @return a {@link RequesterRecord}
@@ -137,7 +140,27 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
         getDisplayNames(metadata, uiInfo),
         getLogos(uiInfo),
         new LinkedHashSet<>(EntityDescriptorUtils.getEntityCategories(metadata)),
+        getOrganizationNumber(metadata),
         metadata);
+  }
+
+  /**
+   * Gets the organisation number from the {@code mdorgext:OrganizationNumber} extension of {@code md:Organization},
+   * exactly as given.
+   *
+   * @param metadata the Service Provider metadata
+   * @return the organisation number, or {@code null} if the metadata has none
+   */
+  private static @Nullable String getOrganizationNumber(final @Nonnull EntityDescriptor metadata) {
+    return Optional.ofNullable(metadata.getOrganization())
+        .map(Organization::getExtensions)
+        .flatMap(e -> e.getUnknownXMLObjects(OrganizationNumber.DEFAULT_ELEMENT_NAME).stream()
+            .filter(OrganizationNumber.class::isInstance)
+            .map(OrganizationNumber.class::cast)
+            .findFirst())
+        .map(OrganizationNumber::getValue)
+        .filter(StringUtils::hasText)
+        .orElse(null);
   }
 
   /**

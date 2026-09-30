@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericRequestedAttribute;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -107,6 +108,17 @@ class SsoVoterTest {
     assertThat(voter.vote(authentication, new AuthenticationRequirements(), SP, List.of(LOA3)).isAllowed()).isTrue();
     policy[0] = SsoPolicy.none();
     assertThat(voter.vote(authentication, new AuthenticationRequirements(), SP, List.of(LOA3)).isDenied()).isTrue();
+  }
+
+  @Test
+  void thePolicyVoterUsesThePolicyOfTheRequestersProtocol() {
+    final SsoPolicyVoter voter = new SsoPolicyVoter((final AuthenticationProtocol protocol) ->
+        protocol == AuthenticationProtocol.SAML ? SsoPolicy.defaultPolicy() : SsoPolicy.none());
+    final UserAuthentication authentication = authentication(user(), SP, REQUESTED);
+
+    assertThat(voter.vote(authentication, new AuthenticationRequirements(), SP, List.of(LOA3)).isAllowed()).isTrue();
+    assertThat(voter.vote(authentication, new AuthenticationRequirements(), oidcRequester("client-1"), List.of(LOA3))
+        .isDenied()).isTrue();
   }
 
   @Test
