@@ -704,23 +704,23 @@ The request processing is found in [`UserInfoRequestProcessor`][UserInfoRequestP
 
 Authorization codes, access tokens and the `jti` values of used client assertions are kept in stores:
 [`AuthorizationCodeStore`][AuthorizationCodeStore], [`AccessTokenStore`][AccessTokenStore] and
-[`ClientAssertionReplayCache`][ClientAssertionReplayCache]. The defaults keep them in memory.
+[`ClientAssertionReplayCache`][ClientAssertionReplayCache]. The defaults keep them in memory, which only serves the
+node they run on. A deployment with several nodes keeps them in Redis, by setting `authn-server.storage.type`, or the
+setting of each store, to `redis`, see [Running several nodes](configuration.html#running-several-nodes). Otherwise it
+needs sticky sessions, so that the authentication request, the token request and the UserInfo request of a client
+reach the same node.
 
-:raised_hand: The in-memory stores only serve the node they run on. A deployment with several nodes needs sticky
-sessions, so that the authentication request, the token request and the UserInfo request of a client reach the same
-node, or stores of its own. Stores backed by Redis will come with the support for Redis. Until then, stores are
-assigned in an [adapter](configuration.html#adjusting-the-configuration-in-code):
+The Redis stores give the same results as the in-memory ones, also when several nodes use them at once: a code is
+redeemed, a single use access token is used, and a client assertion is accepted, on one node only.
+
+A store bean of the application, for example an `AccessTokenStore`, replaces the store that the settings choose.
+Without Spring Boot, stores are assigned on the configurer:
 
 ```java
-@Bean
-AuthnServerConfigurerAdapter oidcStores(final AuthorizationCodeStore codes, final AccessTokenStore tokens,
-    final ClientAssertionReplayCache assertions) {
-  return (http, configurer) -> configurer.protocol(OidcProviderConfigurer.class, oidc -> oidc
-      .authnRequestProcessor(p -> p
-          .authorizationCodeStore(codes)
-          .accessTokenStore(tokens)
-          .clientAssertionReplayCache(assertions)));
-}
+oidc.authnRequestProcessor(p -> p
+    .authorizationCodeStore(codes)
+    .accessTokenStore(tokens)
+    .clientAssertionReplayCache(assertions));
 ```
 
 <a name="the-discovery-document"></a>
@@ -983,6 +983,12 @@ stored trust marks are read at startup. This means that the OpenID Provider publ
 restart, also when an issuer cannot be reached. A stored trust mark that has expired, or that fails the check, is not
 used. Without a cache directory nothing is stored.
 
+**Several nodes.** The trust marks and their state are kept in a [`ProviderTrustMarkStore`][ProviderTrustMarkStore],
+in memory by default. When they are kept in Redis, by `authn-server.storage.type` or
+`authn-server.oidc.storage.trust-marks`, one node at a time fetches and renews them, every node publishes them, and
+`getStates()` gives the same answer on every node. The cache directory is then not used. See
+[Background jobs and trust marks](configuration.html#background-jobs-in-a-cluster).
+
 <a name="changing-the-entity-configuration"></a>
 ### Changing the entity configuration
 
@@ -1035,6 +1041,7 @@ AuthnServerConfigurerAdapter entityConfigurationAdjustments() {
 [OidcAuthnRequestAuthenticationProvider]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestAuthenticationProvider.java
 [OidcAuthnRequestData]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authnrequest/OidcAuthnRequestData.java
 [OidcUnrecoverableError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcUnrecoverableError.java
+[ProviderTrustMarkStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/federation/ProviderTrustMarkStore.java
 [ProviderTrustMarks]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/federation/ProviderTrustMarks.java
 [SigningKeySelector]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/keys/SigningKeySelector.java
 [SupportedScopesAndClaims]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/scope/SupportedScopesAndClaims.java

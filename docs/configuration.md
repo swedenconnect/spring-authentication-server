@@ -7,8 +7,8 @@
 -----
 
 This page describes how the Spring Authentication Server is configured: the properties of the Spring Boot
-auto-configuration, how the URLs of the server are laid out, how an application adjusts the configuration in code, and
-how the server is set up without Spring Boot.
+auto-configuration, how the URLs of the server are laid out, how to run several nodes that share their state through
+Redis, how an application adjusts the configuration in code, and how the server is set up without Spring Boot.
 
 - [Getting started](#getting-started)
 - [Enabling protocols](#enabling-protocols)
@@ -35,6 +35,14 @@ how the server is set up without Spring Boot.
     - [The discovery document](#oidc-discovery)
     - [Entity information for OpenID Connect](#oidc-entity-information)
     - [OpenID Federation](#oidc-federation)
+- [Running several nodes](#running-several-nodes)
+    - [Dependencies](#redis-dependencies)
+    - [Where state is kept](#where-state-is-kept)
+    - [The Redis connection](#the-redis-connection)
+    - [Key names](#redis-key-names)
+    - [The TLS host name check](#redis-host-name-check)
+    - [Redis Cluster](#redis-cluster)
+    - [Background jobs and trust marks](#background-jobs-in-a-cluster)
 - [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
 - [Using the configurers without Spring Boot](#using-the-configurers-without-spring-boot)
 - [Migrating from saml-identity-provider](#migrating-from-saml-identity-provider)
@@ -158,6 +166,7 @@ wins over the shared one.
 | `authn-server.subject-identifier.*` | How subject identifiers are computed, see [Subject identifiers](#subject-identifiers). | See below | Yes |
 | `authn-server.entity-information.*` | The names, logos and contact persons that every protocol publishes, see [Entity information](#entity-information). | - | Yes |
 | `authn-server.authn-flow-max-age` | How long the server waits for the user to come back from an authentication module that has pages of its own. Applied to the session-based storage of every redirect provider. | 30 minutes | No |
+| `authn-server.storage.type` | Where the HTTP session and the stores are kept, `memory` or `redis`, see [Running several nodes](#running-several-nodes). | `memory` | Per store |
 
 <a name="single-sign-on"></a>
 ### Single sign-on
@@ -514,14 +523,13 @@ The ID of every received request is kept for a while, and a request with an ID t
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
-| `replay.type` | The type of store. The supported value is `memory`. | `memory` |
+| `replay.type` | Where the IDs are kept, `memory` or `redis`, overriding `authn-server.storage.type`, see [Running several nodes](#running-several-nodes). | `authn-server.storage.type` |
 | `replay.expiration` | For how long the IDs are kept. | 5 minutes |
 | `replay.context` | The context under which the IDs are stored. | `idp-replay-checker` |
 
-:raised_hand: The in-memory store only protects the node it runs on. A deployment with several nodes has no shared
-replay protection until a shared store is configured. A Redis store will come with the support for Redis. Until then,
-a shared store is added by declaring an OpenSAML `ReplayCache` bean, or a whole `MessageReplayChecker` bean, which
-replace the in-memory store.
+:raised_hand: The in-memory store only protects the node it runs on. A deployment with several nodes keeps the IDs in
+Redis, so that a request replayed to another node is also rejected. A store of your own is added by declaring an
+OpenSAML `ReplayCache` bean, or a whole `MessageReplayChecker` bean, which replace the store chosen by the setting.
 
 <a name="requester-acceptance"></a>
 ### Requester acceptance
@@ -703,8 +711,8 @@ authn-server:
 ```
 
 :raised_hand: Codes, access tokens and used client assertions are kept in memory by default, which only serves the
-node they run on. A deployment with several nodes needs sticky sessions, or stores of its own, see
-[Where codes and tokens are kept](openid-provider.html#where-codes-and-tokens-are-kept).
+node they run on. A deployment with several nodes keeps them in Redis, see
+[Running several nodes](#running-several-nodes), or needs sticky sessions.
 
 <a name="oidc-scopes-and-claims"></a>
 ### Scopes and claims
@@ -795,7 +803,7 @@ The OpenID Provider as a member of an OpenID Federation is configured under `aut
 | `entity-configuration-lifetime` | The lifetime of the entity configuration. | 1 day |
 | `additional-parameters.*` | Parameters applied to the entity configuration only, as a map of name to value, for example `trust_anchor_hints`. A `metadata` entry is merged into the metadata per entity type and parameter. | - |
 | `trust-marks[]` | The trust marks of the OpenID Provider, each with `type`, `issuer` (the entity identifier of the issuer), `endpoint` (its trust mark endpoint) and `jwks` (the location of a JWK Set document with the federation keys of the issuer). | - |
-| `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. | Nothing is stored |
+| `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. Not used when the trust marks are kept in Redis. | Nothing is stored |
 | `trust-mark-retry-interval` | How long to wait before a failed attempt to fetch a trust mark is made again. | 5 minutes |
 
 ```yaml
@@ -822,6 +830,228 @@ authn-server:
 When federation is enabled, the application does not start without federation keys and authority hints, or when the
 [descriptive metadata](openid-provider.html#descriptive-metadata) has no e-mail address in `contacts` or no HTTPS
 `logo_uri`.
+
+<a name="running-several-nodes"></a>
+## Running several nodes
+
+By default the server keeps what it needs between requests in the memory of the node: the HTTP session, which holds
+single sign-on and the authentication in progress, and the stores of the protocols, such as the IDs of received SAML
+requests and the OpenID Connect authorization codes and access tokens. A deployment with several nodes then needs
+sticky load balancing, and a node that restarts loses what it held.
+
+With Redis, the nodes share all of it. Any node can serve any request, and a node that restarts loses nothing.
+
+<a name="redis-dependencies"></a>
+### Dependencies
+
+Redis support is optional, and the starters do not bring it. Add Spring Data Redis, and Spring Session for Redis when
+the HTTP session is kept in Redis:
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-session-data-redis</artifactId>
+</dependency>
+```
+
+Spring Data Redis uses the Lettuce client. To use Jedis instead, add `redis.clients:jedis` and set
+`spring.data.redis.client-type` to `jedis`. Redisson is not supported.
+
+<a name="where-state-is-kept"></a>
+### Where state is kept
+
+One setting decides where the HTTP session and all stores are kept:
+
+```yaml
+authn-server:
+  storage:
+    type: redis
+```
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `authn-server.storage.type` | Where the HTTP session and all stores are kept: `memory` or `redis`. | `memory` |
+
+With `memory`, everything stays in the memory of the node. Spring Boot is kept from putting the HTTP session in Redis,
+also if Spring Session for Redis is on the classpath, since the HTTP session always follows this setting.
+
+With `redis`, the HTTP session is kept in Redis by Spring Session. Spring Boot sets this up when its session module,
+which `spring-boot-starter-session-data-redis` brings, is present, and then its settings apply, for example
+`spring.session.data.redis.repository-type`, `spring.session.data.redis.flush-mode` and
+`server.servlet.session.timeout`. Without Spring Boot's session module, the server sets up Spring Session with its
+defaults.
+
+Each store may be kept elsewhere than the setting says, with a setting of its own. The HTTP session has no such
+setting.
+
+| Property | The store |
+| :--- | :--- |
+| `authn-server.saml.replay.type` | The IDs of received SAML requests, see [Replay protection](#replay-protection). |
+| `authn-server.oidc.storage.authorization-codes` | Authorization codes. |
+| `authn-server.oidc.storage.access-tokens` | Access tokens. |
+| `authn-server.oidc.storage.client-assertions` | The `jti` values of used client assertions, `private_key_jwt` and `client_secret_jwt`. |
+| `authn-server.oidc.storage.federation-cache` | The cache of clients resolved through OpenID Federation, with its lookup counts and the lock of its background jobs, see [Background jobs and trust marks](#background-jobs-in-a-cluster). |
+| `authn-server.oidc.storage.trust-marks` | The OpenID Provider's own trust marks and their state. |
+
+```yaml
+authn-server:
+  storage:
+    type: memory
+  oidc:
+    storage:
+      authorization-codes: redis
+      access-tokens: redis
+```
+
+A store bean that the application declares, such as an `AccessTokenStore` or an OpenSAML `ReplayCache`, replaces the
+store that the setting chooses.
+
+The application does not start, and the message names what is missing, when something is to be kept in Redis and:
+
+- Spring Data Redis is not on the classpath,
+- there is no Redis connection, or the connection does not work, or
+- the HTTP session is to be kept in Redis, that is, `authn-server.storage.type` is `redis`, and Spring Session for
+  Redis is not on the classpath. A store set to `redis` while `authn-server.storage.type` is `memory` does not need
+  Spring Session.
+
+<a name="the-redis-connection"></a>
+### The Redis connection
+
+The connection is configured with Spring Boot's own settings, `spring.data.redis.*`, for a single Redis, Redis Sentinel
+or Redis Cluster, see
+[Spring Boot's Redis documentation](https://docs.spring.io/spring-boot/reference/data/nosql.html#data.nosql.redis).
+TLS key and trust stores are given in a Spring Boot
+[SSL bundle](https://docs.spring.io/spring-boot/reference/features/ssl.html):
+
+```yaml
+spring:
+  ssl:
+    bundle:
+      pem:
+        redis:
+          truststore:
+            certificate: file:/opt/config/redis-ca.crt
+          keystore:
+            certificate: file:/opt/config/redis-client.crt
+            private-key: file:/opt/config/redis-client.key
+  data:
+    redis:
+      host: redis.example.com
+      port: 6380
+      username: authn-server
+      password: ${REDIS_PASSWORD}
+      ssl:
+        enabled: true
+        bundle: redis
+```
+
+The key store is only needed when Redis requires client certificates. At startup, when something is kept in Redis,
+the server checks that the connection works.
+
+<a name="redis-key-names"></a>
+### Key names
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `authn-server.redis.key-prefix` | The prefix that starts every key the server writes, and the default namespace of the HTTP sessions. | `authn-server` |
+
+Two deployments that share one Redis are kept apart by giving them different prefixes. The sessions are kept under
+`<prefix>:sessions:`, unless `spring.session.data.redis.namespace` is set.
+
+The entries of the stores are written as JSON, so that an entry written by an older version of the server can be read
+after an upgrade, also during a rolling upgrade. Every entry expires in Redis when it expires in the store: a code
+when it is no longer retained, a token with its lifetime, a replay ID when it no longer needs to be remembered, and a
+cache entry with the cache entry. The state of a trust mark of the OpenID Provider is kept one day after the trust mark
+expires, so that its failures are still reported.
+
+<a name="redis-host-name-check"></a>
+### The TLS host name check
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `authn-server.redis.ssl.skip-hostname-verification` | Whether the check that the server certificate matches the host name is skipped. | `false` |
+
+With TLS, the server certificate of Redis must be issued by an issuer in the trust store, and match the host name the
+server connects to. Skipping the host name check is for nodes that are reached by addresses that their certificates
+do not hold, as when Redis Cluster nodes are reached by IP address. The certificate is still checked against the trust
+store, so a certificate from an issuer that is not trusted is rejected.
+
+The setting means the same for both clients. For Lettuce, the certificate is verified in its `CA` mode. For Jedis, the
+host name is checked unless the check is skipped, which Spring Boot by itself does not do for Jedis.
+
+<a name="redis-cluster"></a>
+### Redis Cluster
+
+**NAT translation.** The nodes of a Redis Cluster tell the client their addresses. When the cluster is behind NAT, the
+addresses that the nodes report are not the ones the server can reach. Each entry translates one address:
+
+```yaml
+spring:
+  data:
+    redis:
+      cluster:
+        nodes:
+          - redis1.example.com:2001
+          - redis2.example.com:2002
+          - redis3.example.com:2003
+authn-server:
+  redis:
+    cluster:
+      nat-translation:
+        - from: "172.20.0.31:2001"
+          to: "redis1.example.com:2001"
+        - from: "172.20.0.32:2002"
+          to: "redis2.example.com:2002"
+        - from: "172.20.0.33:2003"
+          to: "redis3.example.com:2003"
+```
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `authn-server.redis.cluster.nat-translation[].from` | The address that a node reports, as `host:port`. | - |
+| `authn-server.redis.cluster.nat-translation[].to` | The address that the server uses instead, as `host:port`. | - |
+
+NAT translation is only supported with Lettuce. The application does not start when it is configured and the
+connection uses Jedis.
+
+**Reading from replicas.** Which nodes are read from is Spring Boot's setting `spring.data.redis.lettuce.read-from`,
+for example `upstream`, `replica-preferred` or `any`. The default, reading from the primary nodes, is the safe choice:
+the server often reads what it has just written, such as a session or an authorization code, and a replica may not
+have it yet.
+
+<a name="background-jobs-in-a-cluster"></a>
+### Background jobs and trust marks
+
+Some work runs in the background on every node. When its state is kept in Redis, one node at a time does it.
+
+**The federation cache.** The refresh of the federation cache and the status checks of the trust marks of clients,
+see [The client registry](client-registry.html#the-federation-backend), work on the federation cache. When the cache
+is kept in Redis:
+
+- Each round of a job runs on one node. The node that starts a round takes a lock in Redis, held for the interval of
+  the job, and the other nodes skip the round. A node that stops while it holds the lock blocks the job for at most
+  one round.
+- The lookup counts that decide which clients the refresh renews are kept in Redis, so that the threshold applies to
+  the traffic of all nodes.
+
+The application sets up the federation backend and its jobs, see
+[The client registry](client-registry.html#the-federation-backend). With Spring Boot, a `FederationCache` bean is
+declared according to `authn-server.oidc.storage.federation-cache`, and the backend and the jobs are built from it.
+
+**The trust marks of the OpenID Provider.** When they are kept in Redis:
+
+- One node at a time fetches and renews them, using the same kind of lock, held for one minute.
+- Every node publishes the trust marks from Redis in its entity configuration.
+- The state of each trust mark type, as `ProviderTrustMarks.getStates()` gives it, is the same on every node.
+- `authn-server.oidc.federation.trust-mark-cache-directory` is not used. Redis already keeps the trust marks when a
+  node restarts.
+
+With `memory`, every node runs the jobs and fetches the trust marks itself, as with a single node.
 
 <a name="adjusting-the-configuration-in-code"></a>
 ## Adjusting the configuration in code
@@ -924,13 +1154,21 @@ to `true`.
 | `saml.idp.assertions.encrypt` | `authn-server.saml.assertions.encrypt` | |
 | `saml.idp.assertions.not-after` | `authn-server.saml.assertions.not-after` | |
 | `saml.idp.assertions.not-before` | `authn-server.saml.assertions.not-before` | |
-| `saml.idp.replay.*` | `authn-server.saml.replay.*` | Only `memory` is supported as `type` for now, see [Replay protection](#replay-protection). |
+| `saml.idp.replay.*` | `authn-server.saml.replay.*` | `type` now follows `authn-server.storage.type` when it is not set, instead of choosing Redis when Redis is available, see [Replay protection](#replay-protection). |
+| `saml.idp.session.module` | `authn-server.storage.type` | Shared by the HTTP session and all stores, see [Running several nodes](#running-several-nodes). |
+| `spring.data.redis.ssl-ext.enable-hostname-verification` | `authn-server.redis.ssl.skip-hostname-verification` | Inverted: set to `true` to skip the check. The server certificate is still checked against the trust store, see [The TLS host name check](#redis-host-name-check). |
+| `spring.data.redis.ssl-ext.credential.*`, `spring.data.redis.ssl-ext.trust.*` | `spring.ssl.bundle.*` and `spring.data.redis.ssl.bundle` | Key and trust stores are configured with a Spring Boot SSL bundle, see [The Redis connection](#the-redis-connection). |
+| `spring.data.redis.cluster-ext.nat-translation[]` | `authn-server.redis.cluster.nat-translation[]` | The same `from` and `to`. Now for Lettuce, which Spring Data Redis uses by default; not supported with Jedis. |
+| `spring.data.redis.cluster-ext.read-mode` | `spring.data.redis.lettuce.read-from` | Spring Boot's own setting, see [Redis Cluster](#redis-cluster). `MASTER` is `upstream`, `SLAVE` is `replica-preferred` and `MASTER_SLAVE` is `any`. |
 
 Endpoints that were moved away from `/saml2` are set up by changing `authn-server.saml.path`, if they share a prefix,
 or by giving each endpoint relative to an empty SAML path.
 
 The properties below are not yet available. They will be added, with the same structure, together with the features
-they configure: `saml.idp.session.*` and `saml.idp.audit.*`.
+they configure: `saml.idp.audit.*`.
+
+Redisson is not supported. A deployment that used the Redisson starter configures the connection with Spring Boot's
+`spring.data.redis.*` settings instead, see [The Redis connection](#the-redis-connection).
 
 `Saml2ServiceProviderFilter` is replaced by [requester acceptance](#requester-acceptance), which works for both
 protocols. A filter bean becomes a `RequesterPredicate` for SAML, added in an adapter; a predicate reads the Service

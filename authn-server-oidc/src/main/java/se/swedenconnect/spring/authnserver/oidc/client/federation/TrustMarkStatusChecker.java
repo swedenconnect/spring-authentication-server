@@ -52,6 +52,10 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * client that needs it is treated as not holding it on its next request. A status endpoint that cannot be reached, or
  * a response that does not verify, leaves the trust mark in place.
  * </p>
+ * <p>
+ * When the cache is shared by several nodes, a round runs on one node at a time, see
+ * {@link FederationCache#getJobLock()}.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -68,6 +72,9 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
 
   /** The status of a trust mark that is valid. */
   public static final String STATUS_ACTIVE = "active";
+
+  /** The name of the job, for the {@link se.swedenconnect.spring.authnserver.job.JobLock} of the cache. */
+  public static final String JOB_NAME = "oidc-trust-mark-status-check";
 
   /** Where resolved clients are kept. */
   private final FederationCache cache;
@@ -148,11 +155,16 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
   }
 
   /**
-   * Makes one pass over the cached clients and checks the trust marks that qualify.
+   * Makes one pass over the cached clients and checks the trust marks that qualify. Nothing is done when another node
+   * runs the round.
    *
    * @return the number of trust marks that were removed
    */
   public int check() {
+    if (!this.cache.getJobLock().tryAcquire(JOB_NAME, this.interval)) {
+      log.debug("The trust mark status check runs on another node this round");
+      return 0;
+    }
     final Instant now = this.clock.instant();
     final Instant nextCheck = now.plus(this.interval);
     int removed = 0;

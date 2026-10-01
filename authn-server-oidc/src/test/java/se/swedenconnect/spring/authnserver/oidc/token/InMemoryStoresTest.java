@@ -25,11 +25,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
-import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
-import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
-import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
-
 /**
  * Tests for the in-memory stores of authorization codes, access tokens and client assertions.
  *
@@ -122,11 +117,9 @@ class InMemoryStoresTest {
   }
 
   private static AuthorizationCodeData code(final String code, final Instant expiresAt, final Instant retainUntil) {
-    final AuthenticatedUser user = new AuthenticatedUser(
-        List.of(GenericAttribute.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, "197705232382")),
-        AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, "http://id.elegnamnden.se/loa/1.0/loa3", NOW, "127.0.0.1");
     return new AuthorizationCodeData(code, "client-1", "https://rp.example.com/cb", null, null, null,
-        List.of("openid"), "sub-1", user, new AuthenticationRequirements(), "{}", "{}", NOW, expiresAt, retainUntil);
+        List.of("openid"), "sub-1", NOW, "http://id.elegnamnden.se/loa/1.0/loa3",
+        "{\"https://id.oidc.se/claim/personalIdentityNumber\":\"197705232382\"}", "{}", NOW, expiresAt, retainUntil);
   }
 
   private static AccessTokenData token(final String value, final boolean singleUse) {

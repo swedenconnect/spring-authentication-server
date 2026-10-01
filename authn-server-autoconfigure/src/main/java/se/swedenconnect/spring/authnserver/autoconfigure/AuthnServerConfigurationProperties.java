@@ -77,6 +77,11 @@ public class AuthnServerConfigurationProperties {
   private final EntityInformationProperties entityInformation = new EntityInformationProperties();
 
   /**
+   * Where the server keeps its state between requests: the HTTP session and the stores of the protocols.
+   */
+  private final StorageProperties storage = new StorageProperties();
+
+  /**
    * Gets the base URL.
    *
    * @return the base URL
@@ -173,6 +178,15 @@ public class AuthnServerConfigurationProperties {
    */
   public @NonNull EntityInformationProperties getEntityInformation() {
     return this.entityInformation;
+  }
+
+  /**
+   * Gets the storage properties.
+   *
+   * @return the storage properties
+   */
+  public @NonNull StorageProperties getStorage() {
+    return this.storage;
   }
 
   /**
@@ -376,6 +390,36 @@ public class AuthnServerConfigurationProperties {
      */
     public void setHashAlgorithm(final @Nullable String hashAlgorithm) {
       this.hashAlgorithm = hashAlgorithm;
+    }
+  }
+
+  /**
+   * Where the server keeps its state between requests.
+   */
+  public static class StorageProperties {
+
+    /**
+     * Where the HTTP session and all stores are kept: "memory" or "redis". Defaults to "memory". A store may be
+     * overridden by its own setting, the HTTP session may not.
+     */
+    private String type;
+
+    /**
+     * Gets the storage type.
+     *
+     * @return the storage type, or {@code null}
+     */
+    public @Nullable String getType() {
+      return this.type;
+    }
+
+    /**
+     * Assigns the storage type.
+     *
+     * @param type the storage type
+     */
+    public void setType(final @Nullable String type) {
+      this.type = type;
     }
   }
 

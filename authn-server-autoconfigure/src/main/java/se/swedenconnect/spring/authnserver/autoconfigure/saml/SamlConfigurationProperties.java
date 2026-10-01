@@ -538,7 +538,7 @@ public class SamlConfigurationProperties {
   public static class ReplayProperties {
 
     /**
-     * The type of replay cache. The supported value is "memory". Defaults to "memory".
+     * Where the IDs of received requests are kept: "memory" or "redis". Defaults to authn-server.storage.type.
      */
     private String type;
 

@@ -101,7 +101,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
     this.cache = Objects.requireNonNull(cache, "cache must not be null");
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.clock = Objects.requireNonNull(clock, "clock must not be null");
-    this.lookupTracker = new LookupTracker(this.settings.refresh().maximumTrackedClients(),
+    this.lookupTracker = this.cache.createLookupTracker(this.settings.refresh().maximumTrackedClients(),
         this.settings.refresh().lookupPeriod(), clock);
   }
 
@@ -127,7 +127,8 @@ public class FederationClientBackend implements ClientRegistryBackend {
   }
 
   /**
-   * Gets the count of lookups per client, which is what the background refresh job works from.
+   * Gets the count of lookups per client, which is what the background refresh job works from. It is created by the
+   * cache, so that the counts are kept where the cache is.
    *
    * @return the {@link LookupTracker} of the backend
    */

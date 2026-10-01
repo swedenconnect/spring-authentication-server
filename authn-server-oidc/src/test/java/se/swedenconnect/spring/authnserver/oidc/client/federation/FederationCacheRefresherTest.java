@@ -179,7 +179,8 @@ class FederationCacheRefresherTest extends FederationTestSupport {
       final FederationCacheSettings settings = new FederationCacheSettings(null,
           FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE, refresh);
       this.cache = new InMemoryFederationCache(this.clock);
-      this.lookupTracker = new LookupTracker(refresh.maximumTrackedClients(), refresh.lookupPeriod(), this.clock);
+      this.lookupTracker =
+          new InMemoryLookupTracker(refresh.maximumTrackedClients(), refresh.lookupPeriod(), this.clock);
       this.refresher = new FederationCacheRefresher(
           this.cache, this.resolver, this.lookupTracker, settings, this.clock);
       this.resolver.answerFor = clientId -> new ResolvedClient(clientId, clientMetadata("The Client"), Set.of(),

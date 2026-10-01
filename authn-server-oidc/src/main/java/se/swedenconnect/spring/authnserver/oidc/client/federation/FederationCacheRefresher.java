@@ -37,6 +37,10 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * refreshes more clients than the configured maximum. Clients that are used rarely are left alone and are resolved
  * again when they are next asked for. The job is off unless it has been turned on.
  * </p>
+ * <p>
+ * When the cache is shared by several nodes, a round runs on one node at a time, see
+ * {@link FederationCache#getJobLock()}.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -44,6 +48,9 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
 
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(FederationCacheRefresher.class);
+
+  /** The name of the job, for the {@link se.swedenconnect.spring.authnserver.job.JobLock} of the cache. */
+  public static final String JOB_NAME = "oidc-federation-cache-refresh";
 
   /** Where resolved clients are kept. */
   private final FederationCache cache;
@@ -128,12 +135,17 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
   }
 
   /**
-   * Makes one pass over the clients that qualify and refreshes the entries that are about to expire.
+   * Makes one pass over the clients that qualify and refreshes the entries that are about to expire. Nothing is done
+   * when another node runs the round.
    *
    * @return the number of entries that were refreshed
    */
   public int refresh() {
     final FederationCacheSettings.RefreshSettings refresh = this.settings.refresh();
+    if (!this.cache.getJobLock().tryAcquire(JOB_NAME, refresh.interval())) {
+      log.debug("The federation cache refresh runs on another node this round");
+      return 0;
+    }
     final List<String> candidates =
         this.lookupTracker.getFrequentClients(refresh.minimumLookups(), refresh.maximumClients());
     if (candidates.isEmpty()) {

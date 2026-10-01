@@ -39,6 +39,8 @@ import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConfigurerFactory;
 import se.swedenconnect.spring.authnserver.autoconfigure.EntityInformationProperties;
+import se.swedenconnect.spring.authnserver.autoconfigure.storage.StorageSettings;
+import se.swedenconnect.spring.authnserver.autoconfigure.storage.StorageType;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
@@ -56,7 +58,8 @@ import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
  * It initializes OpenSAML, loads the credentials, and declares the factory that creates the
  * {@link Saml2IdpConfigurer} from the {@link SamlConfigurationProperties}. The requester acceptance rules of the
  * properties are added to the server's {@link ConfigurableRequesterAcceptance}. A {@code ReplayCache} or a
- * {@code MessageReplayChecker} bean replaces the in-memory replay protection.
+ * {@code MessageReplayChecker} bean replaces the in-memory replay protection. When the replay cache is kept in Redis,
+ * see {@link StorageSettings#SAML_REPLAY}, the {@code ReplayCache} bean is declared by the storage autoconfiguration.
  * </p>
  *
  * @author Martin Lindström
@@ -68,9 +71,6 @@ import se.swedenconnect.spring.authnserver.saml.nameid.NameIDGeneratorFactory;
 @EnableConfigurationProperties(SamlConfigurationProperties.class)
 @Import(SamlCredentialConfiguration.class)
 public class SamlAutoConfiguration {
-
-  /** The supported replay cache type. */
-  private static final String REPLAY_TYPE_MEMORY = "memory";
 
   /**
    * Initializes OpenSAML, which the SAML support needs.
@@ -182,10 +182,7 @@ public class SamlAutoConfiguration {
         properties.getAuthnContext().getBetterMappings(), properties.getAuthnContext().getMaximumMappings());
 
     final SamlConfigurationProperties.ReplayProperties replay = properties.getReplay();
-    if (replay.getType() != null && !REPLAY_TYPE_MEMORY.equalsIgnoreCase(replay.getType())) {
-      throw new IllegalArgumentException("Invalid value for %s.replay.type: '%s' - the supported value is '%s'"
-          .formatted(SamlConfigurationProperties.PREFIX, replay.getType(), REPLAY_TYPE_MEMORY));
-    }
+    StorageType.parse(replay.getType(), StorageSettings.SAML_REPLAY);
     if (replay.getExpiration() != null) {
       configurer.replayExpiration(replay.getExpiration());
     }

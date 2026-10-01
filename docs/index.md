@@ -61,8 +61,9 @@ The Spring Boot starters:
   keys, trust marks and descriptive metadata.
 
 - [Configuration](configuration.html) - The properties of the auto-configuration, the URL layout of the server, the
-  entity information that every protocol publishes, adjusting the configuration in code, using the configurers without
-  Spring Boot, and migrating the configuration of an Identity Provider built on saml-identity-provider.
+  entity information that every protocol publishes, running several nodes that share their state through Redis,
+  adjusting the configuration in code, using the configurers without Spring Boot, and migrating the configuration of an
+  Identity Provider built on saml-identity-provider.
 
 - [Release Notes](release-notes.html)
 

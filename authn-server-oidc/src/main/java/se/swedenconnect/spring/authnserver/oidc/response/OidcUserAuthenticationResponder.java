@@ -194,8 +194,8 @@ public class OidcUserAuthenticationResponder {
     this.codeStore.save(new AuthorizationCodeData(code, target.clientId(), target.redirectUri(),
         data.codeChallenge(), data.codeChallengeMethod(), data.nonce(),
         requirements instanceof final OidcAuthenticationRequirements oidc ? oidc.getScopes() : data.scopes(),
-        subject, user, requirements, claims.idToken().toJSONString(), claims.userInfo().toJSONString(), now,
-        expiresAt, expiresAt.plus(this.codeRetention)));
+        subject, user.getAuthnInstant(), user.getAuthnContextUri(), claims.idToken().toJSONString(),
+        claims.userInfo().toJSONString(), now, expiresAt, expiresAt.plus(this.codeRetention)));
 
     this.flow.saveAuthentication(authentication, request, response);
 

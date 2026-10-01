@@ -291,7 +291,7 @@ class AuthnServerAutoConfigurationTest {
   @Test
   void anUnsupportedReplayTypeFailsStartup() {
     this.runner.withPropertyValues(SAML)
-        .withPropertyValues("authn-server.saml.replay.type=redis")
+        .withPropertyValues("authn-server.saml.replay.type=mongo")
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("authn-server.saml.replay.type"));
   }

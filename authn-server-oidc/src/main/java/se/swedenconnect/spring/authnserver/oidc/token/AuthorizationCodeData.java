@@ -25,15 +25,13 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
-import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
-import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 
 /**
  * An issued authorization code and everything it is bound to: the client, the redirect URI, the PKCE challenge, the
- * nonce, the requirements of the request and the authenticated user, together with the {@code sub} and the claims
- * that were released when the code was issued.
+ * nonce, and what the ID token says about the authentication, together with the {@code sub} and the claims that were
+ * released when the code was issued.
  * <p>
- * The claims are kept as JSON strings, so that the object can be kept in a store outside of the JVM.
+ * The object holds strings, instants and JSON only, so that it can be kept in a store outside of the JVM.
  * </p>
  *
  * @param code the code
@@ -44,8 +42,8 @@ import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirem
  * @param nonce the {@code nonce} of the request, or {@code null}
  * @param scopes the requested scopes that the OpenID Provider offers
  * @param subject the {@code sub} of the user for the client
- * @param user the authenticated user
- * @param requirements the authentication requirements of the request
+ * @param authnInstant when the user authenticated, the {@code auth_time} of the ID token
+ * @param acr the authentication context class of the authentication, the {@code acr} of the ID token
  * @param idTokenClaims the identity claims for the ID token, as a JSON object
  * @param userInfoClaims the identity claims for the UserInfo endpoint, as a JSON object
  * @param issuedAt when the code was issued
@@ -56,7 +54,7 @@ import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirem
 public record AuthorizationCodeData(
     @NonNull String code, @NonNull String clientId, @NonNull String redirectUri, @Nullable String codeChallenge,
     @Nullable String codeChallengeMethod, @Nullable String nonce, @NonNull List<String> scopes,
-    @NonNull String subject, @NonNull AuthenticatedUser user, @NonNull AuthenticationRequirements requirements,
+    @NonNull String subject, @NonNull Instant authnInstant, @NonNull String acr,
     @NonNull String idTokenClaims, @NonNull String userInfoClaims, @NonNull Instant issuedAt,
     @NonNull Instant expiresAt, @NonNull Instant retainUntil) implements Serializable {
 
@@ -74,8 +72,8 @@ public record AuthorizationCodeData(
    * @param nonce the nonce, or {@code null}
    * @param scopes the scopes
    * @param subject the {@code sub}
-   * @param user the authenticated user
-   * @param requirements the authentication requirements
+   * @param authnInstant when the user authenticated
+   * @param acr the authentication context class
    * @param idTokenClaims the ID token claims as JSON
    * @param userInfoClaims the UserInfo claims as JSON
    * @param issuedAt when the code was issued
@@ -88,8 +86,8 @@ public record AuthorizationCodeData(
     Objects.requireNonNull(redirectUri, "redirectUri must not be null");
     scopes = List.copyOf(Objects.requireNonNull(scopes, "scopes must not be null"));
     Objects.requireNonNull(subject, "subject must not be null");
-    Objects.requireNonNull(user, "user must not be null");
-    Objects.requireNonNull(requirements, "requirements must not be null");
+    Objects.requireNonNull(authnInstant, "authnInstant must not be null");
+    Objects.requireNonNull(acr, "acr must not be null");
     Objects.requireNonNull(idTokenClaims, "idTokenClaims must not be null");
     Objects.requireNonNull(userInfoClaims, "userInfoClaims must not be null");
     Objects.requireNonNull(issuedAt, "issuedAt must not be null");

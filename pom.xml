@@ -262,13 +262,6 @@
         <version>2.50.0</version>
       </dependency>
 
-      <!-- Kryo (via Redisson) requires 3.4 and Mockito 3.3. Pinned so that the nearest declaration does not decide. -->
-      <dependency>
-        <groupId>org.objenesis</groupId>
-        <artifactId>objenesis</artifactId>
-        <version>3.4</version>
-      </dependency>
-
     </dependencies>
 
   </dependencyManagement>

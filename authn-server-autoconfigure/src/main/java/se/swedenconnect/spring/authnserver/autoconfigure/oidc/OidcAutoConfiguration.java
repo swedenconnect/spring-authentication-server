@@ -19,15 +19,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -50,6 +54,8 @@ import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
+import se.swedenconnect.spring.authnserver.oidc.federation.InMemoryProviderTrustMarkStore;
+import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
 import se.swedenconnect.spring.authnserver.oidc.federation.TrustMarkSource;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
@@ -57,6 +63,9 @@ import se.swedenconnect.spring.authnserver.oidc.keys.FederationKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.ScopeRegistry;
 import se.swedenconnect.spring.authnserver.oidc.subject.SubjectGeneratorFactory;
+import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
+import se.swedenconnect.spring.authnserver.oidc.token.AuthorizationCodeStore;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAssertionReplayCache;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
 import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequesterPredicate;
@@ -72,8 +81,13 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
  * default one.
  * </p>
  * <p>
+ * An {@link AuthorizationCodeStore}, an {@link AccessTokenStore} or a {@link ClientAssertionReplayCache} bean replaces
+ * the in-memory store. When a store is kept in Redis, the bean is declared by the storage autoconfiguration.
+ * </p>
+ * <p>
  * When OpenID Federation is enabled, the trust marks of the OpenID Provider are kept by a {@link ProviderTrustMarks}
- * bean, created from the properties unless the application declares one.
+ * bean, created from the properties unless the application declares one. A {@link ProviderTrustMarkStore} bean decides
+ * where their state is kept.
  * </p>
  *
  * @author Martin Lindström
@@ -85,6 +99,9 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
 @EnableConfigurationProperties(OidcConfigurationProperties.class)
 public class OidcAutoConfiguration {
 
+  /** Logger. */
+  private static final Logger log = LoggerFactory.getLogger(OidcAutoConfiguration.class);
+
   /**
    * Creates the factory for the OIDC protocol configurer.
    *
@@ -94,6 +111,9 @@ public class OidcAutoConfiguration {
    * @param attributeMapping an attribute mapping, if declared as a bean
    * @param subjectGeneratorFactory a subject generator factory, if declared as a bean
    * @param providerTrustMarks the trust marks of the OpenID Provider, when federation is enabled
+   * @param authorizationCodeStore an authorization code store, if declared as a bean
+   * @param accessTokenStore an access token store, if declared as a bean
+   * @param clientAssertionReplayCache a cache of used client assertions, if declared as a bean
    * @return an {@link AuthnServerProtocolConfigurerFactory}
    */
   @Bean
@@ -103,7 +123,10 @@ public class OidcAutoConfiguration {
       final ObjectProvider<ScopeRegistry> scopeRegistry,
       final ObjectProvider<OidcAttributeMapping> attributeMapping,
       final ObjectProvider<SubjectGeneratorFactory> subjectGeneratorFactory,
-      final ObjectProvider<ProviderTrustMarks> providerTrustMarks) {
+      final ObjectProvider<ProviderTrustMarks> providerTrustMarks,
+      final ObjectProvider<AuthorizationCodeStore> authorizationCodeStore,
+      final ObjectProvider<AccessTokenStore> accessTokenStore,
+      final ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache) {
 
     return server -> {
       final List<FederationKey> federationKeys =
@@ -114,6 +137,10 @@ public class OidcAutoConfiguration {
           .scopeRegistry(scopeRegistry.getIfUnique())
           .attributeMapping(attributeMapping.getIfUnique())
           .subjectGeneratorFactory(subjectGeneratorFactory.getIfUnique())
+          .authnRequestProcessor(c -> c
+              .authorizationCodeStore(authorizationCodeStore.getIfUnique())
+              .accessTokenStore(accessTokenStore.getIfUnique())
+              .clientAssertionReplayCache(clientAssertionReplayCache.getIfUnique()))
           .federation(f -> f
               .keys(federationKeys)
               .providerTrustMarks(providerTrustMarks.getIfUnique()));
@@ -126,6 +153,7 @@ public class OidcAutoConfiguration {
    *
    * @param properties the OIDC properties
    * @param shared the shared properties, giving the base URL
+   * @param store where the trust marks are kept, if declared as a bean
    * @return a {@link ProviderTrustMarks}
    * @throws IOException if the keys of a trust mark issuer cannot be read
    */
@@ -134,18 +162,30 @@ public class OidcAutoConfiguration {
   @ConditionalOnProperty(prefix = OidcConfigurationProperties.PREFIX + ".federation", name = "enabled",
       havingValue = "true")
   ProviderTrustMarks oidcProviderTrustMarks(final OidcConfigurationProperties properties,
-      final AuthnServerConfigurationProperties shared) throws IOException {
+      final AuthnServerConfigurationProperties shared, final ObjectProvider<ProviderTrustMarkStore> store)
+      throws IOException {
     final String entityId = properties.getIssuer() != null ? properties.getIssuer() : shared.getBaseUrl();
     if (entityId == null) {
       throw new IllegalArgumentException("Missing base URL - assign " + AuthnServerConfigurationProperties.PREFIX
           + ".base-url");
     }
     final OidcConfigurationProperties.FederationProperties federation = properties.getFederation();
-    return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()),
-        new HttpFederationClient(),
-        federation.getTrustMarkCacheDirectory() != null ? federation.getTrustMarkCacheDirectory().toPath() : null,
-        Optional.ofNullable(federation.getTrustMarkRetryInterval()).orElse(ProviderTrustMarks.DEFAULT_RETRY_INTERVAL),
-        Clock.systemUTC());
+    final Duration retryInterval =
+        Optional.ofNullable(federation.getTrustMarkRetryInterval()).orElse(ProviderTrustMarks.DEFAULT_RETRY_INTERVAL);
+    final ProviderTrustMarkStore trustMarkStore = store.getIfUnique();
+    if (trustMarkStore == null || trustMarkStore instanceof InMemoryProviderTrustMarkStore) {
+      return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()),
+          Objects.requireNonNullElseGet(trustMarkStore, InMemoryProviderTrustMarkStore::new),
+          new HttpFederationClient(),
+          federation.getTrustMarkCacheDirectory() != null ? federation.getTrustMarkCacheDirectory().toPath() : null,
+          retryInterval, Clock.systemUTC());
+    }
+    if (federation.getTrustMarkCacheDirectory() != null) {
+      log.info("The trust marks are kept in a shared store - {}.federation.trust-mark-cache-directory is not used",
+          OidcConfigurationProperties.PREFIX);
+    }
+    return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()), trustMarkStore,
+        new HttpFederationClient(), null, retryInterval, Clock.systemUTC());
   }
 
   /**

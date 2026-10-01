@@ -39,7 +39,6 @@ import com.nimbusds.openid.connect.sdk.claims.ACR;
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
-import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.attributes.DeliveredClaims;
@@ -122,14 +121,13 @@ public class IdTokenBuilder {
   public @NonNull String build(final @NonNull AuthorizationCodeData code, final @NonNull OIDCClientMetadata metadata,
       final @NonNull Instant now) throws UnrecoverableErrorException {
 
-    final AuthenticatedUser user = code.user();
     final IDTokenClaimsSet claims = new IDTokenClaimsSet(new Issuer(this.issuer), new Subject(code.subject()),
         List.of(new Audience(code.clientId())), Date.from(now.plus(this.lifetime)), Date.from(now));
-    claims.setAuthenticationTime(Date.from(user.getAuthnInstant()));
+    claims.setAuthenticationTime(Date.from(code.authnInstant()));
     if (code.nonce() != null) {
       claims.setNonce(new Nonce(code.nonce()));
     }
-    claims.setACR(new ACR(user.getAuthnContextUri()));
+    claims.setACR(new ACR(code.acr()));
     DeliveredClaims.parse(code.idTokenClaims()).forEach(claims::setClaim);
 
     final SigningKeySelector.SelectedSigningKey key = this.signingKeySelector.selectForIdToken(metadata);

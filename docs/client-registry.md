@@ -234,8 +234,9 @@ Resolved clients are cached, because reaching the resolver on every request is n
 
 - An entry lives until the expiry that the resolve response gives, or until an optional maximum age if that comes
   first. No maximum age is set by default.
-- The store is pluggable, so that the nodes of a deployment can share it, for example through Redis. The default is
+- The store is pluggable, so that the nodes of a deployment can share it. The default is
   [`InMemoryFederationCache`][InMemoryFederationCache], which is what a single node needs.
+  [`RedisFederationCache`][RedisFederationCache] keeps the entries in Redis, shared by all nodes.
 - A client that the resolver does not know is cached as such for a short time, one minute by default, so that
   repeated requests with the same unknown `client_id` do not each reach the resolver. A resolver that fails is never
   cached.
@@ -315,6 +316,28 @@ checker.start();
 
 The trust marks of the resolve response are not checked by the job. The resolver has checked them, and they are held
 no longer than the resolve response is valid.
+
+### Several nodes
+
+The cache is also where the background jobs keep their shared state. The backend asks the cache for the object that
+counts lookups, and the jobs ask it for the lock that decides which node runs a round. With a
+`RedisFederationCache`:
+
+- the lookup counts are kept in Redis, so that the threshold of the refresh applies to the traffic of all nodes, and
+- each round of the refresh and of the [trust mark status checks](#trust-mark-status-checks) runs on one node. A node
+  that stops while it holds the lock of a job blocks the job for at most one round.
+
+With Spring Boot, a `FederationCache` bean is declared according to `authn-server.storage.type`, or
+`authn-server.oidc.storage.federation-cache`, see [Running several nodes](configuration.html#running-several-nodes).
+Build the backend and the jobs from it:
+
+```java
+@Bean
+FederationClientBackend federationBackend(final FederationCache cache) {
+  return new FederationClientBackend(new HttpFederationResolver(federation), new HttpTrustMarkRequester(federation),
+      cache, settings);
+}
+```
 
 <a name="requester-acceptance"></a>
 ## Deciding which requesters may use the server
@@ -397,6 +420,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [RequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequesterPredicate.java
 [RequiredMarksRequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequiredMarksRequesterPredicate.java
 [RequesterRecord]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/RequesterRecord.java
+[RedisFederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/RedisFederationCache.java
 [RepositoryClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/RepositoryClientBackend.java
 [SamlMetadataBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/SamlMetadataBackend.java
 [TrustMarkRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/TrustMarkRequester.java

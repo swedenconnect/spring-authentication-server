@@ -151,6 +151,11 @@ public class OidcConfigurationProperties {
   private final FederationProperties federation = new FederationProperties();
 
   /**
+   * Where each of the OpenID Provider's stores is kept, overriding authn-server.storage.type for that store.
+   */
+  private final StorageProperties storage = new StorageProperties();
+
+  /**
    * Tells whether the OpenID Provider is enabled.
    *
    * @return whether the OpenID Provider is enabled
@@ -418,6 +423,15 @@ public class OidcConfigurationProperties {
    */
   public @NonNull FederationProperties getFederation() {
     return this.federation;
+  }
+
+  /**
+   * Gets the storage properties.
+   *
+   * @return the storage properties
+   */
+  public @NonNull StorageProperties getStorage() {
+    return this.storage;
   }
 
   /**
@@ -1505,6 +1519,130 @@ public class OidcConfigurationProperties {
      */
     public void setIdTokenLifetime(final @Nullable Duration idTokenLifetime) {
       this.idTokenLifetime = idTokenLifetime;
+    }
+  }
+
+  /**
+   * Where each store of the OpenID Provider is kept: "memory" or "redis". A store that is not assigned follows
+   * authn-server.storage.type.
+   */
+  public static class StorageProperties {
+
+    /**
+     * Where authorization codes are kept: "memory" or "redis".
+     */
+    private String authorizationCodes;
+
+    /**
+     * Where access tokens are kept: "memory" or "redis".
+     */
+    private String accessTokens;
+
+    /**
+     * Where the jti values of used client assertions (private_key_jwt and client_secret_jwt) are kept: "memory" or
+     * "redis".
+     */
+    private String clientAssertions;
+
+    /**
+     * Where the cache of clients resolved through OpenID Federation is kept, together with the lookup counts and the
+     * lock of its background jobs: "memory" or "redis".
+     */
+    private String federationCache;
+
+    /**
+     * Where the OpenID Provider's own trust marks and their state are kept: "memory" or "redis".
+     */
+    private String trustMarks;
+
+    /**
+     * Gets where authorization codes are kept.
+     *
+     * @return the storage type, or {@code null}
+     */
+    public @Nullable String getAuthorizationCodes() {
+      return this.authorizationCodes;
+    }
+
+    /**
+     * Assigns where authorization codes are kept.
+     *
+     * @param authorizationCodes the storage type
+     */
+    public void setAuthorizationCodes(final @Nullable String authorizationCodes) {
+      this.authorizationCodes = authorizationCodes;
+    }
+
+    /**
+     * Gets where access tokens are kept.
+     *
+     * @return the storage type, or {@code null}
+     */
+    public @Nullable String getAccessTokens() {
+      return this.accessTokens;
+    }
+
+    /**
+     * Assigns where access tokens are kept.
+     *
+     * @param accessTokens the storage type
+     */
+    public void setAccessTokens(final @Nullable String accessTokens) {
+      this.accessTokens = accessTokens;
+    }
+
+    /**
+     * Gets where the values of used client assertions are kept.
+     *
+     * @return the storage type, or {@code null}
+     */
+    public @Nullable String getClientAssertions() {
+      return this.clientAssertions;
+    }
+
+    /**
+     * Assigns where the values of used client assertions are kept.
+     *
+     * @param clientAssertions the storage type
+     */
+    public void setClientAssertions(final @Nullable String clientAssertions) {
+      this.clientAssertions = clientAssertions;
+    }
+
+    /**
+     * Gets where the federation cache is kept.
+     *
+     * @return the storage type, or {@code null}
+     */
+    public @Nullable String getFederationCache() {
+      return this.federationCache;
+    }
+
+    /**
+     * Assigns where the federation cache is kept.
+     *
+     * @param federationCache the storage type
+     */
+    public void setFederationCache(final @Nullable String federationCache) {
+      this.federationCache = federationCache;
+    }
+
+    /**
+     * Gets where the OpenID Provider's own trust marks are kept.
+     *
+     * @return the storage type, or {@code null}
+     */
+    public @Nullable String getTrustMarks() {
+      return this.trustMarks;
+    }
+
+    /**
+     * Assigns where the OpenID Provider's own trust marks are kept.
+     *
+     * @param trustMarks the storage type
+     */
+    public void setTrustMarks(final @Nullable String trustMarks) {
+      this.trustMarks = trustMarks;
     }
   }
 

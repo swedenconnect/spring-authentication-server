@@ -23,16 +23,16 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link LookupTracker}.
+ * Tests for {@link InMemoryLookupTracker}.
  *
  * @author Martin Lindström
  */
-class LookupTrackerTest extends FederationTestSupport {
+class InMemoryLookupTrackerTest extends FederationTestSupport {
 
   @Test
   void onlyClientsThatReachTheMinimumQualify() {
     final TestClock clock = new TestClock();
-    final LookupTracker tracker = new LookupTracker(100, Duration.ofMinutes(10), clock);
+    final InMemoryLookupTracker tracker = new InMemoryLookupTracker(100, Duration.ofMinutes(10), clock);
 
     for (int i = 0; i < 5; i++) {
       tracker.record("frequent");
@@ -45,7 +45,7 @@ class LookupTrackerTest extends FederationTestSupport {
 
   @Test
   void theMostAskedForClientComesFirstAndTheListIsCapped() {
-    final LookupTracker tracker = new LookupTracker(100, Duration.ofMinutes(10), new TestClock());
+    final InMemoryLookupTracker tracker = new InMemoryLookupTracker(100, Duration.ofMinutes(10), new TestClock());
 
     for (int i = 0; i < 10; i++) {
       tracker.record("one");
@@ -64,7 +64,7 @@ class LookupTrackerTest extends FederationTestSupport {
   @Test
   void aClientThatGoesQuietForAWholePeriodStartsOver() {
     final TestClock clock = new TestClock();
-    final LookupTracker tracker = new LookupTracker(100, Duration.ofMinutes(10), clock);
+    final InMemoryLookupTracker tracker = new InMemoryLookupTracker(100, Duration.ofMinutes(10), clock);
 
     for (int i = 0; i < 5; i++) {
       tracker.record("client");
@@ -81,7 +81,7 @@ class LookupTrackerTest extends FederationTestSupport {
 
   @Test
   void theCountingDoesNotGrowWithoutLimit() {
-    final LookupTracker tracker = new LookupTracker(10, Duration.ofMinutes(10), new TestClock());
+    final InMemoryLookupTracker tracker = new InMemoryLookupTracker(10, Duration.ofMinutes(10), new TestClock());
 
     for (int i = 0; i < 1000; i++) {
       tracker.record("client-" + i);
@@ -93,7 +93,7 @@ class LookupTrackerTest extends FederationTestSupport {
 
   @Test
   void theLimitIsValidated() {
-    assertThatThrownBy(() -> new LookupTracker(0, Duration.ofMinutes(10)))
+    assertThatThrownBy(() -> new InMemoryLookupTracker(0, Duration.ofMinutes(10)))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
