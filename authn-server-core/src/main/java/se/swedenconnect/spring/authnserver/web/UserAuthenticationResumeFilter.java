@@ -35,6 +35,10 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import se.swedenconnect.spring.authnserver.audit.AuditFlowData;
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.FlowCorrelation;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.RedirectFlowRepository;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.RedirectForAuthenticationToken;
@@ -50,6 +54,10 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
  * {@link ResumedAuthenticationHandler} of the protocol that the authentication was started for. A request without a
  * matching authentication in progress, or for a protocol that the server does not offer, is an unrecoverable
  * {@link CommonUnrecoverableError#INVALID_SESSION} error.
+ * </p>
+ * <p>
+ * The request joins the flow of the authentication, so that it is audited under the correlation ID of the flow. A
+ * request without a matching authentication in progress is audited under a correlation ID of its own.
  * </p>
  *
  * @author Martin Lindström
@@ -94,6 +102,7 @@ public class UserAuthenticationResumeFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
+    AuditRequestContext.get(request).setStage(AuditStage.USER_AUTHENTICATION);
 
     RedirectFlowRepository repository = null;
     AuthenticationProtocol protocol = null;
@@ -120,6 +129,11 @@ public class UserAuthenticationResumeFilter extends OncePerRequestFilter {
     }
 
     final ResumedAuthenticationToken token = repository.resume(request);
+    final AuditFlowData auditData = token.getAuthnInputToken().getAuditData();
+    FlowCorrelation.join(auditData != null ? auditData.correlationId() : null);
+    if (auditData != null) {
+      AuditRequestContext.get(request).setRequester(auditData.requester());
+    }
     log.debug("Resuming the authentication '{}' for {} [{}]", token.getAuthnId(), protocol,
         token.getAuthnInputToken().getLogString());
     handler.resume(request, response, token);

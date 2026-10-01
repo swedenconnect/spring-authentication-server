@@ -39,6 +39,9 @@ import se.swedenconnect.opensaml.sweid.saml2.authn.umsg.Message;
 import se.swedenconnect.opensaml.sweid.saml2.authn.umsg.UserMessage;
 import se.swedenconnect.opensaml.sweid.saml2.signservice.sap.SADRequest;
 import se.swedenconnect.opensaml.sweid.saml2.signservice.sap.SADVersion;
+import se.swedenconnect.spring.authnserver.audit.AuditFlowData;
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
 import se.swedenconnect.spring.authnserver.authentication.OriginalRequester;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
@@ -51,6 +54,7 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
 import se.swedenconnect.spring.authnserver.saml.attributes.requested.RequestedAttributeContext;
+import se.swedenconnect.spring.authnserver.saml.audit.Saml2AuditData;
 import se.swedenconnect.spring.authnserver.saml.attributes.requested.SamlRequestedAttributeResolver;
 import se.swedenconnect.spring.authnserver.saml.authentication.SadRequestExtension;
 import se.swedenconnect.spring.authnserver.saml.authentication.SamlAuthenticationRequirements;
@@ -77,7 +81,8 @@ import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseAttributes
  * </p>
  * <p>
  * The result is a {@link UserAuthenticationInputToken} holding {@link SamlAuthenticationRequirements} and, as its
- * protocol request data, the {@link Saml2AuthnRequestData}.
+ * protocol request data, the {@link Saml2AuthnRequestData}. The Service Provider counts as verified for the audit once
+ * the signature has been checked.
  * </p>
  *
  * @author Martin Lindström
@@ -191,6 +196,9 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
     }
 
     this.signatureValidator.validate(token);
+    if (token.getHttpServletRequest() != null) {
+      AuditRequestContext.get(token.getHttpServletRequest()).setRequester(AuditRequester.of(record, true));
+    }
     this.encryptCapabilitiesValidator.validate(token);
 
     // A Holder-of-key assertion is bound to the certificate of the TLS handshake ...
@@ -232,14 +240,17 @@ public class Saml2AuthnRequestAuthenticationProvider implements AuthenticationPr
         new SerializableOpenSamlObject<>(token.getAuthnRequest()),
         responseAttributes, token.isHolderOfKey(), nameIdGenerator, token.getClientCertificate());
 
+    final UserAuthenticationInputToken inputToken = new UserAuthenticationInputToken(requirements,
+        record.requester(), token.getAuthnRequest().getID(), requestData);
+    inputToken.setAuditData(AuditFlowData.of(AuditRequester.of(record, true), Saml2AuditData.authnRequest(token)));
+
     // The OpenSAML context and the HTTP request are no longer needed ...
     //
     token.setMessageContext(null);
     token.setHttpServletRequest(null);
     token.setAuthenticated(true);
 
-    return new UserAuthenticationInputToken(requirements, record.requester(), token.getAuthnRequest().getID(),
-        requestData);
+    return inputToken;
   }
 
   /**

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
@@ -37,11 +38,13 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param issuedAt when the token was issued
  * @param expiresAt when the token expires
  * @param singleUse whether the token may only be used once
+ * @param correlationId the correlation ID of the authentication flow, so that the client's call to the UserInfo
+ *     endpoint is audited under it, or {@code null}
  * @author Martin Lindström
  */
 public record AccessTokenData(@NonNull String value, @NonNull String clientId, @NonNull String subject,
     @NonNull List<String> scopes, @NonNull String userInfoClaims, @NonNull Instant issuedAt,
-    @NonNull Instant expiresAt, boolean singleUse) implements Serializable {
+    @NonNull Instant expiresAt, boolean singleUse, @Nullable String correlationId) implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -57,6 +60,7 @@ public record AccessTokenData(@NonNull String value, @NonNull String clientId, @
    * @param issuedAt when the token was issued
    * @param expiresAt when the token expires
    * @param singleUse whether the token may only be used once
+   * @param correlationId the correlation ID of the authentication flow, or {@code null}
    */
   public AccessTokenData {
     Objects.requireNonNull(value, "value must not be null");

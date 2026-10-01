@@ -36,6 +36,7 @@ import org.springframework.util.ClassUtils;
  * @author Martin Lindström
  */
 @SpringBootTest(classes = SamlStarterTest.TestApplication.class, properties = {
+    "spring.application.name=authn-server-test",
     "authn-server.base-url=https://idp.example.com",
     "authn-server.saml.enabled=true",
     "authn-server.saml.credentials.default-credential.jks.store.location=classpath:credentials/idp-credentials.p12",

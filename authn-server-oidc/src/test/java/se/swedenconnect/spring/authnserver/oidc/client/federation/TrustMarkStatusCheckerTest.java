@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 
 import com.nimbusds.jose.jwk.ECKey;
 
+import se.swedenconnect.spring.audit.appevents.SystemAlertEvent;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -70,6 +72,36 @@ class TrustMarkStatusCheckerTest extends FederationTestSupport {
 
     assertThat(fixture.cache.get(CLIENT_ID).onDemandTrustMarks()).isEmpty();
     assertThat(fixture.marks()).isEmpty();
+  }
+
+  @Test
+  void aWithdrawnTrustMarkIsPublishedAsASystemAlert() {
+    final Fixture fixture = new Fixture(true);
+    final List<Object> events = new ArrayList<>();
+    fixture.checker.setEventPublisher(events::add);
+    final String mark = fixture.addOnDemandMark(null);
+    fixture.client.trustMarkStatusResponse = trustMarkStatus(fixture.issuerKey, TRUST_MARK_ISSUER, mark, "revoked");
+
+    fixture.checker.check();
+
+    assertThat(events).singleElement().isInstanceOfSatisfying(SystemAlertEvent.class, e -> {
+      assertThat(e.getMessage()).contains(MARK_TWO, CLIENT_ID, "revoked");
+      assertThat(e.getException()).isNull();
+    });
+  }
+
+  @Test
+  void anActiveOrUncheckableTrustMarkRaisesNoAlert() {
+    final Fixture fixture = new Fixture(true);
+    final List<Object> events = new ArrayList<>();
+    fixture.checker.setEventPublisher(events::add);
+    final String mark = fixture.addOnDemandMark(null);
+    fixture.client.trustMarkStatusResponse = trustMarkStatus(fixture.issuerKey, TRUST_MARK_ISSUER, mark, "active");
+    fixture.checker.check();
+    fixture.client.trustMarkStatusFailure = new ClientRegistryException("Connection refused");
+    fixture.checker.check();
+
+    assertThat(events).isEmpty();
   }
 
   @Test

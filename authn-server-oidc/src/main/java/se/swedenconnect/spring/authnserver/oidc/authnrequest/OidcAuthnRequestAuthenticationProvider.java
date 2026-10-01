@@ -56,6 +56,8 @@ import net.minidev.json.JSONObject;
 import se.oidc.nimbus.claims.ParameterConstants;
 import se.oidc.nimbus.claims.ScopeConstants;
 import se.oidc.nimbus.usermessage.UserMessage;
+import se.swedenconnect.spring.authnserver.audit.AuditFlowData;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
@@ -64,6 +66,7 @@ import se.swedenconnect.spring.authnserver.message.GenericUserMessage;
 import se.swedenconnect.spring.authnserver.message.LocalizedMessage;
 import se.swedenconnect.spring.authnserver.message.MessageMimeType;
 import se.swedenconnect.spring.authnserver.oidc.attributes.requested.OidcRequestedAttributeResolver;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.authentication.OidcAuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorMapping;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorResponseException;
@@ -243,8 +246,13 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
         request.getOIDCClaims() != null ? request.getOIDCClaims().toJSONString() : null,
         requirements.getAuthnContextRequirements());
 
+    final UserAuthenticationInputToken inputToken =
+        new UserAuthenticationInputToken(requirements, token.getRequesterRecord().requester(), null, requestData);
+    inputToken.setAuditData(AuditFlowData.of(AuditRequester.of(token.getRequesterRecord(), true),
+        OidcAuditData.authnRequest(token.getParameters(), token.getRequestObject() != null,
+            token.getResponseTarget().responseMode())));
     token.setAuthenticated(true);
-    return new UserAuthenticationInputToken(requirements, token.getRequesterRecord().requester(), null, requestData);
+    return inputToken;
   }
 
   /**

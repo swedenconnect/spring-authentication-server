@@ -26,11 +26,16 @@ import org.opensaml.saml.saml2.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnSuccessResponseEvent;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.saml.audit.Saml2AuditData;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestData;
 import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatusException;
 import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
@@ -42,6 +47,9 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  * sign-on before the response is sent, and only once the response has been built, so that an authentication that
  * could not be answered is never saved. An error raised while the assertion is built, such as when the attributes are
  * released, removes the authentication from the session, as any failed authentication does.
+ * </p>
+ * <p>
+ * The responses are audited as {@code authn_success_response} and {@code authn_error_response} events.
  * </p>
  *
  * @author Martin Lindström
@@ -62,6 +70,9 @@ public class Saml2UserAuthenticationResponder {
 
   /** Keeps the authentication in the session. */
   private final UserAuthenticationFlow flow;
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /**
    * Constructor.
@@ -96,6 +107,7 @@ public class Saml2UserAuthenticationResponder {
       final @NonNull UserAuthenticationInputToken token, final @NonNull UserAuthentication authentication)
       throws AuthenticationErrorException, UnrecoverableErrorException {
 
+    final AuditRequestContext auditContext = AuditRequestContext.get(request).setStage(AuditStage.RESPONSE);
     final Saml2AuthnRequestData requestData = getRequestData(token);
     final Assertion assertion;
     try {
@@ -109,6 +121,9 @@ public class Saml2UserAuthenticationResponder {
     final Response samlResponse = this.responseBuilder.buildResponse(responseAttributes, assertion);
 
     this.flow.saveAuthentication(authentication, request, response);
+    this.eventPublisher.publish(new AuthnSuccessResponseEvent(auditContext.getRequester(),
+        Saml2AuditData.successResponse(samlResponse, assertion, responseAttributes.relayState()),
+        Saml2AuditData.releasedAttributes(assertion)));
 
     log.debug("Sending response to '{}' for '{}' [{}]", responseAttributes.destination(), authentication.getName(),
         token.getLogString());
@@ -130,11 +145,23 @@ public class Saml2UserAuthenticationResponder {
       throws UnrecoverableErrorException {
 
     final Response samlResponse = this.responseBuilder.buildErrorResponse(responseAttributes, error);
+    this.eventPublisher.publishErrorResponse(request,
+        Saml2AuditData.errorResponse(samlResponse, responseAttributes.relayState()),
+        error.getStatus().subStatusCode(), error.getDescription());
     log.debug("Sending error response {}/{} to '{}' [entity-id: '{}', authn-request: '{}']",
         error.getStatus().statusCode(), error.getStatus().subStatusCode(), responseAttributes.destination(),
         responseAttributes.getEntityId(), responseAttributes.inResponseTo());
     this.responseSender.send(request, response, responseAttributes.destination(), samlResponse,
         responseAttributes.relayState());
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
   /**

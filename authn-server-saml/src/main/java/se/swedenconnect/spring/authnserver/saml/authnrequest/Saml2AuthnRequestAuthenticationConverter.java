@@ -52,12 +52,17 @@ import org.springframework.security.web.authentication.AuthenticationConverter;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.StringUtils;
 
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnRequestReceivedEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
+import se.swedenconnect.spring.authnserver.saml.audit.Saml2AuditData;
 import se.swedenconnect.spring.authnserver.saml.error.SamlUnrecoverableError;
 
 /**
@@ -65,6 +70,9 @@ import se.swedenconnect.spring.authnserver.saml.error.SamlUnrecoverableError;
  * was delivered and its age, and looks up the Service Provider that sent it in the {@link ClientRegistry}.
  * <p>
  * Every failure here is unrecoverable, since the Service Provider, or where to send a response, is not yet known.
+ * </p>
+ * <p>
+ * Once the message has been decoded, an {@link AuthnRequestReceivedEvent} is published.
  * </p>
  *
  * @author Martin Lindström
@@ -98,6 +106,9 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
   /** The maximum age of a received message. */
   private final Duration maxMessageAge;
 
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
+
   /**
    * Constructor.
    *
@@ -128,6 +139,15 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
     catch (final ComponentInitializationException e) {
       throw new IllegalArgumentException("Failed to initialize OpenSAML binding descriptors", e);
     }
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
   /**
@@ -172,6 +192,13 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
         && certificates.length > 0) {
       token.setClientCertificate(certificates[0]);
     }
+
+    // The request has been received ...
+    //
+    final AuditRequestContext auditContext = AuditRequestContext.get(request)
+        .setRequester(AuditRequester.named(AuthenticationProtocol.SAML, token.getEntityId()));
+    this.eventPublisher.publish(
+        new AuthnRequestReceivedEvent(auditContext.getRequester(), Saml2AuditData.authnRequest(token)));
 
     final SAMLProtocolContext protocolContext = new SAMLProtocolContext();
     protocolContext.setProtocol(SAMLConstants.SAML20P_NS);
@@ -253,6 +280,7 @@ public class Saml2AuthnRequestAuthenticationConverter implements AuthenticationC
               "Failed to look up valid SAML metadata for SP " + peerEntityId);
         });
     log.debug("SAML metadata for SP successfully found [{}]", token.getLogString());
+    auditContext.setRequester(AuditRequester.of(Objects.requireNonNull(record), false));
 
     // In order to avoid several threads working with the same DOM, the descriptor is cloned ...
     //

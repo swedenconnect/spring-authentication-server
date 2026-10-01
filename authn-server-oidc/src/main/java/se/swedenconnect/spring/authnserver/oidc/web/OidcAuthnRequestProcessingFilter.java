@@ -31,6 +31,14 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.FlowCorrelation;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnRequestReceivedEvent;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationConverter;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationToken;
@@ -45,6 +53,10 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAut
  * the request attribute {@link #INPUT_TOKEN_ATTRIBUTE} and the filter chain continues, so that
  * {@link OidcUserAuthenticationProcessingFilter} authenticates the user. The security context is left alone, since it
  * holds the authentication that may be reused for single sign-on.
+ * </p>
+ * <p>
+ * Each request starts a new authentication flow, with a new correlation ID for its audit events, and an
+ * {@link AuthnRequestReceivedEvent} is published before any check.
  * </p>
  *
  * @author Martin Lindström
@@ -69,6 +81,9 @@ public class OidcAuthnRequestProcessingFilter extends OncePerRequestFilter {
 
   /** What to do with the result. */
   private AuthenticationSuccessHandler successHandler = null;
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /**
    * Constructor.
@@ -95,6 +110,15 @@ public class OidcAuthnRequestProcessingFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
+    // A new authentication flow starts ...
+    //
+    FlowCorrelation.startFlow();
+    final AuditRequestContext auditContext = AuditRequestContext.get(request)
+        .setRequester(AuditRequester.named(AuthenticationProtocol.OIDC, request.getParameter("client_id")))
+        .setStage(AuditStage.AUTHN_REQUEST);
+    this.eventPublisher.publish(
+        new AuthnRequestReceivedEvent(auditContext.getRequester(), OidcAuditData.authnRequest(request)));
+
     final OidcAuthnRequestAuthenticationToken token = this.converter.convert(request);
     final Authentication result = this.provider.authenticate(token);
     log.debug("Authentication request processed [{}]", token.getLogString());
@@ -115,6 +139,15 @@ public class OidcAuthnRequestProcessingFilter extends OncePerRequestFilter {
    */
   public void setSuccessHandler(final @NonNull AuthenticationSuccessHandler successHandler) {
     this.successHandler = Objects.requireNonNull(successHandler, "successHandler must not be null");
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
 }

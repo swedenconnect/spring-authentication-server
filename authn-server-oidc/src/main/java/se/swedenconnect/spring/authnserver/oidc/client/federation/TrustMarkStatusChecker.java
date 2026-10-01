@@ -27,8 +27,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 
@@ -36,6 +38,7 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Federat
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationTrustMarkStatusRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMarkStatusResponse;
+import se.swedenconnect.spring.audit.appevents.SystemAlertEvent;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -50,7 +53,8 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * <p>
  * A trust mark that the issuer reports as anything but {@value #STATUS_ACTIVE} is removed from the cache entry, so a
  * client that needs it is treated as not holding it on its next request. A status endpoint that cannot be reached, or
- * a response that does not verify, leaves the trust mark in place.
+ * a response that does not verify, leaves the trust mark in place. A trust mark that is removed is published as a
+ * spring-audit-support {@link SystemAlertEvent}.
  * </p>
  * <p>
  * When the cache is shared by several nodes, a round runs on one node at a time, see
@@ -93,6 +97,9 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
 
   /** Where the job runs, or {@code null} until it has been started. */
   private ScheduledExecutorService executor;
+
+  /** Publishes the system alerts, or {@code null} if nothing is published. */
+  private ApplicationEventPublisher eventPublisher;
 
   /**
    * Constructor using an {@link HttpFederationClient} and the default interval.
@@ -221,6 +228,11 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
       }
       log.info("The issuer {} reports the trust mark '{}' of '{}' as '{}' - it is removed",
           issuer.entityId(), mark.type(), clientId, status);
+      if (this.eventPublisher != null) {
+        this.eventPublisher.publishEvent(new SystemAlertEvent(
+            "The issuer %s reports the trust mark '%s' of '%s' as '%s' - it is removed"
+                .formatted(issuer.entityId(), mark.type(), clientId, status)));
+      }
       return false;
     }
     catch (final ClientRegistryException | ParseException e) {
@@ -246,6 +258,16 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
     if (held != null && Objects.equals(held.trustMark(), mark.trustMark())) {
       this.cache.put(current.withoutTrustMark(mark.type()));
     }
+  }
+
+  /**
+   * Assigns the publisher of the {@link SystemAlertEvent}s that report a trust mark that is no longer valid. Without a
+   * publisher, nothing is published.
+   *
+   * @param eventPublisher the event publisher, or {@code null}
+   */
+  public void setEventPublisher(final @Nullable ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
   }
 
   /**

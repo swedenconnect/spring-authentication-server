@@ -66,7 +66,7 @@
     <bc.version>1.86</bc.version>
     <credentials-support.version>2.2.1</credentials-support.version>
     <lombok.version>1.18.48</lombok.version>
-    <audit-support.version>1.0.0</audit-support.version>
+    <audit-support.version>1.0.1</audit-support.version>
     <nimbus-jose-jwt.version>10.10</nimbus-jose-jwt.version>
     <oauth2-oidc-sdk.version>11.38.2</oauth2-oidc-sdk.version>
     <oidc-sweden-nimbus.version>0.9.3</oidc-sweden-nimbus.version>

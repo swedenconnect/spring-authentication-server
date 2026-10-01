@@ -657,6 +657,15 @@ provider.setRepository(repository);
 Whatever the storage, everything the module puts in it must survive Java serialization, including the token the
 controller delivers.
 
+## Audit events
+
+The server audits each authentication flow, see [Auditing](audit.html). A module that wants to add its own entries to
+the audit log publishes Spring application events and registers a spring-audit-support transformer for them. Events
+that the module publishes while the flow is in progress, from the provider or from its controller on the
+authentication path, are audited under the correlation ID of the flow without the module doing anything. A request to
+the controller must carry the `authnId` parameter for this, as it already must for the controller to find the
+authentication, see [The identifier of the authentication](#the-identifier-of-the-authentication).
+
 ## Post-authentication processing
 
 A [`PostAuthenticationProcessor`][PostAuthenticationProcessor] runs on the result before it becomes an assertion or a

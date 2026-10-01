@@ -27,11 +27,13 @@ import org.slf4j.LoggerFactory;
 
 import com.nimbusds.oauth2.sdk.ErrorObject;
 
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.ResumedAuthenticationToken;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorMapping;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorResponseException;
 import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseSender;
@@ -63,6 +65,9 @@ public class OidcResumedAuthenticationHandler implements ResumedAuthenticationHa
 
   /** Sends error responses. */
   private final OidcResponseSender responseSender;
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /**
    * Constructor.
@@ -106,7 +111,18 @@ public class OidcResumedAuthenticationHandler implements ResumedAuthenticationHa
       error = e.toErrorObject();
     }
     log.debug("Answering a failed authentication: {} [{}]", error.getDescription(), inputToken.getLogString());
+    this.eventPublisher.publishErrorResponse(request, OidcAuditData.authorizationErrorResponse(target),
+        error.getCode(), error.getDescription());
     this.responseSender.sendError(request, response, target, error);
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
 }

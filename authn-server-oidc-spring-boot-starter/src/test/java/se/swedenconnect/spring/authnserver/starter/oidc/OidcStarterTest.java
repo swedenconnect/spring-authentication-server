@@ -38,6 +38,7 @@ import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
  * @author Martin Lindström
  */
 @SpringBootTest(classes = OidcStarterTest.TestApplication.class, properties = {
+    "spring.application.name=authn-server-test",
     "authn-server.base-url=https://op.example.com",
     "authn-server.oidc.enabled=true",
     "authn-server.oidc.keys.signing[0].credential.jks.store.location=classpath:credentials/oidc-keys.p12",

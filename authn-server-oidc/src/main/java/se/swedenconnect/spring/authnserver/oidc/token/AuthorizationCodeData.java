@@ -49,6 +49,8 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
  * @param issuedAt when the code was issued
  * @param expiresAt when the code expires
  * @param retainUntil until when the code is kept after it has been used, so that a second use can be detected
+ * @param correlationId the correlation ID of the authentication flow, so that the client's call to the token endpoint
+ *     is audited under it, or {@code null}
  * @author Martin Lindström
  */
 public record AuthorizationCodeData(
@@ -56,7 +58,8 @@ public record AuthorizationCodeData(
     @Nullable String codeChallengeMethod, @Nullable String nonce, @NonNull List<String> scopes,
     @NonNull String subject, @NonNull Instant authnInstant, @NonNull String acr,
     @NonNull String idTokenClaims, @NonNull String userInfoClaims, @NonNull Instant issuedAt,
-    @NonNull Instant expiresAt, @NonNull Instant retainUntil) implements Serializable {
+    @NonNull Instant expiresAt, @NonNull Instant retainUntil, @Nullable String correlationId)
+    implements Serializable {
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
@@ -79,6 +82,7 @@ public record AuthorizationCodeData(
    * @param issuedAt when the code was issued
    * @param expiresAt when the code expires
    * @param retainUntil until when the code is kept after use
+   * @param correlationId the correlation ID of the authentication flow, or {@code null}
    */
   public AuthorizationCodeData {
     Objects.requireNonNull(code, "code must not be null");

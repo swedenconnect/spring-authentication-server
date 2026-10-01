@@ -86,6 +86,11 @@
     </dependency>
 
     <dependency>
+      <groupId>se.swedenconnect.spring.audit</groupId>
+      <artifactId>audit-support</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
     </dependency>

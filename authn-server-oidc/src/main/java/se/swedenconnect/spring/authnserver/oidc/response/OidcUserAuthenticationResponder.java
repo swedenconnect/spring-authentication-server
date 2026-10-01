@@ -40,6 +40,11 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseManager;
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.FlowCorrelation;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnAuthorizationResponseEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
@@ -50,6 +55,7 @@ import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.attributes.DeliveredClaims;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
 import se.swedenconnect.spring.authnserver.oidc.authentication.OidcAuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestData;
@@ -76,6 +82,10 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  * The authentication is kept in the session for single sign-on once the code has been issued. An error raised on the
  * way, such as when the attributes are released, removes the authentication from the session, as any failed
  * authentication does.
+ * </p>
+ * <p>
+ * The code is bound to the correlation ID of the flow, so that the client's call to the token endpoint is audited
+ * under it. The response is audited as an {@code authn_authorization_response} event.
  * </p>
  *
  * @author Martin Lindström
@@ -114,6 +124,9 @@ public class OidcUserAuthenticationResponder {
 
   /** How long a used code is kept, on top of its lifetime, so that a second use can be detected. */
   private Duration codeRetention = Duration.ofMinutes(5);
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /**
    * Constructor.
@@ -158,6 +171,7 @@ public class OidcUserAuthenticationResponder {
       final @NonNull UserAuthenticationInputToken token, final @NonNull UserAuthentication authentication)
       throws AuthenticationErrorException, UnrecoverableErrorException, IOException {
 
+    final AuditRequestContext auditContext = AuditRequestContext.get(request).setStage(AuditStage.RESPONSE);
     final OidcAuthnRequestData data = getRequestData(token);
     final OidcResponseTarget target = data.responseTarget();
     final AuthenticationRequirements requirements = token.getAuthnRequirements();
@@ -195,13 +209,25 @@ public class OidcUserAuthenticationResponder {
         data.codeChallenge(), data.codeChallengeMethod(), data.nonce(),
         requirements instanceof final OidcAuthenticationRequirements oidc ? oidc.getScopes() : data.scopes(),
         subject, user.getAuthnInstant(), user.getAuthnContextUri(), claims.idToken().toJSONString(),
-        claims.userInfo().toJSONString(), now, expiresAt, expiresAt.plus(this.codeRetention)));
+        claims.userInfo().toJSONString(), now, expiresAt, expiresAt.plus(this.codeRetention),
+        FlowCorrelation.current()));
 
     this.flow.saveAuthentication(authentication, request, response);
+    this.eventPublisher.publish(new AuthnAuthorizationResponseEvent(auditContext.getRequester(),
+        OidcAuditData.authorizationResponse(target)));
 
     log.debug("Sending authorization code to '{}' for '{}' [{}]", target.redirectUri(), authentication.getName(),
         logString);
     this.responseSender.send(request, response, target, Map.of("code", code));
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
   /**

@@ -119,12 +119,13 @@ class InMemoryStoresTest {
   private static AuthorizationCodeData code(final String code, final Instant expiresAt, final Instant retainUntil) {
     return new AuthorizationCodeData(code, "client-1", "https://rp.example.com/cb", null, null, null,
         List.of("openid"), "sub-1", NOW, "http://id.elegnamnden.se/loa/1.0/loa3",
-        "{\"https://id.oidc.se/claim/personalIdentityNumber\":\"197705232382\"}", "{}", NOW, expiresAt, retainUntil);
+        "{\"https://id.oidc.se/claim/personalIdentityNumber\":\"197705232382\"}", "{}", NOW, expiresAt, retainUntil,
+        null);
   }
 
   private static AccessTokenData token(final String value, final boolean singleUse) {
     return new AccessTokenData(value, "client-1", "sub-1", List.of("openid"), "{}", NOW,
-        NOW.plus(Duration.ofMinutes(5)), singleUse);
+        NOW.plus(Duration.ofMinutes(5)), singleUse, null);
   }
 
   /** A clock that the test moves. */

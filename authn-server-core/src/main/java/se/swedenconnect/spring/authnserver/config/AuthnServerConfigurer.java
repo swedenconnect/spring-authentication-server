@@ -31,16 +31,21 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.ExceptionTranslationFilter;
+import org.springframework.security.web.session.DisableEncodeUrlFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeProducer;
+import se.swedenconnect.spring.authnserver.audit.AuthnAuditFilter;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseVoter;
 import se.swedenconnect.spring.authnserver.attributes.release.DefaultAttributeProducer;
 import se.swedenconnect.spring.authnserver.attributes.release.IncludeAllAttributeReleaseVoter;
@@ -82,6 +87,11 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationResumeFilter;
  * <p>
  * The chain also serves the authentication paths and the resume paths of the redirect providers. The resume paths are
  * handled once for the whole server, and the flow continues in the protocol that the authentication was started for.
+ * </p>
+ * <p>
+ * The first filter of the chain is an {@link AuthnAuditFilter}, which keeps the correlation ID of the audit events to
+ * the request. The events are published to the {@link ApplicationContext}, see
+ * {@link #eventPublisher(ApplicationEventPublisher)}.
  * </p>
  * <p>
  * Every value is checked when the filter chain is built. Without Spring Boot, set up the chain like this:
@@ -185,6 +195,12 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /** The user authentication flow, assigned when the configurer is initialized. */
   private UserAuthenticationFlow userAuthenticationFlow;
+
+  /** The application event publisher, if assigned by the application. */
+  private ApplicationEventPublisher eventPublisher;
+
+  /** The publisher of the events of the authentication flows, assigned when the configurer is initialized. */
+  private AuthnEventPublisher activeEventPublisher;
 
   /**
    * Applies the configurer to the supplied {@link HttpSecurity} object, and makes the filter chain match the endpoints
@@ -649,6 +665,32 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   }
 
   /**
+   * Assigns the publisher of the application events that the server publishes, and that are turned into audit events.
+   * When not assigned, the {@link ApplicationContext} of the {@link HttpSecurity} object is used. Without either,
+   * nothing is published.
+   *
+   * @param eventPublisher the application event publisher, or {@code null} to use the application context
+   * @return this configurer
+   */
+  public @NonNull AuthnServerConfigurer eventPublisher(final @Nullable ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
+    return this;
+  }
+
+  /**
+   * Gets the publisher of the events of the authentication flows. Available once the configurer has been initialized.
+   *
+   * @return the event publisher
+   * @throws IllegalStateException if the configurer has not been initialized
+   */
+  public @NonNull AuthnEventPublisher getEventPublisher() {
+    if (this.activeEventPublisher == null) {
+      throw new IllegalStateException("AuthnServerConfigurer has not been initialized");
+    }
+    return this.activeEventPublisher;
+  }
+
+  /**
    * Gets the flow that hands processed requests to the authentication providers. Available once the configurer has
    * been initialized.
    *
@@ -666,7 +708,11 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   @Override
   public void init(final @NonNull HttpSecurity http) {
     this.validate();
+    this.activeEventPublisher = new AuthnEventPublisher(this.eventPublisher != null
+        ? this.eventPublisher
+        : http.getSharedObject(ApplicationContext.class));
     this.userAuthenticationFlow = new UserAuthenticationFlow(this.authenticationProviders);
+    this.userAuthenticationFlow.setEventPublisher(this.activeEventPublisher);
 
     final List<RequestMatcher> matchers = new ArrayList<>();
     for (final AbstractProtocolConfigurer<?> protocol : this.protocols.values()) {
@@ -705,6 +751,8 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   /** {@inheritDoc} */
   @Override
   public void configure(final @NonNull HttpSecurity http) {
+    http.addFilterBefore(this.postProcess(new AuthnAuditFilter(this.getEventPublisher(),
+        this.getUserAuthenticationFlow().getRedirectProviders())), DisableEncodeUrlFilter.class);
     this.protocols.values().forEach(p -> p.configure(http));
 
     final List<ResumedAuthenticationHandler> handlers = this.protocols.values().stream()

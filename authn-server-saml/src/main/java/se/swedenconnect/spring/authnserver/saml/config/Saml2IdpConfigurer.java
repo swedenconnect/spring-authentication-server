@@ -867,12 +867,14 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
     responseBuilder.setEncryptAssertions(this.encryptAssertions);
     final Saml2ErrorResponseProcessingFilter errorFilter =
         new Saml2ErrorResponseProcessingFilter(this.authnRequestMatcher, responseBuilder, responseSender);
+    errorFilter.setEventPublisher(server.getEventPublisher());
     http.addFilterAfter(this.postProcess(errorFilter), ExceptionTranslationFilter.class);
 
     // Request processing ...
     //
     final Saml2AuthnRequestAuthenticationConverter converter = new Saml2AuthnRequestAuthenticationConverter(
         server.getClientRegistry(), this.holderOfKeyMatcher, this.getClockSkew(), this.maxMessageAge);
+    converter.setEventPublisher(server.getEventPublisher());
 
     final AuthnContextResolver authnContextResolver = new AuthnContextResolver();
     authnContextResolver.setMinimumMapping(this.authnContextMinimumMapping);
@@ -921,6 +923,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
     final UserAuthenticationFlow flow = server.getUserAuthenticationFlow();
     final Saml2UserAuthenticationResponder responder =
         new Saml2UserAuthenticationResponder(assertionBuilder, responseBuilder, responseSender, flow);
+    responder.setEventPublisher(server.getEventPublisher());
     final Saml2UserAuthenticationProcessingFilter userAuthenticationFilter =
         new Saml2UserAuthenticationProcessingFilter(this.authnRequestMatcher, flow, responder);
     http.addFilterAfter(this.postProcess(userAuthenticationFilter), Saml2AuthnRequestProcessingFilter.class);

@@ -299,6 +299,7 @@ It runs at a configurable interval, one hour by default:
 ```java
 TrustMarkStatusChecker checker = new TrustMarkStatusChecker(cache, federation, new HttpFederationClient(),
     Duration.ofHours(1), Clock.systemUTC());
+checker.setEventPublisher(applicationContext);
 checker.start();
 ```
 
@@ -310,7 +311,9 @@ checker.start();
 - A trust mark that the issuer reports as anything but `active`, such as `revoked` or `expired`, is removed from the
   client's cached record. A client that needs it for the [required marks](#requester-acceptance) is then treated as not
   holding it on its next request: the trust mark is asked for again, and when the issuer no longer issues it, the
-  client is rejected with the same error response as any client that lacks a required mark.
+  client is rejected with the same error response as any client that lacks a required mark. The removal is also
+  published as a system alert for the audit log, when the checker has been given an event publisher, see
+  [Auditing](audit.html#trust-mark-alerts).
 - A status endpoint that cannot be reached, or a response that does not verify, leaves the trust mark in place. It is
   logged at `WARN`, and the trust mark is checked again at the next run.
 

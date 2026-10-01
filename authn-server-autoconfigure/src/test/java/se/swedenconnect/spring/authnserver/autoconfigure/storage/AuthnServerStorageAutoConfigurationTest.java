@@ -321,14 +321,14 @@ class AuthnServerStorageAutoConfigurationTest {
   private static AccessTokenData token(final String value) {
     final Instant now = Instant.parse("2026-10-01T10:00:00Z");
     return new AccessTokenData(value, "rp", "sub", List.of("openid"), "{}", now, Instant.now().plusSeconds(300),
-        false);
+        false, null);
   }
 
   private static AuthorizationCodeData code(final String code) {
     final Instant now = Instant.now();
     return new AuthorizationCodeData(code, "rp", "https://rp.example.com/cb", null, null, null, List.of("openid"),
         "sub", now, "http://id.elegnamnden.se/loa/1.0/loa3", "{}", "{}", now, now.plusSeconds(60),
-        now.plusSeconds(300));
+        now.plusSeconds(300), null);
   }
 
 }

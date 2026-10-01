@@ -37,6 +37,13 @@ import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
+import se.swedenconnect.spring.authnserver.audit.AuditFlowData;
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnRequestAcceptedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnUserAuthenticatedEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.RequestedAttributeValues;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -74,6 +81,10 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
  * {@link AuthenticationError#NO_AUTHN_CONTEXT} and {@link AuthenticationError#PASSIVE_NOT_POSSIBLE} are not failures
  * of an authentication, since no provider could take the request or the user was never asked.
  * </p>
+ * <p>
+ * The flow publishes an {@link AuthnRequestAcceptedEvent} when user authentication starts, and an
+ * {@link AuthnUserAuthenticatedEvent} when the user has been authenticated or single sign-on was used.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -90,6 +101,9 @@ public class UserAuthenticationFlow {
 
   /** Sends the user to a redirect provider's authentication path. */
   private RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
+
+  /** Publishes the events of the flow. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /**
    * Constructor.
@@ -130,6 +144,12 @@ public class UserAuthenticationFlow {
       final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response)
       throws AuthenticationErrorException, UnrecoverableErrorException, IOException {
 
+    final AuditFlowData auditData = getAuditData(token);
+    AuditRequestContext.get(request)
+        .setRequester(auditData.requester())
+        .setStage(AuditStage.USER_AUTHENTICATION);
+    this.eventPublisher.publish(new AuthnRequestAcceptedEvent(auditData.requester(), auditData.authnRequest()));
+
     token.setPreviousAuthentication(this.getSessionAuthentication());
     this.resolveVoluntaryAuthnContexts(token);
 
@@ -164,7 +184,8 @@ public class UserAuthenticationFlow {
       if (result instanceof final UserAuthentication userAuthentication) {
         log.debug("Provider '{}' authenticated '{}' [{}]", provider.getName(), userAuthentication.getName(),
             token.getLogString());
-        return prepare(userAuthentication, token);
+        return this.authenticated(userAuthentication, token,
+            userAuthentication == token.getPreviousAuthentication() || userAuthentication.isSsoApplied());
       }
       throw new UnrecoverableErrorException(CommonUnrecoverableError.INTERNAL,
           "Provider '%s' returned an unsupported result type %s".formatted(
@@ -230,7 +251,7 @@ public class UserAuthenticationFlow {
         final UserAuthentication authentication = provider.resumeAuthentication(token);
         RequestedAttributeValues.check(inputToken.getAuthnRequirements(), authentication.getAuthenticatedUser(),
             inputToken.getLogString());
-        return prepare(authentication, inputToken);
+        return this.authenticated(authentication, inputToken, authentication.isSsoApplied());
       }
       catch (final AuthenticationErrorException e) {
         this.failAuthentication(request, response, e);
@@ -347,6 +368,32 @@ public class UserAuthenticationFlow {
   }
 
   /**
+   * Assigns the publisher of the events of the flow. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
+  }
+
+  /**
+   * Gets the audit data of a request. A protocol module assigns it when it accepts the request. If it has not, the
+   * data is created from the requester of the request, which has been accepted.
+   *
+   * @param token the processed request
+   * @return the audit data
+   */
+  private static @NonNull AuditFlowData getAuditData(final @NonNull UserAuthenticationInputToken token) {
+    AuditFlowData auditData = token.getAuditData();
+    if (auditData == null) {
+      auditData = AuditFlowData.of(new AuditRequester(token.getRequester().protocol(),
+          token.getRequester().identifier(), null, true), null);
+      token.setAuditData(auditData);
+    }
+    return auditData;
+  }
+
+  /**
    * Gets the authentication in the session that may be reused.
    *
    * @return the authentication, or {@code null} if the session holds none
@@ -358,16 +405,21 @@ public class UserAuthenticationFlow {
   }
 
   /**
-   * Gives the result the requirements and the protocol data of the request being answered.
+   * Gives the result the requirements and the protocol data of the request being answered, and publishes an
+   * {@link AuthnUserAuthenticatedEvent}.
    *
    * @param authentication the result
    * @param token the processed request
+   * @param sso whether an earlier authentication was reused for single sign-on
    * @return the result
    */
-  private static @NonNull UserAuthentication prepare(final @NonNull UserAuthentication authentication,
-      final @NonNull UserAuthenticationInputToken token) {
+  private @NonNull UserAuthentication authenticated(final @NonNull UserAuthentication authentication,
+      final @NonNull UserAuthenticationInputToken token, final boolean sso) {
     authentication.setAuthnRequirements(token.getAuthnRequirements());
     authentication.setProtocolRequestData(token.getProtocolRequestData());
+    final AuditFlowData auditData = getAuditData(token);
+    this.eventPublisher.publish(
+        new AuthnUserAuthenticatedEvent(auditData.requester(), auditData.authnRequest(), authentication, sso));
     return authentication;
   }
 

@@ -49,6 +49,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mock.web.MockFilterChain;
@@ -94,6 +95,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import se.swedenconnect.security.credential.PkiCredential;
+import se.swedenconnect.spring.audit.AuditApplicationListener;
+import se.swedenconnect.spring.audit.AuditEvent;
+import se.swedenconnect.spring.audit.tracing.CorrelationIDHolder;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
@@ -108,12 +112,14 @@ import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.oidc.audit.AuditCollector;
 import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
+import se.swedenconnect.spring.authnserver.oidc.userinfo.UserInfoRequestProcessor;
 
 /**
  * End-to-end tests of the OpenID Connect code flow: the authentication request, the authentication of the user with a
@@ -219,6 +225,16 @@ class OidcCodeFlowTest {
       AuthnServerConfigurer.applyDefaultSecurity(http, configurer);
       customizer.accept(configurer);
       return http.build();
+    }
+
+    @Bean
+    AuditApplicationListener auditApplicationListener(final ApplicationContext context) {
+      return AuditCollector.listener(context);
+    }
+
+    @Bean
+    AuditCollector auditCollector() {
+      return new AuditCollector();
     }
   }
 
@@ -962,6 +978,234 @@ class OidcCodeFlowTest {
     assertThat(ACCESS_TOKENS.get((String) json.get("access_token")).singleUse()).isFalse();
   }
 
+  // Audit
+
+  @Test
+  void aCompleteCodeFlowIsAuditedUnderOneCorrelationId() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("scope", "openid profile " + PNR_SCOPE);
+    params.put("acr_values", LOA3);
+    params.put("prompt", "login");
+    final Tokens tokens = this.codeFlow(params);
+    assertThat(CorrelationIDHolder.get()).isNull();
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_request_accepted",
+        "authn_user_authenticated", "authn_authorization_response", "authn_success_response",
+        "authn_userinfo_delivered");
+    assertThat(audit.getCorrelationIds()).doesNotContainNull().containsOnly(audit.getCorrelationIds().getFirst());
+    assertThat(audit.getEvents()).allSatisfy(e -> {
+      assertThat(e.getPrincipal()).isEqualTo(RSA_CLIENT);
+      assertThat(AuditCollector.data(e, "requester")).containsEntry("protocol", "oidc").containsEntry("id", RSA_CLIENT);
+    });
+    assertThat(AuditCollector.data(audit.get("authn_request_received"), "requester")).containsEntry("verified", false);
+    assertThat(audit.getEvents().subList(1, 6))
+        .allSatisfy(e -> assertThat(AuditCollector.data(e, "requester")).containsEntry("verified", true));
+
+    // The OpenID Connect data
+    assertThat(AuditCollector.data(audit.get("authn_request_accepted"), "authn_request"))
+        .containsEntry("client_id", RSA_CLIENT)
+        .containsEntry("redirect_uri", REDIRECT_URI)
+        .containsEntry("response_type", "code")
+        .containsEntry("response_mode", "query")
+        .containsEntry("scope", List.of("openid", "profile", PNR_SCOPE))
+        .containsEntry("acr_values", List.of(LOA3))
+        .containsEntry("prompt", List.of("login"))
+        .containsEntry("state", "state-1")
+        .containsEntry("request_object", false);
+    assertThat(AuditCollector.data(audit.get("authn_authorization_response"), "authorization_response"))
+        .containsEntry("redirect_uri", REDIRECT_URI)
+        .containsEntry("state", "state-1")
+        .doesNotContainKey("code");
+    assertThat(AuditCollector.data(audit.get("authn_success_response"), "response"))
+        .containsEntry("sub", tokens.idToken().getSubject())
+        .containsEntry("acr", LOA3)
+        .containsEntry("id_token_signed", true)
+        .containsEntry("id_token_encrypted", false);
+    assertThat(AuditCollector.data(audit.get("authn_userinfo_delivered"), "response"))
+        .containsEntry("sub", tokens.idToken().getSubject())
+        .containsEntry("signed", true)
+        .containsEntry("encrypted", false);
+
+    // All delivered attributes, and the released claims of the ID token and the UserInfo response
+    assertThat(attributeNames(audit.get("authn_user_authenticated"), "attributes"))
+        .containsExactlyInAnyOrder(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, AttributeIdentifiers.GIVEN_NAME,
+            AttributeIdentifiers.SURNAME);
+    assertThat(attributeNames(audit.get("authn_success_response"), "released_attributes"))
+        .containsExactly(PNR_CLAIM);
+    assertThat(attributeNames(audit.get("authn_userinfo_delivered"), "released_attributes"))
+        .containsExactlyInAnyOrder(PNR_CLAIM, "given_name", "family_name");
+  }
+
+  @Test
+  void aRedirectFlowIsAuditedUnderOneCorrelationIdAcrossItsRequests() throws Exception {
+    final TestRedirectProvider provider = new TestRedirectProvider(LOA3);
+    this.start(c -> {}, provider);
+    final MockHttpServletResponse redirect = this.send(get(AUTHZ_PATH, params(RSA_CLIENT)));
+    final String authnId = redirect.getRedirectedUrl().substring(redirect.getRedirectedUrl().indexOf('=') + 1);
+    provider.getAuthenticatorRepository().complete(new UserAuthentication(user(LOA3)),
+        this.appRequest(AUTHN_PATH, authnId));
+    final Map<String, String> response = query(this.send(this.appRequest(RESUME_PATH, authnId)));
+    final MockHttpServletResponse tokenResponse =
+        this.token(privateKeyJwt(RSA_CLIENT, CLIENT_RSA, "rsa-key"), response.get("code"), REDIRECT_URI, null);
+    this.send(userInfoRequest("GET", (String) JSONObjectUtils.parse(tokenResponse.getContentAsString())
+        .get("access_token"), null));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_request_accepted",
+        "authn_user_authenticated", "authn_authorization_response", "authn_success_response",
+        "authn_userinfo_delivered");
+    assertThat(audit.getCorrelationIds()).doesNotContainNull().containsOnly(audit.getCorrelationIds().getFirst());
+    assertThat(CorrelationIDHolder.get()).isNull();
+  }
+
+  @Test
+  void anErrorSentToTheRedirectUriIsAudited() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    provider.error = new AuthenticationErrorException(AuthenticationError.CANCEL);
+    this.start(c -> {}, provider);
+    this.send(get(AUTHZ_PATH, params(RSA_CLIENT)));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes())
+        .containsExactly("authn_request_received", "authn_request_accepted", "authn_error_response");
+    assertThat(audit.getCorrelationIds()).containsOnly(audit.getCorrelationIds().getFirst());
+    final AuditEvent error = audit.get("authn_error_response");
+    assertThat(error.getPrincipal()).isEqualTo(RSA_CLIENT);
+    assertThat(error.getData().get("stage")).isEqualTo("user_authentication");
+    assertThat(AuditCollector.data(error, "requester")).containsEntry("verified", true);
+    assertThat(AuditCollector.data(error, "error")).containsEntry("code", "access_denied");
+    assertThat(AuditCollector.data(error, "response"))
+        .containsEntry("redirect_uri", REDIRECT_URI)
+        .containsEntry("state", "state-1");
+  }
+
+  @Test
+  void anInvalidRequestIsAuditedAsAnErrorFromTheRequestStage() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("response_type", "id_token");
+    this.send(get(AUTHZ_PATH, params));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_error_response");
+    final AuditEvent error = audit.get("authn_error_response");
+    assertThat(error.getData().get("stage")).isEqualTo("authn_request");
+    assertThat(AuditCollector.data(error, "requester")).containsEntry("verified", true);
+    assertThat(AuditCollector.data(error, "error")).containsEntry("code", "invalid_request");
+  }
+
+  @Test
+  void anUnknownClientIsAuditedWithTheNamedClientAsPrincipal() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    assertThatThrownBy(() -> this.send(get(AUTHZ_PATH, params("https://unknown.example.com"))))
+        .isInstanceOf(UnrecoverableErrorException.class);
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+    assertThat(audit.getCorrelationIds()).doesNotContainNull().containsOnly(audit.getCorrelationIds().getFirst());
+    final AuditEvent error = audit.get("authn_unrecoverable_error");
+    assertThat(error.getPrincipal()).isEqualTo("https://unknown.example.com");
+    assertThat(error.getData().get("stage")).isEqualTo("authn_request");
+    assertThat(AuditCollector.data(error, "requester")).containsEntry("verified", false);
+    assertThat(AuditCollector.data(error, "error"))
+        .containsEntry("code", OidcUnrecoverableError.UNKNOWN_CLIENT.getMessageCode());
+    assertThat(CorrelationIDHolder.get()).isNull();
+  }
+
+  @Test
+  void aRequestWithoutClientIsAuditedWithTheUnknownPrincipal() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.remove("client_id");
+    assertThatThrownBy(() -> this.send(get(AUTHZ_PATH, params))).isInstanceOf(UnrecoverableErrorException.class);
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+    assertThat(audit.getEvents()).allSatisfy(e -> {
+      assertThat(e.getPrincipal()).isEqualTo("unknown");
+      assertThat(AuditCollector.data(e, "requester")).containsEntry("verified", false).doesNotContainKey("id");
+    });
+  }
+
+  @Test
+  void anUnsupportedResponseModeIsAuditedAsAnUnrecoverableError() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("response_mode", "fragment");
+    assertThat(this.send(get(AUTHZ_PATH, params)).getStatus()).isEqualTo(400);
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+    assertThat(audit.get("authn_unrecoverable_error").getPrincipal()).isEqualTo(RSA_CLIENT);
+  }
+
+  @Test
+  void tokenEndpointErrorsAreAudited() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final String code = this.authorize(params(RSA_CLIENT)).get("code");
+    final String flow = this.audit().getCorrelationIds().getFirst();
+    this.audit().clear();
+
+    // An unknown code cannot be tied to a flow
+    this.token(privateKeyJwt(RSA_CLIENT, CLIENT_RSA, "rsa-key"), "unknown-code", REDIRECT_URI, null);
+    // A client that cannot be authenticated is not verified
+    this.token(privateKeyJwt(RSA_CLIENT, OTHER, "rsa-key"), code, REDIRECT_URI, null);
+    // A client that is not known
+    this.token(privateKeyJwt("https://unknown.example.com", CLIENT_RSA, "rsa-key"), code, REDIRECT_URI, null);
+    // A wrong redirect_uri, for a known code
+    this.token(privateKeyJwt(RSA_CLIENT, CLIENT_RSA, "rsa-key"), code, "https://other.example.com", null);
+    assertThat(CorrelationIDHolder.get()).isNull();
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsOnly("authn_error_response").hasSize(4);
+    assertThat(audit.getEvents())
+        .allSatisfy(e -> assertThat(e.getData().get("stage")).isEqualTo("token"));
+    final List<AuditEvent> events = audit.getEvents();
+
+    assertThat(events.get(0).getPrincipal()).isEqualTo(RSA_CLIENT);
+    assertThat(AuditCollector.data(events.get(0), "requester")).containsEntry("verified", true);
+    assertThat(AuditCollector.data(events.get(0), "error")).containsEntry("code", "invalid_grant");
+    assertThat(AuditCollector.data(events.get(0), "response")).containsEntry("http_status", 400);
+    assertThat(events.get(0).getCorrelationId().getValue()).isNotEqualTo(flow);
+
+    assertThat(events.get(1).getPrincipal()).isEqualTo(RSA_CLIENT);
+    assertThat(AuditCollector.data(events.get(1), "requester")).containsEntry("verified", false);
+    assertThat(AuditCollector.data(events.get(1), "error")).containsEntry("code", "invalid_client");
+
+    assertThat(events.get(2).getPrincipal()).isEqualTo("https://unknown.example.com");
+    assertThat(AuditCollector.data(events.get(2), "requester")).containsEntry("verified", false);
+
+    // The code is known, so the request is audited under the flow
+    assertThat(events.get(3).getCorrelationId().getValue()).isEqualTo(flow);
+    assertThat(AuditCollector.data(events.get(3), "requester")).containsEntry("verified", true);
+
+    // Each request that was not tied to a flow got an ID of its own
+    assertThat(audit.getCorrelationIds().subList(0, 3)).doesNotContainNull().doesNotHaveDuplicates();
+  }
+
+  @Test
+  void userInfoErrorsAreAudited() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    this.send(userInfoRequest("GET", "unknown-token", null));
+    this.send(userInfoRequest("GET", null, null));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_error_response", "authn_error_response");
+    assertThat(audit.getEvents()).allSatisfy(e -> {
+      assertThat(e.getPrincipal()).isEqualTo("unknown");
+      assertThat(e.getData().get("stage")).isEqualTo("userinfo");
+      assertThat(AuditCollector.data(e, "requester"))
+          .containsEntry("protocol", "oidc")
+          .containsEntry("verified", false);
+      assertThat(AuditCollector.data(e, "response")).containsEntry("http_status", 401);
+    });
+    assertThat(AuditCollector.data(audit.getEvents().get(0), "error")).containsEntry("code", "invalid_token");
+    assertThat(AuditCollector.data(audit.getEvents().get(1), "error"))
+        .containsEntry("code", UserInfoRequestProcessor.MISSING_TOKEN_AUDIT_CODE);
+  }
+
   // Helpers
 
   private void start(final Consumer<AuthnServerConfigurer> c, final AbstractUserAuthenticationProvider... p) {
@@ -983,6 +1227,17 @@ class OidcCodeFlowTest {
     final MockHttpServletResponse response = new MockHttpServletResponse();
     filter.doFilter(request, response, new MockFilterChain());
     return response;
+  }
+
+  private AuditCollector audit() {
+    return this.context.getBean(AuditCollector.class);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<String> attributeNames(final AuditEvent event, final String name) {
+    return ((List<Map<String, Object>>) event.getData().get(name)).stream()
+        .map(a -> (String) a.get("name"))
+        .toList();
   }
 
   private Map<String, String> authorize(final Map<String, String> params) throws Exception {

@@ -970,6 +970,7 @@ or later:
 
 - The failure is logged as an error, and a new attempt is made after the retry interval, 5 minutes by default,
   `authn-server.oidc.federation.trust-mark-retry-interval`.
+- The failure is published as a system alert for the audit log, see [Auditing](audit.html#trust-mark-alerts).
 - The current trust mark, if there is one, is still published until it expires.
 - At startup without a trust mark, the entity configuration is published without it, and gets it once it has been
   fetched.

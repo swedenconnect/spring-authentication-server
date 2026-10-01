@@ -105,6 +105,10 @@ declared as [`UserAuthenticationProvider`][UserAuthenticationProvider] beans, se
 The whole server uses one `SecurityFilterChain`, named `authnServerSecurityFilterChain`. It matches the endpoints of
 the enabled protocols and nothing else, so the application is free to set up its own chains for its other pages.
 
+The server audits its authentication flows with spring-audit-support, which refuses to start unless
+`spring.application.name` is set. Where the audit events are stored is configured with spring-audit-support's
+`audit.*` properties. See [Auditing](audit.html).
+
 <a name="enabling-protocols"></a>
 ## Enabling protocols
 
@@ -1164,8 +1168,9 @@ to `true`.
 Endpoints that were moved away from `/saml2` are set up by changing `authn-server.saml.path`, if they share a prefix,
 or by giving each endpoint relative to an empty SAML path.
 
-The properties below are not yet available. They will be added, with the same structure, together with the features
-they configure: `saml.idp.audit.*`.
+The `saml.idp.audit.*` properties are gone. Auditing is done with spring-audit-support, and its repositories are
+configured with its `audit.*` properties. The audit event types and their data have changed as well, see
+[Auditing](audit.html).
 
 Redisson is not supported. A deployment that used the Redisson starter configures the connection with Spring Boot's
 `spring.data.redis.*` settings instead, see [The Redis connection](#the-redis-connection).

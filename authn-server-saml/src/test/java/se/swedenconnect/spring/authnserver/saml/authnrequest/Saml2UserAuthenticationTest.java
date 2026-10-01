@@ -35,6 +35,9 @@ import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestT
 import static se.swedenconnect.spring.authnserver.saml.authnrequest.SamlRequestTestSupport.toHttpRequest;
 
 import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +47,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.NonNull;
@@ -74,6 +79,7 @@ import org.opensaml.xmlsec.keyinfo.KeyInfoSupport;
 import org.opensaml.xmlsec.signature.KeyInfo;
 import org.opensaml.xmlsec.signature.Signature;
 import org.opensaml.xmlsec.signature.support.SignatureValidator;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mock.web.MockFilterChain;
@@ -103,6 +109,9 @@ import se.swedenconnect.opensaml.sweid.saml2.signservice.dss.SignMessage;
 import se.swedenconnect.opensaml.xmlsec.encryption.support.SAMLObjectDecrypter;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.opensaml.OpenSamlCredential;
+import se.swedenconnect.spring.audit.AuditApplicationListener;
+import se.swedenconnect.spring.audit.AuditEvent;
+import se.swedenconnect.spring.audit.tracing.CorrelationIDHolder;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.release.AttributeReleaseVote;
@@ -124,11 +133,15 @@ import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
+import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 import se.swedenconnect.spring.authnserver.saml.attributes.OpenSamlTestBase;
 import se.swedenconnect.spring.authnserver.saml.attributes.release.SwedenConnectAttributeProducer;
 import se.swedenconnect.spring.authnserver.saml.attributes.release.SwedenConnectAttributeReleaseVoter;
+import se.swedenconnect.spring.authnserver.saml.audit.AuditCollector;
 import se.swedenconnect.spring.authnserver.saml.config.Saml2IdpConfigurer;
 import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatus;
+import se.swedenconnect.spring.authnserver.saml.error.SamlUnrecoverableError;
 import se.swedenconnect.spring.authnserver.sso.RequestedAttributesSsoVoter;
 import se.swedenconnect.spring.authnserver.sso.SsoDecision;
 import se.swedenconnect.spring.authnserver.sso.SsoDenialReason;
@@ -197,6 +210,16 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
       AuthnServerConfigurer.applyDefaultSecurity(http, configurer);
       customizer.accept(configurer);
       return http.build();
+    }
+
+    @Bean
+    AuditApplicationListener auditApplicationListener(final ApplicationContext context) {
+      return AuditCollector.listener(context);
+    }
+
+    @Bean
+    AuditCollector auditCollector() {
+      return new AuditCollector();
     }
   }
 
@@ -867,6 +890,248 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
         StatusCode.AUTHN_FAILED);
   }
 
+  // Audit
+
+  @Test
+  void aCompleteFlowIsAuditedUnderOneCorrelationId() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    final RequestHttpObject<AuthnRequest> request = this.request(r -> {});
+    final Response response = parseResponse(this.send(toHttpRequest(request)));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_request_accepted",
+        "authn_user_authenticated", "authn_success_response");
+    assertThat(audit.getCorrelationIds()).doesNotContainNull().containsOnly(audit.getCorrelationIds().getFirst());
+    assertThat(audit.getEvents()).allSatisfy(e -> {
+      assertThat(e.getPrincipal()).isEqualTo(SP_ENTITY_ID);
+      assertThat(AuditCollector.data(e, "requester"))
+          .containsEntry("protocol", "saml")
+          .containsEntry("id", SP_ENTITY_ID);
+    });
+    // Received before any check, so the SP is not verified
+    assertThat(AuditCollector.data(audit.get("authn_request_received"), "requester")).containsEntry("verified", false);
+    assertThat(audit.getEvents().subList(1, 4))
+        .allSatisfy(e -> assertThat(AuditCollector.data(e, "requester")).containsEntry("verified", true));
+    assertThat(CorrelationIDHolder.get()).isNull();
+
+    // The SAML data
+    final Map<String, Object> authnRequest = AuditCollector.data(audit.get("authn_request_received"), "authn_request");
+    assertThat(authnRequest)
+        .containsEntry("id", request.getRequest().getID())
+        .containsEntry("issuer", SP_ENTITY_ID)
+        .containsEntry("relay_state", RELAY_STATE)
+        .containsEntry("force_authn", false)
+        .containsEntry("is_passive", false)
+        .containsEntry("binding", POST_BINDING);
+    assertThat(AuditCollector.data(audit.get("authn_request_accepted"), "authn_request"))
+        .containsEntry("id", request.getRequest().getID())
+        .containsEntry("assertion_consumer_service_url", ACS_URL);
+
+    final Map<String, Object> responseData = AuditCollector.data(audit.get("authn_success_response"), "response");
+    assertThat(responseData)
+        .containsEntry("id", response.getID())
+        .containsEntry("in_response_to", request.getRequest().getID())
+        .containsEntry("destination", ACS_URL)
+        .containsEntry("signed", true)
+        .containsEntry("relay_state", RELAY_STATE);
+    assertThat((Map<String, Object>) responseData.get("assertion"))
+        .containsEntry("encrypted", true)
+        .containsEntry("authn_context_class_ref", LOA3)
+        .containsEntry("subject_id", assertion(response).getSubject().getNameID().getValue());
+
+    // All delivered attributes, by their neutral names, and the released ones, by their SAML names
+    assertThat(attributeNames(audit.get("authn_user_authenticated"), "attributes")).contains(
+        AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, AttributeIdentifiers.GIVEN_NAME,
+        AttributeIdentifiers.DISPLAY_NAME);
+    assertThat(attributeNames(audit.get("authn_success_response"), "released_attributes"))
+        .contains(AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER,
+            AttributeConstants.ATTRIBUTE_NAME_GIVEN_NAME)
+        .doesNotContain(AttributeConstants.ATTRIBUTE_NAME_MAIL, AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER);
+    assertThat(AuditCollector.data(audit.get("authn_user_authenticated"), "user_authentication"))
+        .containsEntry("acr", LOA3)
+        .containsEntry("sso", false);
+  }
+
+  @Test
+  void aRedirectFlowIsAuditedUnderOneCorrelationIdAlsoOnTheModulePages() throws Exception {
+    final TestRedirectProvider provider = new TestRedirectProvider(LOA3);
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, provider);
+    final String authnId = this.redirectedAuthnId(this.send(toHttpRequest(this.request(r -> {}))));
+    assertThat(CorrelationIDHolder.get()).isNull();
+
+    // The module's page is served within the flow ...
+    final AtomicReference<String> moduleCorrelationId = new AtomicReference<>();
+    this.send(this.appRequest("GET", AUTHN_PATH, authnId), new MockFilterChain(new HttpServlet() {
+      @Override
+      protected void service(final HttpServletRequest req, final HttpServletResponse resp) {
+        moduleCorrelationId.set(CorrelationIDHolder.get().getValue());
+      }
+    }));
+    provider.getAuthenticatorRepository().complete(new UserAuthentication(user(LOA3, List.of())),
+        this.appRequest("GET", AUTHN_PATH, authnId));
+    this.send(this.appRequest("GET", RESUME_PATH, authnId));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_request_accepted",
+        "authn_user_authenticated", "authn_success_response");
+    assertThat(audit.getCorrelationIds()).containsOnly(moduleCorrelationId.get());
+    assertThat(audit.getEvents()).allSatisfy(e -> assertThat(e.getPrincipal()).isEqualTo(SP_ENTITY_ID));
+    assertThat(AuditCollector.data(audit.get("authn_success_response"), "requester")).containsEntry("verified", true);
+    assertThat(CorrelationIDHolder.get()).isNull();
+  }
+
+  @Test
+  void singleSignOnIsAuditedInAFlowOfItsOwn() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    final RequestHttpObject<AuthnRequest> first = this.request(r -> {});
+    this.send(toHttpRequest(first));
+    final String firstFlow = this.audit().getCorrelationIds().getFirst();
+    this.audit().clear();
+
+    this.send(toHttpRequest(this.request(r -> {})));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getCorrelationIds()).containsOnly(audit.getCorrelationIds().getFirst())
+        .doesNotContain(firstFlow);
+    final Map<String, Object> authentication =
+        AuditCollector.data(audit.get("authn_user_authenticated"), "user_authentication");
+    assertThat(authentication).containsEntry("sso", true);
+    assertThat((Map<String, Object>) authentication.get("sso_information"))
+        .containsEntry("original_protocol", "saml")
+        .containsEntry("original_requester", SP_ENTITY_ID)
+        .containsEntry("original_request_id", first.getRequest().getID());
+  }
+
+  @Test
+  void anErrorFromTheProviderIsAuditedAsAnErrorResponse() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    provider.error = new AuthenticationErrorException(AuthenticationError.FRAUD, "Fraud detected");
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, provider);
+    final RequestHttpObject<AuthnRequest> request = this.request(r -> {});
+    this.send(toHttpRequest(request));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes())
+        .containsExactly("authn_request_received", "authn_request_accepted", "authn_error_response");
+    assertThat(audit.getCorrelationIds()).containsOnly(audit.getCorrelationIds().getFirst());
+    final AuditEvent error = audit.get("authn_error_response");
+    assertThat(error.getPrincipal()).isEqualTo(SP_ENTITY_ID);
+    assertThat(error.getData().get("stage")).isEqualTo("user_authentication");
+    assertThat(AuditCollector.data(error, "requester")).containsEntry("verified", true);
+    assertThat(AuditCollector.data(error, "error")).containsEntry("code", SamlErrorStatus.FRAUD);
+    assertThat(AuditCollector.data(error, "response"))
+        .containsEntry("in_response_to", request.getRequest().getID())
+        .containsEntry("status_code", StatusCode.RESPONDER)
+        .containsEntry("subordinate_status_code", SamlErrorStatus.FRAUD)
+        .containsEntry("destination", ACS_URL);
+  }
+
+  @Test
+  void anInvalidRequestIsAuditedAsAnErrorResponseFromTheRequestStage() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    this.send(toHttpRequest(this.request(r -> {
+      r.setForceAuthn(true);
+      r.setIsPassive(true);
+    })));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_error_response");
+    final AuditEvent error = audit.get("authn_error_response");
+    assertThat(error.getData().get("stage")).isEqualTo("authn_request");
+    assertThat(error.getPrincipal()).isEqualTo(SP_ENTITY_ID);
+    assertThat(AuditCollector.data(error, "requester")).containsEntry("verified", true);
+    assertThat(AuditCollector.data(error, "error")).containsEntry("code", StatusCode.REQUEST_UNSUPPORTED);
+  }
+
+  @Test
+  void aFailedReleaseIsAuditedAsAnErrorResponseFromTheResponseStage() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> c.protocol(Saml2IdpConfigurer.class,
+        saml -> saml.attributeProducers(l -> l.addFirst(a -> {
+          throw new AuthenticationErrorException(AuthenticationError.AUTHN_FAILED, "Release failed");
+        }))), new TestProvider("direct", LOA3));
+    this.send(toHttpRequest(this.request(r -> {})));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_request_accepted",
+        "authn_user_authenticated", "authn_error_response");
+    assertThat(audit.get("authn_error_response").getData().get("stage")).isEqualTo("response");
+  }
+
+  @Test
+  void anUnknownSpIsAuditedAsAnUnrecoverableErrorWithTheNamedSpAsPrincipal() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> c.clientRegistry(new ClientRegistry() {
+      @Override
+      public RequesterRecord lookup(final Requester requester) {
+        return null;
+      }
+
+      @Override
+      public RequesterRecord requestMark(final Requester requester, final String mark) {
+        return null;
+      }
+    }), new TestProvider("direct", LOA3));
+    assertThatThrownBy(() -> this.send(toHttpRequest(this.request(r -> {}))))
+        .isInstanceOf(UnrecoverableErrorException.class);
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+    assertThat(audit.getCorrelationIds()).doesNotContainNull().containsOnly(audit.getCorrelationIds().getFirst());
+    final AuditEvent error = audit.get("authn_unrecoverable_error");
+    assertThat(error.getPrincipal()).isEqualTo(SP_ENTITY_ID);
+    assertThat(error.getData().get("stage")).isEqualTo("authn_request");
+    assertThat(AuditCollector.data(error, "requester"))
+        .containsEntry("id", SP_ENTITY_ID)
+        .containsEntry("verified", false);
+    assertThat(AuditCollector.data(error, "error"))
+        .containsEntry("code", SamlUnrecoverableError.UNKNOWN_PEER.getMessageCode());
+    assertThat(CorrelationIDHolder.get()).isNull();
+  }
+
+  @Test
+  void aRequestWithoutIssuerIsAuditedWithTheUnknownPrincipal() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    assertThatThrownBy(() -> this.send(toHttpRequest(this.request(r -> r.setIssuer(null)))))
+        .isInstanceOf(UnrecoverableErrorException.class);
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+    assertThat(audit.getEvents()).allSatisfy(e -> {
+      assertThat(e.getPrincipal()).isEqualTo("unknown");
+      assertThat(AuditCollector.data(e, "requester"))
+          .containsEntry("protocol", "saml")
+          .containsEntry("verified", false)
+          .doesNotContainKey("id");
+    });
+  }
+
+  @Test
+  void aMessageThatCannotBeDecodedIsAuditedAsAnUnrecoverableErrorOnly() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestProvider("direct", LOA3));
+    final MockHttpServletRequest request = toHttpRequest(this.request(r -> {}));
+    request.setParameter("SAMLRequest", "not-a-message");
+    assertThatThrownBy(() -> this.send(request)).isInstanceOf(UnrecoverableErrorException.class);
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_unrecoverable_error");
+    assertThat(audit.getEvents().getFirst().getPrincipal()).isEqualTo("unknown");
+    assertThat(audit.getCorrelationIds().getFirst()).isNotNull();
+  }
+
+  @Test
+  void aResumeWithoutAFlowIsAuditedUnderACorrelationIdOfItsOwn() throws Exception {
+    this.start(spMetadata(sp -> {}, LOA3_PNR), c -> {}, new TestRedirectProvider(LOA3));
+    assertInvalidSession(this.appRequest("GET", RESUME_PATH, "unknown"));
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_unrecoverable_error");
+    final AuditEvent error = audit.getEvents().getFirst();
+    assertThat(error.getPrincipal()).isEqualTo("unknown");
+    assertThat(error.getCorrelationId()).isNotNull();
+    assertThat(error.getData().get("stage")).isEqualTo("user_authentication");
+    assertThat(AuditCollector.data(error, "error"))
+        .containsEntry("code", CommonUnrecoverableError.INVALID_SESSION.getMessageCode());
+  }
+
   // Support
 
   private void start(final EntityDescriptor spMetadata, final Consumer<AuthnServerConfigurer> c,
@@ -886,11 +1151,27 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
   }
 
   private MockHttpServletResponse send(final MockHttpServletRequest request) throws Exception {
+    return this.send(request, new MockFilterChain());
+  }
+
+  private MockHttpServletResponse send(final MockHttpServletRequest request, final MockFilterChain chain)
+      throws Exception {
     request.setSession(this.session);
     final Filter filter = this.context.getBean("springSecurityFilterChain", Filter.class);
     final MockHttpServletResponse response = new MockHttpServletResponse();
-    filter.doFilter(request, response, new MockFilterChain());
+    filter.doFilter(request, response, chain);
     return response;
+  }
+
+  private AuditCollector audit() {
+    return this.context.getBean(AuditCollector.class);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<String> attributeNames(final AuditEvent event, final String name) {
+    return ((List<Map<String, Object>>) event.getData().get(name)).stream()
+        .map(a -> (String) a.get("name"))
+        .toList();
   }
 
   private MockHttpServletRequest appRequest(final String method, final String path, final @Nullable String authnId) {

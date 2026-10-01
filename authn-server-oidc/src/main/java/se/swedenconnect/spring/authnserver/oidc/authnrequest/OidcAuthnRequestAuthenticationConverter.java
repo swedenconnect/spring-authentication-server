@@ -40,6 +40,8 @@ import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.oauth2.sdk.util.JWTClaimsSetUtils;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorResponseException;
@@ -139,6 +141,8 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
           "Client %s is not known".formatted(clientId));
     }
     log.debug("Client found in the client registry [{}]", logString);
+    final AuditRequestContext auditContext =
+        AuditRequestContext.get(request).setRequester(AuditRequester.of(record, false));
 
     // Public clients are not supported ...
     //
@@ -193,6 +197,7 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
     final OidcResponseTarget target =
         new OidcResponseTarget(clientId, redirectUri, responseMode, getFirstValue(merged, "state"));
     OidcResponseTarget.setOnRequest(request, target);
+    auditContext.setRequester(AuditRequester.of(record, true));
 
     return new OidcAuthnRequestAuthenticationToken(record, merged, requestObject, target);
   }

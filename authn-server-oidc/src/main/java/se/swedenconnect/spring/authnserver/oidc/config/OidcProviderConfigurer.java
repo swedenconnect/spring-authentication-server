@@ -936,6 +936,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     }
     final OidcErrorResponseProcessingFilter errorFilter =
         new OidcErrorResponseProcessingFilter(this.authorizationRequestMatcher, responseSender);
+    errorFilter.setEventPublisher(server.getEventPublisher());
     http.addFilterAfter(this.postProcess(errorFilter), ExceptionTranslationFilter.class);
 
     // Request processing ...
@@ -958,6 +959,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
     final OidcAuthnRequestProcessingFilter processingFilter =
         new OidcAuthnRequestProcessingFilter(this.authorizationRequestMatcher, converter, provider);
+    processingFilter.setEventPublisher(server.getEventPublisher());
     if (components.getSuccessHandler() != null) {
       processingFilter.setSuccessHandler(components.getSuccessHandler());
     }
@@ -971,10 +973,14 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
         this.getAttributeMapping(), this.authorizationCodeStore, responseSender, flow);
     responder.setCodeLifetime(this.authorizationCodeLifetime);
     responder.setCodeRetention(this.accessTokenLifetime);
+    responder.setEventPublisher(server.getEventPublisher());
     final OidcUserAuthenticationProcessingFilter userAuthenticationFilter =
         new OidcUserAuthenticationProcessingFilter(this.authorizationRequestMatcher, flow, responder);
     http.addFilterAfter(this.postProcess(userAuthenticationFilter), OidcAuthnRequestProcessingFilter.class);
-    this.resumedAuthenticationHandler = new OidcResumedAuthenticationHandler(flow, responder, responseSender);
+    final OidcResumedAuthenticationHandler resumedHandler =
+        new OidcResumedAuthenticationHandler(flow, responder, responseSender);
+    resumedHandler.setEventPublisher(server.getEventPublisher());
+    this.resumedAuthenticationHandler = resumedHandler;
 
     // The token endpoint ...
     //
@@ -985,6 +991,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
         this.authorizationCodeStore, this.accessTokenStore, idTokenBuilder);
     tokenRequestProcessor.setAccessTokenLifetime(this.accessTokenLifetime);
     tokenRequestProcessor.setSingleUseAccessTokens(this.singleUseAccessTokens);
+    tokenRequestProcessor.setEventPublisher(server.getEventPublisher());
     http.addFilterBefore(this.postProcess(new OidcTokenEndpointFilter(this.tokenRequestMatcher, tokenRequestProcessor)),
         AbstractPreAuthenticatedProcessingFilter.class);
 
@@ -994,6 +1001,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
         this.accessTokenStore, server.getClientRegistry(), this.signingKeySelector,
         new ClientEncryption(this.clientKeyResolver));
     userInfoRequestProcessor.setSignUserInfo(this.signUserInfo);
+    userInfoRequestProcessor.setEventPublisher(server.getEventPublisher());
     http.addFilterBefore(
         this.postProcess(new OidcUserInfoEndpointFilter(this.userInfoRequestMatcher, userInfoRequestProcessor)),
         AbstractPreAuthenticatedProcessingFilter.class);

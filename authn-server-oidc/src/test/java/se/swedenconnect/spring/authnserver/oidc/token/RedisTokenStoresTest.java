@@ -261,13 +261,14 @@ class RedisTokenStoresTest {
     final Instant now = this.clock.instant();
     return new AuthorizationCodeData(code, "client-1", "https://rp.example.com/cb", "challenge", "S256", "nonce",
         List.of("openid", "profile"), "sub-1", now.minusSeconds(10), "http://id.elegnamnden.se/loa/1.0/loa3",
-        "{\"name\":\"Kalle\"}", "{}", now, now.plusSeconds(expiresIn), now.plusSeconds(retainedFor));
+        "{\"name\":\"Kalle\"}", "{}", now, now.plusSeconds(expiresIn), now.plusSeconds(retainedFor),
+        "correlation-1");
   }
 
   private AccessTokenData token(final String value, final boolean singleUse) {
     final Instant now = this.clock.instant();
     return new AccessTokenData(value, "client-1", "sub-1", List.of("openid"), "{\"name\":\"Kalle\"}", now,
-        now.plus(Duration.ofMinutes(5)), singleUse);
+        now.plus(Duration.ofMinutes(5)), singleUse, "correlation-1");
   }
 
   /** A clock that the test moves. */

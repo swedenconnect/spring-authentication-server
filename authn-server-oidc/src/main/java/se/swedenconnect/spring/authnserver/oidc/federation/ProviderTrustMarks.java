@@ -41,6 +41,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -49,6 +50,7 @@ import com.nimbusds.openid.connect.sdk.federation.entities.EntityID;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationClient;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
+import se.swedenconnect.spring.audit.appevents.SystemAlertEvent;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationJwtVerifier;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpTrustMarkRequester;
@@ -81,6 +83,9 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpTrustMarkR
  * When a cache directory is given, every accepted trust mark is written there, and the trust marks found there are
  * read when the job starts. A stored trust mark that has expired, or does not pass the check, is not used. The cache
  * directory is meant for a store kept in memory; a shared store already survives the restart of a node.
+ * </p>
+ * <p>
+ * A failure to fetch or renew a trust mark is published as a spring-audit-support {@link SystemAlertEvent}.
  * </p>
  *
  * @author Martin Lindström
@@ -128,6 +133,9 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
 
   /** Where the job runs, or {@code null} until it has been started. */
   private ScheduledExecutorService executor;
+
+  /** Publishes the system alerts, or {@code null} if nothing is published. */
+  private ApplicationEventPublisher eventPublisher;
 
   /**
    * Constructor using an {@link HttpFederationClient}, no cache directory, the default retry interval and an
@@ -358,6 +366,10 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
       log.error("Failed to get the trust mark '{}' from {} ({} failed attempts) - next attempt at {}{}: {}",
           source.trustMarkType(), source.endpoint(), entry.failures(), entry.nextAttempt(),
           entry.isValid(now) ? ", the current trust mark is published until it expires" : "", e.getMessage());
+      if (this.eventPublisher != null) {
+        this.eventPublisher.publishEvent(new SystemAlertEvent("Failed to get the trust mark '%s' for '%s' from %s"
+            .formatted(source.trustMarkType(), this.entityId, source.endpoint()), e));
+      }
       return false;
     }
   }
@@ -451,6 +463,16 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
     catch (final NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 is not available", e);
     }
+  }
+
+  /**
+   * Assigns the publisher of the {@link SystemAlertEvent}s that report a failure to fetch or renew a trust mark. Without a
+   * publisher, nothing is published.
+   *
+   * @param eventPublisher the event publisher, or {@code null}
+   */
+  public void setEventPublisher(final @Nullable ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
   }
 
   /**

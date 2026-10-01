@@ -34,6 +34,7 @@ import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.Payload;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.oauth2.sdk.OAuth2Error;
 import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.token.BearerTokenError;
 import com.nimbusds.oauth2.sdk.util.URLUtils;
@@ -42,9 +43,16 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import net.minidev.json.JSONObject;
 import se.swedenconnect.spring.authnserver.LibraryVersion;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.FlowCorrelation;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnErrorResponseEvent;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnUserInfoDeliveredEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.attributes.DeliveredClaims;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKeySelector;
 import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenData;
 import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
@@ -76,6 +84,12 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * one is a JWT that is only encrypted (OpenID Connect Core, Section 5.3.2). A client for which the response cannot be
  * signed or encrypted gets the error {@code invalid_client_metadata} (400) and no claims.
  * </p>
+ * <p>
+ * The request is audited under the correlation ID that the access token is bound to. A response holding the claims is
+ * audited as an {@code authn_userinfo_delivered} event, and an error as an {@code authn_error_response} event. A
+ * request without an access token gets no error code (RFC 6750, Section 3.1), and is audited with the error code
+ * {@value #MISSING_TOKEN_AUDIT_CODE}.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -100,6 +114,9 @@ public class UserInfoRequestProcessor {
   /** What is signed and encrypted, for log and error messages. */
   private static final String WHAT = "UserInfo response";
 
+  /** The error code of the audit event for a request without an access token, which gets no error code. */
+  public static final String MISSING_TOKEN_AUDIT_CODE = "missing_token";
+
   /** The issuer. */
   private final String issuer;
 
@@ -117,6 +134,9 @@ public class UserInfoRequestProcessor {
 
   /** Whether responses are signed also when the client has not asked for it. */
   private boolean signUserInfo = true;
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /**
    * Constructor.
@@ -144,19 +164,26 @@ public class UserInfoRequestProcessor {
    * @return the UserInfo response or the error response
    */
   public @NonNull HTTPResponse process(final @NonNull HttpServletRequest request) {
+    final AuditState audit = new AuditState();
     HTTPResponse response;
     try {
-      response = this.processRequest(request);
+      response = this.processRequest(request, audit);
     }
     catch (final UserInfoErrorException e) {
+      final String errorCode;
       if (e.getError() != null) {
         response = new UserInfoErrorResponse(e.getError()).toHTTPResponse();
+        errorCode = e.getError().getCode() != null ? e.getError().getCode() : MISSING_TOKEN_AUDIT_CODE;
       }
       else {
         response = new HTTPResponse(HTTPResponse.SC_SERVER_ERROR);
         response.setHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
         response.setBody("{\"error\":\"server_error\"}");
+        errorCode = OAuth2Error.SERVER_ERROR_CODE;
       }
+      this.eventPublisher.publish(new AuthnErrorResponseEvent(audit.requester,
+          OidcAuditData.httpErrorResponse(response.getStatusCode()), AuditStage.USERINFO, errorCode,
+          e.getError() != null ? e.getError().getDescription() : e.getMessage()));
     }
     response.setCacheControl("no-store");
     response.setPragma("no-cache");
@@ -167,11 +194,12 @@ public class UserInfoRequestProcessor {
    * Processes a UserInfo request.
    *
    * @param request the request
+   * @param audit where the requester is recorded for the audit
    * @return the UserInfo response
    * @throws UserInfoErrorException if the request fails
    */
-  private @NonNull HTTPResponse processRequest(final @NonNull HttpServletRequest request)
-      throws UserInfoErrorException {
+  private @NonNull HTTPResponse processRequest(final @NonNull HttpServletRequest request,
+      final @NonNull AuditState audit) throws UserInfoErrorException {
 
     final String tokenValue = getAccessToken(request);
     final AccessTokenData token = this.accessTokenStore.get(tokenValue);
@@ -180,8 +208,12 @@ public class UserInfoRequestProcessor {
       throw new UserInfoErrorException(BearerTokenError.INVALID_TOKEN.setDescription(
           "The access token is not valid"));
     }
+    FlowCorrelation.join(token.correlationId());
+    audit.requester = AuditRequester.named(AuthenticationProtocol.OIDC, token.clientId());
     final String logString = "requester: 'OIDC:%s'".formatted(token.clientId());
-    final OIDCClientMetadata metadata = this.getClientMetadata(token.clientId(), logString);
+    final RequesterRecord record = this.getClient(token.clientId(), logString);
+    audit.requester = AuditRequester.of(record, true);
+    final OIDCClientMetadata metadata = record.getProtocolMetadata(OIDCClientMetadata.class);
 
     final JSONObject claims = DeliveredClaims.parse(token.userInfoClaims());
     claims.put("sub", token.subject());
@@ -195,6 +227,10 @@ public class UserInfoRequestProcessor {
       throw new UserInfoErrorException(BearerTokenError.INVALID_TOKEN.setDescription(
           "The access token is not valid"));
     }
+    this.eventPublisher.publish(new AuthnUserInfoDeliveredEvent(audit.requester,
+        OidcAuditData.userInfoResponse(token.subject(), this.isSigned(metadata),
+            metadata.getUserInfoJWEAlg() != null),
+        OidcAuditData.claims(claims, "sub")));
     log.debug("UserInfo response delivered - claims: {} [{}]", claims.keySet(), logString);
     return response;
   }
@@ -212,7 +248,7 @@ public class UserInfoRequestProcessor {
   private @NonNull HTTPResponse createResponse(final @NonNull JSONObject claims, final @NonNull String clientId,
       final @NonNull OIDCClientMetadata metadata, final @NonNull String logString) throws UserInfoErrorException {
 
-    final boolean sign = this.signUserInfo || metadata.getUserInfoJWSAlg() != null;
+    final boolean sign = this.isSigned(metadata);
     final JWEAlgorithm encryptionAlgorithm = metadata.getUserInfoJWEAlg();
     final HTTPResponse response = new HTTPResponse(HTTPResponse.SC_OK);
 
@@ -274,14 +310,24 @@ public class UserInfoRequestProcessor {
   }
 
   /**
-   * Gets the metadata of the client that the token was issued to.
+   * Tells whether the response for a client is signed.
+   *
+   * @param metadata the client metadata
+   * @return {@code true} if the response is signed and {@code false} otherwise
+   */
+  private boolean isSigned(final @NonNull OIDCClientMetadata metadata) {
+    return this.signUserInfo || metadata.getUserInfoJWSAlg() != null;
+  }
+
+  /**
+   * Gets the record of the client that the token was issued to.
    *
    * @param clientId the {@code client_id}
    * @param logString the log string
-   * @return the client metadata
+   * @return the client record, holding the client metadata
    * @throws UserInfoErrorException with {@code invalid_token} if the client is no longer known
    */
-  private @NonNull OIDCClientMetadata getClientMetadata(final @NonNull String clientId,
+  private @NonNull RequesterRecord getClient(final @NonNull String clientId,
       final @NonNull String logString) throws UserInfoErrorException {
     final RequesterRecord record;
     try {
@@ -291,12 +337,12 @@ public class UserInfoRequestProcessor {
       log.error("Failed to look up client in the client registry - {} [{}]", e.getMessage(), logString, e);
       throw new UserInfoErrorException(null);
     }
-    if (record == null || !(record.protocolMetadata() instanceof final OIDCClientMetadata metadata)) {
+    if (record == null || !(record.protocolMetadata() instanceof OIDCClientMetadata)) {
       log.info("UserInfo request with an access token for a client that is no longer known [{}]", logString);
       throw new UserInfoErrorException(BearerTokenError.INVALID_TOKEN.setDescription(
           "The access token is not valid"));
     }
-    return metadata;
+    return record;
   }
 
   /**
@@ -385,6 +431,15 @@ public class UserInfoRequestProcessor {
   }
 
   /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
+  }
+
+  /**
    * Assigns whether responses are signed also when the client has not registered
    * {@code userinfo_signed_response_alg}. Defaults to {@code true}.
    *
@@ -392,6 +447,15 @@ public class UserInfoRequestProcessor {
    */
   public void setSignUserInfo(final boolean signUserInfo) {
     this.signUserInfo = signUserInfo;
+  }
+
+  /**
+   * What the audit knows about the request being processed.
+   */
+  private static final class AuditState {
+
+    /** The requester, unknown until the access token has been found. */
+    private AuditRequester requester = AuditRequester.unknown(AuthenticationProtocol.OIDC);
   }
 
   /**

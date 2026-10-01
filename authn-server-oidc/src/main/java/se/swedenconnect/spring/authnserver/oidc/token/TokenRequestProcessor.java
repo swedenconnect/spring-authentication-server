@@ -30,6 +30,7 @@ import com.nimbusds.oauth2.sdk.GrantType;
 import com.nimbusds.oauth2.sdk.OAuth2Error;
 import com.nimbusds.oauth2.sdk.Scope;
 import com.nimbusds.oauth2.sdk.TokenErrorResponse;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthentication;
 import com.nimbusds.oauth2.sdk.http.HTTPRequest;
 import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallenge;
@@ -40,7 +41,16 @@ import com.nimbusds.openid.connect.sdk.OIDCTokenResponse;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 import com.nimbusds.openid.connect.sdk.token.OIDCTokens;
 
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
+import se.swedenconnect.spring.authnserver.audit.FlowCorrelation;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnErrorResponseEvent;
+import se.swedenconnect.spring.authnserver.audit.events.AuthnSuccessResponseEvent;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.oidc.attributes.DeliveredClaims;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 
@@ -57,6 +67,10 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * <p>
  * A successful request gets an opaque access token and the ID token, see {@link IdTokenBuilder}. No refresh token is
  * issued. Every response carries {@code Cache-Control: no-store}.
+ * </p>
+ * <p>
+ * The request is audited under the correlation ID that the code is bound to. A successful request is audited as an
+ * {@code authn_success_response} event and a failed one as an {@code authn_error_response} event.
  * </p>
  *
  * @author Martin Lindström
@@ -87,6 +101,9 @@ public class TokenRequestProcessor {
   /** Whether access tokens may only be used once. */
   private boolean singleUseAccessTokens = true;
 
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
+
   /**
    * Constructor.
    *
@@ -111,12 +128,19 @@ public class TokenRequestProcessor {
    * @return the token response or the token error response
    */
   public @NonNull HTTPResponse process(final @NonNull HTTPRequest httpRequest) {
+    final AuditState audit = new AuditState();
     HTTPResponse response;
     try {
-      response = this.processRequest(httpRequest).toHTTPResponse();
+      response = this.processRequest(httpRequest, audit).toHTTPResponse();
     }
     catch (final TokenErrorException e) {
       response = new TokenErrorResponse(e.getError()).toHTTPResponse();
+      final AuditRequester requester = audit.requester != null
+          ? audit.requester
+          : AuditRequester.named(AuthenticationProtocol.OIDC, getNamedClientId(httpRequest));
+      this.eventPublisher.publish(new AuthnErrorResponseEvent(requester,
+          OidcAuditData.httpErrorResponse(response.getStatusCode()), AuditStage.TOKEN, e.getError().getCode(),
+          e.getError().getDescription()));
     }
     response.setCacheControl("no-store");
     response.setPragma("no-cache");
@@ -127,16 +151,19 @@ public class TokenRequestProcessor {
    * Processes a token request.
    *
    * @param httpRequest the request
+   * @param audit where the requester is recorded for the audit
    * @return the token response
    * @throws TokenErrorException if the request fails
    */
-  private @NonNull OIDCTokenResponse processRequest(final @NonNull HTTPRequest httpRequest)
+  private @NonNull OIDCTokenResponse processRequest(final @NonNull HTTPRequest httpRequest,
+      final @NonNull AuditState audit)
       throws TokenErrorException {
 
     if (!HTTPRequest.Method.POST.equals(httpRequest.getMethod())) {
       throw new TokenErrorException(OAuth2Error.INVALID_REQUEST, "The token endpoint only accepts POST");
     }
     final RequesterRecord client = this.clientAuthenticator.authenticate(httpRequest);
+    audit.requester = AuditRequester.of(client, true);
     final String clientId = client.getIdentifier();
     final String logString = "requester: 'OIDC:%s'".formatted(clientId);
 
@@ -168,6 +195,7 @@ public class TokenRequestProcessor {
       throw invalidGrant("The code is not known or has expired", logString);
     }
     final AuthorizationCodeData code = redemption.code();
+    FlowCorrelation.join(code.correlationId());
     if (redemption.replay()) {
       log.warn("An authorization code was used a second time - its access token is revoked [{}]", logString);
       if (redemption.accessToken() != null) {
@@ -186,9 +214,10 @@ public class TokenRequestProcessor {
     // Issue the tokens ...
     //
     final Instant now = Instant.now();
+    final OIDCClientMetadata metadata = client.getProtocolMetadata(OIDCClientMetadata.class);
     final String idToken;
     try {
-      idToken = this.idTokenBuilder.build(code, client.getProtocolMetadata(OIDCClientMetadata.class), now);
+      idToken = this.idTokenBuilder.build(code, metadata, now);
     }
     catch (final UnrecoverableErrorException e) {
       if (e.getError() == OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION) {
@@ -200,9 +229,13 @@ public class TokenRequestProcessor {
     final BearerAccessToken accessToken =
         new BearerAccessToken(32, this.accessTokenLifetime.toSeconds(), scope);
     this.accessTokenStore.save(new AccessTokenData(accessToken.getValue(), clientId, code.subject(), code.scopes(),
-        code.userInfoClaims(), now, now.plus(this.accessTokenLifetime), this.singleUseAccessTokens));
+        code.userInfoClaims(), now, now.plus(this.accessTokenLifetime), this.singleUseAccessTokens,
+        FlowCorrelation.current()));
     this.codeStore.registerAccessToken(codeValue, accessToken.getValue());
 
+    this.eventPublisher.publish(new AuthnSuccessResponseEvent(audit.requester,
+        OidcAuditData.tokenResponse(code, metadata.getIDTokenJWEAlg() != null),
+        OidcAuditData.claims(DeliveredClaims.parse(code.idTokenClaims()))));
     log.debug("Issued ID token and access token [{}]", logString);
     return new OIDCTokenResponse(new OIDCTokens(idToken, accessToken, null));
   }
@@ -282,6 +315,35 @@ public class TokenRequestProcessor {
   }
 
   /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
+  }
+
+  /**
+   * Gets the {@code client_id} that a token request names, for the audit of a request whose client could not be
+   * authenticated.
+   *
+   * @param httpRequest the request
+   * @return the {@code client_id}, or {@code null} if the request names none
+   */
+  private static @Nullable String getNamedClientId(final @NonNull HTTPRequest httpRequest) {
+    try {
+      final List<ClientAuthentication> candidates = ClientAuthentication.parseCandidates(httpRequest);
+      if (candidates != null && !candidates.isEmpty()) {
+        return candidates.getFirst().getClientID().getValue();
+      }
+      return getParameter(httpRequest.getBodyAsFormParameters(), "client_id");
+    }
+    catch (final com.nimbusds.oauth2.sdk.ParseException | RuntimeException e) {
+      return null;
+    }
+  }
+
+  /**
    * Assigns the access token lifetime. Defaults to {@link #DEFAULT_ACCESS_TOKEN_LIFETIME}.
    *
    * @param accessTokenLifetime the lifetime
@@ -297,6 +359,15 @@ public class TokenRequestProcessor {
    */
   public void setSingleUseAccessTokens(final boolean singleUseAccessTokens) {
     this.singleUseAccessTokens = singleUseAccessTokens;
+  }
+
+  /**
+   * What the audit knows about the request being processed.
+   */
+  private static final class AuditState {
+
+    /** The authenticated client, or {@code null} if the client has not been authenticated. */
+    private AuditRequester requester;
   }
 
 }

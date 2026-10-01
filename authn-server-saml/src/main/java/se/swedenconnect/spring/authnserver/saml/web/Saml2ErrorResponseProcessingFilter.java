@@ -31,9 +31,11 @@ import org.springframework.security.web.util.ThrowableAnalyzer;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.saml.audit.Saml2AuditData;
 import se.swedenconnect.spring.authnserver.saml.error.SamlErrorStatusException;
 import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseAttributes;
 import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseBuilder;
@@ -46,6 +48,9 @@ import se.swedenconnect.spring.authnserver.saml.response.Saml2ResponseSender;
  * is sent to the Service Provider as an error response, provided that the {@link Saml2ResponseAttributes} have been
  * established for the request. Without them, and for any other exception, the error is passed on and ends at the
  * Identity Provider.
+ * </p>
+ * <p>
+ * An error response that is sent is audited as an {@code authn_error_response} event.
  * </p>
  *
  * @author Martin Lindström
@@ -63,6 +68,9 @@ public class Saml2ErrorResponseProcessingFilter extends OncePerRequestFilter {
 
   /** Sends the error response. */
   private final Saml2ResponseSender responseSender;
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /** For finding the error in a cause chain. */
   private final ThrowableAnalyzer throwableAnalyzer = new ServletThrowableAnalyzer();
@@ -119,12 +127,24 @@ public class Saml2ErrorResponseProcessingFilter extends OncePerRequestFilter {
         throw new ServletException("Unable to send SAML error response since the response is already committed", e);
       }
       final Response samlResponse = this.responseBuilder.buildErrorResponse(responseAttributes, samlError);
+      this.eventPublisher.publishErrorResponse(request,
+          Saml2AuditData.errorResponse(samlResponse, responseAttributes.relayState()),
+          samlError.getStatus().subStatusCode(), samlError.getDescription());
       log.debug("Sending error response {}/{} to '{}' [entity-id: '{}', authn-request: '{}']",
           samlError.getStatus().statusCode(), samlError.getStatus().subStatusCode(),
           responseAttributes.destination(), responseAttributes.getEntityId(), responseAttributes.inResponseTo());
       this.responseSender.send(request, response, responseAttributes.destination(), samlResponse,
           responseAttributes.relayState());
     }
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
   /**

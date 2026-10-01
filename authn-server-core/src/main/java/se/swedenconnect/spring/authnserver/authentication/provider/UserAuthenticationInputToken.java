@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
+import se.swedenconnect.spring.authnserver.audit.AuditFlowData;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationRequirements;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
@@ -54,6 +55,9 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
 
   /** The authentication from the session that may be reused. */
   private UserAuthentication previousAuthentication;
+
+  /** What the audit needs to know about the request for the rest of its flow. */
+  private AuditFlowData auditData;
 
   /**
    * Constructor.
@@ -139,6 +143,25 @@ public class UserAuthenticationInputToken extends AbstractAuthenticationToken {
    */
   public void setPreviousAuthentication(final @Nullable UserAuthentication previousAuthentication) {
     this.previousAuthentication = previousAuthentication;
+  }
+
+  /**
+   * Gets what the audit needs to know about the request for the rest of its flow: the correlation ID, the requester and
+   * the protocol-specific data about the request. The protocol module assigns it when it accepts the request.
+   *
+   * @return the audit data, or {@code null} if it has not been assigned
+   */
+  public @Nullable AuditFlowData getAuditData() {
+    return this.auditData;
+  }
+
+  /**
+   * Assigns what the audit needs to know about the request for the rest of its flow.
+   *
+   * @param auditData the audit data
+   */
+  public void setAuditData(final @Nullable AuditFlowData auditData) {
+    this.auditData = auditData;
   }
 
   /**

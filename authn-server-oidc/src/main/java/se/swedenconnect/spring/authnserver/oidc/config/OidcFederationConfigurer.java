@@ -27,6 +27,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -376,6 +377,9 @@ public class OidcFederationConfigurer {
           this.trustMarks != null ? this.trustMarks : List.of(),
           this.federationClient != null ? this.federationClient : new HttpFederationClient(),
           this.trustMarkCacheDirectory, this.trustMarkRetryInterval, Clock.systemUTC());
+    }
+    if (http.getSharedObject(ApplicationContext.class) instanceof final ApplicationContext context) {
+      this.activeTrustMarks.setEventPublisher(context);
     }
     this.activeTrustMarks.start();
 

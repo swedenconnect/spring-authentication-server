@@ -33,9 +33,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.nimbusds.oauth2.sdk.ErrorObject;
 
+import se.swedenconnect.spring.authnserver.audit.AuthnEventPublisher;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorMapping;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorResponseException;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
@@ -55,6 +57,10 @@ import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseTarget;
  * HTTP status 400, as OpenID Connect Core, Section 3.1.2.6, requires. Other unrecoverable errors, and other
  * exceptions, are passed on.
  * </p>
+ * <p>
+ * An error response that is sent is audited as an {@code authn_error_response} event, and the HTTP status 400 as an
+ * {@code authn_unrecoverable_error} event.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -68,6 +74,9 @@ public class OidcErrorResponseProcessingFilter extends OncePerRequestFilter {
 
   /** Sends the error response. */
   private final OidcResponseSender responseSender;
+
+  /** Publishes the audit events. */
+  private AuthnEventPublisher eventPublisher = AuthnEventPublisher.noop();
 
   /** For finding the error in a cause chain. */
   private final ThrowableAnalyzer throwableAnalyzer = new ServletThrowableAnalyzer();
@@ -106,6 +115,7 @@ public class OidcErrorResponseProcessingFilter extends OncePerRequestFilter {
       if (this.throwableAnalyzer.getFirstThrowableOfType(UnrecoverableErrorException.class, causeChain)
           instanceof final UnrecoverableErrorException unrecoverable) {
         if (unrecoverable.getError() == OidcUnrecoverableError.UNSUPPORTED_RESPONSE_MODE && !response.isCommitted()) {
+          this.eventPublisher.publishUnrecoverableError(request, unrecoverable);
           response.sendError(HttpStatus.BAD_REQUEST.value(), unrecoverable.getMessage());
           return;
         }
@@ -136,8 +146,19 @@ public class OidcErrorResponseProcessingFilter extends OncePerRequestFilter {
       }
       log.debug("Sending error response '{}' to '{}' [requester: 'OIDC:{}']", error.getCode(), target.redirectUri(),
           target.clientId());
+      this.eventPublisher.publishErrorResponse(request, OidcAuditData.authorizationErrorResponse(target),
+          error.getCode(), error.getDescription());
       this.responseSender.sendError(request, response, target, error);
     }
+  }
+
+  /**
+   * Assigns the publisher of the audit events. The default publishes nothing.
+   *
+   * @param eventPublisher the event publisher
+   */
+  public void setEventPublisher(final @NonNull AuthnEventPublisher eventPublisher) {
+    this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher must not be null");
   }
 
   /**

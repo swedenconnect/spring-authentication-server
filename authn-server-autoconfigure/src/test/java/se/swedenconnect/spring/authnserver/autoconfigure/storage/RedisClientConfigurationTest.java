@@ -217,7 +217,7 @@ class RedisClientConfigurationTest {
   private void useStore(final AccessTokenStore store) {
     final Instant now = Instant.now();
     final AccessTokenData token =
-        new AccessTokenData("t", "rp", "sub", List.of("openid"), "{}", now, now.plusSeconds(60), false);
+        new AccessTokenData("t", "rp", "sub", List.of("openid"), "{}", now, now.plusSeconds(60), false, null);
     store.save(token);
     assertThat(store.get("t")).isEqualTo(token);
   }

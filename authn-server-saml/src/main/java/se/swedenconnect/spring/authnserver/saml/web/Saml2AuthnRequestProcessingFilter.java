@@ -31,6 +31,11 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import se.swedenconnect.spring.authnserver.audit.AuditRequestContext;
+import se.swedenconnect.spring.authnserver.audit.AuditRequester;
+import se.swedenconnect.spring.authnserver.audit.AuditStage;
+import se.swedenconnect.spring.authnserver.audit.FlowCorrelation;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAuthenticationConverter;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAuthenticationToken;
@@ -45,6 +50,9 @@ import se.swedenconnect.spring.authnserver.saml.authnrequest.Saml2AuthnRequestAu
  * in the request attribute {@link #INPUT_TOKEN_ATTRIBUTE} and the filter chain continues, so that
  * {@link Saml2UserAuthenticationProcessingFilter} authenticates the user. The security context is left alone, since
  * it holds the authentication that may be reused for single sign-on.
+ * </p>
+ * <p>
+ * Each request starts a new authentication flow, with a new correlation ID for its audit events.
  * </p>
  *
  * @author Martin Lindström
@@ -95,6 +103,13 @@ public class Saml2AuthnRequestProcessingFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
+    // A new authentication flow starts ...
+    //
+    FlowCorrelation.startFlow();
+    AuditRequestContext.get(request)
+        .setRequester(AuditRequester.unknown(AuthenticationProtocol.SAML))
+        .setStage(AuditStage.AUTHN_REQUEST);
+
     final Saml2AuthnRequestAuthenticationToken token = this.converter.convert(request);
     final Authentication result = this.provider.authenticate(token);
     log.debug("Authentication request processed [{}]", token.getLogString());

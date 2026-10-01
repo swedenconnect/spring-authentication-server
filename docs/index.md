@@ -65,6 +65,9 @@ The Spring Boot starters:
   adjusting the configuration in code, using the configurers without Spring Boot, and migrating the configuration of an
   Identity Provider built on saml-identity-provider.
 
+- [Auditing](audit.html) - The audit events that the server produces, built on spring-audit-support, how one
+  authentication flow is followed across requests and server instances, and how to change what an event holds.
+
 - [Release Notes](release-notes.html)
 
 -----

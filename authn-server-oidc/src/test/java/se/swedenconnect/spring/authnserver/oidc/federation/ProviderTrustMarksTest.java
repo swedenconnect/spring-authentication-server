@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -38,6 +39,7 @@ import com.nimbusds.jwt.SignedJWT;
 
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
+import se.swedenconnect.spring.audit.appevents.SystemAlertEvent;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -165,6 +167,32 @@ class ProviderTrustMarksTest {
     state = trustMarks.getStates().getFirst();
     assertThat(state.published()).isFalse();
     assertThat(state.expiresAt()).isNull();
+  }
+
+  @Test
+  void aFailedFetchIsPublishedAsASystemAlert() {
+    this.client.answer(new ClientRegistryException("Connection refused"));
+    final ProviderTrustMarks trustMarks = this.trustMarks(null, LOA3);
+    final List<Object> events = new ArrayList<>();
+    trustMarks.setEventPublisher(events::add);
+
+    trustMarks.refresh();
+
+    assertThat(events).singleElement().isInstanceOfSatisfying(SystemAlertEvent.class, e -> {
+      assertThat(e.getMessage()).contains(LOA3, ENTITY_ID);
+      assertThat(e.getException()).hasMessageContaining("Connection refused");
+    });
+  }
+
+  @Test
+  void aSuccessfulFetchRaisesNoAlert() {
+    this.client.answer(this.mark(LOA3, Duration.ofDays(30)));
+    final ProviderTrustMarks trustMarks = this.trustMarks(null, LOA3);
+    final List<Object> events = new ArrayList<>();
+    trustMarks.setEventPublisher(events::add);
+
+    assertThat(trustMarks.refresh()).isOne();
+    assertThat(events).isEmpty();
   }
 
   @Test

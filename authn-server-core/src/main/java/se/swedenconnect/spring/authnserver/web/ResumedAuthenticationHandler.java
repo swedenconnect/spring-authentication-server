@@ -31,8 +31,9 @@ import se.swedenconnect.spring.authnserver.authentication.provider.redirect.Resu
  * <p>
  * The resume paths are handled once for the whole server, by {@link UserAuthenticationResumeFilter}. It finds the
  * authentication in progress, and hands it to the handler of the protocol that the requester used. The handler turns
- * the outcome into a result with {@link UserAuthenticationFlow#resume(ResumedAuthenticationToken)}, and answers the
- * requester, also when the authentication failed.
+ * the outcome into a result with
+ * {@link UserAuthenticationFlow#resume(ResumedAuthenticationToken, HttpServletRequest, HttpServletResponse)}, and
+ * answers the requester, also when the authentication failed.
  * </p>
  *
  * @author Martin Lindström
