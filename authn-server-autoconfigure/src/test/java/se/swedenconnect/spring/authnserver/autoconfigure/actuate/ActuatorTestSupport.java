@@ -1,0 +1,229 @@
+/*
+ * Copyright 2026 Sweden Connect
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package se.swedenconnect.spring.authnserver.autoconfigure.actuate;
+
+import java.net.URI;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
+
+import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
+import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
+import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.ResolvedClient;
+
+/**
+ * What the Actuator tests share: the properties of a server with both protocols, SAML metadata documents, and the OIDC
+ * backends of the client registry with a resolver that answers what the test has put in it.
+ *
+ * @author Martin Lindström
+ */
+final class ActuatorTestSupport {
+
+  static final String BASE_URL = "https://idp.example.com/auth";
+
+  static final String SP_ONE = "https://sp-one.example.com";
+
+  static final String SP_TWO = "https://sp-two.example.com";
+
+  static final String SP_THREE = "https://sp-three.example.com";
+
+  static final String CONFIGURED_CLIENT = "https://configured.example.com";
+
+  static final String FEDERATION_CLIENT = "https://rp.example.com";
+
+  static final String SAML_CREDENTIALS = "authn-server.saml.credentials.default-credential.jks.";
+
+  static final String OIDC_KEY = "authn-server.oidc.keys.signing[0].credential.jks.";
+
+  static final String FEDERATION_KEY = "authn-server.oidc.federation.keys[0].credential.jks.";
+
+  /** What the resolver answers, by client. */
+  static final Map<String, ResolvedClient> RESOLVED = new ConcurrentHashMap<>();
+
+  /**
+   * Gets the properties of a server with both protocols, whose SAML metadata is read from a file.
+   *
+   * @param metadata the SAML metadata file
+   * @return the properties
+   */
+  static String[] server(final Path metadata) {
+    return new String[] {
+        "authn-server.base-url=" + BASE_URL,
+        "authn-server.saml.enabled=true",
+        SAML_CREDENTIALS + "store.location=classpath:credentials/idp-credentials.p12",
+        SAML_CREDENTIALS + "store.password=secret",
+        SAML_CREDENTIALS + "store.type=PKCS12",
+        SAML_CREDENTIALS + "key.alias=sign",
+        SAML_CREDENTIALS + "key.key-password=secret",
+        "authn-server.saml.metadata-providers[0].location=file:" + metadata.toAbsolutePath(),
+        "authn-server.oidc.enabled=true",
+        OIDC_KEY + "store.location=classpath:credentials/oidc-keys.p12",
+        OIDC_KEY + "store.password=secret",
+        OIDC_KEY + "store.type=PKCS12",
+        OIDC_KEY + "key.alias=rsa-sign",
+        OIDC_KEY + "key.key-password=secret",
+        "authn-server.oidc.federation.enabled=true",
+        "authn-server.oidc.federation.authority-hints[0]=https://ia.example.com",
+        "authn-server.entity-information.ui-info.display-names.sv=Exempel",
+        "authn-server.entity-information.ui-info.logotypes[0].url=https://cdn.example.com/logo.svg",
+        "authn-server.entity-information.organization.names.sv=Exempel AB",
+        "authn-server.entity-information.organization.number=5561234567",
+        "authn-server.entity-information.contact-persons.technical.email-addresses[0]=ops@example.com",
+        FEDERATION_KEY + "store.location=classpath:credentials/oidc-keys.p12",
+        FEDERATION_KEY + "store.password=secret",
+        FEDERATION_KEY + "store.type=PKCS12",
+        FEDERATION_KEY + "key.alias=rsa-sign",
+        FEDERATION_KEY + "key.key-password=secret",
+        "authn-server.oidc.federation.trust-marks[0].type=https://id.swedenconnect.se/loa/loa3",
+        "authn-server.oidc.federation.trust-marks[0].issuer=https://tmi.example.com",
+        "authn-server.oidc.federation.trust-marks[0].endpoint=http://localhost:1/trust_mark",
+        "authn-server.oidc.federation.trust-marks[0].jwks=classpath:federation/tmi-jwks.json"
+    };
+  }
+
+  /**
+   * Creates a metadata document holding Service Providers.
+   *
+   * @param entityIds the entityIDs
+   * @return the metadata
+   */
+  static String metadata(final String... entityIds) {
+    final StringBuilder sb = new StringBuilder("""
+        <md:EntitiesDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata">
+        """);
+    for (final String entityId : entityIds) {
+      sb.append("""
+            <md:EntityDescriptor entityID="%s">
+              <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+                <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                    Location="%s/acs" index="0"/>
+              </md:SPSSODescriptor>
+            </md:EntityDescriptor>
+          """.formatted(entityId, entityId));
+    }
+    return sb.append("</md:EntitiesDescriptor>\n").toString();
+  }
+
+  /**
+   * Creates the answer of the resolver for a client.
+   *
+   * @param clientId the client
+   * @return a {@link ResolvedClient}
+   */
+  static ResolvedClient resolved(final String clientId) {
+    return new ResolvedClient(clientId, clientMetadata("Federation Client"), Set.of(),
+        Instant.now().plus(1, ChronoUnit.HOURS));
+  }
+
+  /**
+   * Creates client metadata.
+   *
+   * @param name the client name
+   * @return the metadata
+   */
+  static OIDCClientMetadata clientMetadata(final String name) {
+    final OIDCClientMetadata metadata = new OIDCClientMetadata();
+    metadata.setName(name);
+    metadata.setRedirectionURI(URI.create("https://client.example.com/callback"));
+    return metadata;
+  }
+
+  /**
+   * Adds the OIDC backends: a configured client and the federation backend.
+   */
+  @Configuration(proxyBeanMethods = false)
+  static class OidcBackendsConfiguration {
+
+    @Bean
+    AuthnServerConfigurerAdapter oidcBackends(final FederationCache cache) {
+      return (http, configurer) -> {
+        final OIDCClientMetadata metadata = clientMetadata("Configured Client");
+        metadata.setCustomField(OidcClientRecord.CLIENT_SECRET, "the-secret");
+        configurer.clientRegistryBackend(new ConfigurationClientBackend(
+            List.of(OidcClientRecord.of(CONFIGURED_CLIENT, metadata))));
+        configurer.clientRegistryBackend(new FederationClientBackend(RESOLVED::get, (clientId, type) -> null, cache,
+            FederationCacheSettings.defaults()));
+      };
+    }
+
+  }
+
+  /**
+   * Collects the client events.
+   */
+  @Configuration(proxyBeanMethods = false)
+  static class EventsConfiguration {
+
+    @Bean
+    EventCollector eventCollector() {
+      return new EventCollector();
+    }
+
+  }
+
+  /**
+   * Collects the client events.
+   */
+  static class EventCollector implements ApplicationListener<ApplicationEvent> {
+
+    final List<ApplicationEvent> events = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void onApplicationEvent(final ApplicationEvent event) {
+      if (event instanceof ClientAddedEvent || event instanceof ClientRemovedEvent) {
+        this.events.add(event);
+      }
+    }
+
+    List<String> added() {
+      return this.events.stream()
+          .filter(ClientAddedEvent.class::isInstance)
+          .map(e -> ((ClientAddedEvent) e).getClient().identifier())
+          .toList();
+    }
+
+    List<String> removed() {
+      return this.events.stream()
+          .filter(ClientRemovedEvent.class::isInstance)
+          .map(e -> ((ClientRemovedEvent) e).getClient().identifier())
+          .toList();
+    }
+
+  }
+
+  // Hidden constructor
+  private ActuatorTestSupport() {
+  }
+
+}

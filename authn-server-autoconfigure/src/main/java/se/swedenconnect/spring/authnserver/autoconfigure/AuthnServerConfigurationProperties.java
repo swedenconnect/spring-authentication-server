@@ -15,7 +15,9 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 
 import org.jspecify.annotations.NonNull;
@@ -37,6 +39,15 @@ public class AuthnServerConfigurationProperties {
 
   /** The property prefix. */
   public static final String PREFIX = "authn-server";
+
+  /** The file in the cache directory holding the record of known clients. */
+  public static final String KNOWN_CLIENTS_FILE = "known-clients.json";
+
+  /** The file in the cache directory holding the OpenID Federation client cache. */
+  public static final String OIDC_FEDERATION_CACHE_FILE = "oidc/federation-cache.json";
+
+  /** The directory in the cache directory holding the OpenID Provider's own trust marks. */
+  public static final String OIDC_TRUST_MARKS_DIRECTORY = "oidc/trust-marks";
 
   /**
    * The base URL of the server: protocol, host and context path, for example https://idp.example.com/auth. Must not
@@ -80,6 +91,13 @@ public class AuthnServerConfigurationProperties {
    * Where the server keeps its state between requests: the HTTP session and the stores of the protocols.
    */
   private final StorageProperties storage = new StorageProperties();
+
+  /**
+   * A directory where the server keeps state that should survive a restart when it keeps its state in memory: the
+   * OpenID Provider's own trust marks, the OpenID Federation client cache and the record of known clients. Without a
+   * cache directory nothing is kept, and every start behaves as a first start. Not used for state kept in Redis.
+   */
+  private File cacheDirectory;
 
   /**
    * Gets the base URL.
@@ -187,6 +205,34 @@ public class AuthnServerConfigurationProperties {
    */
   public @NonNull StorageProperties getStorage() {
     return this.storage;
+  }
+
+  /**
+   * Gets the cache directory.
+   *
+   * @return the cache directory, or {@code null}
+   */
+  public @Nullable File getCacheDirectory() {
+    return this.cacheDirectory;
+  }
+
+  /**
+   * Assigns the cache directory.
+   *
+   * @param cacheDirectory the cache directory
+   */
+  public void setCacheDirectory(final @Nullable File cacheDirectory) {
+    this.cacheDirectory = cacheDirectory;
+  }
+
+  /**
+   * Gets a file or directory in the cache directory.
+   *
+   * @param path the path relative to the cache directory
+   * @return the path, or {@code null} if there is no cache directory
+   */
+  public @Nullable Path getCachePath(final @NonNull String path) {
+    return this.cacheDirectory != null ? this.cacheDirectory.toPath().resolve(path) : null;
   }
 
   /**

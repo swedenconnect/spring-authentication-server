@@ -37,6 +37,8 @@ Source links in this guide point to the `main` branch of the
     - [Credential Reload Success](#authn_credential_reload_success)
     - [Credential Reload Error](#authn_credential_reload_error)
     - [Trust mark alerts](#trust-mark-alerts)
+    - [Client Added](#client_added)
+    - [Client Removed](#client_removed)
 - [Changing what an event holds](#replacing-a-transformer)
 
 <a name="setting-up-auditing"></a>
@@ -488,6 +490,46 @@ The trust marks of the OpenID Provider are wired to publish the alerts. A
 [`TrustMarkStatusChecker`][TrustMarkStatusChecker] is created by the application, which gives it the application
 context with `setEventPublisher(...)`.
 
+<a name="client_added"></a>
+### Client Added
+
+**Type:** `client_added`
+
+**Description:** A client appeared in the client registry: a SAML metadata source that was downloaded or read again
+holds a new Service Provider, an OpenID Federation client was resolved and was not known before, or a client that the
+server loads at startup was not known before the restart. There is one event per client. The type has no `authn_`
+prefix since it is a system operation. When the event occurs, and how the server knows which clients it had before a
+restart, is described under [Clients added and removed](management.html#clients-added-and-removed).
+
+**Audit data:**
+
+| Parameter | Description | Type |
+| :--- | :--- | :--- |
+| `client.protocol` | `saml` or `oidc`. | String |
+| `client.id` | The SAML entityID or the OpenID Connect `client_id`. | String |
+| `client.organization_number` | The organisation number of the client exactly as the client registry holds it, see [The requester](#the-requester). Absent if the client has none. | String |
+| `client.source` | Where the client came from: the SAML metadata source, or the OpenID Connect backend, `configuration`, `repository` or `federation`. | String |
+
+<a name="client_removed"></a>
+### Client Removed
+
+**Type:** `client_removed`
+
+**Description:** A client disappeared from the client registry: a SAML metadata source that was downloaded or read
+again no longer holds a Service Provider, and no other source does, the OpenID Federation resolver reports a client
+that was known as not found, or a client that was known before a restart is no longer loaded. There is one event per
+client. A federation client whose cache entry expires and is resolved again is not removed.
+
+**Audit data:**
+
+| Parameter | Description | Type |
+| :--- | :--- | :--- |
+| `client` | The client as it was known, with the members of [Client Added](#client_added). | Object |
+| `reason` | Why the client was removed, for example `no longer held by the source 'https://md.example.com/sp.xml'` or `the resolver reports the client as not found`. | String |
+
+The events are written once for the whole deployment when the nodes share their state in Redis. A deployment that does
+not want them leaves them out with `audit.repository.exclude-events`.
+
 <a name="replacing-a-transformer"></a>
 ## Changing what an event holds
 
@@ -506,6 +548,8 @@ Each event type has a transformer, registered as a bean by the auto-configuratio
 | `authn_credential_test_error` | `CredentialTestErrorEventTransformer` |
 | `authn_credential_reload_success` | `CredentialReloadSuccessEventTransformer` |
 | `authn_credential_reload_error` | `CredentialReloadErrorEventTransformer` |
+| `client_added` | `ClientAddedEventTransformer` |
+| `client_removed` | `ClientRemovedEventTransformer` |
 
 They are found in the
 [`se.swedenconnect.spring.authnserver.audit.transform`][transform-package] package. A transformer is only created if the

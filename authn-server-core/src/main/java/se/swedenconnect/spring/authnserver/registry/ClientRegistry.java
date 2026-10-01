@@ -15,6 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.registry;
 
+import java.util.List;
+
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -78,5 +80,15 @@ public interface ClientRegistry {
    */
   @Nullable RequesterRecord requestMark(final @NonNull Requester requester, final @NonNull String mark)
       throws ClientRegistryException;
+
+  /**
+   * Gets the backends of the registry, in the order they are asked. Used for management, such as the Actuator
+   * support. The default is none.
+   *
+   * @return the backends
+   */
+  default @NonNull List<ClientRegistryBackend> getBackends() {
+    return List.of();
+  }
 
 }

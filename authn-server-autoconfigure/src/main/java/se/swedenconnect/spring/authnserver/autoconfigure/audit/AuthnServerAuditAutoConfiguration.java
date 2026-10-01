@@ -28,6 +28,8 @@ import se.swedenconnect.spring.authnserver.audit.transform.AuthnSuccessResponseE
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUnrecoverableErrorEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUserAuthenticatedEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUserInfoDeliveredEventTransformer;
+import se.swedenconnect.spring.authnserver.audit.transform.ClientAddedEventTransformer;
+import se.swedenconnect.spring.authnserver.audit.transform.ClientRemovedEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialReloadErrorEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialReloadSuccessEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialTestErrorEventTransformer;
@@ -165,6 +167,28 @@ public class AuthnServerAuditAutoConfiguration {
   @ConditionalOnMissingBean
   @NonNull CredentialReloadErrorEventTransformer credentialReloadErrorEventTransformer() {
     return new CredentialReloadErrorEventTransformer();
+  }
+
+  /**
+   * Creates the transformer for {@code client_added}.
+   *
+   * @return the transformer
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  @NonNull ClientAddedEventTransformer clientAddedEventTransformer() {
+    return new ClientAddedEventTransformer();
+  }
+
+  /**
+   * Creates the transformer for {@code client_removed}.
+   *
+   * @return the transformer
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  @NonNull ClientRemovedEventTransformer clientRemovedEventTransformer() {
+    return new ClientRemovedEventTransformer();
   }
 
 }

@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import com.nimbusds.langtag.LangTag;
+import com.nimbusds.jose.util.JSONObjectUtils;
 import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
@@ -121,6 +122,18 @@ public record OidcClientRecord(
     return metadata.getCustomField(CLIENT_SECRET) instanceof final String value && StringUtils.hasText(value)
         ? new Secret(value)
         : null;
+  }
+
+  /**
+   * Gets client metadata as JSON, exactly as held except that a client secret is left out.
+   *
+   * @param metadata the client metadata
+   * @return the JSON
+   */
+  public static @NonNull String toJson(final @NonNull OIDCClientMetadata metadata) {
+    final Map<String, Object> json = metadata.toJSONObject();
+    json.remove(CLIENT_SECRET);
+    return JSONObjectUtils.toJSONString(json);
   }
 
   /**

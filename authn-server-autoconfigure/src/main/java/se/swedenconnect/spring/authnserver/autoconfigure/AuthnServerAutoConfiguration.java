@@ -36,6 +36,9 @@ import org.springframework.util.ClassUtils;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
+import se.swedenconnect.spring.authnserver.registry.changes.ClientChangeTracker;
+import se.swedenconnect.spring.authnserver.registry.changes.InMemoryKnownClientStore;
+import se.swedenconnect.spring.authnserver.registry.changes.KnownClientStore;
 
 /**
  * Autoconfiguration for the authentication server. It checks that at least one protocol has been enabled, and sets up
@@ -44,6 +47,10 @@ import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
  * The chain is built from an {@link AuthnServerConfigurer} holding the values of the shared properties, the configurers
  * of the enabled protocols, and every {@link UserAuthenticationProvider} bean. After that, every
  * {@link AuthnServerConfigurerAdapter} bean is invoked in Spring's order.
+ * </p>
+ * <p>
+ * A {@link ClientChangeTracker} is given to the configurer, so that clients that appear in or disappear from the
+ * client registry are reported, and the configured server is made available in a {@link ConfiguredAuthnServer} bean.
  * </p>
  *
  * @author Martin Lindström
@@ -91,6 +98,29 @@ public class AuthnServerAutoConfiguration {
   }
 
   /**
+   * Creates the object that gives access to the configured server.
+   *
+   * @return a {@link ConfiguredAuthnServer}
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  ConfiguredAuthnServer configuredAuthnServer() {
+    return new ConfiguredAuthnServer();
+  }
+
+  /**
+   * Creates the tracker of clients that appear in and disappear from the client registry.
+   *
+   * @param store the record of known clients, if declared as a bean
+   * @return a {@link ClientChangeTracker}
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  ClientChangeTracker authnServerClientChangeTracker(final ObjectProvider<KnownClientStore> store) {
+    return new ClientChangeTracker(store.getIfUnique(InMemoryKnownClientStore::new));
+  }
+
+  /**
    * Sets up the security filter chain of the server.
    */
   @Configuration(proxyBeanMethods = false)
@@ -109,6 +139,8 @@ public class AuthnServerAutoConfiguration {
      * @param providers the authentication providers
      * @param protocolFactories the factories for the configurers of the enabled protocols
      * @param adapters the adapters
+     * @param tracker the tracker of client changes, if declared as a bean
+     * @param configuredServer gets the configured server, if declared as a bean
      * @return a {@link SecurityFilterChain}
      * @throws Exception for configuration errors
      */
@@ -119,10 +151,13 @@ public class AuthnServerAutoConfiguration {
         final AuthnServerConfigurationProperties properties,
         final ObjectProvider<UserAuthenticationProvider> providers,
         final ObjectProvider<AuthnServerProtocolConfigurerFactory> protocolFactories,
-        final ObjectProvider<AuthnServerConfigurerAdapter> adapters) throws Exception {
+        final ObjectProvider<AuthnServerConfigurerAdapter> adapters,
+        final ObjectProvider<ClientChangeTracker> tracker,
+        final ObjectProvider<ConfiguredAuthnServer> configuredServer) throws Exception {
 
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer();
       properties.applyTo(configurer);
+      configurer.clientChangeTracker(tracker.getIfUnique());
       providers.orderedStream().forEach(configurer::authenticationProvider);
       for (final AuthnServerProtocolConfigurerFactory factory : protocolFactories.orderedStream().toList()) {
         configurer.protocol(factory.createConfigurer(configurer));
@@ -133,7 +168,9 @@ public class AuthnServerAutoConfiguration {
       for (final AuthnServerConfigurerAdapter adapter : adapters.orderedStream().toList()) {
         adapter.configure(http, configurer);
       }
-      return http.build();
+      final SecurityFilterChain chain = http.build();
+      configuredServer.ifAvailable(c -> c.setConfigurer(configurer));
+      return chain;
     }
 
   }

@@ -15,6 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.saml.metadata;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -26,6 +27,8 @@ import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.opensaml.core.criterion.EntityIdCriterion;
+import org.opensaml.core.xml.io.MarshallingException;
+import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.ext.saml2mdui.Logo;
 import org.opensaml.saml.ext.saml2mdui.UIInfo;
@@ -39,14 +42,20 @@ import org.springframework.util.StringUtils;
 
 import net.shibboleth.shared.resolver.CriteriaSet;
 import net.shibboleth.shared.resolver.ResolverException;
+import net.shibboleth.shared.xml.SerializeSupport;
 import se.swedenconnect.opensaml.saml2.metadata.EntityDescriptorUtils;
 import se.swedenconnect.opensaml.sweid.saml2.metadata.ext.OrganizationNumber;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
+import se.swedenconnect.spring.authnserver.registry.ClientSource;
+import se.swedenconnect.spring.authnserver.registry.ClientUpdateResult;
 import se.swedenconnect.spring.authnserver.registry.DisplayName;
+import se.swedenconnect.spring.authnserver.registry.RegisteredClient;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
+import se.swedenconnect.spring.authnserver.registry.changes.ClientChangeTracker;
+import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
 
 /**
  * The client registry backend that serves SAML Service Providers from the Identity Provider's metadata sources.
@@ -55,6 +64,11 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * from the {@code mdui:UIInfo} extension, then from {@code Organization/OrganizationDisplayName} and finally from
  * {@code Organization/OrganizationName}, and logotypes from {@code mdui:UIInfo}. The marks of the record are the
  * entity category URIs that the Service Provider declares.
+ * </p>
+ * <p>
+ * Created from {@link ManagedMetadataSource}s, the backend can show what each source holds, update the sources on
+ * request, and report every Service Provider that appears in or disappears from a source to the
+ * {@link ClientChangeTracker}. Created from a {@link MetadataResolver}, the resolver is treated as one source.
  * </p>
  *
  * @author Martin Lindström
@@ -70,8 +84,14 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
   /** Where Service Provider metadata is found. */
   private final MetadataResolver metadataResolver;
 
+  /** The sources, in the order they are searched. */
+  private final List<ManagedMetadataSource> sources;
+
   /** The backend name. */
   private final String name;
+
+  /** Told when a Service Provider appears or disappears, or {@code null}. */
+  private volatile ClientChangeTracker tracker;
 
   /**
    * Constructor.
@@ -91,6 +111,44 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
   public SamlMetadataBackend(final @NonNull MetadataResolver metadataResolver, final @NonNull String name) {
     this.metadataResolver = Objects.requireNonNull(metadataResolver, "metadataResolver must not be null");
     this.name = Objects.requireNonNull(name, "name must not be null");
+    this.sources = List.of(new ManagedMetadataSource(
+        Optional.ofNullable(metadataResolver.getId()).orElse(name), metadataResolver));
+  }
+
+  /**
+   * Constructor.
+   *
+   * @param sources the metadata sources, in the order they are searched, see
+   *     {@link MetadataProviderFactory#createManagedSources(List, org.springframework.boot.ssl.SslBundles)}
+   */
+  public SamlMetadataBackend(final @NonNull List<ManagedMetadataSource> sources) {
+    this(sources, DEFAULT_NAME);
+  }
+
+  /**
+   * Constructor.
+   *
+   * @param sources the metadata sources, in the order they are searched
+   * @param name the backend name
+   */
+  public SamlMetadataBackend(final @NonNull List<ManagedMetadataSource> sources, final @NonNull String name) {
+    this.sources = List.copyOf(Objects.requireNonNull(sources, "sources must not be null"));
+    if (this.sources.isEmpty()) {
+      throw new IllegalArgumentException("At least one metadata source must be given");
+    }
+    this.name = Objects.requireNonNull(name, "name must not be null");
+    this.metadataResolver = this.sources.size() == 1
+        ? this.sources.get(0).getResolver()
+        : MetadataProviderFactory.combine(this.sources).getMetadataResolver();
+  }
+
+  /**
+   * Gets the metadata sources, in the order they are searched.
+   *
+   * @return the sources
+   */
+  public @NonNull List<ManagedMetadataSource> getMetadataSources() {
+    return this.sources;
   }
 
   /** {@inheritDoc} */
@@ -122,6 +180,187 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
       return null;
     }
     return toRecord(metadata);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @NonNull List<RegisteredClient> getClients() {
+    final Map<String, RegisteredClient> clients = new LinkedHashMap<>();
+    for (final ManagedMetadataSource source : this.sources) {
+      for (final EntityDescriptor metadata : source.getServiceProviders()) {
+        clients.putIfAbsent(metadata.getEntityID(), toRegisteredClient(metadata, source));
+      }
+    }
+    return List.copyOf(clients.values());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nullable RegisteredClient getClient(final @NonNull String identifier) {
+    Objects.requireNonNull(identifier, "identifier must not be null");
+    for (final ManagedMetadataSource source : this.sources) {
+      final EntityDescriptor metadata = find(source, identifier);
+      if (metadata != null) {
+        return toRegisteredClient(metadata, source);
+      }
+    }
+    return null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nullable String getMetadata(final @NonNull String identifier) {
+    Objects.requireNonNull(identifier, "identifier must not be null");
+    for (final ManagedMetadataSource source : this.sources) {
+      final EntityDescriptor metadata = find(source, identifier);
+      if (metadata != null) {
+        try {
+          return SerializeSupport.nodeToString(XMLObjectSupport.marshall(metadata));
+        }
+        catch (final MarshallingException e) {
+          throw new IllegalStateException(
+              "Failed to serialize the metadata of '%s' - %s".formatted(identifier, e.getMessage()), e);
+        }
+      }
+    }
+    return null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @NonNull List<ClientSource> getSources() {
+    return this.sources.stream()
+        .map(s -> new ClientSource(AuthenticationProtocol.SAML, s.getName(),
+            s.isListable() ? s.getServiceProviders().size() : null, s.getLastUpdate()))
+        .toList();
+  }
+
+  /**
+   * Updates every source that can be updated, that is, every source that is downloaded or read from a file. The
+   * Service Providers of each updated source are compared with those known before, so that changes are reported.
+   */
+  @Override
+  public @NonNull ClientUpdateResult update() {
+    final List<String> updated = new ArrayList<>();
+    final List<String> failed = new ArrayList<>();
+    for (final ManagedMetadataSource source : this.sources) {
+      if (!source.isRefreshable()) {
+        continue;
+      }
+      try {
+        source.refresh();
+        updated.add(source.getName());
+        log.info("The SAML metadata source '{}' was updated on request", source.getName());
+      }
+      catch (final ResolverException | RuntimeException e) {
+        failed.add("%s (%s)".formatted(source.getName(), e.getMessage()));
+        log.info("Failed to update the SAML metadata source '{}' on request: {}", source.getName(), e.getMessage());
+      }
+      this.report(source);
+    }
+    if (!failed.isEmpty()) {
+      return ClientUpdateResult.failed("Failed to update %s%s".formatted(String.join(", ", failed),
+          updated.isEmpty() ? "" : " - updated " + String.join(", ", updated)));
+    }
+    if (updated.isEmpty()) {
+      return ClientUpdateResult.nothingToUpdate("No SAML metadata source can be updated");
+    }
+    return ClientUpdateResult.updated("Updated " + String.join(", ", updated));
+  }
+
+  /**
+   * Updating a single Service Provider is not supported; use {@link #update()}.
+   */
+  @Override
+  public @NonNull ClientUpdateResult update(final @NonNull String identifier) {
+    return ClientUpdateResult.nothingToUpdate(
+        "A single Service Provider cannot be updated - update the SAML metadata sources instead");
+  }
+
+  /**
+   * Reports the Service Providers of every listable source to the tracker, and every change after that.
+   */
+  @Override
+  public void setClientChangeTracker(final @Nullable ClientChangeTracker tracker) {
+    this.tracker = tracker;
+    for (final ManagedMetadataSource source : this.sources) {
+      if (!source.isListable()) {
+        source.setListener(null);
+        continue;
+      }
+      if (tracker == null) {
+        source.setListener(null);
+      }
+      else {
+        source.setListener(serviceProviders -> this.report(source, serviceProviders));
+        this.report(source);
+      }
+    }
+  }
+
+  /**
+   * Reports the Service Providers that a source holds now to the tracker.
+   *
+   * @param source the source
+   */
+  private void report(final @NonNull ManagedMetadataSource source) {
+    if (this.tracker != null && source.isListable()) {
+      this.report(source, source.getServiceProviders());
+    }
+  }
+
+  /**
+   * Reports the Service Providers of a source to the tracker.
+   *
+   * @param source the source
+   * @param serviceProviders the Service Providers that the source holds
+   */
+  private void report(final @NonNull ManagedMetadataSource source,
+      final @NonNull List<EntityDescriptor> serviceProviders) {
+    final ClientChangeTracker current = this.tracker;
+    if (current == null) {
+      return;
+    }
+    try {
+      current.sourceLoaded(AuthenticationProtocol.SAML, source.getName(), serviceProviders.stream()
+          .filter(e -> e.getEntityID() != null)
+          .map(e -> new KnownClient(new Requester(AuthenticationProtocol.SAML, e.getEntityID()),
+              getOrganizationNumber(e), source.getName()))
+          .toList());
+    }
+    catch (final RuntimeException e) {
+      log.error("Failed to compare the Service Providers of '{}' with those known before: {}", source.getName(),
+          e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Finds a Service Provider among those that a source holds now, without reading anything new.
+   *
+   * @param source the source
+   * @param identifier the entityID
+   * @return the metadata, or {@code null}
+   */
+  private static @Nullable EntityDescriptor find(final @NonNull ManagedMetadataSource source,
+      final @NonNull String identifier) {
+    return source.getServiceProviders().stream()
+        .filter(e -> identifier.equals(e.getEntityID()))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Creates the entry of a Service Provider. The data expires at the {@code validUntil} of the entity, or else when
+   * the metadata of the source expires.
+   *
+   * @param metadata the metadata
+   * @param source the source
+   * @return a {@link RegisteredClient}
+   */
+  private static @NonNull RegisteredClient toRegisteredClient(final @NonNull EntityDescriptor metadata,
+      final @NonNull ManagedMetadataSource source) {
+    final Instant expiresAt = metadata.getValidUntil() != null ? metadata.getValidUntil() : source.getExpirationTime();
+    return RegisteredClient.of(toRecord(metadata), source.getName(), expiresAt);
   }
 
   /**

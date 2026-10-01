@@ -80,6 +80,7 @@ public class InMemoryClientRepository implements ClientRepository {
    *
    * @return the clients
    */
+  @Override
   public @NonNull List<OidcClientRecord> findAll() {
     return List.copyOf(this.clients.values());
   }

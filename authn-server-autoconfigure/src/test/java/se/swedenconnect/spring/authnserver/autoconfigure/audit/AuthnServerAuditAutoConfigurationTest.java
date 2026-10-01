@@ -50,6 +50,8 @@ import se.swedenconnect.spring.authnserver.audit.transform.AuthnSuccessResponseE
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUnrecoverableErrorEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUserAuthenticatedEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUserInfoDeliveredEventTransformer;
+import se.swedenconnect.spring.authnserver.audit.transform.ClientAddedEventTransformer;
+import se.swedenconnect.spring.authnserver.audit.transform.ClientRemovedEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialReloadErrorEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialReloadSuccessEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialTestErrorEventTransformer;
@@ -105,6 +107,8 @@ class AuthnServerAuditAutoConfigurationTest {
       assertThat(context).hasSingleBean(CredentialTestErrorEventTransformer.class);
       assertThat(context).hasSingleBean(CredentialReloadSuccessEventTransformer.class);
       assertThat(context).hasSingleBean(CredentialReloadErrorEventTransformer.class);
+      assertThat(context).hasSingleBean(ClientAddedEventTransformer.class);
+      assertThat(context).hasSingleBean(ClientRemovedEventTransformer.class);
 
       context.publishEvent(new AuthnRequestReceivedEvent(SP, null));
       assertThat(context.getBean(Collector.class).events).extracting(AuditEvent::getType)

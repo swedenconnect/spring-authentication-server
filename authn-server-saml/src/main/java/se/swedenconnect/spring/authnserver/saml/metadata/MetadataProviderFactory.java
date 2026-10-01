@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.TrustManager;
@@ -32,11 +34,14 @@ import org.apache.hc.client5.http.ssl.DefaultHostnameVerifier;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
 import org.springframework.boot.ssl.SslBundles;
@@ -80,29 +85,7 @@ public class MetadataProviderFactory {
    */
   public static @NonNull MetadataProvider createMetadataProvider(
       final @NonNull List<MetadataSource> sources, final @Nullable SslBundles sslBundles) {
-
-    Objects.requireNonNull(sources, "sources must not be null");
-    if (sources.isEmpty()) {
-      throw new IllegalArgumentException("At least one metadata source must be given");
-    }
-    try {
-      final List<MetadataProvider> providers = new ArrayList<>();
-      for (final MetadataSource source : sources) {
-        final AbstractMetadataProvider provider = createProvider(source, sslBundles);
-        provider.setPerformSchemaValidation(false);
-        provider.initialize();
-        providers.add(provider);
-      }
-      if (providers.size() == 1) {
-        return providers.get(0);
-      }
-      final CompositeMetadataProvider composite = new CompositeMetadataProvider("composite-provider", providers);
-      composite.initialize();
-      return composite;
-    }
-    catch (final ResolverException | ComponentInitializationException | IOException | XMLParserException e) {
-      throw new IllegalArgumentException("Failed to initialize metadata provider - " + e.getMessage(), e);
-    }
+    return combine(createManagedSources(sources, sslBundles));
   }
 
   /**
@@ -118,17 +101,114 @@ public class MetadataProviderFactory {
   }
 
   /**
+   * Creates one initialized {@link ManagedMetadataSource} for each of the supplied sources, in the same order. Each
+   * source tells its listener when it has read new metadata, except an MDQ source.
+   *
+   * @param sources the metadata sources
+   * @param sslBundles the SSL bundles of the application, needed if a source names one, otherwise {@code null}
+   * @return the managed sources
+   */
+  public static @NonNull List<ManagedMetadataSource> createManagedSources(
+      final @NonNull List<MetadataSource> sources, final @Nullable SslBundles sslBundles) {
+
+    Objects.requireNonNull(sources, "sources must not be null");
+    if (sources.isEmpty()) {
+      throw new IllegalArgumentException("At least one metadata source must be given");
+    }
+    try {
+      final List<ManagedMetadataSource> managed = new ArrayList<>();
+      for (final MetadataSource source : sources) {
+        final AtomicReference<ManagedMetadataSource> reference = new AtomicReference<>();
+        final DownloadRecordingHttpClient.DownloadRecord downloads = new DownloadRecordingHttpClient.DownloadRecord();
+        final AbstractMetadataProvider provider = createProvider(source, sslBundles, downloads, m -> {
+          final ManagedMetadataSource s = reference.get();
+          if (s != null) {
+            s.metadataLoaded(m);
+          }
+        });
+        provider.setPerformSchemaValidation(false);
+        provider.initialize();
+        final ManagedMetadataSource s = new ManagedMetadataSource(getName(source.location()), provider,
+            provider instanceof MDQMetadataProvider,
+            provider instanceof HTTPMetadataProvider || provider instanceof MDQMetadataProvider ? downloads : null);
+        reference.set(s);
+        managed.add(s);
+      }
+      return managed;
+    }
+    catch (final ResolverException | ComponentInitializationException | IOException | XMLParserException e) {
+      throw new IllegalArgumentException("Failed to initialize metadata provider - " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Combines the providers of several managed sources into one, where the sources are searched in the order they are
+   * given. A single source gives its own provider.
+   *
+   * @param sources the managed sources, each with a provider
+   * @return an initialized {@link MetadataProvider}
+   * @throws IllegalArgumentException if a source has no provider, or the providers cannot be combined
+   */
+  public static @NonNull MetadataProvider combine(final @NonNull List<ManagedMetadataSource> sources) {
+    final List<MetadataProvider> providers = new ArrayList<>();
+    for (final ManagedMetadataSource source : sources) {
+      if (source.getProvider() == null) {
+        throw new IllegalArgumentException("The metadata source '%s' has no provider".formatted(source.getName()));
+      }
+      providers.add(source.getProvider());
+    }
+    if (providers.size() == 1) {
+      return providers.get(0);
+    }
+    try {
+      final CompositeMetadataProvider composite = new CompositeMetadataProvider("composite-provider", providers);
+      composite.initialize();
+      return composite;
+    }
+    catch (final ComponentInitializationException e) {
+      throw new IllegalArgumentException("Failed to initialize metadata provider - " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Gets the name of a source from its location: the URL, the file path or the classpath resource.
+   *
+   * @param location the location
+   * @return the name
+   */
+  static @NonNull String getName(final @NonNull Resource location) {
+    if (location instanceof final FileSystemResource file) {
+      return file.getPath();
+    }
+    if (location instanceof final ClassPathResource classPath) {
+      return "classpath:" + classPath.getPath();
+    }
+    try {
+      if (location instanceof final UrlResource url) {
+        return url.isFile() ? url.getFile().getPath() : url.getURL().toString();
+      }
+    }
+    catch (final IOException e) {
+      // The description is used instead
+    }
+    return location.getDescription();
+  }
+
+  /**
    * Creates the provider for one source.
    *
    * @param source the metadata source
    * @param sslBundles the SSL bundles of the application
+   * @param downloads where the outcome of the downloads of the source is recorded
+   * @param listener told every time the provider has read new metadata
    * @return an uninitialized {@link AbstractMetadataProvider}
    * @throws ResolverException for provider errors
    * @throws IOException if the location cannot be read
    * @throws XMLParserException if the metadata cannot be parsed
    */
   private static @NonNull AbstractMetadataProvider createProvider(
-      final @NonNull MetadataSource source, final @Nullable SslBundles sslBundles)
+      final @NonNull MetadataSource source, final @Nullable SslBundles sslBundles,
+      final DownloadRecordingHttpClient.@NonNull DownloadRecord downloads, final @NonNull Consumer<XMLObject> listener)
       throws ResolverException, IOException, XMLParserException {
 
     if (source.location() instanceof final UrlResource urlResource && !urlResource.isFile()) {
@@ -138,12 +218,20 @@ public class MetadataProviderFactory {
       }
       final AbstractMetadataProvider provider;
       if (source.mdq()) {
-        provider = new MDQMetadataProvider(urlResource.getURL().toString(), createHttpClient(source, sslBundles),
+        provider = new MDQMetadataProvider(urlResource.getURL().toString(),
+            new DownloadRecordingHttpClient(createHttpClient(source, sslBundles), downloads, true),
             preProcessBackupDirectory(source.backupLocation()));
       }
       else {
         provider = new HTTPMetadataProvider(urlResource.getURL().toString(),
-            preProcessBackupFile(source.backupLocation()), createHttpClient(source, sslBundles));
+            preProcessBackupFile(source.backupLocation()),
+            new DownloadRecordingHttpClient(createHttpClient(source, sslBundles), downloads, false)) {
+          @Override
+          protected synchronized void setMetadata(final XMLObject metadata) {
+            super.setMetadata(metadata);
+            listener.accept(metadata);
+          }
+        };
       }
       if (source.validationCertificate() != null) {
         provider.setSignatureVerificationCertificate(source.validationCertificate());
@@ -154,12 +242,25 @@ public class MetadataProviderFactory {
       }
       return provider;
     }
-    if (source.location() instanceof FileSystemResource) {
-      return new FilesystemMetadataProvider(source.location().getFile());
+    if (source.location() instanceof FileSystemResource
+        || source.location() instanceof final UrlResource fileUrl && fileUrl.isFile()) {
+      return new FilesystemMetadataProvider(source.location().getFile()) {
+        @Override
+        protected synchronized void setMetadata(final XMLObject metadata) {
+          super.setMetadata(metadata);
+          listener.accept(metadata);
+        }
+      };
     }
     final Document document = Objects.requireNonNull(XMLObjectProviderRegistrySupport.getParserPool())
         .parse(source.location().getInputStream());
-    return new StaticMetadataProvider(document.getDocumentElement());
+    return new StaticMetadataProvider(document.getDocumentElement()) {
+      @Override
+      protected synchronized void setMetadata(final XMLObject metadata) {
+        super.setMetadata(metadata);
+        listener.accept(metadata);
+      }
+    };
   }
 
   /**

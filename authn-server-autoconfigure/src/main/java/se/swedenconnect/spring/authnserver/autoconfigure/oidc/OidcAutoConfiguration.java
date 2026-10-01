@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.text.ParseException;
 import java.time.Clock;
 import java.time.Duration;
@@ -52,6 +53,7 @@ import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConf
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
+import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationClient;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.federation.InMemoryProviderTrustMarkStore;
@@ -88,6 +90,11 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
  * When OpenID Federation is enabled, the trust marks of the OpenID Provider are kept by a {@link ProviderTrustMarks}
  * bean, created from the properties unless the application declares one. A {@link ProviderTrustMarkStore} bean decides
  * where their state is kept.
+ * </p>
+ * <p>
+ * An {@link HttpFederationClient} bean makes the federation calls, unless the application declares a
+ * {@link FederationClient}. As a bean it publishes the outcome of every call, which the health of the federation
+ * services is built from, so an application that sets up the federation backend of the client registry should use it.
  * </p>
  *
  * @author Martin Lindström
@@ -148,12 +155,29 @@ public class OidcAutoConfiguration {
   }
 
   /**
+   * Creates the client that makes the federation calls. As a bean it publishes the outcome of every call.
+   *
+   * @return an {@link HttpFederationClient}
+   */
+  @Bean
+  @ConditionalOnMissingBean(FederationClient.class)
+  HttpFederationClient oidcFederationClient() {
+    return new HttpFederationClient();
+  }
+
+  /**
    * Creates the object that keeps the trust marks of the OpenID Provider, when OpenID Federation is enabled. It is a
    * bean so that the state of the trust marks can be read, for example by a health check.
+   * <p>
+   * In memory, the trust marks are kept in {@code authn-server.oidc.federation.trust-mark-cache-directory}, or else
+   * in the directory {@value AuthnServerConfigurationProperties#OIDC_TRUST_MARKS_DIRECTORY} of
+   * {@code authn-server.cache-directory}.
+   * </p>
    *
    * @param properties the OIDC properties
-   * @param shared the shared properties, giving the base URL
+   * @param shared the shared properties, giving the base URL and the cache directory
    * @param store where the trust marks are kept, if declared as a bean
+   * @param federationClient the client making the calls, if declared as a bean
    * @return a {@link ProviderTrustMarks}
    * @throws IOException if the keys of a trust mark issuer cannot be read
    */
@@ -162,7 +186,8 @@ public class OidcAutoConfiguration {
   @ConditionalOnProperty(prefix = OidcConfigurationProperties.PREFIX + ".federation", name = "enabled",
       havingValue = "true")
   ProviderTrustMarks oidcProviderTrustMarks(final OidcConfigurationProperties properties,
-      final AuthnServerConfigurationProperties shared, final ObjectProvider<ProviderTrustMarkStore> store)
+      final AuthnServerConfigurationProperties shared, final ObjectProvider<ProviderTrustMarkStore> store,
+      final ObjectProvider<FederationClient> federationClient)
       throws IOException {
     final String entityId = properties.getIssuer() != null ? properties.getIssuer() : shared.getBaseUrl();
     if (entityId == null) {
@@ -173,19 +198,21 @@ public class OidcAutoConfiguration {
     final Duration retryInterval =
         Optional.ofNullable(federation.getTrustMarkRetryInterval()).orElse(ProviderTrustMarks.DEFAULT_RETRY_INTERVAL);
     final ProviderTrustMarkStore trustMarkStore = store.getIfUnique();
+    final FederationClient client = federationClient.getIfUnique(HttpFederationClient::new);
     if (trustMarkStore == null || trustMarkStore instanceof InMemoryProviderTrustMarkStore) {
+      final Path cacheDirectory = federation.getTrustMarkCacheDirectory() != null
+          ? federation.getTrustMarkCacheDirectory().toPath()
+          : shared.getCachePath(AuthnServerConfigurationProperties.OIDC_TRUST_MARKS_DIRECTORY);
       return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()),
-          Objects.requireNonNullElseGet(trustMarkStore, InMemoryProviderTrustMarkStore::new),
-          new HttpFederationClient(),
-          federation.getTrustMarkCacheDirectory() != null ? federation.getTrustMarkCacheDirectory().toPath() : null,
-          retryInterval, Clock.systemUTC());
+          Objects.requireNonNullElseGet(trustMarkStore, InMemoryProviderTrustMarkStore::new), client,
+          cacheDirectory, retryInterval, Clock.systemUTC());
     }
     if (federation.getTrustMarkCacheDirectory() != null) {
       log.info("The trust marks are kept in a shared store - {}.federation.trust-mark-cache-directory is not used",
           OidcConfigurationProperties.PREFIX);
     }
     return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()), trustMarkStore,
-        new HttpFederationClient(), null, retryInterval, Clock.systemUTC());
+        client, null, retryInterval, Clock.systemUTC());
   }
 
   /**

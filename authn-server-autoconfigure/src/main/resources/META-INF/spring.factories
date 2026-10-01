@@ -15,3 +15,5 @@
 #
 org.springframework.boot.autoconfigure.AutoConfigurationImportFilter=\
 se.swedenconnect.spring.authnserver.autoconfigure.storage.SessionStorageImportFilter
+org.springframework.boot.EnvironmentPostProcessor=\
+se.swedenconnect.spring.authnserver.autoconfigure.actuate.HealthStatusEnvironmentPostProcessor

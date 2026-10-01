@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -189,6 +190,64 @@ class HttpFederationClientTest extends FederationTestSupport {
         new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, null, Boolean.FALSE),
         Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, "http://localhost:1/resolve"))))
         .isInstanceOf(ClientRegistryException.class);
+  }
+
+  @Test
+  void everyCallIsPublishedWithItsOutcome() throws Exception {
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+    final int port = this.startServer();
+
+    this.status = 404;
+    assertThat(client.resolve(this.resolveRequest(port))).isNull();
+    this.status = 500;
+    this.body = "server error";
+    assertThatThrownBy(() -> client.resolve(this.resolveRequest(port))).isInstanceOf(ClientRegistryException.class);
+    assertThatThrownBy(() -> client.resolve(new FederationRequest<>(
+        new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, null, Boolean.FALSE),
+        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, "http://localhost:1/resolve"))))
+        .isInstanceOf(ClientRegistryException.class);
+    this.status = 200;
+    this.body = trustMark(key("k1"), TRUST_MARK_ISSUER, CLIENT_ID, MARK_ONE, null).serialize();
+    client.trustMark(new FederationRequest<>(
+        new TrustMarkRequest(new EntityID(CLIENT_ID), new EntityID(TRUST_MARK_ISSUER), new EntityID(MARK_ONE)),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT,
+            "http://localhost:%d/trust_mark".formatted(port))));
+    this.status = 404;
+    this.body = "";
+    assertThatThrownBy(() -> client.trustMarkStatus(new FederationRequest<>(
+        new FederationTrustMarkStatusRequest("a.b.c", TRUST_MARK_ISSUER),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
+            "http://localhost:%d/trust_mark_status".formatted(port))))).isInstanceOf(ClientRegistryException.class);
+
+    assertThat(events).extracting(FederationCallEvent::getCall, FederationCallEvent::getOutcome).containsExactly(
+        tuple(FederationCallEvent.Call.RESOLVE, FederationCallEvent.Outcome.SUCCESS),
+        tuple(FederationCallEvent.Call.RESOLVE, FederationCallEvent.Outcome.ERROR_RESPONSE),
+        tuple(FederationCallEvent.Call.RESOLVE, FederationCallEvent.Outcome.UNREACHABLE),
+        tuple(FederationCallEvent.Call.TRUST_MARK, FederationCallEvent.Outcome.SUCCESS),
+        tuple(FederationCallEvent.Call.TRUST_MARK_STATUS, FederationCallEvent.Outcome.ERROR_RESPONSE));
+    assertThat(events.get(0).getServiceType()).isEqualTo(FederationCallEvent.ServiceType.RESOLVER);
+    assertThat(events.get(0).getServiceId()).isEqualTo("http://localhost:%d/resolve".formatted(port));
+    assertThat(events.get(0).getError()).isNull();
+    assertThat(events.get(1).getError()).contains("500");
+    assertThat(events.get(3).getServiceType()).isEqualTo(FederationCallEvent.ServiceType.TRUST_MARK_ISSUER);
+    assertThat(events.get(3).getServiceId()).isEqualTo(TRUST_MARK_ISSUER);
+    assertThat(events.get(3).getIssuer()).isEqualTo(TRUST_MARK_ISSUER);
+    assertThat(events.get(4).getServiceId()).isEqualTo(TRUST_MARK_ISSUER);
+    assertThat(events.get(4).getEndpoint()).endsWith("/trust_mark_status");
+    assertThat(events.get(4).getTime()).isNotNull();
+  }
+
+  @Test
+  void aPublisherThatFailsDoesNotAffectTheCall() throws Exception {
+    this.status = 404;
+    final int port = this.startServer();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> {
+      throw new IllegalStateException("no listeners");
+    });
+    assertThat(client.resolve(this.resolveRequest(port))).isNull();
   }
 
   @Test

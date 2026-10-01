@@ -166,7 +166,9 @@ configuration, repository, federation.
   gives the server directly.
 - **Repository** ([`RepositoryClientBackend`][RepositoryClientBackend]): the clients of a
   [`ClientRepository`][ClientRepository]. The library ships [`InMemoryClientRepository`][InMemoryClientRepository];
-  implementations backed by a database are added later.
+  implementations backed by a database are added later. A repository that can list its clients implements
+  `findAll()`, so that its clients can be listed and compared with those known before a restart, see
+  [Monitoring and managing the server](management.html#clients-added-and-removed).
 - **Federation** ([`FederationClientBackend`][FederationClientBackend]): clients resolved through OpenID Federation.
 
 The first two work from an [`OidcClientRecord`][OidcClientRecord], which is a `client_id`, the client metadata as
@@ -259,10 +261,13 @@ FederationCacheSettings settings = new FederationCacheSettings(
     Duration.ofMinutes(1),
     FederationCacheSettings.RefreshSettings.enabled(true));
 
-FederationCacheRefresher refresher = new FederationCacheRefresher(cache, resolver, backend.getLookupTracker(),
-    settings);
+FederationCacheRefresher refresher = new FederationCacheRefresher(backend);
 refresher.start();
 ```
+
+Built from the backend, the refresher uses the cache, the resolver and the settings of the backend, and a client that
+the resolver no longer knows is reported as [removed](management.html#clients-added-and-removed). The constructor that
+takes the parts one by one is still there, but a refresher built that way reports nothing.
 
 ### Trust marks on demand
 
@@ -297,11 +302,14 @@ obtained on demand are still valid, at the issuer's trust mark status endpoint (
 It runs at a configurable interval, one hour by default:
 
 ```java
-TrustMarkStatusChecker checker = new TrustMarkStatusChecker(cache, federation, new HttpFederationClient(),
+TrustMarkStatusChecker checker = new TrustMarkStatusChecker(cache, federation, httpFederationClient,
     Duration.ofHours(1), Clock.systemUTC());
 checker.setEventPublisher(applicationContext);
 checker.start();
 ```
+
+With Spring Boot, `httpFederationClient` is the [`HttpFederationClient`][HttpFederationClient] bean, so that the
+status checks count toward the [health of the trust mark issuers](management.html#oidc-federation-health).
 
 - A trust mark is checked when it has no `exp`, or when its `exp` is later than the next check. A trust mark that
   expires before the next check is not checked; it expires as before.
@@ -332,15 +340,22 @@ counts lookups, and the jobs ask it for the lock that decides which node runs a 
 
 With Spring Boot, a `FederationCache` bean is declared according to `authn-server.storage.type`, or
 `authn-server.oidc.storage.federation-cache`, see [Running several nodes](configuration.html#running-several-nodes).
-Build the backend and the jobs from it:
+Build the backend and the jobs from it, and from the [`HttpFederationClient`][HttpFederationClient] bean that the
+auto-configuration declares. That client publishes the outcome of every call it makes, which is what the
+[health of the federation services](management.html#oidc-federation-health) is built from:
 
 ```java
 @Bean
-FederationClientBackend federationBackend(final FederationCache cache) {
-  return new FederationClientBackend(new HttpFederationResolver(federation), new HttpTrustMarkRequester(federation),
-      cache, settings);
+FederationClientBackend federationBackend(final FederationCache cache, final HttpFederationClient client) {
+  return new FederationClientBackend(new HttpFederationResolver(federation, client),
+      new HttpTrustMarkRequester(federation, client), cache, settings);
 }
 ```
+
+The backend is added to the client registry with an `AuthnServerConfigurerAdapter`, which calls
+`configurer.clientRegistryBackend(backend)`. The clients that the backend adds and removes are then reported, see
+[Clients added and removed](management.html#clients-added-and-removed), and the clients it holds can be listed and
+updated through the [clients endpoint](management.html#the-clients-endpoint).
 
 <a name="requester-acceptance"></a>
 ## Deciding which requesters may use the server
@@ -412,6 +427,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [FederationCacheSettings]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCacheSettings.java
 [FederationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientBackend.java
 [FederationResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationResolver.java
+[HttpFederationClient]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/HttpFederationClient.java
 [HttpFederationResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/HttpFederationResolver.java
 [InMemoryClientRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/InMemoryClientRepository.java
 [InMemoryFederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/InMemoryFederationCache.java

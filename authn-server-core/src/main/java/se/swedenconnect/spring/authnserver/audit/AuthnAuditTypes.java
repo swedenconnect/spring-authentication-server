@@ -57,6 +57,12 @@ public final class AuthnAuditTypes {
   /** A monitored credential that failed its test could not be reloaded. */
   public static final AuditType AUTHN_CREDENTIAL_RELOAD_ERROR = AuditType.of("authn_credential_reload_error");
 
+  /** A client appeared in the client registry. A system operation, so the type has no {@code authn_} prefix. */
+  public static final AuditType CLIENT_ADDED = AuditType.of("client_added");
+
+  /** A client disappeared from the client registry. A system operation, so the type has no {@code authn_} prefix. */
+  public static final AuditType CLIENT_REMOVED = AuditType.of("client_removed");
+
   // Hidden constructor
   private AuthnAuditTypes() {
   }

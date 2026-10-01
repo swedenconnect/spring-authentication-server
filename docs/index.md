@@ -68,6 +68,10 @@ The Spring Boot starters:
 - [Auditing](audit.html) - The audit events that the server produces, built on spring-audit-support, how one
   authentication flow is followed across requests and server instances, and how to change what an event holds.
 
+- [Monitoring and managing the server](management.html) - The Actuator support: the `clients` endpoint that shows and
+  updates the clients the server knows, the info contributions, the health indicators and the `WARNING` status, the
+  state that survives a restart, and the events of clients that are added and removed.
+
 - [Release Notes](release-notes.html)
 
 -----

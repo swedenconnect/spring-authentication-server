@@ -82,6 +82,12 @@ public class DefaultClientRegistry implements ClientRegistry {
     return null;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public @NonNull List<ClientRegistryBackend> getBackends() {
+    return this.backends;
+  }
+
   /**
    * Gets the backends that answer for the protocol of the supplied requester.
    *

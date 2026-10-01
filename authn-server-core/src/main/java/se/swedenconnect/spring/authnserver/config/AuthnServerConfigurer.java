@@ -64,6 +64,7 @@ import se.swedenconnect.spring.authnserver.registry.DefaultClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
+import se.swedenconnect.spring.authnserver.registry.changes.ClientChangeTracker;
 import se.swedenconnect.spring.authnserver.sso.SsoPolicy;
 import se.swedenconnect.spring.authnserver.sso.SsoVoter;
 import se.swedenconnect.spring.authnserver.subject.AbstractSubjectIdentifierGenerator;
@@ -169,6 +170,9 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
 
   /** The client registry that is used, assigned when the configurer is initialized. */
   private ClientRegistry activeClientRegistry;
+
+  /** Is told when a client appears in or disappears from the registry, or {@code null}. */
+  private ClientChangeTracker clientChangeTracker;
 
   /** The requester acceptance check. */
   private RequesterAcceptance requesterAcceptance;
@@ -415,6 +419,27 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   public @NonNull AuthnServerConfigurer clientRegistryBackend(final @NonNull ClientRegistryBackend backend) {
     this.clientRegistryBackends.add(Objects.requireNonNull(backend, "backend must not be null"));
     return this;
+  }
+
+  /**
+   * Assigns the object that is told when a client appears in or disappears from the client registry. It is given to
+   * every backend of the registry when the configurer is initialized. Without one, no changes are tracked.
+   *
+   * @param clientChangeTracker the tracker, or {@code null}
+   * @return this configurer
+   */
+  public @NonNull AuthnServerConfigurer clientChangeTracker(final @Nullable ClientChangeTracker clientChangeTracker) {
+    this.clientChangeTracker = clientChangeTracker;
+    return this;
+  }
+
+  /**
+   * Gets the client change tracker.
+   *
+   * @return the tracker, or {@code null} if none has been assigned
+   */
+  public @Nullable ClientChangeTracker getClientChangeTracker() {
+    return this.clientChangeTracker;
   }
 
   /**
@@ -731,6 +756,9 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
     this.authnPathsMatcher = authnPathMatchers.isEmpty() ? request -> false : new OrRequestMatcher(authnPathMatchers);
     this.endpointsMatcher = matchers.isEmpty() ? request -> false : new OrRequestMatcher(matchers);
     this.activeClientRegistry = this.createClientRegistry();
+    if (this.clientChangeTracker != null) {
+      this.activeClientRegistry.getBackends().forEach(b -> b.setClientChangeTracker(this.clientChangeTracker));
+    }
 
     for (final UserAuthenticationProvider provider : this.authenticationProviders) {
       if (provider instanceof final AbstractUserAuthenticationProvider p) {

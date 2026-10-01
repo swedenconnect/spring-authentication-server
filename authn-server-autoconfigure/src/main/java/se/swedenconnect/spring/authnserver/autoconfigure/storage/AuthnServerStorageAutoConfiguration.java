@@ -15,6 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure.storage;
 
+import java.time.Clock;
 import java.util.List;
 
 import org.jspecify.annotations.NonNull;
@@ -46,9 +47,13 @@ import org.springframework.session.data.redis.RedisSessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration;
 import org.springframework.util.ClassUtils;
 
+import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.RedisProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
@@ -57,6 +62,9 @@ import se.swedenconnect.spring.authnserver.oidc.token.ClientAssertionReplayCache
 import se.swedenconnect.spring.authnserver.oidc.token.RedisAccessTokenStore;
 import se.swedenconnect.spring.authnserver.oidc.token.RedisAuthorizationCodeStore;
 import se.swedenconnect.spring.authnserver.oidc.token.RedisClientAssertionReplayCache;
+import se.swedenconnect.spring.authnserver.redis.RedisKnownClientStore;
+import se.swedenconnect.spring.authnserver.registry.changes.InMemoryKnownClientStore;
+import se.swedenconnect.spring.authnserver.registry.changes.KnownClientStore;
 import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.replay.RedisReplayCache;
 
 /**
@@ -72,6 +80,10 @@ import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.replay.R
  * its session module is present and by this class otherwise, with the key prefix as the default namespace.
  * </p>
  * <p>
+ * The record of known clients follows the shared setting. In memory, it and the federation cache are kept in the
+ * cache directory, {@code authn-server.cache-directory}, when one is given, so that they survive a restart.
+ * </p>
+ * <p>
  * Startup fails when something is to be kept in Redis and Spring Data Redis or a working Redis connection is missing,
  * and when the HTTP session is to be kept in Redis and Spring Session for Redis is missing.
  * </p>
@@ -82,7 +94,7 @@ import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.replay.R
     "org.springframework.boot.session.data.redis.autoconfigure.SessionDataRedisAutoConfiguration" },
     beforeName = { "se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration",
         "se.swedenconnect.spring.authnserver.autoconfigure.oidc.OidcAutoConfiguration" })
-@EnableConfigurationProperties(AuthnServerRedisProperties.class)
+@EnableConfigurationProperties({ AuthnServerRedisProperties.class, AuthnServerConfigurationProperties.class })
 @Import(RedisClientConfiguration.class)
 public class AuthnServerStorageAutoConfiguration {
 
@@ -139,6 +151,41 @@ public class AuthnServerStorageAutoConfiguration {
    */
   static @NonNull String describe(final @NonNull List<String> settings) {
     return settings.size() == 1 ? settings.getFirst() + " is" : String.join(", ", settings) + " are";
+  }
+
+  /**
+   * Creates the record of known clients in memory, kept in the cache directory when one is given.
+   *
+   * @param properties the shared properties
+   * @return an {@link InMemoryKnownClientStore}
+   */
+  @Bean
+  @ConditionalOnMissingBean(KnownClientStore.class)
+  @ConditionalOnStorageType(StorageType.MEMORY)
+  KnownClientStore authnServerKnownClientStore(final AuthnServerConfigurationProperties properties) {
+    return new InMemoryKnownClientStore(properties.getCachePath(AuthnServerConfigurationProperties.KNOWN_CLIENTS_FILE));
+  }
+
+  /**
+   * The record of known clients in Redis.
+   */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnClass(name = SPRING_DATA_REDIS_CLASS)
+  @ConditionalOnStorageType(StorageType.REDIS)
+  static class RedisKnownClientsConfiguration {
+
+    /**
+     * Creates the record of known clients.
+     *
+     * @param storage the Redis storage
+     * @return a {@link RedisKnownClientStore}
+     */
+    @Bean
+    @ConditionalOnMissingBean(KnownClientStore.class)
+    KnownClientStore authnServerKnownClientStore(final RedisStorage storage) {
+      return new RedisKnownClientStore(storage.getRedisTemplate(), storage.getKeyPrefix());
+    }
+
   }
 
   /**
@@ -215,15 +262,29 @@ public class AuthnServerStorageAutoConfiguration {
 
     /**
      * Creates the federation cache in memory, for applications that set up the federation backend of the client
-     * registry.
+     * registry. It is kept in the cache directory when one is given.
      *
+     * @param properties the shared properties
      * @return an {@link InMemoryFederationCache}
      */
     @Bean
     @ConditionalOnMissingBean(FederationCache.class)
     @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.MEMORY)
-    FederationCache authnServerFederationCache() {
-      return new InMemoryFederationCache();
+    FederationCache authnServerFederationCache(final AuthnServerConfigurationProperties properties) {
+      return new InMemoryFederationCache(
+          properties.getCachePath(AuthnServerConfigurationProperties.OIDC_FEDERATION_CACHE_FILE), Clock.systemUTC());
+    }
+
+    /**
+     * Creates the store of the state of the federation services in memory. It follows the federation cache.
+     *
+     * @return an {@link InMemoryFederationServiceStateStore}
+     */
+    @Bean
+    @ConditionalOnMissingBean(FederationServiceStateStore.class)
+    @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.MEMORY)
+    FederationServiceStateStore authnServerFederationServiceStateStore() {
+      return new InMemoryFederationServiceStateStore();
     }
 
     /**
@@ -283,6 +344,19 @@ public class AuthnServerStorageAutoConfiguration {
       @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.REDIS)
       FederationCache authnServerFederationCache(final RedisStorage storage) {
         return new RedisFederationCache(storage.getRedisTemplate(), storage.getKeyPrefix());
+      }
+
+      /**
+       * Creates the store of the state of the federation services. It follows the federation cache.
+       *
+       * @param storage the Redis storage
+       * @return a {@link RedisFederationServiceStateStore}
+       */
+      @Bean
+      @ConditionalOnMissingBean(FederationServiceStateStore.class)
+      @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.REDIS)
+      FederationServiceStateStore authnServerFederationServiceStateStore(final RedisStorage storage) {
+        return new RedisFederationServiceStateStore(storage.getRedisTemplate(), storage.getKeyPrefix());
       }
 
       /**

@@ -976,13 +976,15 @@ or later:
   fetched.
 
 The state of each trust mark type, whether a valid trust mark is published and whether the latest attempt failed, is
-recorded in [`ProviderTrustMarks`][ProviderTrustMarks]. With Spring Boot it is a bean, so that a health check can read
-it with `getStates()`.
+recorded in [`ProviderTrustMarks`][ProviderTrustMarks]. With Spring Boot it is a bean, and the `oidc-trust-marks`
+health indicator reads it with `getStates()`, see [Monitoring and managing the server](management.html#oidc-trust-marks-health).
 
-**The cache directory.** When `trust-mark-cache-directory` is set, every accepted trust mark is written there, and the
-stored trust marks are read at startup. This means that the OpenID Provider publishes its trust marks at once after a
+**The cache directory.** When a cache directory is given, every accepted trust mark is written there, and the stored
+trust marks are read at startup. This means that the OpenID Provider publishes its trust marks at once after a
 restart, also when an issuer cannot be reached. A stored trust mark that has expired, or that fails the check, is not
-used. Without a cache directory nothing is stored.
+used. With Spring Boot the directory is `oidc/trust-marks` in `authn-server.cache-directory`, see
+[State that survives a restart](management.html#state-that-survives-a-restart), or
+`trust-mark-cache-directory` when that is set. Without either, nothing is stored.
 
 **Several nodes.** The trust marks and their state are kept in a [`ProviderTrustMarkStore`][ProviderTrustMarkStore],
 in memory by default. When they are kept in Redis, by `authn-server.storage.type` or

@@ -830,7 +830,7 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
     }
     else if (this.metadataSources != null && !this.metadataSources.isEmpty()) {
       this.metadataBackend = new SamlMetadataBackend(
-          MetadataProviderFactory.createMetadataResolver(this.metadataSources, this.sslBundles));
+          MetadataProviderFactory.createManagedSources(this.metadataSources, this.sslBundles));
     }
 
     if (this.nameIdGeneratorFactory != null) {

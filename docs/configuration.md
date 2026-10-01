@@ -171,6 +171,7 @@ wins over the shared one.
 | `authn-server.entity-information.*` | The names, logos and contact persons that every protocol publishes, see [Entity information](#entity-information). | - | Yes |
 | `authn-server.authn-flow-max-age` | How long the server waits for the user to come back from an authentication module that has pages of its own. Applied to the session-based storage of every redirect provider. | 30 minutes | No |
 | `authn-server.storage.type` | Where the HTTP session and the stores are kept, `memory` or `redis`, see [Running several nodes](#running-several-nodes). | `memory` | Per store |
+| `authn-server.cache-directory` | A directory where the server keeps state that should survive a restart when it keeps its state in memory: the OpenID Provider's own trust marks, the OpenID Federation client cache and the record of known clients, see [State that survives a restart](management.html#state-that-survives-a-restart). | Nothing is kept | No |
 
 <a name="single-sign-on"></a>
 ### Single sign-on
@@ -807,7 +808,7 @@ The OpenID Provider as a member of an OpenID Federation is configured under `aut
 | `entity-configuration-lifetime` | The lifetime of the entity configuration. | 1 day |
 | `additional-parameters.*` | Parameters applied to the entity configuration only, as a map of name to value, for example `trust_anchor_hints`. A `metadata` entry is merged into the metadata per entity type and parameter. | - |
 | `trust-marks[]` | The trust marks of the OpenID Provider, each with `type`, `issuer` (the entity identifier of the issuer), `endpoint` (its trust mark endpoint) and `jwks` (the location of a JWK Set document with the federation keys of the issuer). | - |
-| `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. Not used when the trust marks are kept in Redis. | Nothing is stored |
+| `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. Overrides the directory `oidc/trust-marks` of `authn-server.cache-directory`. Not used when the trust marks are kept in Redis. | Nothing is stored |
 | `trust-mark-retry-interval` | How long to wait before a failed attempt to fetch a trust mark is made again. | 5 minutes |
 
 ```yaml
@@ -901,6 +902,11 @@ setting.
 | `authn-server.oidc.storage.client-assertions` | The `jti` values of used client assertions, `private_key_jwt` and `client_secret_jwt`. |
 | `authn-server.oidc.storage.federation-cache` | The cache of clients resolved through OpenID Federation, with its lookup counts and the lock of its background jobs, see [Background jobs and trust marks](#background-jobs-in-a-cluster). |
 | `authn-server.oidc.storage.trust-marks` | The OpenID Provider's own trust marks and their state. |
+
+The record of known clients, which tells which clients have been [added and removed](management.html#clients-added-and-removed)
+since the previous start, follows `authn-server.storage.type`. In Redis it is the hash `<prefix>:known-clients`. The
+state of the federation services that the `oidc-federation` health indicator reports follows
+`authn-server.oidc.storage.federation-cache`.
 
 ```yaml
 authn-server:
@@ -1046,13 +1052,15 @@ is kept in Redis:
 The application sets up the federation backend and its jobs, see
 [The client registry](client-registry.html#the-federation-backend). With Spring Boot, a `FederationCache` bean is
 declared according to `authn-server.oidc.storage.federation-cache`, and the backend and the jobs are built from it.
+Kept in memory, the cache is written to `authn-server.cache-directory`, when given, so that it survives a restart.
 
 **The trust marks of the OpenID Provider.** When they are kept in Redis:
 
 - One node at a time fetches and renews them, using the same kind of lock, held for one minute.
 - Every node publishes the trust marks from Redis in its entity configuration.
 - The state of each trust mark type, as `ProviderTrustMarks.getStates()` gives it, is the same on every node.
-- `authn-server.oidc.federation.trust-mark-cache-directory` is not used. Redis already keeps the trust marks when a
+- `authn-server.oidc.federation.trust-mark-cache-directory` and `authn-server.cache-directory` are not used for
+  them. Redis already keeps the trust marks when a
   node restarts.
 
 With `memory`, every node runs the jobs and fetches the trust marks itself, as with a single node.

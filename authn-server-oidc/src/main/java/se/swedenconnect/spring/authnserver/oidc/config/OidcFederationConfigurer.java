@@ -169,6 +169,15 @@ public class OidcFederationConfigurer {
   }
 
   /**
+   * Gets the authority hints.
+   *
+   * @return the authority hints, or an empty list if none have been assigned
+   */
+  public @NonNull List<String> getAuthorityHints() {
+    return this.authorityHints != null ? List.copyOf(this.authorityHints) : List.of();
+  }
+
+  /**
    * Assigns the federation keys. They are separate from the OpenID Connect keys. All keys are published, and the first
    * active key signs. At least one active key is required.
    *
@@ -373,9 +382,19 @@ public class OidcFederationConfigurer {
       this.activeTrustMarks = this.providerTrustMarks;
     }
     else {
+      final FederationClient client;
+      if (this.federationClient != null) {
+        client = this.federationClient;
+      }
+      else {
+        final HttpFederationClient httpClient = new HttpFederationClient();
+        if (http.getSharedObject(ApplicationContext.class) instanceof final ApplicationContext context) {
+          httpClient.setApplicationEventPublisher(context);
+        }
+        client = httpClient;
+      }
       this.activeTrustMarks = new ProviderTrustMarks(entityId,
-          this.trustMarks != null ? this.trustMarks : List.of(),
-          this.federationClient != null ? this.federationClient : new HttpFederationClient(),
+          this.trustMarks != null ? this.trustMarks : List.of(), client,
           this.trustMarkCacheDirectory, this.trustMarkRetryInterval, Clock.systemUTC());
     }
     if (http.getSharedObject(ApplicationContext.class) instanceof final ApplicationContext context) {

@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.oidc.client;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -25,7 +26,11 @@ import org.jspecify.annotations.Nullable;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
+import se.swedenconnect.spring.authnserver.registry.ClientSource;
+import se.swedenconnect.spring.authnserver.registry.RegisteredClient;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
+import se.swedenconnect.spring.authnserver.registry.changes.ClientChangeTracker;
+import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
 
 /**
  * The client registry backend that serves the OpenID Connect clients given in the configuration of the OpenID
@@ -86,6 +91,39 @@ public class ConfigurationClientBackend implements ClientRegistryBackend {
     Objects.requireNonNull(identifier, "identifier must not be null");
     final OidcClientRecord client = this.clients.get(identifier);
     return client != null ? client.toRequesterRecord() : null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @NonNull List<RegisteredClient> getClients() {
+    return this.clients.values().stream()
+        .map(c -> RegisteredClient.of(c.toRequesterRecord(), this.name, null))
+        .toList();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @Nullable String getMetadata(final @NonNull String identifier) {
+    final OidcClientRecord client = this.clients.get(Objects.requireNonNull(identifier, "identifier must not be null"));
+    return client != null ? OidcClientRecord.toJson(client.metadata()) : null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public @NonNull List<ClientSource> getSources() {
+    return List.of(new ClientSource(AuthenticationProtocol.OIDC, this.name, this.clients.size(), null));
+  }
+
+  /**
+   * Reports the configured clients to the tracker.
+   */
+  @Override
+  public void setClientChangeTracker(final @Nullable ClientChangeTracker tracker) {
+    if (tracker != null) {
+      tracker.sourceLoaded(AuthenticationProtocol.OIDC, this.name, this.clients.values().stream()
+          .map(c -> KnownClient.of(c.toRequesterRecord(), this.name))
+          .toList());
+    }
   }
 
 }

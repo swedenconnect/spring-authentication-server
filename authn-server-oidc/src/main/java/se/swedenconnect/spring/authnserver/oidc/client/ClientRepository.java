@@ -15,6 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client;
 
+import java.util.List;
+
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -38,5 +40,17 @@ public interface ClientRepository {
    * @throws ClientRegistryException if the repository cannot be read
    */
   @Nullable OidcClientRecord findByClientId(final @NonNull String clientId) throws ClientRegistryException;
+
+  /**
+   * Gets every client of the repository. It is used for management, such as listing the clients and telling which
+   * clients have been added or removed since the previous start. The default tells that the repository cannot list
+   * its clients.
+   *
+   * @return the clients, or {@code null} if the repository cannot list them
+   * @throws ClientRegistryException if the repository cannot be read
+   */
+  default @Nullable List<OidcClientRecord> findAll() throws ClientRegistryException {
+    return null;
+  }
 
 }

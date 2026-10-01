@@ -21,11 +21,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -35,8 +32,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
 import com.nimbusds.oauth2.sdk.ParseException;
-import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
-import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.job.JobLock;
 import se.swedenconnect.spring.authnserver.redis.RedisJobLock;
@@ -123,7 +118,8 @@ public class RedisFederationCache implements FederationCache {
   public void put(final @NonNull CachedClientRecord record) {
     Objects.requireNonNull(record, "record must not be null");
     final Instant now = this.clock.instant();
-    this.redisTemplate.opsForValue().set(this.entryKey(record.clientId()), RedisJson.write(Entry.of(record)),
+    this.redisTemplate.opsForValue().set(this.entryKey(record.clientId()),
+        RedisJson.write(StoredClientRecord.of(record)),
         RedisKeys.timeToLive(record.expiresAt(), now));
 
     final String indexKey = this.indexKey();
@@ -196,7 +192,7 @@ public class RedisFederationCache implements FederationCache {
    * @return the entry, or {@code null} if there is none or it cannot be read
    */
   private @Nullable CachedClientRecord toRecord(final @NonNull String key, final @Nullable String json) {
-    final Entry entry = RedisJson.read(key, json, Entry.class);
+    final StoredClientRecord entry = RedisJson.read(key, json, StoredClientRecord.class);
     if (entry == null) {
       return null;
     }
@@ -226,47 +222,6 @@ public class RedisFederationCache implements FederationCache {
    */
   private @NonNull String indexKey() {
     return this.keyPrefix + ":oidc:federation-cache-index";
-  }
-
-  /**
-   * A cache entry as it is written to Redis. The client metadata is kept as the JSON that the metadata gives.
-   *
-   * @param clientId the {@code client_id}
-   * @param metadata the client metadata as a JSON object, or {@code null}
-   * @param trustMarkTypes the trust mark types of the resolve response
-   * @param onDemandTrustMarks the trust marks that have been asked for on demand
-   * @param expiresAt when the entry is no longer valid
-   */
-  record Entry(@NonNull String clientId, @Nullable String metadata, @Nullable Set<String> trustMarkTypes,
-      @Nullable List<OnDemandTrustMark> onDemandTrustMarks, @NonNull Instant expiresAt) {
-
-    /**
-     * Creates the entry of a cache record.
-     *
-     * @param record the record
-     * @return an {@link Entry}
-     */
-    static @NonNull Entry of(final @NonNull CachedClientRecord record) {
-      return new Entry(record.clientId(),
-          record.metadata() != null ? record.metadata().toJSONObject().toJSONString() : null,
-          record.trustMarkTypes(), List.copyOf(record.onDemandTrustMarks().values()), record.expiresAt());
-    }
-
-    /**
-     * Creates the cache record of the entry.
-     *
-     * @return a {@link CachedClientRecord}
-     * @throws ParseException if the client metadata cannot be parsed
-     */
-    @NonNull CachedClientRecord toRecord() throws ParseException {
-      final Map<String, OnDemandTrustMark> marks = this.onDemandTrustMarks == null
-          ? Map.of()
-          : this.onDemandTrustMarks.stream().collect(Collectors.toMap(OnDemandTrustMark::type, Function.identity()));
-      return new CachedClientRecord(this.clientId,
-          this.metadata != null ? OIDCClientMetadata.parse(JSONObjectUtils.parse(this.metadata)) : null,
-          this.trustMarkTypes != null ? this.trustMarkTypes : Set.of(), marks, this.expiresAt);
-    }
-
   }
 
 }

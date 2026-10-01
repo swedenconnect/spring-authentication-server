@@ -653,8 +653,9 @@ public class OidcConfigurationProperties {
     private List<TrustMarkProperties> trustMarks;
 
     /**
-     * A directory where fetched trust marks are stored, so that they are available after a restart. Without it,
-     * nothing is stored.
+     * A directory where fetched trust marks are stored, so that they are available after a restart. Overrides the
+     * directory oidc/trust-marks of authn-server.cache-directory. Without either, nothing is stored. Not used when the
+     * trust marks are kept in Redis.
      */
     private File trustMarkCacheDirectory;
 

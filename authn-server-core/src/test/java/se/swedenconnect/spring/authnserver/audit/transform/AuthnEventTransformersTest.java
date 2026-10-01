@@ -54,11 +54,15 @@ import se.swedenconnect.spring.authnserver.audit.events.AuthnSuccessResponseEven
 import se.swedenconnect.spring.authnserver.audit.events.AuthnUnrecoverableErrorEvent;
 import se.swedenconnect.spring.authnserver.audit.events.AuthnUserAuthenticatedEvent;
 import se.swedenconnect.spring.authnserver.audit.events.AuthnUserInfoDeliveredEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
+import se.swedenconnect.spring.authnserver.authentication.Requester;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.error.CommonUnrecoverableError;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
+import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -250,6 +254,30 @@ class AuthnEventTransformersTest {
     assertThat(reloaded.getType()).isEqualTo("authn_credential_reload_success");
     assertThat(reloaded.getPrincipal()).isEqualTo(AuditEvent.SYSTEM_PRINCIPAL);
     assertThat(reloaded.getData()).containsOnlyKeys("credential_name");
+  }
+
+  @Test
+  void clientEventsHaveTheSystemPrincipal() {
+    final KnownClient sp = new KnownClient(new Requester(AuthenticationProtocol.SAML, "https://sp.example.com"),
+        "556677-8899", "https://md.example.com/sp.xml");
+    final AuditEvent added = this.transform(new ClientAddedEventTransformer(), new ClientAddedEvent(sp));
+    assertThat(added.getType()).isEqualTo("client_added");
+    assertThat(added.getPrincipal()).isEqualTo(AuditEvent.SYSTEM_PRINCIPAL);
+    assertThat(added.getData()).containsOnlyKeys("client");
+    assertThat(map(added, "client")).isEqualTo(Map.of("protocol", "saml", "id", "https://sp.example.com",
+        "organization_number", "556677-8899", "source", "https://md.example.com/sp.xml"));
+
+    final KnownClient rp = new KnownClient(new Requester(AuthenticationProtocol.OIDC, "https://rp.example.com"), null,
+        "federation");
+    final AuditEvent removed = this.transform(new ClientRemovedEventTransformer(),
+        new ClientRemovedEvent(rp, "the resolver reports the client as not found"));
+    assertThat(removed.getType()).isEqualTo("client_removed");
+    assertThat(removed.getPrincipal()).isEqualTo(AuditEvent.SYSTEM_PRINCIPAL);
+    assertThat(map(removed, "client")).isEqualTo(
+        Map.of("protocol", "oidc", "id", "https://rp.example.com", "source", "federation"));
+    assertThat(removed.getData().get("reason")).isEqualTo("the resolver reports the client as not found");
+    assertThat(new ClientAddedEventTransformer().getEventType()).isEqualTo(ClientAddedEvent.class);
+    assertThat(new ClientRemovedEventTransformer().getEventType()).isEqualTo(ClientRemovedEvent.class);
   }
 
   @Test

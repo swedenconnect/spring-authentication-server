@@ -27,6 +27,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
@@ -59,10 +61,14 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * <p>
  * The other calls of the interface are not made by the client registry and are not implemented.
  * </p>
+ * <p>
+ * Every call is published as a {@link FederationCallEvent}, telling whether the service answered, answered with an
+ * error or could not be reached, when the client has an event publisher. As a Spring bean it gets one.
+ * </p>
  *
  * @author Martin Lindström
  */
-public class HttpFederationClient implements FederationClient {
+public class HttpFederationClient implements FederationClient, ApplicationEventPublisherAware {
 
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(HttpFederationClient.class);
@@ -78,6 +84,9 @@ public class HttpFederationClient implements FederationClient {
 
   /** The HTTP client. */
   private final RestClient restClient;
+
+  /** Publishes the outcome of every call, or {@code null}. */
+  private ApplicationEventPublisher eventPublisher;
 
   /**
    * Default constructor using a {@link RestClient} with the default settings.
@@ -106,7 +115,8 @@ public class HttpFederationClient implements FederationClient {
       appendParameter(query, "entity_type", parameters.type());
     }
     final String endpoint = endpoint(request, FEDERATION_RESOLVE_ENDPOINT);
-    return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint, "resolve");
+    return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,
+        FederationCallEvent.Call.RESOLVE, null);
   }
 
   /** {@inheritDoc} */
@@ -117,7 +127,8 @@ public class HttpFederationClient implements FederationClient {
     appendParameter(query, "trust_mark_type", parameters.trustMarkType().getValue());
     appendParameter(query, "sub", parameters.subject().getValue());
     final String endpoint = endpoint(request, FEDERATION_TRUST_MARK_ENDPOINT);
-    return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint, "trust mark");
+    return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,
+        FederationCallEvent.Call.TRUST_MARK, parameters.trustMarkIssuer().getValue());
   }
 
   /**
@@ -137,31 +148,37 @@ public class HttpFederationClient implements FederationClient {
     final SignedJWT response = this.call(this.restClient.post()
         .uri(URI.create(endpoint))
         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-        .body(body.toString()), endpoint, "trust mark status");
+        .body(body.toString()), endpoint, FederationCallEvent.Call.TRUST_MARK_STATUS,
+        request.parameters().trustMarkIssuer());
     if (response == null) {
-      throw new ClientRegistryException("The trust mark status endpoint %s answered 404".formatted(endpoint));
+      throw new ClientRegistryException("The trust mark status endpoint %s did not answer".formatted(endpoint));
     }
     return new TrustMarkStatusResponse(response, false);
   }
 
   /**
-   * Makes the call and parses the response as a signed JWT.
+   * Makes the call, parses the response as a signed JWT and publishes how the call went. A 404 answer to a resolve or
+   * trust mark request means that the service has nothing for the subject, which is a successful call; a 404 answer to
+   * a trust mark status request is an error.
    *
    * @param spec the prepared request
-   * @param endpoint the endpoint that is called, used in messages
-   * @param what what is asked for, used in messages
+   * @param endpoint the endpoint that is called
+   * @param call the call that is made
+   * @param issuer the trust mark issuer, or {@code null} for a resolve request
    * @return a {@link SignedJWT}, or {@code null} if the endpoint answered that it has nothing
    * @throws ClientRegistryException if the call fails
    */
   private @Nullable SignedJWT call(final RestClient.@NonNull RequestHeadersSpec<?> spec,
-      final @NonNull String endpoint, final @NonNull String what) throws ClientRegistryException {
+      final @NonNull String endpoint, final FederationCallEvent.@NonNull Call call, final @Nullable String issuer)
+      throws ClientRegistryException {
 
+    final String what = describe(call);
     log.trace("Making {} request to {}", what, endpoint);
     try {
-      return spec
+      final SignedJWT response = spec
           .exchange((clientRequest, clientResponse) -> {
             final HttpStatusCode status = clientResponse.getStatusCode();
-            if (status.value() == 404) {
+            if (status.value() == 404 && call != FederationCallEvent.Call.TRUST_MARK_STATUS) {
               log.debug("The {} endpoint {} answered 404", what, endpoint);
               return null;
             }
@@ -182,14 +199,66 @@ public class HttpFederationClient implements FederationClient {
                   "The %s endpoint %s did not answer with a signed JWT".formatted(what, endpoint), e);
             }
           }, false);
+      this.publish(call, endpoint, issuer, FederationCallEvent.Outcome.SUCCESS, null);
+      return response;
     }
     catch (final ClientRegistryException e) {
+      this.publish(call, endpoint, issuer, FederationCallEvent.Outcome.ERROR_RESPONSE, e.getMessage());
       throw e;
     }
     catch (final RuntimeException e) {
-      throw new ClientRegistryException(
+      final ClientRegistryException error = new ClientRegistryException(
           "Failed to make %s request to %s - %s".formatted(what, endpoint, e.getMessage()), e);
+      this.publish(call, endpoint, issuer, FederationCallEvent.Outcome.UNREACHABLE, error.getMessage());
+      throw error;
     }
+  }
+
+  /**
+   * Publishes how a call went, if there is an event publisher. A failure to publish is logged and does not affect the
+   * call.
+   *
+   * @param call the call
+   * @param endpoint the endpoint
+   * @param issuer the trust mark issuer, or {@code null}
+   * @param outcome how the call went
+   * @param error what went wrong, or {@code null}
+   */
+  private void publish(final FederationCallEvent.@NonNull Call call, final @NonNull String endpoint,
+      final @Nullable String issuer, final FederationCallEvent.@NonNull Outcome outcome, final @Nullable String error) {
+    if (this.eventPublisher == null) {
+      return;
+    }
+    try {
+      this.eventPublisher.publishEvent(new FederationCallEvent(call, endpoint, issuer, outcome, error));
+    }
+    catch (final RuntimeException e) {
+      log.warn("Failed to publish the outcome of a {} request to {}: {}", describe(call), endpoint, e.getMessage());
+    }
+  }
+
+  /**
+   * Describes a call, for messages.
+   *
+   * @param call the call
+   * @return a description
+   */
+  private static @NonNull String describe(final FederationCallEvent.@NonNull Call call) {
+    return switch (call) {
+      case RESOLVE -> "resolve";
+      case TRUST_MARK -> "trust mark";
+      case TRUST_MARK_STATUS -> "trust mark status";
+    };
+  }
+
+  /**
+   * Assigns the publisher of the {@link FederationCallEvent}s. Without a publisher, nothing is published.
+   *
+   * @param eventPublisher the event publisher, or {@code null}
+   */
+  @Override
+  public void setApplicationEventPublisher(final @Nullable ApplicationEventPublisher eventPublisher) {
+    this.eventPublisher = eventPublisher;
   }
 
   /**

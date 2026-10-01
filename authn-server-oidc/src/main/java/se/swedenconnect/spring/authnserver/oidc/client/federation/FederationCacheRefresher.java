@@ -67,8 +67,23 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
   /** The clock, so that tests can control time. */
   private final Clock clock;
 
+  /** The backend whose cache is refreshed, told about clients that are no longer known, or {@code null}. */
+  private FederationClientBackend backend;
+
   /** Where the job runs, or {@code null} until it has been started. */
   private ScheduledExecutorService executor;
+
+  /**
+   * Constructor for the job that refreshes the cache of a backend. A client that the resolver no longer knows is
+   * reported by the backend as removed, see {@link FederationClientBackend}.
+   *
+   * @param backend the backend whose cache is refreshed
+   */
+  public FederationCacheRefresher(final @NonNull FederationClientBackend backend) {
+    this(Objects.requireNonNull(backend, "backend must not be null").getCache(), backend.getResolver(),
+        backend.getLookupTracker(), backend.getSettings(), backend.getClock());
+    this.backend = backend;
+  }
 
   /**
    * Constructor.
@@ -184,10 +199,18 @@ public class FederationCacheRefresher implements Runnable, AutoCloseable {
       if (resolved == null) {
         log.info("The client '{}' is no longer known by the resolver - its cache entry is dropped", clientId);
         this.cache.remove(clientId);
+        if (this.backend != null) {
+          this.backend.reportResolved(
+              CachedClientRecord.notFound(clientId, now, this.settings.notFoundTimeToLive()));
+        }
         return false;
       }
-      this.cache.put(CachedClientRecord.found(resolved, now, this.settings.maximumAge())
-          .carryOverTrustMarks(current, now));
+      final CachedClientRecord entry = CachedClientRecord.found(resolved, now, this.settings.maximumAge())
+          .carryOverTrustMarks(current, now);
+      this.cache.put(entry);
+      if (this.backend != null) {
+        this.backend.reportResolved(entry);
+      }
       return true;
     }
     catch (final ClientRegistryException e) {

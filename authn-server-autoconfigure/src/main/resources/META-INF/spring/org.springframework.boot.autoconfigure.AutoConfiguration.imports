@@ -18,3 +18,4 @@ se.swedenconnect.spring.authnserver.autoconfigure.oidc.OidcAutoConfiguration
 se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerAutoConfiguration
 se.swedenconnect.spring.authnserver.autoconfigure.storage.AuthnServerStorageAutoConfiguration
 se.swedenconnect.spring.authnserver.autoconfigure.audit.AuthnServerAuditAutoConfiguration
+se.swedenconnect.spring.authnserver.autoconfigure.actuate.AuthnServerActuatorAutoConfiguration
