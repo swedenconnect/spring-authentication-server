@@ -146,7 +146,7 @@ $(document).ready(
         }
 
         if ($('#givenName').val().trim() == ''
-            && $('#surname').val().trim() == '') {
+            && $('#surname').val().trim() == '' && typeof users !== 'undefined') {
           for (var i = 0; i < users.length; i++) {
             if (users[i].pnr == pnr) {
               $('#givenName').val(users[i].givenName);

@@ -264,6 +264,10 @@
 </div> <!-- main -->
 
 <th:block th:insert="~{fragments/base :: scriptFragment}"></th:block>
+<!-- The users of the list, so that the names are filled in when a known personal ID is entered under Advanced -->
+<script th:inline="javascript">
+  var users = /*[[${users.![{'pnr': personalNumber, 'givenName': givenName, 'surname': surname}]}]]*/ [];
+</script>
 <th:block th:insert="~{fragments/base :: scriptFragment2}"></th:block>
 
 </body>

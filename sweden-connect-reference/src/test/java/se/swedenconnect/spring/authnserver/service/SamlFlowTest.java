@@ -95,6 +95,9 @@ class SamlFlowTest extends AbstractCompleteProfileTest {
     assertThat(TestBrowser.optionValues(html, "selectLoa")).containsExactly(LOA3, LOA2);
     assertThat(TestBrowser.startTag(html, "selectSimulatedUser")).doesNotContain("disabled");
     assertThat(html).doesNotContain("sign-message");
+    // The users that the advanced view fills in names from
+    assertThat(html).containsPattern(
+        "var users = \\[.*\\{\"pnr\":\"197705232382\",\"givenName\":\"Frida\",\"surname\":\"Kranstege\"\\}");
 
     final Assertion assertion = this.assertion(this.complete(browser, html, Map.of(
         "action", "ok",
