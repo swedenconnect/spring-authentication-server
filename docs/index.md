@@ -72,6 +72,11 @@ The Spring Boot starters:
   updates the clients the server knows, the info contributions, the health indicators and the `WARNING` status, the
   state that survives a restart, and the events of clients that are added and removed.
 
+- [The Sweden Connect reference authentication server](https://github.com/swedenconnect/spring-authentication-server/blob/main/sweden-connect-reference/README.md) -
+  A SAML Identity Provider and OpenID Provider with simulated user authentication, built on these libraries. How it is
+  built and deployed, the settings a deployment must add, and how the simulated users work. It is also an example of
+  a complete deployment.
+
 - [Release Notes](release-notes.html)
 
 -----

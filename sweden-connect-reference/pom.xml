@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright 2026 Sweden Connect
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <artifactId>sweden-connect-reference-authn-server</artifactId>
+  <packaging>jar</packaging>
+
+  <parent>
+    <groupId>se.swedenconnect.spring.authnserver</groupId>
+    <artifactId>spring-authentication-server-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <name>Sweden Connect :: Spring Authentication Server :: Sweden Connect Reference</name>
+  <description>Sweden Connect reference authentication server, with simulated user authentication</description>
+
+  <properties>
+    <flexmark.version>0.64.8</flexmark.version>
+    <jsoup.version>1.23.2</jsoup.version>
+  </properties>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>se.swedenconnect.spring.authnserver</groupId>
+      <artifactId>authn-server-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-thymeleaf</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!--
+      Redis, so that a deployment that runs several instances can keep the session and the stores in Redis by
+      configuration alone (authn-server.storage.type).
+      -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-session-data-redis</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- The pages -->
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>bootstrap</artifactId>
+      <version>5.3.8</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.webjars</groupId>
+          <artifactId>popper.js</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>popper.js</artifactId>
+      <version>2.11.7</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>jquery</artifactId>
+      <version>3.7.1</version>
+    </dependency>
+
+    <!-- Markdown and HTML processing of sign messages and user messages -->
+    <dependency>
+      <groupId>com.vladsch.flexmark</groupId>
+      <artifactId>flexmark</artifactId>
+      <version>${flexmark.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.vladsch.flexmark</groupId>
+      <artifactId>flexmark-util</artifactId>
+      <version>${flexmark.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.vladsch.flexmark</groupId>
+      <artifactId>flexmark-ext-tables</artifactId>
+      <version>${flexmark.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jsoup</groupId>
+      <artifactId>jsoup</artifactId>
+      <version>${jsoup.version}</version>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <!-- application.yml gets the version of the service, other resources are copied as they are -->
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+        <includes>
+          <include>application.yml</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+        <excludes>
+          <exclude>application.yml</exclude>
+        </excludes>
+      </resource>
+    </resources>
+
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <configuration>
+          <useDefaultDelimiters>false</useDefaultDelimiters>
+          <delimiters>
+            <delimiter>@</delimiter>
+          </delimiters>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <doctitle>Sweden Connect Reference Authentication Server - ${project.version}</doctitle>
+          <windowtitle>Sweden Connect Reference Authentication Server - ${project.version}</windowtitle>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring.boot.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+              <goal>build-info</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        The container image. Neither execution runs in the normal build:
+          mvn jib:dockerBuild@local - builds local/sweden-connect-reference-authn-server:<version> to the local Docker
+          mvn jib:build             - builds for linux/amd64 and linux/arm64 and pushes to ${DOCKER_REPO}
+        -->
+      <plugin>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <from>
+            <image>amazoncorretto:25.0.1</image>
+          </from>
+          <to>
+            <image>${DOCKER_REPO}/swedenconnect/${project.artifactId}:${project.version}</image>
+          </to>
+          <container>
+            <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+            <jvmFlags>
+              <jvmFlag>-Djava.net.preferIPv4Stack=true</jvmFlag>
+              <jvmFlag>-Dorg.apache.xml.security.ignoreLineBreaks=true</jvmFlag>
+            </jvmFlags>
+            <ports>
+              <port>8443</port>
+              <port>8444</port>
+            </ports>
+            <labels>
+              <org.opencontainers.image.source>
+                https://github.com/swedenconnect/spring-authentication-server
+              </org.opencontainers.image.source>
+              <org.opencontainers.image.description>Sweden Connect Reference Authentication Server
+              </org.opencontainers.image.description>
+              <org.opencontainers.image.licenses>Apache-2.0</org.opencontainers.image.licenses>
+            </labels>
+          </container>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>none</phase>
+            <id>local</id>
+            <goals>
+              <goal>dockerBuild</goal>
+            </goals>
+            <configuration>
+              <to>
+                <image>local/${project.artifactId}</image>
+                <tags>
+                  <tag>${project.version}</tag>
+                </tags>
+              </to>
+            </configuration>
+          </execution>
+          <execution>
+            <id>default-cli</id>
+            <phase>none</phase>
+            <goals>
+              <goal>build</goal>
+            </goals>
+            <configuration>
+              <from>
+                <platforms>
+                  <platform>
+                    <os>linux</os>
+                    <architecture>amd64</architecture>
+                  </platform>
+                  <platform>
+                    <os>linux</os>
+                    <architecture>arm64</architecture>
+                  </platform>
+                </platforms>
+              </from>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+
+  </build>
+
+  <profiles>
+
+    <!-- The reference is a service, not a library, and is never published to Maven Central -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <configuration>
+              <skipPublishing>true</skipPublishing>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <configuration>
+              <skip>true</skip>
+            </configuration>
+          </plugin>
+
+        </plugins>
+      </build>
+    </profile>
+
+  </profiles>
+
+</project>

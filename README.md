@@ -36,6 +36,9 @@ authentication requirements and the user identity model.
 
     - `authn-server-oidc-spring-boot-starter` - OpenID Provider only.
 
+The [sweden-connect-reference](sweden-connect-reference) module is the Sweden Connect reference authentication
+server, a SAML Identity Provider and OpenID Provider with simulated user authentication, built on the libraries.
+
 ## Documentation
 
 See [https://docs.swedenconnect.se/spring-authentication-server](https://docs.swedenconnect.se/spring-authentication-server/) for documentation about Java classes and configuration.

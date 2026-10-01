@@ -1,0 +1,288 @@
+#
+# Default configuration of the Sweden Connect reference authentication server.
+#
+# This file holds defaults only. The settings marked "DEPLOYMENT MUST ADD" have no defaults, and the server does not
+# start until the deployment supplies them, for example in an application.yml file of its own, in a profile, or as
+# environment variables. No base URL, entity ID, issuer, metadata, keys or key stores ship with the service.
+#
+# See the README of the module for a description of each setting.
+#
+
+spring:
+  application:
+    name: sweden-connect-reference-authn-server
+  messages:
+    basename: messages
+  config:
+    import:
+      - optional:${idp-users-location}/users.yml
+  web:
+    error:
+      include-message: always
+
+  # The TLS key store.
+  #
+  # DEPLOYMENT MUST ADD: the SSL bundle that server.ssl.bundle names, holding the TLS key and certificate of the
+  # server. For example:
+  #
+  # ssl:
+  #   bundle:
+  #     jks:
+  #       tls:
+  #         key:
+  #           alias: tls
+  #           password: <key password>
+  #         keystore:
+  #           location: file:/opt/config/tls.p12
+  #           password: <key store password>
+  #           type: PKCS12
+
+# Where users.yml, the file with the simulated users, is read from. The default is the users.yml of the service.
+# A deployment that wants other users sets IDP_CONFIG_DIR to a directory holding its own users.yml.
+idp-users-location: ${IDP_CONFIG_DIR:classpath:}
+
+server:
+  # HTTPS on port 8443, with the key store of the SSL bundle below.
+  port: 8443
+  ssl:
+    bundle: tls
+  # There is no context path. A deployment may add one, for example:
+  #
+  # servlet:
+  #   context-path: /idp
+  #
+  # The context path is then part of the base URL (authn-server.base-url), and so of the OIDC issuer and of every
+  # endpoint, and the base URL and issuer must include it.
+  servlet:
+    session:
+      cookie:
+        # The SAML POST binding and the OIDC form_post response mode post across sites.
+        same-site: none
+        secure: true
+        max-age: 60m
+
+# The Actuator, on a management port of its own, 8444. Exposed: health, info and clients, where clients is read-only.
+management:
+  server:
+    port: 8444
+  endpoints:
+    web:
+      exposure:
+        include: health, info, clients
+  endpoint:
+    clients:
+      access: read-only
+  # The Redis health check is off, since Redis is not used by default. Turn it on when Redis is used.
+  health:
+    redis:
+      enabled: false
+
+# Auditing, with spring-audit-support. The events are kept in memory. Other repositories are added under
+# audit.repository, for example:
+#
+#   file:
+#     log-file: /var/log/reference/audit.log
+#   jdbc:
+#     table-name: audit_events      # requires spring-jdbc and a DataSource
+#   mongo:
+#     collection: audit_events      # requires spring-data-mongodb and a MongoTemplate
+#   redis:
+#     enabled: true                 # requires spring-data-redis and a Redis connection
+#   syslog:
+#     host: logs.example.com        # requires syslog-java-client
+#     port: 514
+audit:
+  # The version of the service, put in every audit event. It must be set, since spring-audit-support 1.0.1 fails to
+  # start when it looks for the version in the build information itself.
+  app-version: "@project.version@"
+  repository:
+    in-memory:
+      enabled: true
+
+# The Tomcat AJP connector. Off unless a deployment turns it on:
+#
+#   enabled: true
+#   port: 8009
+#   secret-required: true
+#   secret: <the AJP secret>
+tomcat:
+  ajp:
+    enabled: false
+
+# The languages of the pages.
+ui:
+  languages:
+    - tag: sv
+      text: Svenska
+    - tag: en
+      text: English
+
+# The simulated authentication.
+authn:
+  provider-name: "Simulated Authentication Provider"
+  authn-path: /extauth
+  resume-path: /resume
+  supported-loas:
+    - http://id.elegnamnden.se/loa/1.0/loa3
+    - http://id.swedenconnect.se/loa/1.0/uncertified-loa3
+    - http://id.elegnamnden.se/loa/1.0/loa2
+    - http://id.elegnamnden.se/loa/1.0/eidas-nf-low
+    - http://id.elegnamnden.se/loa/1.0/eidas-nf-sub
+    - http://id.elegnamnden.se/loa/1.0/eidas-nf-high
+  entity-categories:
+    - http://id.elegnamnden.se/ec/1.0/loa2-pnr
+    - http://id.swedenconnect.se/ec/1.0/loa2-name
+    - http://id.elegnamnden.se/ec/1.0/loa3-pnr
+    - http://id.swedenconnect.se/ec/1.0/loa3-name
+    - http://id.elegnamnden.se/ec/1.0/eidas-pnr-delivery
+    - http://id.elegnamnden.se/sprop/1.0/scal2
+    - http://id.elegnamnden.se/sprop/1.0/mobile-auth
+    - http://id.swedenconnect.se/contract/sc/eid-authorization-system
+
+authn-server:
+
+  # DEPLOYMENT MUST ADD: the base URL of the server, protocol, host, port and context path (if any). Every URL of the
+  # server is built from it. For example:
+  #
+  # base-url: https://idp.example.com
+
+  # Recommended: the secret that takes part in the computation of the SAML NameID and the OIDC sub.
+  #
+  # subject-identifier:
+  #   secret: <a secret of the deployment>
+
+  supports-user-message: true
+
+  # Everything is kept in memory. A deployment that runs several instances keeps the session and the stores in Redis
+  # instead, with type: redis and a Redis connection under spring.data.redis (and management.health.redis.enabled
+  # set to true).
+  storage:
+    type: memory
+
+  # The descriptive information that both protocols publish.
+  entity-information:
+    ui-info:
+      display-names:
+        en: Sweden Connect Reference IdP
+        sv: Sweden Connect Referens-IdP
+      descriptions:
+        en: Sweden Connect Reference Identity Provider
+        sv: Sweden Connect referens-legitimeringstjänst
+      logotypes:
+        - path: /images/logo-notext.svg
+          height: 256
+          width: 256
+        - path: /images/logo.svg
+          height: 56
+          width: 280
+    organization:
+      names:
+        en: Sweden Connect
+        sv: Sweden Connect
+      display-names:
+        en: Sweden Connect
+        sv: Sweden Connect
+      urls:
+        en: https://www.swedenconnect.se/en
+        sv: https://www.swedenconnect.se
+      number: "2021006883"
+    contact-persons:
+      technical:
+        company: Sweden Connect
+        email-addresses:
+          - operations@swedenconnect.se
+      support:
+        company: Sweden Connect
+        email-addresses:
+          - operations@swedenconnect.se
+
+  saml:
+    enabled: true
+
+    # DEPLOYMENT MUST ADD: the SAML entity ID of the Identity Provider. For example:
+    #
+    # entity-id: https://idp.example.com/saml
+
+    # DEPLOYMENT MUST ADD: the signing and encryption keys, as references to credential bundles (credential.bundles),
+    # or default-credential for one key that does both. For example:
+    #
+    # credentials:
+    #   sign:
+    #     bundle: saml-sign
+    #   encrypt:
+    #     bundle: saml-encrypt
+    #   metadata-sign:
+    #     bundle: saml-sign
+
+    # DEPLOYMENT MUST ADD: the sources of the SAML Service Provider metadata. For example:
+    #
+    # metadata-providers:
+    #   - location: https://md.swedenconnect.se/role/sp.xml
+    #     validation-certificate: file:/opt/config/metadata-signing.crt
+    #     backup-location: /var/reference/sp-metadata-backup.xml
+
+    metadata:
+      digest-methods:
+        - http://www.w3.org/2001/04/xmlenc#sha256
+        - http://www.w3.org/2001/04/xmldsig-more#sha384
+        - http://www.w3.org/2001/04/xmlenc#sha512
+      include-digest-methods-under-role: true
+      signing-methods:
+        - algorithm: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+          min-key-size: 2048
+        - algorithm: http://www.w3.org/2001/04/xmldsig-more#rsa-sha384
+          min-key-size: 2048
+        - algorithm: http://www.w3.org/2001/04/xmldsig-more#rsa-sha512
+          min-key-size: 2048
+        - algorithm: http://www.w3.org/2007/05/xmldsig-more#sha256-rsa-MGF1
+          min-key-size: 2048
+        - algorithm: http://www.w3.org/2007/05/xmldsig-more#sha384-rsa-MGF1
+          min-key-size: 2048
+        - algorithm: http://www.w3.org/2007/05/xmldsig-more#sha512-rsa-MGF1
+          min-key-size: 2048
+        - algorithm: http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256
+          min-key-size: 256
+        - algorithm: http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha384
+          min-key-size: 256
+        - algorithm: http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512
+          min-key-size: 256
+      include-signing-methods-under-role: true
+      encryption-methods:
+        - algorithm: http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p
+        - algorithm: http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p
+          digest-method: http://www.w3.org/2001/04/xmlenc#sha256
+        - algorithm: http://www.w3.org/2009/xmlenc11#aes256-gcm
+        - algorithm: http://www.w3.org/2009/xmlenc11#aes192-gcm
+        - algorithm: http://www.w3.org/2009/xmlenc11#aes128-gcm
+        - algorithm: http://www.w3.org/2001/04/xmlenc#aes256-cbc
+        - algorithm: http://www.w3.org/2001/04/xmlenc#aes192-cbc
+        - algorithm: http://www.w3.org/2001/04/xmlenc#aes128-cbc
+      requested-principal-selection:
+        - "urn:oid:1.2.752.29.4.13"
+
+  oidc:
+    enabled: true
+
+    # DEPLOYMENT MUST ADD: the issuer identifier of the OpenID Provider. It is also its OpenID Federation entity
+    # identifier. It must be the base URL, or begin with it. For example:
+    #
+    # issuer: https://idp.example.com
+
+    # DEPLOYMENT MUST ADD: the signing keys of the OpenID Provider. For example:
+    #
+    # keys:
+    #   signing:
+    #     - credential:
+    #         bundle: oidc-sign
+
+    ui-locales:
+      - sv
+      - en
+
+# DEPLOYMENT MUST ADD: the OpenID Connect clients. Each location holds the client metadata of a client as a JSON object
+# with its client_id, or a JSON array of such objects. For example:
+#
+# reference:
+#   oidc:
+#     clients:
+#       - file:/opt/config/oidc-clients.json

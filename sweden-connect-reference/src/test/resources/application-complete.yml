@@ -1,0 +1,75 @@
+#
+# The complete profile, for the tests only. It supplies everything that the default configuration leaves to the
+# deployment: a localhost base URL, test keys, a TLS key store, local SAML metadata with a test Service Provider and a
+# test signature service, and one statically configured OpenID Connect client.
+#
+# The keys and the TLS key store were generated for the tests, and are found in the complete directory. The tests
+# replace the ports, and so the base URL, entity ID and issuer, with free ports.
+#
+
+spring:
+  ssl:
+    bundle:
+      jks:
+        tls:
+          key:
+            alias: tls
+            password: secret
+          keystore:
+            location: classpath:complete/tls.p12
+            password: secret
+            type: PKCS12
+
+credential:
+  bundles:
+    keystore:
+      reference-keys:
+        location: classpath:complete/authn-server-keys.p12
+        password: secret
+        type: PKCS12
+    jks:
+      saml-sign:
+        name: "SAML Signing Key"
+        store-reference: reference-keys
+        key:
+          alias: saml-sign
+          key-password: secret
+      saml-encrypt:
+        name: "SAML Encryption Key"
+        store-reference: reference-keys
+        key:
+          alias: saml-encrypt
+          key-password: secret
+      oidc-sign:
+        name: "OIDC Signing Key"
+        store-reference: reference-keys
+        key:
+          alias: oidc-sign
+          key-password: secret
+
+authn-server:
+  base-url: https://localhost:8443
+  subject-identifier:
+    secret: reference-test-secret
+  saml:
+    entity-id: https://localhost:8443/saml
+    credentials:
+      sign:
+        bundle: saml-sign
+      encrypt:
+        bundle: saml-encrypt
+      metadata-sign:
+        bundle: saml-sign
+    metadata-providers:
+      - location: classpath:complete/sp-metadata.xml
+  oidc:
+    issuer: https://localhost:8443
+    keys:
+      signing:
+        - credential:
+            bundle: oidc-sign
+
+reference:
+  oidc:
+    clients:
+      - classpath:complete/oidc-clients.json

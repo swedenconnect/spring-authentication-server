@@ -92,6 +92,8 @@
     <module>authn-server-oidc</module>
     <module>authn-server-autoconfigure</module>
     <module>authn-server-spring-boot-starter</module>
+    <!-- Not published. Kept before the single-protocol starters, so that it is not the last module of the reactor. -->
+    <module>sweden-connect-reference</module>
     <module>authn-server-saml-spring-boot-starter</module>
     <module>authn-server-oidc-spring-boot-starter</module>
   </modules>

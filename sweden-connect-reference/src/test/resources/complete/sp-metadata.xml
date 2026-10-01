@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright 2026 Sweden Connect
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<!--
+  Metadata for the tests of the complete profile: a Service Provider and a signature service. Both use the key "sp" of
+  test-clients.p12.
+  -->
+<md:EntitiesDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                       xmlns:mdui="urn:oasis:names:tc:SAML:metadata:ui"
+                       xmlns:mdattr="urn:oasis:names:tc:SAML:metadata:attribute"
+                       xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                       xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                       Name="https://test.local/metadata">
+
+  <md:EntityDescriptor entityID="https://sp.test.local">
+    <md:Extensions>
+      <mdattr:EntityAttributes>
+        <saml:Attribute Name="http://macedir.org/entity-category"
+                        NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+          <saml:AttributeValue xsi:type="xs:string">http://id.elegnamnden.se/ec/1.0/loa3-pnr</saml:AttributeValue>
+        </saml:Attribute>
+      </mdattr:EntityAttributes>
+    </md:Extensions>
+    <md:SPSSODescriptor AuthnRequestsSigned="true" WantAssertionsSigned="true"
+                        protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+      <md:Extensions>
+        <mdui:UIInfo>
+          <mdui:DisplayName xml:lang="sv">Testtjänst</mdui:DisplayName>
+          <mdui:DisplayName xml:lang="en">Test Service</mdui:DisplayName>
+          <mdui:Logo height="256" width="256">https://sp.test.local/logo-square.svg</mdui:Logo>
+          <mdui:Logo height="60" width="200">https://sp.test.local/logo.svg</mdui:Logo>
+        </mdui:UIInfo>
+      </md:Extensions>
+      <md:KeyDescriptor use="signing">
+        <ds:KeyInfo>
+          <ds:X509Data>
+            <ds:X509Certificate>
+              MIIDNjCCAh6gAwIBAgIJAO7Sz7vrwaomMA0GCSqGSIb3DQEBDAUAMEkxCzAJBgNV
+              BAYTAlNFMRcwFQYDVQQKEw5Td2VkZW4gQ29ubmVjdDEhMB8GA1UEAxMYUmVmZXJl
+              bmNlIFRlc3QgQ2xpZW50IHNwMB4XDTI2MTAwMTE3NDUxM1oXDTQ2MDkyNjE3NDUx
+              M1owSTELMAkGA1UEBhMCU0UxFzAVBgNVBAoTDlN3ZWRlbiBDb25uZWN0MSEwHwYD
+              VQQDExhSZWZlcmVuY2UgVGVzdCBDbGllbnQgc3AwggEiMA0GCSqGSIb3DQEBAQUA
+              A4IBDwAwggEKAoIBAQDOPQU9bb46MOCEHE3XOE1IutNUXmpi+6DzQ+EUjydbw7oB
+              nGySwVX3p3+5Z/OkZqIaf4WrCFki1jXRNOa8Lkvns701wC7rGfxRyPB8bV2UveoY
+              I+GPvFJJC7eOrh3kLDlVXe8dyKwM0Z+AYdZ17EyqNB6PrOZ1R2OgYqpsDullKQVD
+              BaBaJNtdRPQ7Zb1nvWDfL3DecRNWez48243aHm38TL+Ojsw+BHYfSuBOG+Id+vfN
+              iJuiN7hXDUqQhHZK4+nQ8qnX1OboymBuVRxwxIfuK879p96LoCD6FPpEGjq5LcUE
+              5Y7JgwjUSumENrFPDXYwGKtLFjmSFpd/GTxE+gH3AgMBAAGjITAfMB0GA1UdDgQW
+              BBSS0Hl0QXdoYu06BJK06yS5ZswIETANBgkqhkiG9w0BAQwFAAOCAQEANn0pDE8K
+              HwWyoT6IMTUqLaV6hgCk/0Y0DRONnsQsSEzMw4QWqkbYZa5655ubhFMXiI4/GvyR
+              Q7nQATrXEubhKunApQAiSpsNg7XcK+HIFCgWpFPSQ58SgM1XTbcl+1hPmyZxMKd4
+              l7Ozw0uVfpPiXcBGvjFRovWVywLC+8phs3NoLD26PhWd+vR6M5168eRa7xb2TFnM
+              /Y9FxbOygC4UTLrKv72fpjR2i96N4T5vjFtXjNCIG5obz/0FAwIObzJlTUvKvNAo
+              L4+1qCLMmyT7Cnz3NYDwIq9X34ZIzP659EDrcrERlV4oy4QUjFkExJ2et1W/Lyui
+              Kcq0jWh6JaFs4g==
+            </ds:X509Certificate>
+          </ds:X509Data>
+        </ds:KeyInfo>
+      </md:KeyDescriptor>
+      <md:KeyDescriptor use="encryption">
+        <ds:KeyInfo>
+          <ds:X509Data>
+            <ds:X509Certificate>
+              MIIDNjCCAh6gAwIBAgIJAO7Sz7vrwaomMA0GCSqGSIb3DQEBDAUAMEkxCzAJBgNV
+              BAYTAlNFMRcwFQYDVQQKEw5Td2VkZW4gQ29ubmVjdDEhMB8GA1UEAxMYUmVmZXJl
+              bmNlIFRlc3QgQ2xpZW50IHNwMB4XDTI2MTAwMTE3NDUxM1oXDTQ2MDkyNjE3NDUx
+              M1owSTELMAkGA1UEBhMCU0UxFzAVBgNVBAoTDlN3ZWRlbiBDb25uZWN0MSEwHwYD
+              VQQDExhSZWZlcmVuY2UgVGVzdCBDbGllbnQgc3AwggEiMA0GCSqGSIb3DQEBAQUA
+              A4IBDwAwggEKAoIBAQDOPQU9bb46MOCEHE3XOE1IutNUXmpi+6DzQ+EUjydbw7oB
+              nGySwVX3p3+5Z/OkZqIaf4WrCFki1jXRNOa8Lkvns701wC7rGfxRyPB8bV2UveoY
+              I+GPvFJJC7eOrh3kLDlVXe8dyKwM0Z+AYdZ17EyqNB6PrOZ1R2OgYqpsDullKQVD
+              BaBaJNtdRPQ7Zb1nvWDfL3DecRNWez48243aHm38TL+Ojsw+BHYfSuBOG+Id+vfN
+              iJuiN7hXDUqQhHZK4+nQ8qnX1OboymBuVRxwxIfuK879p96LoCD6FPpEGjq5LcUE
+              5Y7JgwjUSumENrFPDXYwGKtLFjmSFpd/GTxE+gH3AgMBAAGjITAfMB0GA1UdDgQW
+              BBSS0Hl0QXdoYu06BJK06yS5ZswIETANBgkqhkiG9w0BAQwFAAOCAQEANn0pDE8K
+              HwWyoT6IMTUqLaV6hgCk/0Y0DRONnsQsSEzMw4QWqkbYZa5655ubhFMXiI4/GvyR
+              Q7nQATrXEubhKunApQAiSpsNg7XcK+HIFCgWpFPSQ58SgM1XTbcl+1hPmyZxMKd4
+              l7Ozw0uVfpPiXcBGvjFRovWVywLC+8phs3NoLD26PhWd+vR6M5168eRa7xb2TFnM
+              /Y9FxbOygC4UTLrKv72fpjR2i96N4T5vjFtXjNCIG5obz/0FAwIObzJlTUvKvNAo
+              L4+1qCLMmyT7Cnz3NYDwIq9X34ZIzP659EDrcrERlV4oy4QUjFkExJ2et1W/Lyui
+              Kcq0jWh6JaFs4g==
+            </ds:X509Certificate>
+          </ds:X509Data>
+        </ds:KeyInfo>
+      </md:KeyDescriptor>
+      <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                   Location="https://sp.test.local/acs" index="0" isDefault="true"/>
+    </md:SPSSODescriptor>
+    <md:Organization>
+      <md:OrganizationName xml:lang="en">Test Service</md:OrganizationName>
+      <md:OrganizationDisplayName xml:lang="en">Test Service</md:OrganizationDisplayName>
+      <md:OrganizationURL xml:lang="en">https://sp.test.local</md:OrganizationURL>
+    </md:Organization>
+  </md:EntityDescriptor>
+
+  <md:EntityDescriptor entityID="https://sign.test.local">
+    <md:Extensions>
+      <mdattr:EntityAttributes>
+        <saml:Attribute Name="http://macedir.org/entity-category"
+                        NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+          <saml:AttributeValue xsi:type="xs:string">http://id.elegnamnden.se/ec/1.0/loa3-pnr</saml:AttributeValue>
+          <saml:AttributeValue xsi:type="xs:string">http://id.elegnamnden.se/st/1.0/sigservice</saml:AttributeValue>
+        </saml:Attribute>
+      </mdattr:EntityAttributes>
+    </md:Extensions>
+    <md:SPSSODescriptor AuthnRequestsSigned="true" WantAssertionsSigned="true"
+                        protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+      <md:Extensions>
+        <mdui:UIInfo>
+          <mdui:DisplayName xml:lang="sv">Testunderskriftstjänst</mdui:DisplayName>
+          <mdui:DisplayName xml:lang="en">Test Signature Service</mdui:DisplayName>
+          <mdui:Logo height="256" width="256">https://sign.test.local/logo-square.svg</mdui:Logo>
+          <mdui:Logo height="60" width="200">https://sign.test.local/logo.svg</mdui:Logo>
+        </mdui:UIInfo>
+      </md:Extensions>
+      <md:KeyDescriptor use="signing">
+        <ds:KeyInfo>
+          <ds:X509Data>
+            <ds:X509Certificate>
+              MIIDNjCCAh6gAwIBAgIJAO7Sz7vrwaomMA0GCSqGSIb3DQEBDAUAMEkxCzAJBgNV
+              BAYTAlNFMRcwFQYDVQQKEw5Td2VkZW4gQ29ubmVjdDEhMB8GA1UEAxMYUmVmZXJl
+              bmNlIFRlc3QgQ2xpZW50IHNwMB4XDTI2MTAwMTE3NDUxM1oXDTQ2MDkyNjE3NDUx
+              M1owSTELMAkGA1UEBhMCU0UxFzAVBgNVBAoTDlN3ZWRlbiBDb25uZWN0MSEwHwYD
+              VQQDExhSZWZlcmVuY2UgVGVzdCBDbGllbnQgc3AwggEiMA0GCSqGSIb3DQEBAQUA
+              A4IBDwAwggEKAoIBAQDOPQU9bb46MOCEHE3XOE1IutNUXmpi+6DzQ+EUjydbw7oB
+              nGySwVX3p3+5Z/OkZqIaf4WrCFki1jXRNOa8Lkvns701wC7rGfxRyPB8bV2UveoY
+              I+GPvFJJC7eOrh3kLDlVXe8dyKwM0Z+AYdZ17EyqNB6PrOZ1R2OgYqpsDullKQVD
+              BaBaJNtdRPQ7Zb1nvWDfL3DecRNWez48243aHm38TL+Ojsw+BHYfSuBOG+Id+vfN
+              iJuiN7hXDUqQhHZK4+nQ8qnX1OboymBuVRxwxIfuK879p96LoCD6FPpEGjq5LcUE
+              5Y7JgwjUSumENrFPDXYwGKtLFjmSFpd/GTxE+gH3AgMBAAGjITAfMB0GA1UdDgQW
+              BBSS0Hl0QXdoYu06BJK06yS5ZswIETANBgkqhkiG9w0BAQwFAAOCAQEANn0pDE8K
+              HwWyoT6IMTUqLaV6hgCk/0Y0DRONnsQsSEzMw4QWqkbYZa5655ubhFMXiI4/GvyR
+              Q7nQATrXEubhKunApQAiSpsNg7XcK+HIFCgWpFPSQ58SgM1XTbcl+1hPmyZxMKd4
+              l7Ozw0uVfpPiXcBGvjFRovWVywLC+8phs3NoLD26PhWd+vR6M5168eRa7xb2TFnM
+              /Y9FxbOygC4UTLrKv72fpjR2i96N4T5vjFtXjNCIG5obz/0FAwIObzJlTUvKvNAo
+              L4+1qCLMmyT7Cnz3NYDwIq9X34ZIzP659EDrcrERlV4oy4QUjFkExJ2et1W/Lyui
+              Kcq0jWh6JaFs4g==
+            </ds:X509Certificate>
+          </ds:X509Data>
+        </ds:KeyInfo>
+      </md:KeyDescriptor>
+      <md:KeyDescriptor use="encryption">
+        <ds:KeyInfo>
+          <ds:X509Data>
+            <ds:X509Certificate>
+              MIIDNjCCAh6gAwIBAgIJAO7Sz7vrwaomMA0GCSqGSIb3DQEBDAUAMEkxCzAJBgNV
+              BAYTAlNFMRcwFQYDVQQKEw5Td2VkZW4gQ29ubmVjdDEhMB8GA1UEAxMYUmVmZXJl
+              bmNlIFRlc3QgQ2xpZW50IHNwMB4XDTI2MTAwMTE3NDUxM1oXDTQ2MDkyNjE3NDUx
+              M1owSTELMAkGA1UEBhMCU0UxFzAVBgNVBAoTDlN3ZWRlbiBDb25uZWN0MSEwHwYD
+              VQQDExhSZWZlcmVuY2UgVGVzdCBDbGllbnQgc3AwggEiMA0GCSqGSIb3DQEBAQUA
+              A4IBDwAwggEKAoIBAQDOPQU9bb46MOCEHE3XOE1IutNUXmpi+6DzQ+EUjydbw7oB
+              nGySwVX3p3+5Z/OkZqIaf4WrCFki1jXRNOa8Lkvns701wC7rGfxRyPB8bV2UveoY
+              I+GPvFJJC7eOrh3kLDlVXe8dyKwM0Z+AYdZ17EyqNB6PrOZ1R2OgYqpsDullKQVD
+              BaBaJNtdRPQ7Zb1nvWDfL3DecRNWez48243aHm38TL+Ojsw+BHYfSuBOG+Id+vfN
+              iJuiN7hXDUqQhHZK4+nQ8qnX1OboymBuVRxwxIfuK879p96LoCD6FPpEGjq5LcUE
+              5Y7JgwjUSumENrFPDXYwGKtLFjmSFpd/GTxE+gH3AgMBAAGjITAfMB0GA1UdDgQW
+              BBSS0Hl0QXdoYu06BJK06yS5ZswIETANBgkqhkiG9w0BAQwFAAOCAQEANn0pDE8K
+              HwWyoT6IMTUqLaV6hgCk/0Y0DRONnsQsSEzMw4QWqkbYZa5655ubhFMXiI4/GvyR
+              Q7nQATrXEubhKunApQAiSpsNg7XcK+HIFCgWpFPSQ58SgM1XTbcl+1hPmyZxMKd4
+              l7Ozw0uVfpPiXcBGvjFRovWVywLC+8phs3NoLD26PhWd+vR6M5168eRa7xb2TFnM
+              /Y9FxbOygC4UTLrKv72fpjR2i96N4T5vjFtXjNCIG5obz/0FAwIObzJlTUvKvNAo
+              L4+1qCLMmyT7Cnz3NYDwIq9X34ZIzP659EDrcrERlV4oy4QUjFkExJ2et1W/Lyui
+              Kcq0jWh6JaFs4g==
+            </ds:X509Certificate>
+          </ds:X509Data>
+        </ds:KeyInfo>
+      </md:KeyDescriptor>
+      <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                   Location="https://sign.test.local/acs" index="0" isDefault="true"/>
+    </md:SPSSODescriptor>
+    <md:Organization>
+      <md:OrganizationName xml:lang="en">Test Signature Service</md:OrganizationName>
+      <md:OrganizationDisplayName xml:lang="en">Test Signature Service</md:OrganizationDisplayName>
+      <md:OrganizationURL xml:lang="en">https://sign.test.local</md:OrganizationURL>
+    </md:Organization>
+  </md:EntityDescriptor>
+
+</md:EntitiesDescriptor>
