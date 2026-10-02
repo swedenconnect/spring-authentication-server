@@ -92,9 +92,6 @@ management:
 #     host: logs.example.com        # requires syslog-java-client
 #     port: 514
 audit:
-  # The version of the service, put in every audit event. It must be set, since spring-audit-support 1.0.1 fails to
-  # start when it looks for the version in the build information itself.
-  app-version: "@project.version@"
   repository:
     in-memory:
       enabled: true

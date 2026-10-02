@@ -140,24 +140,6 @@
 
   <build>
 
-    <!-- application.yml gets the version of the service, other resources are copied as they are -->
-    <resources>
-      <resource>
-        <directory>src/main/resources</directory>
-        <filtering>true</filtering>
-        <includes>
-          <include>application.yml</include>
-        </includes>
-      </resource>
-      <resource>
-        <directory>src/main/resources</directory>
-        <filtering>false</filtering>
-        <excludes>
-          <exclude>application.yml</exclude>
-        </excludes>
-      </resource>
-    </resources>
-
     <plugins>
 
       <plugin>
