@@ -40,7 +40,13 @@
 
     <dependency>
       <groupId>se.swedenconnect.spring.authnserver</groupId>
-      <artifactId>authn-server-spring-boot-starter</artifactId>
+      <artifactId>authn-server-saml-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>se.swedenconnect.spring.authnserver</groupId>
+      <artifactId>authn-server-oidc-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
 
@@ -258,20 +264,14 @@
 
   <profiles>
 
-    <!-- The reference is a service, not a library, and is never published to Maven Central -->
+    <!--
+      The reference is a service, not a library, and is never published to Maven Central. The parent excludes it from
+      the published bundle, so there is nothing to sign.
+      -->
     <profile>
       <id>release</id>
       <build>
         <plugins>
-
-          <plugin>
-            <groupId>org.sonatype.central</groupId>
-            <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>0.11.0</version>
-            <configuration>
-              <skipPublishing>true</skipPublishing>
-            </configuration>
-          </plugin>
 
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>

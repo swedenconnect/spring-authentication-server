@@ -30,11 +30,11 @@ The libraries:
 
 The Spring Boot starters:
 
-- `authn-server-spring-boot-starter` - Both SAML and OpenID Connect.
-
 - `authn-server-saml-spring-boot-starter` - SAML only.
 
 - `authn-server-oidc-spring-boot-starter` - OpenID Connect only.
+
+A server that offers both protocols includes both starters.
 
 ## Documentation
 

@@ -50,11 +50,12 @@ Redis, how an application adjusts the configuration in code, and how the server 
 <a name="getting-started"></a>
 ## Getting started
 
-Include one of the starters:
+Include the starter for each protocol the server offers:
 
-- `authn-server-spring-boot-starter` for a server offering both SAML and OpenID Connect.
-- `authn-server-saml-spring-boot-starter` for a SAML Identity Provider only.
-- `authn-server-oidc-spring-boot-starter` for an OpenID Provider only.
+- `authn-server-saml-spring-boot-starter` for a SAML Identity Provider.
+- `authn-server-oidc-spring-boot-starter` for an OpenID Provider.
+
+A server that offers both protocols includes both starters.
 
 ```xml
 <dependency>

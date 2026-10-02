@@ -91,11 +91,9 @@
     <module>authn-server-saml</module>
     <module>authn-server-oidc</module>
     <module>authn-server-autoconfigure</module>
-    <module>authn-server-spring-boot-starter</module>
-    <!-- Not published. Kept before the single-protocol starters, so that it is not the last module of the reactor. -->
-    <module>sweden-connect-reference</module>
     <module>authn-server-saml-spring-boot-starter</module>
     <module>authn-server-oidc-spring-boot-starter</module>
+    <module>sweden-connect-reference</module>
   </modules>
 
   <dependencyManagement>
@@ -568,6 +566,10 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
+              <!-- The reference is a service, not a library, and is never published to Maven Central -->
+              <excludeArtifacts>
+                <excludeArtifact>sweden-connect-reference-authn-server</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
 
