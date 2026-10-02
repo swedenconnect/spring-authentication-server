@@ -1,0 +1,27 @@
+[
+  {
+    "client_id": "https://one.example.com",
+    "trust_mark_types": [
+      "https://tm.example.com/a"
+    ],
+    "metadata": {
+      "client_name#en": "One",
+      "redirect_uris": [
+        "https://one.example.com/cb"
+      ],
+      "token_endpoint_auth_method": "private_key_jwt",
+      "jwks_uri": "https://one.example.com/jwks"
+    }
+  },
+  {
+    "client_id": "https://two.example.com",
+    "client_secret": "two-secret",
+    "metadata": {
+      "client_name#en": "Two",
+      "redirect_uris": [
+        "https://two.example.com/cb"
+      ],
+      "token_endpoint_auth_method": "client_secret_basic"
+    }
+  }
+]

@@ -15,7 +15,7 @@ spring:
     basename: messages
   config:
     import:
-      - optional:${idp-users-location}/users.yml
+      - optional:${authn-server-reference.users-location}/users.yml
   web:
     error:
       include-message: always
@@ -36,10 +36,6 @@ spring:
   #           location: file:/opt/config/tls.p12
   #           password: <key store password>
   #           type: PKCS12
-
-# Where users.yml, the file with the simulated users, is read from. The default is the users.yml of the service.
-# A deployment that wants other users sets IDP_CONFIG_DIR to a directory holding its own users.yml.
-idp-users-location: ${IDP_CONFIG_DIR:classpath:}
 
 server:
   # HTTPS on port 8443, with the key store of the SSL bundle below.
@@ -106,35 +102,42 @@ tomcat:
   ajp:
     enabled: false
 
-# The languages of the pages.
-ui:
-  languages:
-    - tag: sv
-      text: Svenska
-    - tag: en
-      text: English
+# The settings of the reference service itself.
+authn-server-reference:
 
-# The simulated authentication.
-authn:
-  provider-name: "Simulated Authentication Provider"
-  authn-path: /extauth
-  resume-path: /resume
-  supported-loas:
-    - http://id.elegnamnden.se/loa/1.0/loa3
-    - http://id.swedenconnect.se/loa/1.0/uncertified-loa3
-    - http://id.elegnamnden.se/loa/1.0/loa2
-    - http://id.elegnamnden.se/loa/1.0/eidas-nf-low
-    - http://id.elegnamnden.se/loa/1.0/eidas-nf-sub
-    - http://id.elegnamnden.se/loa/1.0/eidas-nf-high
-  entity-categories:
-    - http://id.elegnamnden.se/ec/1.0/loa2-pnr
-    - http://id.swedenconnect.se/ec/1.0/loa2-name
-    - http://id.elegnamnden.se/ec/1.0/loa3-pnr
-    - http://id.swedenconnect.se/ec/1.0/loa3-name
-    - http://id.elegnamnden.se/ec/1.0/eidas-pnr-delivery
-    - http://id.elegnamnden.se/sprop/1.0/scal2
-    - http://id.elegnamnden.se/sprop/1.0/mobile-auth
-    - http://id.swedenconnect.se/contract/sc/eid-authorization-system
+  # Where users.yml, the file with the simulated users, is read from. The default is the users.yml of the service.
+  # A deployment that wants other users sets IDP_CONFIG_DIR to a directory holding its own users.yml.
+  users-location: ${IDP_CONFIG_DIR:classpath:}
+
+  # The languages of the pages.
+  ui:
+    languages:
+      - tag: sv
+        text: Svenska
+      - tag: en
+        text: English
+
+  # The simulated authentication.
+  authn:
+    provider-name: "Simulated Authentication Provider"
+    authn-path: /extauth
+    resume-path: /resume
+    supported-loas:
+      - http://id.elegnamnden.se/loa/1.0/loa3
+      - http://id.swedenconnect.se/loa/1.0/uncertified-loa3
+      - http://id.elegnamnden.se/loa/1.0/loa2
+      - http://id.elegnamnden.se/loa/1.0/eidas-nf-low
+      - http://id.elegnamnden.se/loa/1.0/eidas-nf-sub
+      - http://id.elegnamnden.se/loa/1.0/eidas-nf-high
+    entity-categories:
+      - http://id.elegnamnden.se/ec/1.0/loa2-pnr
+      - http://id.swedenconnect.se/ec/1.0/loa2-name
+      - http://id.elegnamnden.se/ec/1.0/loa3-pnr
+      - http://id.swedenconnect.se/ec/1.0/loa3-name
+      - http://id.elegnamnden.se/ec/1.0/eidas-pnr-delivery
+      - http://id.elegnamnden.se/sprop/1.0/scal2
+      - http://id.elegnamnden.se/sprop/1.0/mobile-auth
+      - http://id.swedenconnect.se/contract/sc/eid-authorization-system
 
 authn-server:
 
@@ -156,14 +159,13 @@ authn-server:
   storage:
     type: memory
 
-  # The descriptive information that both protocols publish.
+  # The descriptive information that both protocols publish. The display names are given per protocol, under
+  # authn-server.saml.metadata.ui-info and authn-server.oidc.entity-information.ui-info, only because this service
+  # shows both protocols side by side. A normal deployment gives one shared display name here.
   entity-information:
     ui-info:
-      display-names:
-        en: Sweden Connect Reference IdP
-        sv: Sweden Connect Referens-IdP
       descriptions:
-        en: Sweden Connect Reference Identity Provider
+        en: Sweden Connect Reference Authentication Service
         sv: Sweden Connect referens-legitimeringstjänst
       logotypes:
         - path: /images/logo-notext.svg
@@ -219,6 +221,10 @@ authn-server:
     #     backup-location: /var/reference/sp-metadata-backup.xml
 
     metadata:
+      ui-info:
+        display-names:
+          en: Sweden Connect Reference IdP
+          sv: Sweden Connect Referens-IdP
       digest-methods:
         - http://www.w3.org/2001/04/xmlenc#sha256
         - http://www.w3.org/2001/04/xmldsig-more#sha384
@@ -272,14 +278,24 @@ authn-server:
     #     - credential:
     #         bundle: oidc-sign
 
+    entity-information:
+      ui-info:
+        display-names:
+          en: Sweden Connect Reference OP
+          sv: Sweden Connect Referens-OP
+
+    # DEPLOYMENT MUST ADD: the OpenID Connect clients. Each entry is either a location, a file holding one client or
+    # an array of clients as JSON, or one client given inline. For example:
+    #
+    # clients:
+    #   - location: file:/opt/config/oidc-clients.json
+    #   - client-id: https://rp.example.com
+    #     metadata: >
+    #       {"redirect_uris": ["https://rp.example.com/callback"], "client_name": "Example RP",
+    #        "token_endpoint_auth_method": "private_key_jwt", "jwks_uri": "https://rp.example.com/jwks"}
+    #
+    # A client in a file is an object with client_id, metadata, and optionally client_secret and trust_mark_types.
+
     ui-locales:
       - sv
       - en
-
-# DEPLOYMENT MUST ADD: the OpenID Connect clients. Each location holds the client metadata of a client as a JSON object
-# with its client_id, or a JSON array of such objects. For example:
-#
-# reference:
-#   oidc:
-#     clients:
-#       - file:/opt/config/oidc-clients.json

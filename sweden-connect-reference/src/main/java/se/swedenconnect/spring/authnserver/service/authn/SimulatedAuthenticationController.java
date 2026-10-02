@@ -86,7 +86,7 @@ import se.swedenconnect.spring.authnserver.service.users.SimulatedUsers;
  * @author Martin Lindström
  */
 @Controller
-@RequestMapping("${authn.authn-path}")
+@RequestMapping("${authn-server-reference.authn.authn-path}")
 public class SimulatedAuthenticationController
     extends AbstractAuthenticationController<SimulatedAuthenticationProvider> {
 

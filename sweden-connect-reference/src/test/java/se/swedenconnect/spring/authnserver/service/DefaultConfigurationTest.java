@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ import se.swedenconnect.spring.authnserver.service.config.MissingDeploymentSetti
 
 /**
  * Tests that the service does not start with the default configuration only, and that the failure names everything
- * that the deployment must add.
+ * that the deployment must add. The OpenID Connect clients are named by the server itself.
  *
  * @author Martin Lindström
  */
@@ -52,9 +53,20 @@ class DefaultConfigurationTest {
             "authn-server.saml.credentials.encrypt",
             "authn-server.saml.metadata-providers",
             "authn-server.oidc.issuer",
-            "authn-server.oidc.keys.signing",
-            "reference.oidc.clients");
-    assertThat(error.getMessage()).contains("authn-server.base-url", "reference.oidc.clients");
+            "authn-server.oidc.keys.signing");
+    assertThat(error.getMessage()).contains("authn-server.base-url", "authn-server.oidc.keys.signing");
+  }
+
+  @Test
+  void withoutOidcClientsTheServerStopsStartupNamingTheProperty() {
+    final Throwable error = catchThrowable(() -> new SpringApplication(ReferenceApplication.class).run(
+        "--spring.profiles.active=complete", "--authn-server.oidc.clients=", "--server.port=0",
+        "--management.server.port=0"));
+
+    assertThat(error).isNotNull();
+    assertThat(error).rootCause()
+        .hasMessageContaining("No client registry backend for OIDC requesters")
+        .hasMessageContaining("authn-server.oidc.clients");
   }
 
   @Test

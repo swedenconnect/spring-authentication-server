@@ -32,11 +32,12 @@ import org.springframework.util.StringUtils;
 
 /**
  * Checks, before anything else is set up, that the deployment has supplied the settings that the reference has no
- * defaults for: the base URL, the SAML entity ID, the OpenID Connect issuer, the keys, the SAML metadata, the OpenID
- * Connect clients and the TLS key store. When any of them is missing, startup fails with a
- * {@link MissingDeploymentSettingsException} that names all of them.
+ * defaults for: the base URL, the SAML entity ID, the OpenID Connect issuer, the keys, the SAML metadata and the TLS
+ * key store. When any of them is missing, startup fails with a {@link MissingDeploymentSettingsException} that names
+ * all of them.
  * <p>
- * The settings of a protocol are only required when the protocol is enabled.
+ * The settings of a protocol are only required when the protocol is enabled. The OpenID Connect clients are not
+ * checked here, since the server itself stops startup when the OpenID Provider has no client source.
  * </p>
  *
  * @author Martin Lindström
@@ -120,10 +121,6 @@ public class DeploymentSettingsCheck implements EnvironmentPostProcessor, Ordere
       if (!hasDescendants(sources, "authn-server.oidc.keys.signing")) {
         missing.add(new MissingSetting("authn-server.oidc.keys.signing",
             "the signing keys of the OpenID Provider"));
-      }
-      if (!hasText(binder, "reference.oidc.clients") && !hasDescendants(sources, "reference.oidc.clients")) {
-        missing.add(new MissingSetting("reference.oidc.clients",
-            "the locations of the OpenID Connect client metadata"));
       }
     }
     return missing;

@@ -60,6 +60,8 @@ final class ActuatorTestSupport {
 
   static final String CONFIGURED_CLIENT = "https://configured.example.com";
 
+  static final String PROPERTIES_CLIENT = "https://file.example.com";
+
   static final String FEDERATION_CLIENT = "https://rp.example.com";
 
   static final String SAML_CREDENTIALS = "authn-server.saml.credentials.default-credential.jks.";
@@ -88,6 +90,7 @@ final class ActuatorTestSupport {
         SAML_CREDENTIALS + "key.key-password=secret",
         "authn-server.saml.metadata-providers[0].location=file:" + metadata.toAbsolutePath(),
         "authn-server.oidc.enabled=true",
+        "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json",
         OIDC_KEY + "store.location=classpath:credentials/oidc-keys.p12",
         OIDC_KEY + "store.password=secret",
         OIDC_KEY + "store.type=PKCS12",

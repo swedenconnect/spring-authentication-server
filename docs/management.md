@@ -84,8 +84,8 @@ are usually URLs.
 An unknown protocol or an unknown client gives 404.
 
 The list holds, for each client, its protocol, its identity, its organisation number as the registry holds it, where
-it came from (the SAML metadata source, or the OpenID Connect backend: `configuration`, `repository` or `federation`),
-and when its data expires. A client with no expiry, such as a configured OpenID Connect client, has none:
+it came from (the SAML metadata source, or the OpenID Connect backend: `properties`, `configuration`, `repository` or
+`federation`), and when its data expires. A client with no expiry, such as a configured OpenID Connect client, has none:
 
 ```json
 {

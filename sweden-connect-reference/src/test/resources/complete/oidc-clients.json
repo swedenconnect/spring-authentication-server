@@ -1,29 +1,31 @@
 [
   {
     "client_id": "https://rp.test.local",
-    "client_name#sv": "Testklient",
-    "client_name#en": "Test Client",
-    "logo_uri": "https://rp.test.local/logo.svg",
-    "redirect_uris": [
-      "https://rp.test.local/callback"
-    ],
-    "response_types": [
-      "code"
-    ],
-    "grant_types": [
-      "authorization_code"
-    ],
-    "token_endpoint_auth_method": "private_key_jwt",
-    "jwks": {
-      "keys": [
-        {
-          "kty": "RSA",
-          "kid": "rp-key",
-          "use": "sig",
-          "e": "AQAB",
-          "n": "ozTDDZkZNbnggkQ6PbqcNUerlVtc5g0n95NXxekACY-HEL-4vXuVpeAhMnKbJ313h-lm8A8L1ZEbFCl-Erw_nzBmvQnWPmVOHJOtANGDdpVvMmEumnfe6VtPHPh55mzylGsDWnjoblrZHTAdmsRn0j7-Fcs5MmA6rggHZ2trYffWdoiiazOSj_GaDA_rYRecCFzGVSCD9cFM30SoHWbRjTi7BW1S06BDJ5NTSyooV2qfWSFq5R45RVE8ttuMXOwwTc_Ro5IObJgOLCQjgMiA5Ez4JczhxymcARtpdgt5wWImwdjUIkKb_JOWIFENloYubSMVHgMIaMRkvNAzhaOb5w"
-        }
-      ]
+    "metadata": {
+      "client_name#sv": "Testklient",
+      "client_name#en": "Test Client",
+      "logo_uri": "https://rp.test.local/logo.svg",
+      "redirect_uris": [
+        "https://rp.test.local/callback"
+      ],
+      "response_types": [
+        "code"
+      ],
+      "grant_types": [
+        "authorization_code"
+      ],
+      "token_endpoint_auth_method": "private_key_jwt",
+      "jwks": {
+        "keys": [
+          {
+            "kty": "RSA",
+            "kid": "rp-key",
+            "use": "sig",
+            "e": "AQAB",
+            "n": "ozTDDZkZNbnggkQ6PbqcNUerlVtc5g0n95NXxekACY-HEL-4vXuVpeAhMnKbJ313h-lm8A8L1ZEbFCl-Erw_nzBmvQnWPmVOHJOtANGDdpVvMmEumnfe6VtPHPh55mzylGsDWnjoblrZHTAdmsRn0j7-Fcs5MmA6rggHZ2trYffWdoiiazOSj_GaDA_rYRecCFzGVSCD9cFM30SoHWbRjTi7BW1S06BDJ5NTSyooV2qfWSFq5R45RVE8ttuMXOwwTc_Ro5IObJgOLCQjgMiA5Ez4JczhxymcARtpdgt5wWImwdjUIkKb_JOWIFENloYubSMVHgMIaMRkvNAzhaOb5w"
+          }
+        ]
+      }
     }
   }
 ]

@@ -38,8 +38,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
-import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
-import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.saml.config.Saml2IdpConfigurer;
 import se.swedenconnect.spring.authnserver.service.authn.SimulatedAuthenticationProvider;
@@ -48,15 +46,17 @@ import se.swedenconnect.spring.authnserver.service.users.SimulatedUser;
 import se.swedenconnect.spring.authnserver.service.users.SimulatedUsers;
 
 /**
- * The configuration of the reference: the simulated authentication, its pages, the OpenID Connect clients, and the
- * security of everything that is not an endpoint of the server.
+ * The configuration of the reference: the simulated authentication, its pages, and the security of everything that is
+ * not an endpoint of the server. The settings of the reference are given under {@value #PREFIX}.
  *
  * @author Martin Lindström
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({ AuthnProperties.class, UiProperties.class, ReferenceProperties.class,
-    TomcatAjpProperties.class })
+@EnableConfigurationProperties({ AuthnProperties.class, UiProperties.class, TomcatAjpProperties.class })
 public class ReferenceConfiguration {
+
+  /** The prefix of the settings of the reference. */
+  public static final String PREFIX = "authn-server-reference";
 
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(ReferenceConfiguration.class);
@@ -156,15 +156,14 @@ public class ReferenceConfiguration {
   }
 
   /**
-   * Adjusts the server: the response page of both protocols, and the statically configured OpenID Connect clients.
+   * Adjusts the server: the response page of both protocols. The OpenID Connect clients are given with
+   * {@code authn-server.oidc.clients}.
    *
    * @param responsePage the response page
-   * @param properties the settings of the reference
    * @return an {@link AuthnServerConfigurerAdapter}
    */
   @Bean
-  AuthnServerConfigurerAdapter referenceAdapter(final @NonNull ThymeleafResponsePage responsePage,
-      final @NonNull ReferenceProperties properties) {
+  AuthnServerConfigurerAdapter referenceAdapter(final @NonNull ThymeleafResponsePage responsePage) {
     return (http, configurer) -> {
       final Saml2IdpConfigurer saml = configurer.getProtocolConfigurer(Saml2IdpConfigurer.class);
       if (saml != null) {
@@ -173,9 +172,6 @@ public class ReferenceConfiguration {
       final OidcProviderConfigurer oidc = configurer.getProtocolConfigurer(OidcProviderConfigurer.class);
       if (oidc != null) {
         oidc.authnRequestProcessor(p -> p.responsePage(responsePage));
-        final List<OidcClientRecord> clients = OidcClientLoader.load(properties.getOidc().getClients());
-        configurer.clientRegistryBackend(new ConfigurationClientBackend(clients));
-        log.info("Configured {} OpenID Connect client(s)", clients.size());
       }
     };
   }
@@ -213,7 +209,7 @@ public class ReferenceConfiguration {
   @Bean
   @Order(2)
   SecurityFilterChain referenceSecurityFilterChain(final @NonNull HttpSecurity http) throws Exception {
-    final String authnPath = Objects.requireNonNull(this.authn.getAuthnPath(), "authn.authn-path must be set");
+    final String authnPath = Objects.requireNonNull(this.authn.getAuthnPath(), AuthnProperties.PREFIX + ".authn-path must be set");
     http
         .csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(authorize -> authorize

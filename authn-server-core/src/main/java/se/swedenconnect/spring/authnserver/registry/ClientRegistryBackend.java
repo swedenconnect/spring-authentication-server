@@ -119,6 +119,17 @@ public interface ClientRegistryBackend {
   }
 
   /**
+   * Gets the names of the sources of the backend, the names that {@link #getSources()} gives them. The names tell the
+   * sources apart in management and audit, so they must be unique among the sources of a protocol. Unlike
+   * {@link #getSources()}, this method never reads the clients. The default is the backend name.
+   *
+   * @return the source names
+   */
+  default @NonNull List<String> getSourceNames() {
+    return List.of(this.getName());
+  }
+
+  /**
    * Gets the sources of the backend, with the number of clients of each and when it was last updated.
    *
    * @return the sources

@@ -99,6 +99,7 @@ class AuthnServerStorageSettingsTest {
             AuthnServerStorageAutoConfiguration.class))
         .withPropertyValues("authn-server.base-url=" + StorageTestProperties.BASE_URL,
             "authn-server.oidc.enabled=true",
+            "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json",
             OIDC_KEY + "store.location=classpath:credentials/oidc-keys.p12",
             OIDC_KEY + "store.password=secret",
             OIDC_KEY + "store.type=PKCS12",

@@ -163,13 +163,21 @@ The OpenID Connect side has three backends. They are asked in a configured order
 configuration, repository, federation.
 
 - **Configuration** ([`ConfigurationClientBackend`][ConfigurationClientBackend]): the clients that the deployment
-  gives the server directly.
+  gives the server directly. With Spring Boot, they are given with `authn-server.oidc.clients`, in JSON files or
+  inline, see [Clients](configuration.html#oidc-clients), and that source is named `properties`. Configured clients
+  added in code get the name `configuration`. The clients are read with
+  [`OidcClientReader`][OidcClientReader], which may also be used without Spring Boot.
 - **Repository** ([`RepositoryClientBackend`][RepositoryClientBackend]): the clients of a
   [`ClientRepository`][ClientRepository]. The library ships [`InMemoryClientRepository`][InMemoryClientRepository];
   implementations backed by a database are added later. A repository that can list its clients implements
   `findAll()`, so that its clients can be listed and compared with those known before a restart, see
   [Monitoring and managing the server](management.html#clients-added-and-removed).
 - **Federation** ([`FederationClientBackend`][FederationClientBackend]): clients resolved through OpenID Federation.
+
+Every client source has a name, which the [Actuator](management.html) and the [audit events](audit.html) use to tell
+the sources apart. The names must be unique among the client sources of a protocol, and the application does not
+start if two sources of the same protocol have the same name. The `properties` source is asked before any OpenID
+Connect client source added in code.
 
 The first two work from an [`OidcClientRecord`][OidcClientRecord], which is a `client_id`, the client metadata as
 Nimbus models it, and the trust mark types that the operator has set:
@@ -433,6 +441,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [InMemoryFederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/InMemoryFederationCache.java
 [MetadataProviderFactory]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/MetadataProviderFactory.java
 [MetadataSource]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/MetadataSource.java
+[OidcClientReader]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/OidcClientReader.java
 [OidcClientRecord]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/OidcClientRecord.java
 [Requester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/Requester.java
 [RequesterAcceptance]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequesterAcceptance.java

@@ -365,6 +365,51 @@ class AuthnServerConfigurerTest {
   }
 
   @Test
+  void clientSourceNamesMustBeUniquePerProtocol() {
+    final AuthnServerConfigurer configurer = new AuthnServerConfigurer().baseUrl(BASE_URL)
+        .clientRegistryBackend(backend(null, "configuration", AuthenticationProtocol.OIDC))
+        .clientRegistryBackend(backend(null, "configuration", AuthenticationProtocol.SAML))
+        .clientRegistryBackend(backend(null, "repository", AuthenticationProtocol.OIDC));
+    configurer.init(mock(HttpSecurity.class));
+
+    configurer.clientRegistryBackend(backend(null, "configuration", AuthenticationProtocol.OIDC));
+    assertThatIllegalArgumentException().isThrownBy(() -> configurer.init(mock(HttpSecurity.class)))
+        .withMessageContaining("Two OIDC client sources are named 'configuration'");
+  }
+
+  @Test
+  void theSourceNamesOfABackendAreChecked() {
+    final ClientRegistryBackend sources = new ClientRegistryBackend() {
+
+      @Override
+      public @NonNull String getName() {
+        return "saml-metadata";
+      }
+
+      @Override
+      public @NonNull AuthenticationProtocol getProtocol() {
+        return AuthenticationProtocol.SAML;
+      }
+
+      @Override
+      public @NonNull List<String> getSourceNames() {
+        return List.of("one", "two");
+      }
+
+      @Override
+      public RequesterRecord lookup(final @NonNull String identifier) {
+        return null;
+      }
+    };
+    AuthnServerConfigurer.assertUniqueSourceNames(List.of(sources, backend(null, "saml-metadata",
+        AuthenticationProtocol.SAML)));
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> AuthnServerConfigurer.assertUniqueSourceNames(
+            List.of(sources, backend(null, "two", AuthenticationProtocol.SAML))))
+        .withMessageContaining("Two SAML client sources are named 'two'");
+  }
+
+  @Test
   void theRequesterAcceptanceDefaultsToAcceptAll() {
     final AuthnServerConfigurer configurer = new AuthnServerConfigurer();
     assertThat(configurer.getRequesterAcceptance()).isSameAs(RequesterAcceptance.acceptAll());
@@ -387,16 +432,21 @@ class AuthnServerConfigurerTest {
   }
 
   private static ClientRegistryBackend backend(final RequesterRecord record) {
+    return backend(record, "test", AuthenticationProtocol.SAML);
+  }
+
+  private static ClientRegistryBackend backend(final RequesterRecord record, final String name,
+      final AuthenticationProtocol protocol) {
     return new ClientRegistryBackend() {
 
       @Override
       public @NonNull String getName() {
-        return "test";
+        return name;
       }
 
       @Override
       public @NonNull AuthenticationProtocol getProtocol() {
-        return AuthenticationProtocol.SAML;
+        return protocol;
       }
 
       @Override

@@ -54,6 +54,9 @@ import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationClient;
+import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.OidcClientReader;
+import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.federation.InMemoryProviderTrustMarkStore;
@@ -87,6 +90,10 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
  * the in-memory store. When a store is kept in Redis, the bean is declared by the storage autoconfiguration.
  * </p>
  * <p>
+ * The clients of {@code authn-server.oidc.clients} are read at startup into a {@link ConfigurationClientBackend}
+ * named {@value #CLIENTS_SOURCE_NAME}, which is asked before any client source that an adapter adds.
+ * </p>
+ * <p>
  * When OpenID Federation is enabled, the trust marks of the OpenID Provider are kept by a {@link ProviderTrustMarks}
  * bean, created from the properties unless the application declares one. A {@link ProviderTrustMarkStore} bean decides
  * where their state is kept.
@@ -108,6 +115,9 @@ public class OidcAutoConfiguration {
 
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(OidcAutoConfiguration.class);
+
+  /** The name of the client source holding the clients of {@code authn-server.oidc.clients}. */
+  public static final String CLIENTS_SOURCE_NAME = "properties";
 
   /**
    * Creates the factory for the OIDC protocol configurer.
@@ -138,6 +148,10 @@ public class OidcAutoConfiguration {
     return server -> {
       final List<FederationKey> federationKeys =
           loadFederationKeys(properties.getFederation().getKeys(), credentialFactory);
+      final ConfigurationClientBackend clients = createClientBackend(properties.getClients());
+      if (clients != null) {
+        server.clientRegistryBackend(clients);
+      }
       return createConfigurer(server, properties)
           .signingKeys(loadSigningKeys(properties.getKeys().getSigning(), credentialFactory))
           .decryptionKeys(loadDecryptionKeys(properties.getKeys().getDecryption(), credentialFactory))
@@ -213,6 +227,47 @@ public class OidcAutoConfiguration {
     }
     return new ProviderTrustMarks(entityId, loadTrustMarkSources(federation.getTrustMarks()), trustMarkStore,
         client, null, retryInterval, Clock.systemUTC());
+  }
+
+  /**
+   * Creates the client source holding the clients of {@code authn-server.oidc.clients}, named
+   * {@value #CLIENTS_SOURCE_NAME}.
+   *
+   * @param properties the client entries
+   * @return the client source, or {@code null} if no entries are assigned
+   * @throws IllegalArgumentException for an invalid entry or client
+   */
+  static @Nullable ConfigurationClientBackend createClientBackend(
+      final @Nullable List<OidcConfigurationProperties.ClientProperties> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return null;
+    }
+    final OidcClientReader reader = new OidcClientReader();
+    for (int i = 0; i < properties.size(); i++) {
+      final OidcConfigurationProperties.ClientProperties p = properties.get(i);
+      final String name = "%s.clients[%d]".formatted(OidcConfigurationProperties.PREFIX, i);
+      if (p.getLocation() != null && p.hasInlineFields()) {
+        throw new IllegalArgumentException(
+            "%s has both a location and inline fields - give either a location or an inline client".formatted(name));
+      }
+      if (p.getLocation() != null) {
+        reader.readLocation(p.getLocation());
+      }
+      else if (p.hasInlineFields()) {
+        if (p.getClientId() == null || p.getMetadata() == null) {
+          throw new IllegalArgumentException("%s must have client-id and metadata".formatted(name));
+        }
+        reader.addClient(p.getClientId(), p.getMetadata(), p.getClientSecret(), p.getTrustMarkTypes(), name);
+      }
+      else {
+        throw new IllegalArgumentException(
+            "%s has neither a location nor an inline client (client-id and metadata)".formatted(name));
+      }
+    }
+    final List<OidcClientRecord> clients = reader.getClients();
+    log.info("Configured {} OpenID Connect client(s) from {}.clients", clients.size(),
+        OidcConfigurationProperties.PREFIX);
+    return new ConfigurationClientBackend(clients, CLIENTS_SOURCE_NAME);
   }
 
   /**

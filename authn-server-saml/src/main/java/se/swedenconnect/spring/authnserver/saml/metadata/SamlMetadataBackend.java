@@ -226,6 +226,14 @@ public class SamlMetadataBackend implements ClientRegistryBackend {
     return null;
   }
 
+  /**
+   * Gets the names of the metadata sources.
+   */
+  @Override
+  public @NonNull List<String> getSourceNames() {
+    return this.sources.stream().map(ManagedMetadataSource::getName).toList();
+  }
+
   /** {@inheritDoc} */
   @Override
   public @NonNull List<ClientSource> getSources() {

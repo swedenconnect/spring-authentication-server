@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.autoconfigure.oidc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import jakarta.servlet.Filter;
 
@@ -36,6 +37,7 @@ import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -52,8 +54,10 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.langtag.LangTag;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
+import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.oauth2.sdk.id.Identifier;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.oidc.nimbus.claims.ParameterConstants;
 import se.swedenconnect.security.credential.spring.autoconfigure.ConvertersAutoConfiguration;
@@ -63,12 +67,18 @@ import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationInputToken;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerAutoConfiguration;
+import se.swedenconnect.spring.authnserver.autoconfigure.ConfiguredAuthnServer;
 import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfiguration;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
+import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
 import se.swedenconnect.spring.authnserver.oidc.federation.TrustMarkState;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
+import se.swedenconnect.spring.authnserver.registry.RegisteredClient;
+import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 import se.swedenconnect.spring.authnserver.registry.acceptance.ConfigurableRequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptance;
 import se.swedenconnect.spring.authnserver.registry.acceptance.RequiredMarksRequesterPredicate;
@@ -101,7 +111,49 @@ class OidcAutoConfigurationTest {
       .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
           ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, OidcAutoConfiguration.class,
           AuthnServerAutoConfiguration.class))
+      .withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true",
+          "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json");
+
+  /** The same as the runner, but without any OIDC clients. */
+  private final WebApplicationContextRunner noClientsRunner = new WebApplicationContextRunner()
+      .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
+          ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, OidcAutoConfiguration.class,
+          AuthnServerAutoConfiguration.class))
       .withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true");
+
+  /** An inline client of the properties. */
+  private static final String[] INLINE_CLIENT = {
+      "authn-server.oidc.clients[1].client-id=https://inline.example.com",
+      "authn-server.oidc.clients[1].metadata={\"client_name\":\"Inline\","
+          + "\"redirect_uris\":[\"https://inline.example.com/cb\"],"
+          + "\"token_endpoint_auth_method\":\"client_secret_basic\"}",
+      "authn-server.oidc.clients[1].client-secret=inline-secret",
+      "authn-server.oidc.clients[1].trust-mark-types[0]=https://tm.example.com/inline" };
+
+  /** Adds OIDC clients in code, with the default name. */
+  @Configuration
+  static class CodeClientsConfiguration {
+
+    @Bean
+    AuthnServerConfigurerAdapter codeClients() {
+      final OIDCClientMetadata metadata = new OIDCClientMetadata();
+      metadata.setName("From Code");
+      return (http, configurer) -> configurer.clientRegistryBackend(new ConfigurationClientBackend(List.of(
+          OidcClientRecord.of("https://inline.example.com", metadata),
+          OidcClientRecord.of("https://code.example.com", metadata))));
+    }
+  }
+
+  /** Adds OIDC clients in code under the name of the properties source. */
+  @Configuration
+  static class ClashingClientsConfiguration {
+
+    @Bean
+    AuthnServerConfigurerAdapter clashingClients() {
+      return (http, configurer) -> configurer.clientRegistryBackend(
+          new ConfigurationClientBackend(List.of(), OidcAutoConfiguration.CLIENTS_SOURCE_NAME));
+    }
+  }
 
   /** A provider delivering a personal identity number and names. */
   @Configuration
@@ -391,6 +443,133 @@ class OidcAutoConfigurationTest {
               p -> assertThat(p.getGroups()).containsExactly(
                   Set.of("https://tm.example.com/a", "https://tm.example.com/b")));
         });
+  }
+
+  @Test
+  void theClientsOfThePropertiesAreFoundAndAskedFirst() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues(INLINE_CLIENT)
+        .withPropertyValues(
+            "authn-server.oidc.requester-acceptance.required-marks[0][0]=https://tm.example.com/approved")
+        .withUserConfiguration(CodeClientsConfiguration.class, CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final AuthnServerConfigurer configurer = CaptureConfiguration.CONFIGURER.get();
+          final ClientRegistry registry = configurer.getClientRegistry();
+
+          final RequesterRecord file = registry.lookup(AuthenticationProtocol.OIDC, "https://file.example.com");
+          assertThat(file).isNotNull();
+          assertThat(file.marks()).containsExactly("https://tm.example.com/approved");
+
+          // The inline client is also given in code, and the properties source is asked first
+          final RequesterRecord inline = registry.lookup(AuthenticationProtocol.OIDC, "https://inline.example.com");
+          assertThat(inline).isNotNull();
+          assertThat(inline.getDisplayName("en")).isEqualTo("Inline");
+          assertThat(inline.marks()).containsExactly("https://tm.example.com/inline");
+          assertThat(OidcClientRecord.getClientSecret((OIDCClientMetadata) inline.protocolMetadata()))
+              .isEqualTo(new Secret("inline-secret"));
+
+          final RequesterRecord code = registry.lookup(AuthenticationProtocol.OIDC, "https://code.example.com");
+          assertThat(code).isNotNull();
+
+          final List<ConfigurationClientBackend> backends = context.getBean(ConfiguredAuthnServer.class)
+              .getClientRegistryBackends(ConfigurationClientBackend.class);
+          assertThat(backends).extracting(ConfigurationClientBackend::getName)
+              .containsExactly(OidcAutoConfiguration.CLIENTS_SOURCE_NAME, ConfigurationClientBackend.DEFAULT_NAME);
+          assertThat(backends.getFirst().getClient("https://file.example.com"))
+              .extracting(RegisteredClient::source).isEqualTo(OidcAutoConfiguration.CLIENTS_SOURCE_NAME);
+
+          // The operator-assigned trust mark type satisfies the required marks
+          final RequesterAcceptance acceptance = configurer.getRequesterAcceptance();
+          assertThat(acceptance.isAccepted(file, registry)).isTrue();
+          assertThat(acceptance.isAccepted(inline, registry)).isFalse();
+          assertThat(acceptance.isAccepted(code, registry)).isFalse();
+        });
+  }
+
+  @Test
+  void anOpenIdProviderWithoutClientSourcesFailsStartup() {
+    this.noClientsRunner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause()
+            .hasMessageContaining("No client registry backend for OIDC requesters")
+            .hasMessageContaining("authn-server.oidc.clients")
+            .hasMessageContaining("AuthnServerConfigurerAdapter"));
+  }
+
+  @Test
+  void clientsAddedInCodeAreEnoughWithoutTheProperty() {
+    this.noClientsRunner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withUserConfiguration(CodeClientsConfiguration.class)
+        .run(context -> assertThat(context).hasNotFailed());
+  }
+
+  @Test
+  void aSourceNamedAsThePropertiesSourceFailsStartup() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withUserConfiguration(ClashingClientsConfiguration.class)
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause().hasMessageContaining("Two OIDC client sources are named 'properties'"));
+  }
+
+  @Test
+  void aClientGivenInAFileAndInlineFailsStartup() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.clients[1].client-id=https://file.example.com",
+            "authn-server.oidc.clients[1].metadata={}")
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause().hasMessageContaining("'https://file.example.com' is given more than once"));
+  }
+
+  @Test
+  void anEntryWithBothALocationAndInlineFieldsFailsStartup() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.clients[0].client-id=https://other.example.com")
+        .run(context -> assertThat(context).hasFailed()
+            .getFailure().rootCause()
+            .hasMessageContaining("authn-server.oidc.clients[0] has both a location and inline fields"));
+  }
+
+  @Test
+  void invalidClientEntriesAreRejected() {
+    assertThat(OidcAutoConfiguration.createClientBackend(null)).isNull();
+    assertThat(OidcAutoConfiguration.createClientBackend(List.of())).isNull();
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> OidcAutoConfiguration.createClientBackend(
+            List.of(new OidcConfigurationProperties.ClientProperties())))
+        .withMessageContaining("authn-server.oidc.clients[0] has neither a location nor an inline client");
+
+    final OidcConfigurationProperties.ClientProperties noMetadata = new OidcConfigurationProperties.ClientProperties();
+    noMetadata.setClientId("https://rp.example.com");
+    noMetadata.setTrustMarkTypes(List.of("https://tm.example.com/a"));
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> OidcAutoConfiguration.createClientBackend(List.of(noMetadata)))
+        .withMessageContaining("authn-server.oidc.clients[0] must have client-id and metadata");
+
+    final OidcConfigurationProperties.ClientProperties secretInMetadata =
+        new OidcConfigurationProperties.ClientProperties();
+    secretInMetadata.setClientId("https://rp.example.com");
+    secretInMetadata.setMetadata("{\"client_secret\":\"s\"}");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> OidcAutoConfiguration.createClientBackend(List.of(secretInMetadata)))
+        .withMessageContaining("client-secret");
+
+    final OidcConfigurationProperties.ClientProperties missingFile = new OidcConfigurationProperties.ClientProperties();
+    missingFile.setLocation(new ClassPathResource("clients/missing.json"));
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> OidcAutoConfiguration.createClientBackend(List.of(missingFile)))
+        .withMessageContaining("Failed to read OpenID Connect clients");
+  }
+
+  @Test
+  void theBackendOfThePropertiesIsNamedProperties() {
+    final OidcConfigurationProperties.ClientProperties file = new OidcConfigurationProperties.ClientProperties();
+    file.setLocation(new ClassPathResource("clients/oidc-clients.json"));
+    final ConfigurationClientBackend backend = OidcAutoConfiguration.createClientBackend(List.of(file));
+    assertThat(backend).isNotNull();
+    assertThat(backend.getName()).isEqualTo("properties");
+    assertThat(backend.lookup("https://file.example.com")).isNotNull();
   }
 
   @Test

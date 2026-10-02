@@ -113,8 +113,10 @@ class AuthnServerActuatorAutoConfigurationTest {
       mvc.perform(get("/actuator/clients"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.clients[*].id", Matchers.containsInAnyOrder(ActuatorTestSupport.SP_ONE,
-              ActuatorTestSupport.SP_TWO, ActuatorTestSupport.CONFIGURED_CLIENT,
+              ActuatorTestSupport.SP_TWO, ActuatorTestSupport.PROPERTIES_CLIENT, ActuatorTestSupport.CONFIGURED_CLIENT,
               ActuatorTestSupport.FEDERATION_CLIENT)))
+          .andExpect(jsonPath("$.clients[?(@.id == '%s')].source".formatted(ActuatorTestSupport.PROPERTIES_CLIENT))
+              .value("properties"))
           .andExpect(jsonPath("$.clients[?(@.id == '%s')].source".formatted(ActuatorTestSupport.FEDERATION_CLIENT))
               .value("federation"))
           .andExpect(jsonPath("$.clients[?(@.id == '%s')].expires-at".formatted(ActuatorTestSupport.FEDERATION_CLIENT))
@@ -137,6 +139,11 @@ class AuthnServerActuatorAutoConfigurationTest {
       mvc.perform(get("/actuator/clients/oidc").param("id", ActuatorTestSupport.CONFIGURED_CLIENT))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.source").value("configuration"));
+
+      mvc.perform(get("/actuator/clients/oidc").param("id", ActuatorTestSupport.PROPERTIES_CLIENT))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.source").value("properties"))
+          .andExpect(jsonPath("$.marks[0]").value("https://tm.example.com/approved"));
 
       mvc.perform(get("/actuator/clients/oidc/metadata").param("id", ActuatorTestSupport.CONFIGURED_CLIENT))
           .andExpect(status().isOk())
@@ -246,6 +253,7 @@ class AuthnServerActuatorAutoConfigurationTest {
           .andExpect(jsonPath("$.authn-server.authentication-providers").isArray())
           .andExpect(jsonPath("$.client-registry.sources[?(@.protocol == 'saml')].clients").value(2))
           .andExpect(jsonPath("$.client-registry.sources[?(@.backend == 'configuration')].clients").value(1))
+          .andExpect(jsonPath("$.client-registry.sources[?(@.backend == 'properties')].clients").value(1))
           .andExpect(jsonPath("$.client-registry.sources[?(@.backend == 'federation')].clients").value(1))
           .andExpect(jsonPath("$.client-registry.sources[?(@.backend == 'federation')].last-update").exists());
     });

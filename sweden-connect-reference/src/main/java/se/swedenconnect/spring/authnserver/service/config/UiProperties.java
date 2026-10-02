@@ -27,8 +27,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @author Martin Lindström
  */
-@ConfigurationProperties("ui")
+@ConfigurationProperties(UiProperties.PREFIX)
 public class UiProperties {
+
+  /** The property prefix. */
+  public static final String PREFIX = ReferenceConfiguration.PREFIX + ".ui";
 
   /**
    * The languages that the pages can be shown in.

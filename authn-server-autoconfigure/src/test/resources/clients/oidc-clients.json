@@ -1,0 +1,16 @@
+[
+  {
+    "client_id": "https://file.example.com",
+    "trust_mark_types": [
+      "https://tm.example.com/approved"
+    ],
+    "metadata": {
+      "client_name#en": "File Client",
+      "redirect_uris": [
+        "https://file.example.com/cb"
+      ],
+      "token_endpoint_auth_method": "private_key_jwt",
+      "jwks_uri": "https://file.example.com/jwks"
+    }
+  }
+]

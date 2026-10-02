@@ -1,7 +1,7 @@
 #
 # The complete profile, for the tests only. It supplies everything that the default configuration leaves to the
 # deployment: a localhost base URL, test keys, a TLS key store, local SAML metadata with a test Service Provider and a
-# test signature service, and one statically configured OpenID Connect client.
+# test signature service, and two statically configured OpenID Connect clients, one in a file and one inline.
 #
 # The keys and the TLS key store were generated for the tests, and are found in the complete directory. The tests
 # replace the ports, and so the base URL, entity ID and issuer, with free ports.
@@ -68,8 +68,12 @@ authn-server:
       signing:
         - credential:
             bundle: oidc-sign
-
-reference:
-  oidc:
     clients:
-      - classpath:complete/oidc-clients.json
+      - location: classpath:complete/oidc-clients.json
+      - client-id: https://inline.test.local
+        metadata: >
+          {"client_name": "Inline Test Client", "redirect_uris": ["https://inline.test.local/callback"],
+           "token_endpoint_auth_method": "client_secret_basic"}
+        client-secret: inline-secret
+        trust-mark-types:
+          - https://inline.test.local/trust-mark

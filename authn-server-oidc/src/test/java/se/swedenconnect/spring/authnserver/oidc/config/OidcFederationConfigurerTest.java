@@ -51,6 +51,7 @@ import com.nimbusds.jwt.SignedJWT;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.entity.EntityInformation;
+import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.federation.FederationSupport;
 import se.swedenconnect.spring.authnserver.oidc.federation.OidcEntityMetadata;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
@@ -100,6 +101,7 @@ class OidcFederationConfigurerTest {
           .authenticationProvider(new TestAuthenticationProvider("one",
               List.of("http://id.elegnamnden.se/loa/1.0/loa3"),
               List.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER), List.of()))
+          .clientRegistryBackend(new ConfigurationClientBackend(List.of()))
           .protocol(new OidcProviderConfigurer()
               .signingKeys(List.of(SigningKey.active(KeyTestSupport.rsa("op-rsa", 2048))))
               .federation(f -> f

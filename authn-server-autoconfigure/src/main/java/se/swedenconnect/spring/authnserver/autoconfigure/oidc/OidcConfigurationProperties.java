@@ -135,6 +135,12 @@ public class OidcConfigurationProperties {
   private List<String> clientAuthenticationMethods;
 
   /**
+   * The OpenID Connect clients that are configured here. Each entry is either a location, holding one client or an
+   * array of clients as JSON, or one client given inline. The clients are read once, at startup.
+   */
+  private List<ClientProperties> clients;
+
+  /**
    * The rules for which clients are accepted. Without rules, every client that the client registry knows is accepted.
    */
   private final RequesterAcceptanceProperties requesterAcceptance = new RequesterAcceptanceProperties();
@@ -399,6 +405,24 @@ public class OidcConfigurationProperties {
   }
 
   /**
+   * Gets the configured OpenID Connect clients.
+   *
+   * @return the client entries, or {@code null} if none are assigned
+   */
+  public @Nullable List<ClientProperties> getClients() {
+    return this.clients;
+  }
+
+  /**
+   * Assigns the configured OpenID Connect clients.
+   *
+   * @param clients the client entries
+   */
+  public void setClients(final @Nullable List<ClientProperties> clients) {
+    this.clients = clients;
+  }
+
+  /**
    * Gets the requester acceptance properties.
    *
    * @return the requester acceptance properties
@@ -432,6 +456,142 @@ public class OidcConfigurationProperties {
    */
   public @NonNull StorageProperties getStorage() {
     return this.storage;
+  }
+
+  /**
+   * One entry of the configured OpenID Connect clients: either a location, or one client given inline with
+   * client-id, metadata, and optionally client-secret and trust-mark-types.
+   */
+  public static class ClientProperties {
+
+    /**
+     * A resource holding one client as a JSON object, or an array of such objects. Each object has client_id,
+     * metadata, and optionally client_secret and trust_mark_types.
+     */
+    private Resource location;
+
+    /**
+     * The client identifier of an inline client.
+     */
+    private String clientId;
+
+    /**
+     * The client metadata of an inline client, as a JSON object in a string. It never holds the client secret.
+     */
+    private String metadata;
+
+    /**
+     * The client secret of an inline client that authenticates with one.
+     */
+    private String clientSecret;
+
+    /**
+     * Trust mark types that the operator assigns to an inline client. They are not verified, and they are not trust
+     * marks, but they give the client the same treatment as a client holding a trust mark of the type, for example
+     * under requester-acceptance.required-marks.
+     */
+    private List<String> trustMarkTypes;
+
+    /**
+     * Gets the location of the client file.
+     *
+     * @return the location, or {@code null}
+     */
+    public @Nullable Resource getLocation() {
+      return this.location;
+    }
+
+    /**
+     * Assigns the location of the client file.
+     *
+     * @param location the location
+     */
+    public void setLocation(final @Nullable Resource location) {
+      this.location = location;
+    }
+
+    /**
+     * Gets the client identifier of an inline client.
+     *
+     * @return the client identifier, or {@code null}
+     */
+    public @Nullable String getClientId() {
+      return this.clientId;
+    }
+
+    /**
+     * Assigns the client identifier of an inline client.
+     *
+     * @param clientId the client identifier
+     */
+    public void setClientId(final @Nullable String clientId) {
+      this.clientId = clientId;
+    }
+
+    /**
+     * Gets the client metadata of an inline client, as JSON.
+     *
+     * @return the client metadata, or {@code null}
+     */
+    public @Nullable String getMetadata() {
+      return this.metadata;
+    }
+
+    /**
+     * Assigns the client metadata of an inline client, as JSON.
+     *
+     * @param metadata the client metadata
+     */
+    public void setMetadata(final @Nullable String metadata) {
+      this.metadata = metadata;
+    }
+
+    /**
+     * Gets the client secret of an inline client.
+     *
+     * @return the client secret, or {@code null}
+     */
+    public @Nullable String getClientSecret() {
+      return this.clientSecret;
+    }
+
+    /**
+     * Assigns the client secret of an inline client.
+     *
+     * @param clientSecret the client secret
+     */
+    public void setClientSecret(final @Nullable String clientSecret) {
+      this.clientSecret = clientSecret;
+    }
+
+    /**
+     * Gets the trust mark types that the operator assigns to an inline client.
+     *
+     * @return the trust mark types, or {@code null}
+     */
+    public @Nullable List<String> getTrustMarkTypes() {
+      return this.trustMarkTypes;
+    }
+
+    /**
+     * Assigns the trust mark types that the operator assigns to an inline client.
+     *
+     * @param trustMarkTypes the trust mark types
+     */
+    public void setTrustMarkTypes(final @Nullable List<String> trustMarkTypes) {
+      this.trustMarkTypes = trustMarkTypes;
+    }
+
+    /**
+     * Tells whether any of the fields of an inline client is assigned.
+     *
+     * @return {@code true} if an inline field is assigned
+     */
+    public boolean hasInlineFields() {
+      return this.clientId != null || this.metadata != null || this.clientSecret != null
+          || this.trustMarkTypes != null;
+    }
+
   }
 
   /**

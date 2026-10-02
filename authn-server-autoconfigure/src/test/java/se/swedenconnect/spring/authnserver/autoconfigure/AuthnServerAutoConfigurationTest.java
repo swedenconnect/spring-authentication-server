@@ -323,6 +323,7 @@ class AuthnServerAutoConfigurationTest {
   @Test
   void anOidcOnlyServerStarts() {
     this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true",
+            "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json",
             OIDC_KEY + "location=classpath:credentials/oidc-keys.p12", OIDC_KEY + "password=secret",
             OIDC_KEY + "type=PKCS12", "authn-server.oidc.keys.signing[0].credential.jks.key.alias=rsa-sign",
             "authn-server.oidc.keys.signing[0].credential.jks.key.key-password=secret")

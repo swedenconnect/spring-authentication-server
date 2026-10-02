@@ -66,7 +66,7 @@ class DeploymentSettingsCheckTest {
         .withProperty("authn-server.oidc.enabled", "true");
     assertThat(DeploymentSettingsCheck.check(environment))
         .extracting(DeploymentSettingsCheck.MissingSetting::setting)
-        .containsExactly("authn-server.oidc.issuer", "authn-server.oidc.keys.signing", "reference.oidc.clients");
+        .containsExactly("authn-server.oidc.issuer", "authn-server.oidc.keys.signing");
 
     environment.setProperty("authn-server.oidc.enabled", "false");
     environment.setProperty("authn-server.saml.enabled", "true");
@@ -118,16 +118,8 @@ class DeploymentSettingsCheckTest {
         "SPRING_SSL_BUNDLE_JKS_TLS_KEYSTORE_LOCATION", "file:/tls.p12",
         "AUTHN_SERVER_OIDC_ENABLED", "true",
         "AUTHN_SERVER_OIDC_ISSUER", "https://idp.example.com",
-        "AUTHN_SERVER_OIDC_KEYS_SIGNING_0_CREDENTIAL_BUNDLE", "oidc",
-        "REFERENCE_OIDC_CLIENTS_0", "file:/clients.json")));
+        "AUTHN_SERVER_OIDC_KEYS_SIGNING_0_CREDENTIAL_BUNDLE", "oidc")));
     assertThat(DeploymentSettingsCheck.check(environment)).isEmpty();
-  }
-
-  @Test
-  void theOidcClientsMayBeGivenAsACommaSeparatedValue() {
-    final MockEnvironment clients = without("reference.oidc.clients")
-        .withProperty("reference.oidc.clients", "file:/a.json,file:/b.json");
-    assertThat(DeploymentSettingsCheck.check(clients)).isEmpty();
   }
 
   /** The settings of a complete configuration. */
@@ -142,8 +134,7 @@ class DeploymentSettingsCheckTest {
       Map.entry("authn-server.saml.metadata-providers[0].location", "classpath:metadata.xml"),
       Map.entry("authn-server.oidc.enabled", "true"),
       Map.entry("authn-server.oidc.issuer", "https://idp.example.com"),
-      Map.entry("authn-server.oidc.keys.signing[0].credential.bundle", "oidc"),
-      Map.entry("reference.oidc.clients[0]", "classpath:clients.json"));
+      Map.entry("authn-server.oidc.keys.signing[0].credential.bundle", "oidc"));
 
   private static MockEnvironment complete() {
     return without();

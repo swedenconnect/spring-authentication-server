@@ -22,10 +22,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -829,7 +831,27 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
             .formatted(type, protocol.getMissingClientRegistryBackendHint()));
       }
     }
+    assertUniqueSourceNames(backends);
     return backends.isEmpty() ? EMPTY_CLIENT_REGISTRY : new DefaultClientRegistry(backends);
+  }
+
+  /**
+   * Checks that no two client sources of the same protocol have the same name.
+   *
+   * @param backends the backends
+   * @throws IllegalArgumentException if a name is used more than once
+   */
+  static void assertUniqueSourceNames(final @NonNull List<ClientRegistryBackend> backends) {
+    final Set<String> names = new HashSet<>();
+    for (final ClientRegistryBackend backend : backends) {
+      for (final String name : backend.getSourceNames()) {
+        if (!names.add(backend.getProtocol() + ":" + name)) {
+          throw new IllegalArgumentException(("Two %s client sources are named '%s' - the source names must be "
+              + "unique per protocol, since management and audit tell the sources apart by them")
+              .formatted(backend.getProtocol(), name));
+        }
+      }
+    }
   }
 
   /**

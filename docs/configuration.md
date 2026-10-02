@@ -27,6 +27,7 @@ Redis, how an application adjusts the configuration in code, and how the server 
     - [Requester acceptance](#requester-acceptance)
 - [The OpenID Provider](#the-openid-provider)
     - [Keys](#oidc-keys)
+    - [Clients](#oidc-clients)
     - [OIDC endpoints](#oidc-endpoints)
     - [Authorization requests](#oidc-authorization-requests)
     - [Requester acceptance](#oidc-requester-acceptance)
@@ -578,6 +579,7 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the `https://id.oidc.se/param/userMessage` parameter is read, and the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. When they are not, the parameter is ignored. | `authn-server.supports-user-message` |
 | `subject-identifier.*` | The subject identifier settings for OpenID Connect. | `authn-server.subject-identifier.*` |
 | `keys.*` | The signing and decryption keys, see [Keys](#oidc-keys). | Required |
+| `clients[]` | The OpenID Connect clients, given in files or inline, see [Clients](#oidc-clients). | - |
 | `endpoints.*` | The endpoints, see [OIDC endpoints](#oidc-endpoints). | See below |
 | `authorization-request.*` | The processing of authentication requests, see [Authorization requests](#oidc-authorization-requests). | See below |
 | `requester-acceptance.*` | Which clients are accepted, see [Requester acceptance](#oidc-requester-acceptance). | Every known client |
@@ -627,6 +629,86 @@ authn-server:
         - credential:
             bundle: op-enc
 ```
+
+<a name="oidc-clients"></a>
+### Clients
+
+The OpenID Provider needs at least one source of clients, and the application does not start without one. The
+simplest source is `authn-server.oidc.clients`, a list where each entry is either a file or one client given inline.
+Clients from a client repository or from OpenID Federation are added in an
+[adapter](#adjusting-the-configuration-in-code), see
+[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends).
+
+| Property | Description |
+| :--- | :--- |
+| `clients[].location` | A resource, file or classpath, holding one client as a JSON object, or a JSON array of such objects. |
+| `clients[].client-id` | The `client_id` of an inline client. |
+| `clients[].metadata` | The client metadata of an inline client, as a JSON object in a string. |
+| `clients[].client-secret` | The client secret of an inline client that authenticates with one, see [Client authentication](openid-provider.html#client-authentication). |
+| `clients[].trust-mark-types[]` | Trust mark types that the operator assigns to an inline client, see below. |
+
+An entry has either a `location` or the inline fields, never both. An inline client needs `client-id` and `metadata`.
+
+A client object in a file has the same parts as an inline client: `client_id`, `metadata` as a nested JSON object, and
+optionally `client_secret` and `trust_mark_types`, an array of strings:
+
+```json
+[
+  {
+    "client_id": "https://rp.example.com",
+    "trust_mark_types": [
+      "https://tm.example.com/public-sector"
+    ],
+    "metadata": {
+      "client_name#sv": "Exempeltjänsten",
+      "client_name#en": "The Example Service",
+      "redirect_uris": [ "https://rp.example.com/callback" ],
+      "token_endpoint_auth_method": "private_key_jwt",
+      "jwks_uri": "https://rp.example.com/jwks"
+    }
+  }
+]
+```
+
+The same client inline, next to a file:
+
+```yaml
+authn-server:
+  oidc:
+    clients:
+      - location: file:/opt/config/oidc-clients.json
+      - client-id: https://rp.example.com
+        metadata: >
+          {"client_name#sv": "Exempeltjänsten", "client_name#en": "The Example Service",
+           "redirect_uris": ["https://rp.example.com/callback"],
+           "token_endpoint_auth_method": "private_key_jwt", "jwks_uri": "https://rp.example.com/jwks"}
+        trust-mark-types:
+          - https://tm.example.com/public-sector
+```
+
+The `metadata` is exactly the client's registered metadata, so it can be copied to or from the client's registration
+unchanged. The following rules apply to both forms, and a client that breaks one of them stops startup with a message
+that names the client and where it was given:
+
+- A client secret never goes in the metadata. It is given as `client-secret` for an inline client, and as
+  `client_secret` next to `metadata` in a file.
+- A `client_id` in the metadata is accepted only when it equals the client's `client_id`.
+- The metadata must be valid OpenID Connect client metadata.
+- A `client_id` may only be given once, over all entries, files and inline clients alike.
+- A location must be readable and hold a JSON object or an array of JSON objects.
+
+**Operator-assigned trust mark types.** The trust mark types of a client are not trust marks. Nothing is verified, and
+the operator vouches for them. They let the operator give a locally configured client the same treatment as a
+federation client that holds a real trust mark of that type, for example under
+`authn-server.oidc.requester-acceptance.required-marks`, see [Requester acceptance](#oidc-requester-acceptance). This
+is useful for testing, and for using the meaning of trust mark assignments outside a federation.
+
+The clients of the property are served by a client source named `properties`. That is the name shown by the
+[Actuator](management.html) and used in the [audit events](audit.html) for clients that are added or removed. The
+source is asked before any OpenID Connect client source added in code. Two client sources of the same protocol may not
+have the same name, so a source added in code may not be named `properties`.
+
+The clients are read once, at startup. A changed file has no effect until the server is restarted.
 
 <a name="oidc-endpoints"></a>
 ### OIDC endpoints

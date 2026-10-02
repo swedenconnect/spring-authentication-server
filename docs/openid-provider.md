@@ -278,13 +278,17 @@ the `state` of the request. The second part checks the request and builds the re
 ### Clients
 
 The clients are found in the client registry, through its OpenID Connect backends and in their configured order, see
-[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends). There are no properties for the
-backends yet, so they are added in an [adapter](configuration.html#adjusting-the-configuration-in-code):
+[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends). The OpenID Provider needs at
+least one client source, and the application does not start without one.
+
+Clients that the deployment configures itself are given with `authn-server.oidc.clients`, in JSON files or inline, see
+[Clients](configuration.html#oidc-clients). A client repository, OpenID Federation, or a client source of the
+application's own, is added in an [adapter](configuration.html#adjusting-the-configuration-in-code):
 
 ```java
 @Bean
-AuthnServerConfigurerAdapter oidcClients(final List<OidcClientRecord> clients) {
-  return (http, configurer) -> configurer.clientRegistryBackend(new ConfigurationClientBackend(clients));
+AuthnServerConfigurerAdapter oidcClients(final ClientRepository repository) {
+  return (http, configurer) -> configurer.clientRegistryBackend(new RepositoryClientBackend(repository));
 }
 ```
 
@@ -575,8 +579,10 @@ key and an EC key, or an old and a new key during a rollover; the `kid` of the a
 `kid` every matching key is tried. A client that has registered `token_endpoint_auth_signing_alg` must sign with that
 algorithm.
 
-The client secret is kept as the `client_secret` field of the client metadata, the name that OpenID Connect Dynamic
-Client Registration uses. A client resolved through OpenID Federation never has a secret:
+With `authn-server.oidc.clients`, the client secret is given next to the client metadata, never in it, see
+[Clients](configuration.html#oidc-clients). In an [`OidcClientRecord`][OidcClientRecord], the secret is kept as the
+`client_secret` field of the client metadata, the name that OpenID Connect Dynamic Client Registration uses. A client
+resolved through OpenID Federation never has a secret:
 
 ```java
 metadata.setCustomField(OidcClientRecord.CLIENT_SECRET, secret);
@@ -1037,6 +1043,7 @@ AuthnServerConfigurerAdapter entityConfigurationAdjustments() {
 [AccessTokenStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/AccessTokenStore.java
 [AuthorizationCodeStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/AuthorizationCodeStore.java
 [ClientAssertionReplayCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/token/ClientAssertionReplayCache.java
+[OidcClientRecord]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/OidcClientRecord.java
 [OidcEntityMetadata]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/federation/OidcEntityMetadata.java
 [OidcFederationConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/config/OidcFederationConfigurer.java
 [OidcAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/authentication/OidcAuthenticationRequirements.java

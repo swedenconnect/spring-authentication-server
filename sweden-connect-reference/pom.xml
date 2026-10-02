@@ -185,7 +185,7 @@
       <!--
         The container image. Neither execution runs in the normal build:
           mvn jib:dockerBuild@local - builds local/sweden-connect-reference-authn-server:<version> to the local Docker
-          mvn jib:build             - builds for linux/amd64 and linux/arm64 and pushes to ${DOCKER_REPO}
+          mvn jib:build             - builds for linux/amd64 and linux/arm64 and pushes to ghcr.io
         -->
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
@@ -196,7 +196,7 @@
             <image>amazoncorretto:25.0.1</image>
           </from>
           <to>
-            <image>${DOCKER_REPO}/swedenconnect/${project.artifactId}:${project.version}</image>
+            <image>ghcr.io/swedenconnect/${project.artifactId}:${project.version}</image>
           </to>
           <container>
             <creationTime>USE_CURRENT_TIMESTAMP</creationTime>

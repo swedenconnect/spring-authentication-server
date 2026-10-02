@@ -1014,6 +1014,23 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
+   * The OpenID Provider needs at least one OpenID Connect client source: configured clients, a repository, a
+   * federation backend or a backend of the application's own.
+   */
+  @Override
+  protected boolean requiresClientRegistryBackend() {
+    return true;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected @NonNull String getMissingClientRegistryBackendHint() {
+    return "assign clients with authn-server.oidc.clients, or add a client registry backend (configured clients, "
+        + "a client repository, OpenID Federation or one of the application's own) in an "
+        + "AuthnServerConfigurerAdapter";
+  }
+
+  /**
    * Gets the authentication context URIs that the authentication providers support.
    *
    * @return the authentication context URIs

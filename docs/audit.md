@@ -508,7 +508,7 @@ restart, is described under [Clients added and removed](management.html#clients-
 | `client.protocol` | `saml` or `oidc`. | String |
 | `client.id` | The SAML entityID or the OpenID Connect `client_id`. | String |
 | `client.organization_number` | The organisation number of the client exactly as the client registry holds it, see [The requester](#the-requester). Absent if the client has none. | String |
-| `client.source` | Where the client came from: the SAML metadata source, or the OpenID Connect backend, `configuration`, `repository` or `federation`. | String |
+| `client.source` | Where the client came from: the SAML metadata source, or the OpenID Connect backend, `properties`, `configuration`, `repository` or `federation`. | String |
 
 <a name="client_removed"></a>
 ### Client Removed

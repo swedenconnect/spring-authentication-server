@@ -95,7 +95,8 @@ class ClientChangesTest {
       context.getBean(ConfiguredAuthnServer.class).getClientRegistry()
           .lookup(AuthenticationProtocol.OIDC, ActuatorTestSupport.FEDERATION_CLIENT);
       assertThat(events(context).added()).containsExactlyInAnyOrder(ActuatorTestSupport.SP_ONE,
-          ActuatorTestSupport.SP_TWO, ActuatorTestSupport.CONFIGURED_CLIENT, ActuatorTestSupport.FEDERATION_CLIENT);
+          ActuatorTestSupport.SP_TWO, ActuatorTestSupport.PROPERTIES_CLIENT, ActuatorTestSupport.CONFIGURED_CLIENT,
+          ActuatorTestSupport.FEDERATION_CLIENT);
     });
     assertThat(cache.resolve("known-clients.json")).exists();
     assertThat(cache.resolve("oidc/federation-cache.json")).exists();
@@ -121,7 +122,8 @@ class ClientChangesTest {
 
     for (int i = 0; i < 2; i++) {
       server.run(context -> assertThat(events(context).added())
-          .containsExactlyInAnyOrder(ActuatorTestSupport.SP_ONE, ActuatorTestSupport.CONFIGURED_CLIENT));
+          .containsExactlyInAnyOrder(ActuatorTestSupport.SP_ONE, ActuatorTestSupport.PROPERTIES_CLIENT,
+              ActuatorTestSupport.CONFIGURED_CLIENT));
     }
   }
 
@@ -150,7 +152,7 @@ class ClientChangesTest {
       all.addAll(events(a).events);
       all.addAll(events(b).events);
     }));
-    assertThat(all).hasSize(3);
+    assertThat(all).hasSize(4);
 
     Files.writeString(metadata,
         ActuatorTestSupport.metadata(ActuatorTestSupport.SP_TWO, ActuatorTestSupport.SP_THREE));

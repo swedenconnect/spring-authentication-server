@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.oidc.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import java.net.URI;
 import java.time.Duration;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
@@ -46,10 +48,13 @@ import net.minidev.json.JSONObject;
 import se.oidc.nimbus.claims.ParameterConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientRepository;
+import se.swedenconnect.spring.authnserver.oidc.client.RepositoryClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.TestAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 
 /**
  * Tests for {@link OidcProviderConfigurer} and {@link OidcDiscoveryEndpointConfigurer}.
@@ -299,6 +304,32 @@ class OidcProviderConfigurerTest {
   private OidcProviderConfigurer newConfigurer() {
     return new OidcProviderConfigurer()
         .signingKeys(List.of(SigningKey.active(KeyTestSupport.rsa("rsa", 2048))));
+  }
+
+  @Test
+  void anOpenIdProviderWithoutAClientSourceFailsToStart() {
+    this.server.protocol(this.oidc);
+    assertThatThrownBy(() -> this.server.init(mock(HttpSecurity.class)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("No client registry backend for OIDC requesters")
+        .hasMessageContaining("authn-server.oidc.clients")
+        .hasMessageContaining("AuthnServerConfigurerAdapter");
+  }
+
+  @Test
+  void anEmptyRepositoryIsAClientSource() {
+    this.server.clientRegistryBackend(new RepositoryClientBackend(new InMemoryClientRepository()))
+        .protocol(this.oidc);
+    this.server.init(mock(HttpSecurity.class));
+    assertThat(this.server.getClientRegistry()).isNotNull();
+  }
+
+  @Test
+  void anAssignedClientRegistryNeedsNoClientSource() {
+    final ClientRegistry registry = mock(ClientRegistry.class);
+    this.server.clientRegistry(registry).protocol(this.oidc);
+    this.server.init(mock(HttpSecurity.class));
+    assertThat(this.server.getClientRegistry()).isSameAs(registry);
   }
 
   private OIDCProviderMetadata buildWith(final Consumer<OidcProviderConfigurer> customizer) {

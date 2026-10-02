@@ -25,8 +25,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @author Martin Lindström
  */
-@ConfigurationProperties("authn")
+@ConfigurationProperties(AuthnProperties.PREFIX)
 public class AuthnProperties {
+
+  /** The property prefix. */
+  public static final String PREFIX = ReferenceConfiguration.PREFIX + ".authn";
 
   /**
    * The name of the authentication provider.

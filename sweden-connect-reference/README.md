@@ -43,8 +43,8 @@ base image. Neither build runs as part of the normal build. Build and install th
 mvn jib:dockerBuild@local
 
 # Builds the image for linux/amd64 and linux/arm64, and pushes it to
-# ${DOCKER_REPO}/swedenconnect/sweden-connect-reference-authn-server:<version>
-mvn jib:build -DDOCKER_REPO=ghcr.io
+# ghcr.io/swedenconnect/sweden-connect-reference-authn-server:<version>
+mvn jib:build
 ```
 
 The image exposes port 8443 for the service and port 8444 for the Actuator.
@@ -54,7 +54,8 @@ The image exposes port 8443 for the service and port 8444 for the Actuator.
 
 The [default configuration](src/main/resources/application.yml) holds defaults only. It ships no base URL, entity ID,
 issuer, metadata, keys or key stores, so the service does not start until the deployment supplies them. When something
-is missing, startup fails with a list of the settings to add:
+is missing, startup fails with a list of the settings to add. The OpenID Connect clients are not on that list; when
+they are missing, the server itself stops startup with a message that names `authn-server.oidc.clients`:
 
 ```
 The Sweden Connect reference authentication server has no defaults for these settings, and the deployment has not
@@ -95,7 +96,7 @@ required when the protocol is enabled; both are enabled by default.
 | `authn-server.saml.metadata-providers[]` | The sources of the SAML Service Provider metadata, for example the metadata of the Sweden Connect federation. See [Service Provider metadata](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#sp-metadata). |
 | `authn-server.oidc.issuer` | The issuer identifier of the OpenID Provider. It is also its OpenID Federation entity identifier. It must be the base URL, or begin with it. |
 | `authn-server.oidc.keys.signing[]` | The signing keys of the OpenID Provider. See [Keys](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-keys). |
-| `reference.oidc.clients[]` | The OpenID Connect clients, as the locations of their client metadata, see [OpenID Connect clients](#openid-connect-clients). |
+| `authn-server.oidc.clients[]` | The OpenID Connect clients, in JSON files or inline, see [OpenID Connect clients](#openid-connect-clients). |
 
 The keys are configured through [credentials-support](https://docs.swedenconnect.se/credentials-support/), preferably as
 credential bundles that the settings refer to. A complete example:
@@ -159,38 +160,57 @@ authn-server:
       signing:
         - credential:
             bundle: oidc-sign
-
-reference:
-  oidc:
     clients:
-      - file:/opt/reference/oidc-clients.json
+      - location: file:/opt/reference/oidc-clients.json
 ```
 
 <a name="openid-connect-clients"></a>
 ### OpenID Connect clients
 
-The server has no properties for its OpenID Connect clients, so the reference reads them itself, from the locations
-given in `reference.oidc.clients`. Each location holds the client metadata of one client as a JSON object, or a JSON
-array of such objects. The `client_id` is given in the object, next to the metadata, and so is the `client_secret` of
-a client that authenticates with a secret:
+The OpenID Connect clients are given with `authn-server.oidc.clients`, see
+[Clients](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-clients). Each entry is
+either the `location` of a JSON file, holding one client object or an array of them, or one client given inline with
+`client-id`, `metadata` as a JSON string, and optionally `client-secret` and `trust-mark-types`. A client object in a
+file has `client_id`, `metadata` as a nested object, and optionally `client_secret` and `trust_mark_types`. The
+`metadata` is exactly the client's registered metadata, and never holds the client secret:
 
 ```json
 [
   {
     "client_id": "https://rp.example.com",
-    "client_name#sv": "Exempeltjänsten",
-    "client_name#en": "The Example Service",
-    "logo_uri": "https://rp.example.com/logo.svg",
-    "redirect_uris": [ "https://rp.example.com/callback" ],
-    "response_types": [ "code" ],
-    "grant_types": [ "authorization_code" ],
-    "token_endpoint_auth_method": "private_key_jwt",
-    "jwks_uri": "https://rp.example.com/jwks"
+    "metadata": {
+      "client_name#sv": "Exempeltjänsten",
+      "client_name#en": "The Example Service",
+      "logo_uri": "https://rp.example.com/logo.svg",
+      "redirect_uris": [ "https://rp.example.com/callback" ],
+      "response_types": [ "code" ],
+      "grant_types": [ "authorization_code" ],
+      "token_endpoint_auth_method": "private_key_jwt",
+      "jwks_uri": "https://rp.example.com/jwks"
+    }
   }
 ]
 ```
 
-The clients become the configuration backend of the [client registry](https://docs.swedenconnect.se/spring-authentication-server/client-registry.html#openid-connect-three-backends).
+The same client inline:
+
+```yaml
+authn-server:
+  oidc:
+    clients:
+      - client-id: https://rp.example.com
+        metadata: >
+          {"client_name#sv": "Exempeltjänsten", "client_name#en": "The Example Service",
+           "logo_uri": "https://rp.example.com/logo.svg", "redirect_uris": ["https://rp.example.com/callback"],
+           "token_endpoint_auth_method": "private_key_jwt", "jwks_uri": "https://rp.example.com/jwks"}
+```
+
+The trust mark types of a client are assigned by the operator and are not verified. They give a locally configured
+client the same treatment as a federation client that holds a trust mark of that type, for example under
+`authn-server.oidc.requester-acceptance.required-marks`.
+
+The clients are read at startup only, so a changed file takes effect when the service is restarted. They become the
+`properties` source of the [client registry](https://docs.swedenconnect.se/spring-authentication-server/client-registry.html#openid-connect-three-backends).
 The `client_name` and `logo_uri` of a client are shown on the pages, in the language of the page where the metadata
 gives one. Only `private_key_jwt` is enabled at the token endpoint by default, see
 [The token endpoint and tokens](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-token-endpoint)
@@ -221,6 +241,15 @@ authn-server:
   oidc:
     issuer: https://example.com/idp
 ```
+
+**Display names and description.** The descriptive information is given under `authn-server.entity-information` and
+published by both protocols. The reference gives its display names per protocol, "Sweden Connect Reference IdP" in
+the SAML metadata under `authn-server.saml.metadata.ui-info.display-names` and "Sweden Connect Reference OP" for the
+OpenID Provider under `authn-server.oidc.entity-information.ui-info.display-names`, only because this service shows
+both protocols side by side. A normal deployment gives one shared display name under
+`authn-server.entity-information.ui-info.display-names`. The description, "Sweden Connect Reference Authentication
+Service", is shared. See
+[Entity information](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#entity-information).
 
 **AJP.** The Tomcat AJP connector is off. A deployment behind a web server that speaks AJP turns it on:
 
@@ -326,17 +355,18 @@ The pages are in Swedish and English.
 <a name="settings-of-the-simulated-authentication"></a>
 ## Settings of the simulated authentication
 
-The default configuration gives these values, and a deployment rarely changes them.
+The settings of the reference itself are placed under `authn-server-reference`. The default configuration gives these
+values, and a deployment rarely changes them.
 
 | Setting | Description |
 | :--- | :--- |
-| `authn.provider-name` | The name of the authentication provider. |
-| `authn.authn-path` | The path of the user picker, `/extauth`. |
-| `authn.resume-path` | The path that the user is sent back to after the authentication, `/resume`. |
-| `authn.supported-loas[]` | The levels of assurance that the service offers. |
-| `authn.entity-categories[]` | The SAML entity categories that the service declares in its metadata. |
-| `ui.languages[]` | The languages of the pages, each with a `tag` and the `text` of its button. |
-| `idp-users-location` | Where `users.yml` is read from, `${IDP_CONFIG_DIR:classpath:}`. |
+| `authn-server-reference.authn.provider-name` | The name of the authentication provider. |
+| `authn-server-reference.authn.authn-path` | The path of the user picker, `/extauth`. |
+| `authn-server-reference.authn.resume-path` | The path that the user is sent back to after the authentication, `/resume`. |
+| `authn-server-reference.authn.supported-loas[]` | The levels of assurance that the service offers. |
+| `authn-server-reference.authn.entity-categories[]` | The SAML entity categories that the service declares in its metadata. |
+| `authn-server-reference.ui.languages[]` | The languages of the pages, each with a `tag` and the `text` of its button. |
+| `authn-server-reference.users-location` | Where `users.yml` is read from, `${IDP_CONFIG_DIR:classpath:}`. |
 
 -----
 
