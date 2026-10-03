@@ -207,10 +207,26 @@ A configured client, or a client in a repository, that authenticates with a clie
 the secret in the `client_secret` field of its metadata, see
 [Client authentication](openid-provider.html#client-authentication).
 
+<a name="the-federation-backend"></a>
 ## The federation backend
 
 The federation backend resolves a client through OpenID Federation, where the `client_id` of the client is its entity
-identifier. It is put together from a [`FederationResolver`][FederationResolver], a
+identifier.
+
+With Spring Boot, it is set up from properties: the trust anchor under `authn-server.oidc.federation.trust-anchor` and
+the source under `authn-server.oidc.federation.clients`, with the resolver, the trust mark issuers and the cache, see
+[Clients from OpenID Federation](configuration.html#oidc-federation-clients). The source is named `federation`, and it
+is on whenever the OpenID Provider is a member of a federation, unless it is turned off. Endpoints that are not
+configured are found in the entity configurations of the resolver and the issuers, by
+[`EntityConfigurationEndpoints`][EntityConfigurationEndpoints].
+
+The OpenID Connect sources are asked in this order: the configured clients of `authn-server.oidc.clients`
+(`properties`), then the sources added in an adapter, and the federation source last. A client known to both the
+configured clients and the federation is therefore served from the configured clients.
+
+The rest of this section describes the parts, for an application that replaces some of them, for example with a
+resolver of its own. A `FederationClientBackend` that an adapter adds replaces the one of the properties, which is
+then not set up. The backend is put together from a [`FederationResolver`][FederationResolver], a
 [`TrustMarkRequester`][TrustMarkRequester], a [`FederationCache`][FederationCache] and
 [`FederationCacheSettings`][FederationCacheSettings]:
 
@@ -231,7 +247,9 @@ FederationClientBackend backend = new FederationClientBackend(
 [`HttpFederationResolver`][HttpFederationResolver] calls the resolve endpoint of an external resolver service. The
 resolve response is a signed JWT, and it is verified with the trust anchor's keys when the resolver runs at the trust
 anchor, that is, when it has the same entity identifier, and with the resolver's own keys otherwise. The keys of a
-resolver that is not the trust anchor are configured together with its endpoint. The record holds the client metadata
+resolver that is not the trust anchor are configured together with it. A resolver given without an endpoint, `null`,
+is called at the `federation_resolve_endpoint` that it publishes in its entity configuration, and the same holds for
+the trust mark endpoint and the status endpoint of an issuer. The record holds the client metadata
 of the response, after the metadata policies of the trust chain have been applied by the resolver, and the trust mark
 types of the response.
 
@@ -322,7 +340,10 @@ status checks count toward the [health of the trust mark issuers](management.htm
 - A trust mark is checked when it has no `exp`, or when its `exp` is later than the next check. A trust mark that
   expires before the next check is not checked; it expires as before.
 - The status endpoint of an issuer is configured together with the issuer, as `statusEndpoint` of
-  `FederationSettings.TrustMarkIssuer`. The trust marks of an issuer without a status endpoint are not checked.
+  `FederationSettings.TrustMarkIssuer`. A checker built with an
+  [`EntityConfigurationEndpoints`][EntityConfigurationEndpoints] checks an issuer without a configured status endpoint
+  at the `federation_trust_mark_status_endpoint` that it publishes, as the one set up from the properties does. The
+  trust marks of an issuer without a status endpoint are not checked.
 - The status response is verified with the keys of the issuer, and must be about the trust mark that was sent.
 - A trust mark that the issuer reports as anything but `active`, such as `revoked` or `expired`, is removed from the
   client's cached record. A client that needs it for the [required marks](#requester-acceptance) is then treated as not
@@ -348,7 +369,8 @@ counts lookups, and the jobs ask it for the lock that decides which node runs a 
 
 With Spring Boot, a `FederationCache` bean is declared according to `authn-server.storage.type`, or
 `authn-server.oidc.storage.federation-cache`, see [Running several nodes](configuration.html#running-several-nodes).
-Build the backend and the jobs from it, and from the [`HttpFederationClient`][HttpFederationClient] bean that the
+The source set up from the properties uses it, together with the jobs. An application that builds the backend in code
+builds it and the jobs from the same bean, and from the [`HttpFederationClient`][HttpFederationClient] bean that the
 auto-configuration declares. That client publishes the outcome of every call it makes, which is what the
 [health of the federation services](management.html#oidc-federation-health) is built from:
 
@@ -430,6 +452,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [ConfigurableRequesterAcceptance]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/ConfigurableRequesterAcceptance.java
 [ConfigurationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ConfigurationClientBackend.java
 [DefaultClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/DefaultClientRegistry.java
+[EntityConfigurationEndpoints]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/EntityConfigurationEndpoints.java
 [FederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCache.java
 [FederationCacheRefresher]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCacheRefresher.java
 [FederationCacheSettings]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCacheSettings.java

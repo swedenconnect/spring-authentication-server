@@ -43,4 +43,16 @@ public interface AuthnServerProtocolConfigurerFactory {
    */
   @NonNull AbstractProtocolConfigurer<?> createConfigurer(final @NonNull AuthnServerConfigurer server) throws Exception;
 
+  /**
+   * Completes the configuration after every
+   * {@link se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter AuthnServerConfigurerAdapter} has
+   * been invoked, for example by adding a client registry backend unless an adapter has added one of its own. The
+   * default does nothing.
+   *
+   * @param server the shared configurer
+   * @throws Exception for errors completing the configuration
+   */
+  default void afterAdapters(final @NonNull AuthnServerConfigurer server) throws Exception {
+  }
+
 }

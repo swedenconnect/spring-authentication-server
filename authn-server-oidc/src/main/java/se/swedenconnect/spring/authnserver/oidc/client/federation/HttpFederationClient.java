@@ -52,7 +52,8 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * A {@link FederationClient} that makes the federation calls that the OpenID Provider needs over HTTP: the resolve
  * request of
  * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.3">OpenID Federation 1.0, Section 8.3</a>,
- * the trust mark status request of Section 8.4 and the trust mark request of Section 8.6.
+ * the trust mark status request of Section 8.4, the trust mark request of Section 8.6, and the request for an entity
+ * configuration of Section 9.
  * <p>
  * The endpoint of a call is taken from the federation entity metadata of the request, under
  * {@value #FEDERATION_RESOLVE_ENDPOINT}, {@value #FEDERATION_TRUST_MARK_STATUS_ENDPOINT} and
@@ -159,12 +160,13 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
   /**
    * Makes the call, parses the response as a signed JWT and publishes how the call went. A 404 answer to a resolve or
    * trust mark request means that the service has nothing for the subject, which is a successful call; a 404 answer to
-   * a trust mark status request is an error.
+   * a trust mark status request or an entity configuration request is an error.
    *
    * @param spec the prepared request
    * @param endpoint the endpoint that is called
    * @param call the call that is made
-   * @param issuer the trust mark issuer, or {@code null} for a resolve request
+   * @param issuer the trust mark issuer or the entity whose entity configuration is fetched, or {@code null} for a
+   *     resolve request
    * @return a {@link SignedJWT}, or {@code null} if the endpoint answered that it has nothing
    * @throws ClientRegistryException if the call fails
    */
@@ -178,7 +180,8 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
       final SignedJWT response = spec
           .exchange((clientRequest, clientResponse) -> {
             final HttpStatusCode status = clientResponse.getStatusCode();
-            if (status.value() == 404 && call != FederationCallEvent.Call.TRUST_MARK_STATUS) {
+            if (status.value() == 404
+                && (call == FederationCallEvent.Call.RESOLVE || call == FederationCallEvent.Call.TRUST_MARK)) {
               log.debug("The {} endpoint {} answered 404", what, endpoint);
               return null;
             }
@@ -248,6 +251,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
       case RESOLVE -> "resolve";
       case TRUST_MARK -> "trust mark";
       case TRUST_MARK_STATUS -> "trust mark status";
+      case ENTITY_CONFIGURATION -> "entity configuration";
     };
   }
 
@@ -305,10 +309,25 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
     query.append(name).append('=').append(URLEncoder.encode(value, StandardCharsets.UTF_8));
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Fetches the entity configuration of an entity, OpenID Federation 1.0, Section 9: an HTTP GET of the location of
+   * the request, or of the entity identifier followed by {@value EntityConfigurationEndpoints#WELL_KNOWN_PATH}. The
+   * entity configuration is returned as it is, without being verified.
+   *
+   * @param request the request
+   * @return the entity configuration
+   * @throws ClientRegistryException if the call fails, or the entity does not answer with a signed JWT
+   */
   @Override
-  public @NonNull SignedJWT entityConfiguration(final FederationRequest<EntityConfigurationRequest> request) {
-    throw new UnsupportedOperationException("The entity configuration call is not implemented");
+  public @NonNull SignedJWT entityConfiguration(final @NonNull FederationRequest<EntityConfigurationRequest> request) {
+    final EntityConfigurationRequest parameters = request.parameters();
+    final String entityId = parameters.entityID().getValue();
+    final String location = StringUtils.hasText(parameters.ecLocation())
+        ? parameters.ecLocation()
+        : EntityConfigurationEndpoints.location(entityId);
+    final SignedJWT response = this.call(this.restClient.get().uri(URI.create(location)), location,
+        FederationCallEvent.Call.ENTITY_CONFIGURATION, entityId);
+    return Objects.requireNonNull(response, "a 404 answer to an entity configuration request is an error");
   }
 
   /** {@inheritDoc} */

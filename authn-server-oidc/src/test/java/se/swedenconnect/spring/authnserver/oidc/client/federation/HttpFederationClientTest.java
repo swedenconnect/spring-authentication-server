@@ -40,6 +40,7 @@ import com.nimbusds.openid.connect.sdk.federation.entities.EntityID;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
+import se.swedenconnect.oidf.common.entity.entity.integration.federation.EntityConfigurationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationTrustMarkStatusRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.ResolveRequest;
@@ -59,6 +60,9 @@ class HttpFederationClientTest extends FederationTestSupport {
 
   /** The queries that the server was called with. */
   private final List<String> queries = new ArrayList<>();
+
+  /** The paths that the server was called with. */
+  private final List<String> paths = new ArrayList<>();
 
   /** The methods and bodies that the server was called with. */
   private final List<String> requests = new ArrayList<>();
@@ -259,9 +263,42 @@ class HttpFederationClientTest extends FederationTestSupport {
   }
 
   @Test
+  void theEntityConfigurationIsFetchedFromTheWellKnownLocation() throws Exception {
+    final ECKey key = key("k1");
+    final int port = this.startServer();
+    final String entityId = "http://localhost:%d/ta/".formatted(port);
+    this.body = entityConfiguration(key, entityId, Map.of(), Instant.now().plus(1, ChronoUnit.HOURS)).serialize();
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+
+    final SignedJWT answer = client.entityConfiguration(new FederationRequest<>(
+        new EntityConfigurationRequest(new EntityID(entityId), null)));
+
+    assertThat(answer.serialize()).isEqualTo(this.body);
+    assertThat(this.paths).containsExactly("/ta/.well-known/openid-federation");
+    assertThat(events).singleElement().satisfies(e -> {
+      assertThat(e.getCall()).isEqualTo(FederationCallEvent.Call.ENTITY_CONFIGURATION);
+      assertThat(e.getServiceType()).isEqualTo(FederationCallEvent.ServiceType.ENTITY_CONFIGURATION);
+      assertThat(e.getServiceId()).isEqualTo(entityId);
+      assertThat(e.getOutcome()).isEqualTo(FederationCallEvent.Outcome.SUCCESS);
+    });
+  }
+
+  @Test
+  void anEntityConfigurationThatIsNotFoundIsAnError() throws Exception {
+    this.status = 404;
+    final int port = this.startServer();
+    final String entityId = "http://localhost:%d".formatted(port);
+    assertThatThrownBy(() -> new HttpFederationClient().entityConfiguration(new FederationRequest<>(
+        new EntityConfigurationRequest(new EntityID(entityId), null))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("404");
+  }
+
+  @Test
   void theCallsThatTheClientRegistryDoesNotMakeAreNotImplemented() {
     final HttpFederationClient client = new HttpFederationClient();
-    assertThatThrownBy(() -> client.entityConfiguration(null)).isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> client.fetch(null)).isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> client.subordinateListing(null)).isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> client.trustMarkedListing(null)).isInstanceOf(UnsupportedOperationException.class);
@@ -288,6 +325,7 @@ class HttpFederationClientTest extends FederationTestSupport {
 
   private void handle(final HttpExchange exchange) throws IOException {
     this.queries.add(exchange.getRequestURI().getRawQuery());
+    this.paths.add(exchange.getRequestURI().getPath());
     this.requests.add(exchange.getRequestMethod() + " "
         + new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
     final byte[] bytes = this.body.getBytes(StandardCharsets.UTF_8);

@@ -226,4 +226,72 @@ class HttpFederationResolverTest extends FederationTestSupport {
         .hasMessageContaining(RESOLVER);
   }
 
+  @Test
+  void aConfiguredResolveEndpointIsUsedWithoutFetchingAnything() {
+    final ECKey trustAnchorKey = key("ta");
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, RESOLVE_ENDPOINT, null));
+    final StubFederationClient client = new StubFederationClient();
+    client.resolveResponse = resolveResponse(trustAnchorKey, TRUST_ANCHOR, CLIENT_ID, clientMetadata("The Client"),
+        Set.of(), Instant.now().plus(1, ChronoUnit.HOURS));
+
+    assertThat(new HttpFederationResolver(settings, client).resolve(CLIENT_ID)).isNotNull();
+    assertThat(client.lastResolveEndpoint).isEqualTo(RESOLVE_ENDPOINT.toString());
+    assertThat(client.entityConfigurationRequests).isEmpty();
+  }
+
+  @Test
+  void aResolverAtTheTrustAnchorWithoutAnEndpointUsesThePublishedOne() {
+    final ECKey trustAnchorKey = key("ta");
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, null, null));
+    final StubFederationClient client = new StubFederationClient();
+    client.entityConfigurations.put(TRUST_ANCHOR, entityConfiguration(trustAnchorKey, TRUST_ANCHOR,
+        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, "https://ta.example.com/published-resolve"),
+        Instant.now().plus(1, ChronoUnit.HOURS)));
+    client.resolveResponse = resolveResponse(trustAnchorKey, TRUST_ANCHOR, CLIENT_ID, clientMetadata("The Client"),
+        Set.of(), Instant.now().plus(1, ChronoUnit.HOURS));
+    final HttpFederationResolver resolver = new HttpFederationResolver(settings, client);
+
+    assertThat(resolver.resolve(CLIENT_ID)).isNotNull();
+    assertThat(resolver.resolve(CLIENT_ID)).isNotNull();
+    assertThat(client.lastResolveEndpoint).isEqualTo("https://ta.example.com/published-resolve");
+    assertThat(client.entityConfigurationRequests).containsExactly(TRUST_ANCHOR);
+  }
+
+  @Test
+  void aStandaloneResolverWithoutAnEndpointIsVerifiedWithItsOwnKeys() {
+    final ECKey trustAnchorKey = key("ta");
+    final ECKey resolverKey = key("resolver");
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(RESOLVER, null, publicKeys(resolverKey)));
+    final StubFederationClient client = new StubFederationClient();
+    client.entityConfigurations.put(RESOLVER, entityConfiguration(resolverKey, RESOLVER,
+        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, "https://resolver.example.com/published"),
+        Instant.now().plus(1, ChronoUnit.HOURS)));
+    client.resolveResponse = resolveResponse(resolverKey, RESOLVER, CLIENT_ID, clientMetadata("The Client"),
+        Set.of(), Instant.now().plus(1, ChronoUnit.HOURS));
+
+    assertThat(new HttpFederationResolver(settings, client).resolve(CLIENT_ID)).isNotNull();
+    assertThat(client.lastResolveEndpoint).isEqualTo("https://resolver.example.com/published");
+  }
+
+  @Test
+  void aResolverThatCannotBeFoundFailsTheResolutionWithoutCachingIt() {
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(key("ta"))),
+        new FederationSettings.Resolver(TRUST_ANCHOR, null, null));
+    final StubFederationClient client = new StubFederationClient();
+    final FederationClientBackend backend = new FederationClientBackend(new HttpFederationResolver(settings, client),
+        (id, type) -> null, new InMemoryFederationCache(), FederationCacheSettings.defaults());
+
+    assertThatThrownBy(() -> backend.lookup(CLIENT_ID)).isInstanceOf(ClientRegistryException.class);
+    assertThatThrownBy(() -> backend.lookup(CLIENT_ID)).isInstanceOf(ClientRegistryException.class);
+    assertThat(client.resolveCalls).isZero();
+    assertThat(client.entityConfigurationRequests).containsExactly(TRUST_ANCHOR, TRUST_ANCHOR);
+  }
+
 }

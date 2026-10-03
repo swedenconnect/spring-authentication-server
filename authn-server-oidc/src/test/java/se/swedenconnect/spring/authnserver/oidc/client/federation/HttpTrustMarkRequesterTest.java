@@ -190,4 +190,51 @@ class HttpTrustMarkRequesterTest extends FederationTestSupport {
         issuer != null ? Map.of(MARK_ONE, issuer) : Map.of());
   }
 
+  @Test
+  void anIssuerWithoutAnEndpointUsesThePublishedOne() {
+    final ECKey issuerKey = key("tmi");
+    final FederationSettings settings = settings(
+        new FederationSettings.TrustMarkIssuer(TRUST_MARK_ISSUER, null, publicKeys(issuerKey)));
+    final StubFederationClient client = new StubFederationClient();
+    client.entityConfigurations.put(TRUST_MARK_ISSUER, entityConfiguration(issuerKey, TRUST_MARK_ISSUER,
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, "https://tmi.example.com/published"),
+        Instant.now().plus(1, ChronoUnit.HOURS)));
+    client.trustMarkResponse = trustMark(issuerKey, TRUST_MARK_ISSUER, CLIENT_ID, MARK_ONE, null);
+
+    assertThat(new HttpTrustMarkRequester(settings, client).request(CLIENT_ID, MARK_ONE)).isNotNull();
+    assertThat(client.lastTrustMarkEndpoint).isEqualTo("https://tmi.example.com/published");
+  }
+
+  @Test
+  void theTrustAnchorAsIssuerIsLookedUpWithTheTrustAnchorKeys() {
+    final ECKey trustAnchorKey = key("ta");
+    final FederationSettings settings = new FederationSettings(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, RESOLVE_ENDPOINT, null),
+        Map.of(MARK_ONE, new FederationSettings.TrustMarkIssuer(TRUST_ANCHOR, null, null)));
+    final StubFederationClient client = new StubFederationClient();
+    client.entityConfigurations.put(TRUST_ANCHOR, entityConfiguration(trustAnchorKey, TRUST_ANCHOR,
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, "https://ta.example.com/trust_mark"),
+        Instant.now().plus(1, ChronoUnit.HOURS)));
+    client.trustMarkResponse = trustMark(trustAnchorKey, TRUST_ANCHOR, CLIENT_ID, MARK_ONE, null);
+
+    assertThat(new HttpTrustMarkRequester(settings, client).request(CLIENT_ID, MARK_ONE)).isNotNull();
+    assertThat(client.lastTrustMarkEndpoint).isEqualTo("https://ta.example.com/trust_mark");
+  }
+
+  @Test
+  void anIssuerThatDoesNotPublishAnEndpointGivesNoTrustMark() {
+    final ECKey issuerKey = key("tmi");
+    final FederationSettings settings = settings(
+        new FederationSettings.TrustMarkIssuer(TRUST_MARK_ISSUER, null, publicKeys(issuerKey)));
+    final StubFederationClient client = new StubFederationClient();
+    client.entityConfigurations.put(TRUST_MARK_ISSUER,
+        entityConfiguration(issuerKey, TRUST_MARK_ISSUER, Map.of(), Instant.now().plus(1, ChronoUnit.HOURS)));
+
+    assertThatThrownBy(() -> new HttpTrustMarkRequester(settings, client).request(CLIENT_ID, MARK_ONE))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("federation_trust_mark_endpoint");
+    assertThat(client.trustMarkCalls).isZero();
+  }
+
 }

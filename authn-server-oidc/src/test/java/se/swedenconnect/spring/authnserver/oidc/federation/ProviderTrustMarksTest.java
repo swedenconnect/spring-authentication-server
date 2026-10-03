@@ -29,17 +29,20 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jwt.SignedJWT;
 
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
 import se.swedenconnect.spring.audit.appevents.SystemAlertEvent;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -301,6 +304,33 @@ class ProviderTrustMarksTest {
       none.start();
       assertThat(none.getTrustMarks()).isEmpty();
     }
+  }
+
+  @Test
+  void withoutAConfiguredEndpointTheIssuersPublishedEndpointIsUsed() {
+    this.client.entityConfiguration = FederationSupport.entityConfiguration(this.issuerKey, ISSUER,
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, "https://tmi.example.com/published"),
+        this.clock.instant().plus(Duration.ofDays(1)));
+    final SignedJWT mark = this.mark(LOA3, Duration.ofDays(30));
+    this.client.answer(mark);
+    final ProviderTrustMarks trustMarks = new ProviderTrustMarks(ENTITY_ID, List.of(new TrustMarkSource(LOA3,
+        ISSUER, null, new JWKSet(this.issuerKey.toPublicJWK()))), this.client, null, RETRY,
+        this.clock);
+
+    assertThat(trustMarks.refresh()).isEqualTo(1);
+    assertThat(this.client.endpoints).containsExactly("https://tmi.example.com/published");
+  }
+
+  @Test
+  void anIssuerThatCannotBeFoundIsAFailedFetchThatIsRetried() {
+    final ProviderTrustMarks trustMarks = new ProviderTrustMarks(ENTITY_ID, List.of(new TrustMarkSource(LOA3,
+        ISSUER, null, new JWKSet(this.issuerKey.toPublicJWK()))), this.client, null, RETRY,
+        this.clock);
+
+    assertThat(trustMarks.refresh()).isZero();
+    assertThat(this.client.requests).isEmpty();
+    assertThat(trustMarks.getStates()).singleElement()
+        .satisfies(state -> assertThat(state.lastFailureReason()).contains("could not be reached"));
   }
 
   private SignedJWT mark(final String type, final Duration lifetime) {

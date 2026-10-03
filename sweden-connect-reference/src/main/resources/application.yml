@@ -296,6 +296,26 @@ authn-server:
     #
     # A client in a file is an object with client_id, metadata, and optionally client_secret and trust_mark_types.
 
+    # A deployment joining an OpenID Federation adds the membership of the OpenID Provider and the clients that it
+    # resolves through the federation under federation, with the trust anchor. The endpoints of the resolver and the
+    # trust mark issuers are found in their entity configurations. For example:
+    #
+    # federation:
+    #   enabled: true
+    #   authority-hints:
+    #     - https://intermediate.example.com
+    #   keys:
+    #     - credential:
+    #         bundle: oidc-federation
+    #   trust-anchor:
+    #     entity-id: https://ta.example.com
+    #     jwks: file:/opt/config/ta-jwks.json
+    #   clients:
+    #     trust-mark-issuers:
+    #       - type: https://tm.example.com/public-sector
+    #         issuer: https://tmi.example.com
+    #         jwks: file:/opt/config/tmi-jwks.json
+
     ui-locales:
       - sv
       - en

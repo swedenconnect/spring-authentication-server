@@ -99,6 +99,7 @@ class OidcAutoConfigurationTest {
 
   private static final String[] FEDERATION = {
       "authn-server.oidc.federation.enabled=true",
+      "authn-server.oidc.federation.clients.enabled=false",
       "authn-server.oidc.federation.authority-hints[0]=https://ia.example.com",
       "authn-server.entity-information.ui-info.display-names.sv=Exempel-OP",
       "authn-server.entity-information.ui-info.logotypes[0].url=https://cdn.example.com/logo.svg",

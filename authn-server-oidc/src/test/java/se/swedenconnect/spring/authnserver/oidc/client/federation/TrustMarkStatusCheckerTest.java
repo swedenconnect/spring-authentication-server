@@ -255,12 +255,17 @@ class TrustMarkStatusCheckerTest extends FederationTestSupport {
     final TrustMarkStatusChecker checker;
 
     Fixture(final boolean withStatusEndpoint) {
+      this(withStatusEndpoint, false);
+    }
+
+    Fixture(final boolean withStatusEndpoint, final boolean withEndpointLookup) {
       this.settings = new FederationSettings(
           new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(key("ta"))),
           new FederationSettings.Resolver(TRUST_ANCHOR, URI.create("https://ta.example.com/resolve"), null),
           Map.of(MARK_TWO, new FederationSettings.TrustMarkIssuer(TRUST_MARK_ISSUER, TRUST_MARK_ENDPOINT,
               publicKeys(this.issuerKey), withStatusEndpoint ? STATUS_ENDPOINT : null)));
-      this.checker = new TrustMarkStatusChecker(this.cache, this.settings, this.client, INTERVAL, this.clock);
+      this.checker = new TrustMarkStatusChecker(this.cache, this.settings, this.client,
+          withEndpointLookup ? new EntityConfigurationEndpoints(this.client, this.clock) : null, INTERVAL, this.clock);
     }
 
     /**
@@ -288,6 +293,54 @@ class TrustMarkStatusCheckerTest extends FederationTestSupport {
       return record == null ? Set.of() : record.getMarks(this.clock.instant());
     }
 
+  }
+
+  @Test
+  void withEndpointLookupThePublishedStatusEndpointIsUsed() {
+    final Fixture fixture = new Fixture(false, true);
+    final String mark = fixture.addOnDemandMark(null);
+    fixture.client.entityConfigurations.put(TRUST_MARK_ISSUER, entityConfiguration(fixture.issuerKey,
+        TRUST_MARK_ISSUER, Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
+            "https://tmi.example.com/published-status"), fixture.clock.instant().plus(Duration.ofDays(1))));
+    fixture.client.trustMarkStatusResponse = trustMarkStatus(fixture.issuerKey, TRUST_MARK_ISSUER, mark, "revoked");
+
+    assertThat(fixture.checker.check()).isOne();
+    assertThat(fixture.client.trustMarkStatusRequests.getFirst().federationEntityMetadata())
+        .containsEntry(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
+            "https://tmi.example.com/published-status");
+    assertThat(fixture.marks()).isEmpty();
+  }
+
+  @Test
+  void anIssuerThatPublishesNoStatusEndpointGetsNoStatusChecks() {
+    final Fixture fixture = new Fixture(false, true);
+    fixture.addOnDemandMark(null);
+    fixture.client.entityConfigurations.put(TRUST_MARK_ISSUER, entityConfiguration(fixture.issuerKey,
+        TRUST_MARK_ISSUER, Map.of(), fixture.clock.instant().plus(Duration.ofDays(1))));
+
+    assertThat(fixture.checker.check()).isZero();
+    assertThat(fixture.client.trustMarkStatusRequests).isEmpty();
+    assertThat(fixture.marks()).containsExactly(MARK_TWO);
+  }
+
+  @Test
+  void anIssuerThatCannotBeReachedForItsEntityConfigurationLeavesTheTrustMark() {
+    final Fixture fixture = new Fixture(false, true);
+    fixture.addOnDemandMark(null);
+
+    assertThat(fixture.checker.check()).isZero();
+    assertThat(fixture.client.entityConfigurationRequests).containsExactly(TRUST_MARK_ISSUER);
+    assertThat(fixture.marks()).containsExactly(MARK_TWO);
+  }
+
+  @Test
+  void withoutEndpointLookupAnIssuerWithoutStatusEndpointIsNotChecked() {
+    final Fixture fixture = new Fixture(false);
+    fixture.addOnDemandMark(null);
+
+    assertThat(fixture.checker.check()).isZero();
+    assertThat(fixture.client.entityConfigurationRequests).isEmpty();
+    assertThat(fixture.client.trustMarkStatusRequests).isEmpty();
   }
 
 }

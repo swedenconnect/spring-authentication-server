@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.oidc.federation;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,13 +53,15 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Federat
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
 import se.swedenconnect.spring.audit.appevents.SystemAlertEvent;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationJwtVerifier;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.EntityConfigurationEndpoints;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpTrustMarkRequester;
 
 /**
  * The OpenID Provider's own trust marks, that it publishes in its entity configuration.
  * <p>
- * Each trust mark is fetched from the trust mark endpoint of its issuer, see
+ * Each trust mark is fetched from the trust mark endpoint of its issuer, the configured one or else the
+ * {@code federation_trust_mark_endpoint} that the issuer publishes in its entity configuration, see
  * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.6">OpenID Federation 1.0, Section 8.6</a>,
  * when the job starts and again when three quarters of its lifetime have passed. A trust mark without {@code exp} is
  * kept as it is and never fetched again.
@@ -118,6 +121,9 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
 
   /** The client making the calls. */
   private final FederationClient federationClient;
+
+  /** Finds the trust mark endpoint of an issuer when none is configured. */
+  private final EntityConfigurationEndpoints endpoints;
 
   /** The directory where trust marks are stored, or {@code null}. */
   private final Path cacheDirectory;
@@ -182,6 +188,7 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
     this.entityId = Objects.requireNonNull(entityId, "entityId must not be null");
     this.store = Objects.requireNonNull(store, "store must not be null");
     this.federationClient = Objects.requireNonNull(federationClient, "federationClient must not be null");
+    this.endpoints = new EntityConfigurationEndpoints(federationClient, clock);
     this.cacheDirectory = cacheDirectory;
     this.retryInterval = Objects.requireNonNull(retryInterval, "retryInterval must not be null");
     this.clock = Objects.requireNonNull(clock, "clock must not be null");
@@ -335,10 +342,14 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
    */
   private boolean fetch(final @NonNull TrustMarkSource source) {
     try {
+      final URI endpoint = source.endpoint() != null
+          ? source.endpoint()
+          : this.endpoints.getEndpoint(source.issuer(), source.issuerKeys(),
+              HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT);
       final SignedJWT response = this.federationClient.trustMark(new FederationRequest<>(
           new TrustMarkRequest(new EntityID(this.entityId), new EntityID(source.issuer()),
               new EntityID(source.trustMarkType())),
-          Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, source.endpoint().toString())));
+          Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, endpoint.toString())));
       if (response == null) {
         throw new IllegalStateException("the issuer has not issued the trust mark to '%s'".formatted(this.entityId));
       }
@@ -364,14 +375,24 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
             storeError.getMessage());
       }
       log.error("Failed to get the trust mark '{}' from {} ({} failed attempts) - next attempt at {}{}: {}",
-          source.trustMarkType(), source.endpoint(), entry.failures(), entry.nextAttempt(),
+          source.trustMarkType(), from(source), entry.failures(), entry.nextAttempt(),
           entry.isValid(now) ? ", the current trust mark is published until it expires" : "", e.getMessage());
       if (this.eventPublisher != null) {
         this.eventPublisher.publishEvent(new SystemAlertEvent("Failed to get the trust mark '%s' for '%s' from %s"
-            .formatted(source.trustMarkType(), this.entityId, source.endpoint()), e));
+            .formatted(source.trustMarkType(), this.entityId, from(source)), e));
       }
       return false;
     }
+  }
+
+  /**
+   * Describes where a trust mark is fetched, for messages: the configured endpoint, or else the issuer.
+   *
+   * @param source where the trust mark is fetched
+   * @return a description
+   */
+  private static @NonNull String from(final @NonNull TrustMarkSource source) {
+    return source.endpoint() != null ? source.endpoint().toString() : source.issuer();
   }
 
   /**
@@ -473,6 +494,7 @@ public class ProviderTrustMarks implements Runnable, AutoCloseable {
    */
   public void setEventPublisher(final @Nullable ApplicationEventPublisher eventPublisher) {
     this.eventPublisher = eventPublisher;
+    this.endpoints.setEventPublisher(eventPublisher);
   }
 
   /**

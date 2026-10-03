@@ -36,6 +36,8 @@ Redis, how an application adjusts the configuration in code, and how the server 
     - [The discovery document](#oidc-discovery)
     - [Entity information for OpenID Connect](#oidc-entity-information)
     - [OpenID Federation](#oidc-federation)
+    - [Clients from OpenID Federation](#oidc-federation-clients)
+    - [Joining Sweden Connect](#joining-sweden-connect)
 - [Running several nodes](#running-several-nodes)
     - [Dependencies](#redis-dependencies)
     - [Where state is kept](#where-state-is-kept)
@@ -890,7 +892,9 @@ The OpenID Provider as a member of an OpenID Federation is configured under `aut
 | `keys[]` | The federation keys, each with a `credential` and a `state`, `active` or `future`. At least one active key is required when federation is enabled. | - |
 | `entity-configuration-lifetime` | The lifetime of the entity configuration. | 1 day |
 | `additional-parameters.*` | Parameters applied to the entity configuration only, as a map of name to value, for example `trust_anchor_hints`. A `metadata` entry is merged into the metadata per entity type and parameter. | - |
-| `trust-marks[]` | The trust marks of the OpenID Provider, each with `type`, `issuer` (the entity identifier of the issuer), `endpoint` (its trust mark endpoint) and `jwks` (the location of a JWK Set document with the federation keys of the issuer). | - |
+| `trust-marks[]` | The trust marks of the OpenID Provider, each with `type`, `issuer` (the entity identifier of the issuer), `jwks` (the location of a JWK Set document with the federation keys of the issuer) and, optionally, `endpoint` (its trust mark endpoint). Without `endpoint`, the `federation_trust_mark_endpoint` that the issuer publishes in its entity configuration is used. | - |
+| `trust-anchor.*` | The trust anchor, see [Clients from OpenID Federation](#oidc-federation-clients). | - |
+| `clients.*` | The client source that resolves clients through the federation, see [Clients from OpenID Federation](#oidc-federation-clients). | Enabled |
 | `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. Overrides the directory `oidc/trust-marks` of `authn-server.cache-directory`. Not used when the trust marks are kept in Redis. | Nothing is stored |
 | `trust-mark-retry-interval` | How long to wait before a failed attempt to fetch a trust mark is made again. | 5 minutes |
 
@@ -910,7 +914,6 @@ authn-server:
       trust-marks:
         - type: https://id.swedenconnect.se/loa/loa3
           issuer: https://fed.swedenconnect.se/tmi-loa
-          endpoint: https://fed.swedenconnect.se/tmi-loa/trust_mark
           jwks: file:/opt/config/tmi-loa-jwks.json
       trust-mark-cache-directory: /var/op/trust-marks
 ```
@@ -918,6 +921,113 @@ authn-server:
 When federation is enabled, the application does not start without federation keys and authority hints, or when the
 [descriptive metadata](openid-provider.html#descriptive-metadata) has no e-mail address in `contacts` or no HTTPS
 `logo_uri`.
+
+<a name="oidc-federation-clients"></a>
+### Clients from OpenID Federation
+
+A member of a federation also accepts clients, relying parties, that are resolved through the federation. The client
+source is configured under `authn-server.oidc.federation.clients`, and the trust anchor that clients are resolved
+against under `authn-server.oidc.federation.trust-anchor`. How the source works is described in
+[The federation backend](client-registry.html#the-federation-backend).
+
+The source is only used when federation is enabled, and it is then on by default. An OpenID Provider that is a member
+but takes no clients from the federation turns it off with `clients.enabled: false`. When the source is on, the trust
+anchor is required, and the application does not start without it. An OpenID Provider that resolves clients through a
+federation that it is not a member of is not supported.
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `trust-anchor.entity-id` | The entity identifier of the trust anchor. | Required |
+| `trust-anchor.jwks` | The location of a JWK Set document with the federation keys of the trust anchor. | Required |
+| `clients.enabled` | Whether clients are resolved through the federation. | `true` |
+| `clients.resolver.entity-id` | The entity identifier of the resolver. | The trust anchor |
+| `clients.resolver.endpoint` | The resolve endpoint. | The `federation_resolve_endpoint` that the resolver publishes |
+| `clients.resolver.jwks` | The location of a JWK Set document with the federation keys of the resolver. Required when the resolver is not the trust anchor. | The trust anchor's keys |
+| `clients.trust-mark-issuers[]` | The issuers that are asked for a trust mark that a client does not hold, one per trust mark type, see below. | - |
+| `clients.trust-mark-status-interval` | The interval between two checks of the status of the trust marks obtained from the issuers. | 1 hour |
+| `clients.cache.maximum-age` | How long a resolved client is kept at the most, regardless of what the resolve response says. | No limit |
+| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. | 1 minute |
+| `clients.cache.refresh.enabled` | Whether the background job that refreshes frequently used clients before they expire runs. | `false` |
+| `clients.cache.refresh.interval` | How often the job runs. | 1 minute |
+| `clients.cache.refresh.refresh-ahead` | How long before an entry expires that it is refreshed. | 5 minutes |
+| `clients.cache.refresh.minimum-lookups` | How many times a client must have been looked up within `lookup-period` to be refreshed. | 10 |
+| `clients.cache.refresh.lookup-period` | The period that lookups are counted within. | 10 minutes |
+| `clients.cache.refresh.maximum-clients` | The largest number of clients that one run refreshes. | 100 |
+| `clients.cache.refresh.maximum-tracked-clients` | The largest number of clients that lookups are counted for. | 1000 |
+
+A trust mark issuer has:
+
+| Property | Description | Default value |
+| :--- | :--- | :--- |
+| `type` | The trust mark type. | Required |
+| `issuer` | The entity identifier of the issuer. | Required |
+| `jwks` | The location of a JWK Set document with the federation keys of the issuer. Required when the issuer is not the trust anchor. | The trust anchor's keys |
+| `endpoint` | The trust mark endpoint. | The `federation_trust_mark_endpoint` that the issuer publishes |
+| `status-endpoint` | The trust mark status endpoint. An issuer without one gets no status checks. | The `federation_trust_mark_status_endpoint` that the issuer publishes, if any |
+
+**Endpoints.** No endpoint path is ever assumed. An endpoint that is not configured is taken from the
+`federation_entity` metadata of the entity configuration of the resolver or the issuer (OpenID Federation 1.0, Section
+5.1.1). The entity configuration is fetched when one of its endpoints is first needed, verified with the keys
+configured for the entity, or the trust anchor's keys when the entity is the trust anchor, and kept in memory on each
+node until its `exp`. Only the endpoints that are not configured are looked up.
+
+**When the federation cannot be reached.** Nothing is fetched at startup, so the OpenID Provider starts, and serves
+SAML and its configured clients, when the trust anchor, the resolver or an issuer cannot be reached. A failed fetch,
+or an entity configuration that does not publish a needed endpoint, is handled like a failed resolve or trust mark
+call: the client is not resolved, or the trust mark not obtained, the failure shows in the
+[health of the federation services](management.html#oidc-federation-health), and the next request tries again.
+
+**The order of the sources.** The configured clients of `authn-server.oidc.clients` are asked first, so an operator's
+entry overrides what the federation says about the same `client_id`. Client sources added in an
+[adapter](#adjusting-the-configuration-in-code) come next, and the federation source, named `federation`, last. A
+`FederationClientBackend` added in an adapter replaces the federation source of the properties.
+
+The federation cache is kept where `authn-server.storage.type`, or `authn-server.oidc.storage.federation-cache`, says,
+see [Where state is kept](#where-state-is-kept).
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      enabled: true
+      trust-anchor:
+        entity-id: https://ta.example.com
+        jwks: file:/opt/config/ta-jwks.json
+      clients:
+        trust-mark-issuers:
+          - type: https://tm.example.com/public-sector
+            issuer: https://tmi.example.com
+            jwks: file:/opt/config/tmi-jwks.json
+        cache:
+          refresh:
+            enabled: true
+```
+
+A standalone resolver, one that is not the trust anchor, is given with its own keys:
+
+```yaml
+authn-server:
+  oidc:
+    federation:
+      clients:
+        resolver:
+          entity-id: https://resolver.example.com
+          jwks: file:/opt/config/resolver-jwks.json
+```
+
+<a name="joining-sweden-connect"></a>
+### Joining Sweden Connect
+
+An OpenID Provider that joins the Sweden Connect federation takes the trust anchor's entity identifier and its
+federation keys from [Sweden Connect - OpenID Federation Structure](https://docs.swedenconnect.se/federation/oidf-structure.html),
+for `authn-server.oidc.federation.trust-anchor`, and the entity identifiers of the resolver and the trust mark issuers
+from the same document. The endpoints of these entities do not need to be configured; they are found in their entity
+configurations. The keys of the trust anchor are what everything else is verified against, so they are the one value
+that must be taken from a trusted copy of that document.
+
+The authority hint, `authn-server.oidc.federation.authority-hints`, is the intermediate that the OpenID Provider is
+registered under, and the OpenID Provider's own trust marks, `authn-server.oidc.federation.trust-marks`, are those that
+it has been granted, see [OpenID Federation](openid-provider.html#openid-federation).
 
 <a name="running-several-nodes"></a>
 ## Running several nodes

@@ -15,6 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
+import java.net.URI;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
@@ -39,7 +40,8 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * A {@link TrustMarkRequester} that asks the trust mark endpoint of the issuer, see
  * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.6">OpenID Federation 1.0, Section 8.6</a>.
  * <p>
- * A trust mark type that has no configured issuer is never asked for. A trust mark that is received is verified
+ * A trust mark type that has no configured issuer is never asked for. When no trust mark endpoint is configured for
+ * the issuer, the {@code federation_trust_mark_endpoint} that it publishes in its entity configuration is used. A trust mark that is received is verified
  * before it is accepted: its type, its signature against the issuer's keys, that it was issued to the client, and
  * that it has not expired.
  * </p>
@@ -60,6 +62,9 @@ public class HttpTrustMarkRequester implements TrustMarkRequester {
   /** The client making the call. */
   private final FederationClient federationClient;
 
+  /** Finds the trust mark endpoint of an issuer when none is configured. */
+  private final EntityConfigurationEndpoints endpoints;
+
   /**
    * Constructor using an {@link HttpFederationClient} with the default settings.
    *
@@ -77,8 +82,21 @@ public class HttpTrustMarkRequester implements TrustMarkRequester {
    */
   public HttpTrustMarkRequester(
       final @NonNull FederationSettings settings, final @NonNull FederationClient federationClient) {
+    this(settings, federationClient, new EntityConfigurationEndpoints(federationClient));
+  }
+
+  /**
+   * Constructor.
+   *
+   * @param settings the settings of the federation
+   * @param federationClient the client making the call
+   * @param endpoints finds the trust mark endpoint in the issuer's entity configuration when none is configured
+   */
+  public HttpTrustMarkRequester(final @NonNull FederationSettings settings,
+      final @NonNull FederationClient federationClient, final @NonNull EntityConfigurationEndpoints endpoints) {
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.federationClient = Objects.requireNonNull(federationClient, "federationClient must not be null");
+    this.endpoints = Objects.requireNonNull(endpoints, "endpoints must not be null");
   }
 
   /** {@inheritDoc} */
@@ -96,8 +114,12 @@ public class HttpTrustMarkRequester implements TrustMarkRequester {
     }
     final TrustMarkRequest request = new TrustMarkRequest(
         new EntityID(clientId), new EntityID(issuer.entityId()), new EntityID(trustMarkType));
+    final URI endpoint = issuer.endpoint() != null
+        ? issuer.endpoint()
+        : this.endpoints.getEndpoint(issuer.entityId(), this.settings.getTrustMarkIssuerKeys(issuer),
+            HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT);
     final SignedJWT response = this.federationClient.trustMark(new FederationRequest<>(request,
-        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, issuer.endpoint().toString())));
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, endpoint.toString())));
 
     if (response == null) {
       log.debug("The issuer {} has not issued a trust mark of type '{}' to '{}'",

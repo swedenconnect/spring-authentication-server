@@ -19,24 +19,26 @@ import java.net.URI;
 import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import com.nimbusds.jose.jwk.JWKSet;
 
 /**
- * Where the OpenID Provider gets one of its own trust marks: the trust mark type, and the issuer with its trust mark
- * endpoint and its keys.
+ * Where the OpenID Provider gets one of its own trust marks: the trust mark type, and the issuer with its keys and,
+ * optionally, its trust mark endpoint.
  *
  * @param trustMarkType the trust mark type
  * @param issuer the entity identifier of the trust mark issuer
- * @param endpoint the trust mark endpoint of the issuer
+ * @param endpoint the trust mark endpoint of the issuer, or {@code null} to use the
+ *     {@code federation_trust_mark_endpoint} that the issuer publishes in its entity configuration
  * @param issuerKeys the federation keys of the issuer, that the trust mark is verified with
  * @author Martin Lindström
  */
 public record TrustMarkSource(
     @NonNull String trustMarkType,
     @NonNull String issuer,
-    @NonNull URI endpoint,
+    @Nullable URI endpoint,
     @NonNull JWKSet issuerKeys) {
 
   /**
@@ -44,7 +46,7 @@ public record TrustMarkSource(
    *
    * @param trustMarkType the trust mark type
    * @param issuer the entity identifier of the trust mark issuer
-   * @param endpoint the trust mark endpoint of the issuer
+   * @param endpoint the trust mark endpoint of the issuer, or {@code null}
    * @param issuerKeys the federation keys of the issuer
    */
   public TrustMarkSource {
@@ -54,7 +56,6 @@ public record TrustMarkSource(
     if (!StringUtils.hasText(issuer)) {
       throw new IllegalArgumentException("issuer must be set and not empty");
     }
-    Objects.requireNonNull(endpoint, "endpoint must not be null");
     Objects.requireNonNull(issuerKeys, "issuerKeys must not be null");
     if (issuerKeys.getKeys().isEmpty()) {
       throw new IllegalArgumentException("No keys are given for the trust mark issuer " + issuer);

@@ -39,6 +39,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 
 import com.nimbusds.jose.jwk.JWKSet;
@@ -57,7 +58,9 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Federat
 import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientReader;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.federation.InMemoryProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
@@ -103,6 +106,12 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
  * {@link FederationClient}. As a bean it publishes the outcome of every call, which the health of the federation
  * services is built from, so an application that sets up the federation backend of the client registry should use it.
  * </p>
+ * <p>
+ * When federation is enabled, clients are also resolved through the federation, by an
+ * {@link OidcFederationClientSource} set up from {@code authn-server.oidc.federation.trust-anchor} and
+ * {@code authn-server.oidc.federation.clients}, unless that is turned off or an adapter adds a federation backend of
+ * its own.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -131,6 +140,8 @@ public class OidcAutoConfiguration {
    * @param authorizationCodeStore an authorization code store, if declared as a bean
    * @param accessTokenStore an access token store, if declared as a bean
    * @param clientAssertionReplayCache a cache of used client assertions, if declared as a bean
+   * @param federationClientSource the client source that resolves clients through the federation, when federation
+   *     is enabled
    * @return an {@link AuthnServerProtocolConfigurerFactory}
    */
   @Bean
@@ -143,29 +154,73 @@ public class OidcAutoConfiguration {
       final ObjectProvider<ProviderTrustMarks> providerTrustMarks,
       final ObjectProvider<AuthorizationCodeStore> authorizationCodeStore,
       final ObjectProvider<AccessTokenStore> accessTokenStore,
-      final ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache) {
+      final ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache,
+      final ObjectProvider<OidcFederationClientSource> federationClientSource) {
 
-    return server -> {
-      final List<FederationKey> federationKeys =
-          loadFederationKeys(properties.getFederation().getKeys(), credentialFactory);
-      final ConfigurationClientBackend clients = createClientBackend(properties.getClients());
-      if (clients != null) {
-        server.clientRegistryBackend(clients);
+    return new AuthnServerProtocolConfigurerFactory() {
+
+      @Override
+      public @NonNull OidcProviderConfigurer createConfigurer(final @NonNull AuthnServerConfigurer server)
+          throws Exception {
+        return createProviderConfigurer(server, properties, credentialFactory,
+            scopeRegistry, attributeMapping, subjectGeneratorFactory, providerTrustMarks, authorizationCodeStore,
+            accessTokenStore, clientAssertionReplayCache);
       }
-      return createConfigurer(server, properties)
-          .signingKeys(loadSigningKeys(properties.getKeys().getSigning(), credentialFactory))
-          .decryptionKeys(loadDecryptionKeys(properties.getKeys().getDecryption(), credentialFactory))
-          .scopeRegistry(scopeRegistry.getIfUnique())
-          .attributeMapping(attributeMapping.getIfUnique())
-          .subjectGeneratorFactory(subjectGeneratorFactory.getIfUnique())
-          .authnRequestProcessor(c -> c
-              .authorizationCodeStore(authorizationCodeStore.getIfUnique())
-              .accessTokenStore(accessTokenStore.getIfUnique())
-              .clientAssertionReplayCache(clientAssertionReplayCache.getIfUnique()))
-          .federation(f -> f
-              .keys(federationKeys)
-              .providerTrustMarks(providerTrustMarks.getIfUnique()));
+
+      @Override
+      public void afterAdapters(final @NonNull AuthnServerConfigurer server) throws Exception {
+        final OidcFederationClientSource source = federationClientSource.getIfAvailable();
+        if (source != null) {
+          source.addTo(server);
+        }
+      }
     };
+  }
+
+  /**
+   * Creates the OIDC protocol configurer, see {@link #oidcProtocolConfigurerFactory}.
+   *
+   * @param server the shared configurer
+   * @param properties the OIDC properties
+   * @param credentialFactory the credential factory
+   * @param scopeRegistry a scope registry, if declared as a bean
+   * @param attributeMapping an attribute mapping, if declared as a bean
+   * @param subjectGeneratorFactory a subject generator factory, if declared as a bean
+   * @param providerTrustMarks the trust marks of the OpenID Provider, when federation is enabled
+   * @param authorizationCodeStore an authorization code store, if declared as a bean
+   * @param accessTokenStore an access token store, if declared as a bean
+   * @param clientAssertionReplayCache a cache of used client assertions, if declared as a bean
+   * @return the configurer
+   * @throws Exception for errors loading the keys or the clients
+   */
+  private static @NonNull OidcProviderConfigurer createProviderConfigurer(final @NonNull AuthnServerConfigurer server,
+      final @NonNull OidcConfigurationProperties properties, final @NonNull PkiCredentialFactory credentialFactory,
+      final @NonNull ObjectProvider<ScopeRegistry> scopeRegistry,
+      final @NonNull ObjectProvider<OidcAttributeMapping> attributeMapping,
+      final @NonNull ObjectProvider<SubjectGeneratorFactory> subjectGeneratorFactory,
+      final @NonNull ObjectProvider<ProviderTrustMarks> providerTrustMarks,
+      final @NonNull ObjectProvider<AuthorizationCodeStore> authorizationCodeStore,
+      final @NonNull ObjectProvider<AccessTokenStore> accessTokenStore,
+      final @NonNull ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache) throws Exception {
+    final List<FederationKey> federationKeys =
+        loadFederationKeys(properties.getFederation().getKeys(), credentialFactory);
+    final ConfigurationClientBackend clients = createClientBackend(properties.getClients());
+    if (clients != null) {
+      server.clientRegistryBackend(clients);
+    }
+    return createConfigurer(server, properties)
+        .signingKeys(loadSigningKeys(properties.getKeys().getSigning(), credentialFactory))
+        .decryptionKeys(loadDecryptionKeys(properties.getKeys().getDecryption(), credentialFactory))
+        .scopeRegistry(scopeRegistry.getIfUnique())
+        .attributeMapping(attributeMapping.getIfUnique())
+        .subjectGeneratorFactory(subjectGeneratorFactory.getIfUnique())
+        .authnRequestProcessor(c -> c
+            .authorizationCodeStore(authorizationCodeStore.getIfUnique())
+            .accessTokenStore(accessTokenStore.getIfUnique())
+            .clientAssertionReplayCache(clientAssertionReplayCache.getIfUnique()))
+        .federation(f -> f
+            .keys(federationKeys)
+            .providerTrustMarks(providerTrustMarks.getIfUnique()));
   }
 
   /**
@@ -177,6 +232,27 @@ public class OidcAutoConfiguration {
   @ConditionalOnMissingBean(FederationClient.class)
   HttpFederationClient oidcFederationClient() {
     return new HttpFederationClient();
+  }
+
+  /**
+   * Creates the client source that resolves clients through the federation, when OpenID Federation is enabled. It is
+   * added to the client registry after the adapters have run, unless it is turned off with
+   * {@code authn-server.oidc.federation.clients.enabled}, see {@link OidcFederationClientSource}.
+   *
+   * @param properties the OIDC properties
+   * @param cache where resolved clients are kept, declared according to the storage settings
+   * @param federationClient the client making the calls
+   * @param eventPublisher the event publisher
+   * @return an {@link OidcFederationClientSource}
+   */
+  @Bean
+  @ConditionalOnProperty(prefix = OidcConfigurationProperties.PREFIX + ".federation", name = "enabled",
+      havingValue = "true")
+  OidcFederationClientSource oidcFederationClientSource(final OidcConfigurationProperties properties,
+      final ObjectProvider<FederationCache> cache, final ObjectProvider<FederationClient> federationClient,
+      final ApplicationEventPublisher eventPublisher) {
+    return new OidcFederationClientSource(properties.getFederation(), cache.getIfUnique(InMemoryFederationCache::new),
+        federationClient.getIfUnique(HttpFederationClient::new), eventPublisher);
   }
 
   /**
@@ -416,8 +492,8 @@ public class OidcAutoConfiguration {
     for (int i = 0; i < properties.size(); i++) {
       final OidcConfigurationProperties.TrustMarkProperties p = properties.get(i);
       final String name = "%s.federation.trust-marks[%d]".formatted(OidcConfigurationProperties.PREFIX, i);
-      if (p.getType() == null || p.getIssuer() == null || p.getEndpoint() == null || p.getJwks() == null) {
-        throw new IllegalArgumentException("%s must have type, issuer, endpoint and jwks".formatted(name));
+      if (p.getType() == null || p.getIssuer() == null || p.getJwks() == null) {
+        throw new IllegalArgumentException("%s must have type, issuer and jwks".formatted(name));
       }
       final JWKSet keys;
       try (final InputStream is = p.getJwks().getInputStream()) {

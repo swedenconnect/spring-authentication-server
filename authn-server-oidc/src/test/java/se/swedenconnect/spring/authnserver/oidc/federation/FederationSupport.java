@@ -25,6 +25,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -47,6 +48,8 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Subordi
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkListingRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMarkStatusResponse;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.EntityConfigurationEndpoints;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 
 /**
  * Support for the tests of the OpenID Provider's federation membership.
@@ -133,6 +136,36 @@ public final class FederationSupport {
   }
 
   /**
+   * Creates an entity configuration.
+   *
+   * @param key the key to sign with
+   * @param entityId the entity identifier, the issuer and subject
+   * @param federationEntity the {@code federation_entity} metadata
+   * @param expiresAt when it expires
+   * @return the entity configuration
+   */
+  public static SignedJWT entityConfiguration(final ECKey key, final String entityId,
+      final Map<String, Object> federationEntity, final Instant expiresAt) {
+    try {
+      final SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.ES256)
+          .type(new JOSEObjectType(EntityConfigurationEndpoints.ENTITY_CONFIGURATION_TYPE))
+          .keyID(key.getKeyID()).build(),
+          new JWTClaimsSet.Builder()
+              .issuer(entityId)
+              .subject(entityId)
+              .issueTime(new Date())
+              .expirationTime(Date.from(expiresAt))
+              .claim("metadata", Map.of("federation_entity", federationEntity))
+              .build());
+      jwt.sign(new ECDSASigner(key));
+      return jwt;
+    }
+    catch (final Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
    * Creates a trust mark source.
    *
    * @param trustMarkType the trust mark type
@@ -154,6 +187,12 @@ public final class FederationSupport {
     /** The trust mark requests made. */
     public final List<TrustMarkRequest> requests = new ArrayList<>();
 
+    /** The trust mark endpoints of the requests made. */
+    public final List<Object> endpoints = new ArrayList<>();
+
+    /** The entity configuration that is answered, or {@code null} to fail as unreachable. */
+    public SignedJWT entityConfiguration;
+
     /**
      * Adds an answer: a {@link SignedJWT}, {@code null} for nothing, or a {@link RuntimeException} to throw.
      *
@@ -168,6 +207,7 @@ public final class FederationSupport {
     @Override
     public SignedJWT trustMark(final FederationRequest<TrustMarkRequest> request) {
       this.requests.add(request.parameters());
+      this.endpoints.add(request.federationEntityMetadata().get(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT));
       if (this.answers.isEmpty()) {
         return null;
       }
@@ -185,7 +225,10 @@ public final class FederationSupport {
 
     @Override
     public SignedJWT entityConfiguration(final FederationRequest<EntityConfigurationRequest> request) {
-      throw new UnsupportedOperationException();
+      if (this.entityConfiguration == null) {
+        throw new IllegalStateException("%s could not be reached".formatted(request.parameters().entityID()));
+      }
+      return this.entityConfiguration;
     }
 
     @Override

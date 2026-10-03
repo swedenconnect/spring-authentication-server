@@ -140,21 +140,21 @@ public record FederationSettings(
    * The resolver service that client metadata is resolved through.
    *
    * @param entityId the entity identifier of the resolver
-   * @param endpoint the resolve endpoint of the resolver
+   * @param endpoint the resolve endpoint of the resolver, or {@code null} to use the
+   *          {@code federation_resolve_endpoint} that the resolver publishes in its entity configuration
    * @param keys the federation keys of the resolver, or {@code null} when the resolver is the trust anchor and the
    *          trust anchor keys are used
    */
-  public record Resolver(@NonNull String entityId, @NonNull URI endpoint, @Nullable JWKSet keys) {
+  public record Resolver(@NonNull String entityId, @Nullable URI endpoint, @Nullable JWKSet keys) {
 
     /**
      * Constructor.
      *
      * @param entityId the entity identifier of the resolver
-     * @param endpoint the resolve endpoint of the resolver
+     * @param endpoint the resolve endpoint of the resolver, or {@code null}
      * @param keys the federation keys of the resolver, or {@code null}
      */
     public Resolver {
-      Objects.requireNonNull(endpoint, "endpoint must not be null");
       if (!StringUtils.hasText(entityId)) {
         throw new IllegalArgumentException("entityId must be set and not empty");
       }
@@ -166,38 +166,39 @@ public record FederationSettings(
    * A trust mark issuer that is asked for trust marks on demand.
    *
    * @param entityId the entity identifier of the issuer
-   * @param endpoint the trust mark endpoint of the issuer
+   * @param endpoint the trust mark endpoint of the issuer, or {@code null} to use the
+   *          {@code federation_trust_mark_endpoint} that the issuer publishes in its entity configuration
    * @param keys the federation keys of the issuer, or {@code null} when the issuer is the trust anchor and the trust
    *          anchor keys are used
-   * @param statusEndpoint the trust mark status endpoint of the issuer, or {@code null} if the status of its trust
-   *          marks is not checked
+   * @param statusEndpoint the trust mark status endpoint of the issuer, or {@code null} to use the
+   *          {@code federation_trust_mark_status_endpoint} that the issuer publishes in its entity configuration. An
+   *          issuer that publishes none gets no status checks
    */
-  public record TrustMarkIssuer(@NonNull String entityId, @NonNull URI endpoint, @Nullable JWKSet keys,
+  public record TrustMarkIssuer(@NonNull String entityId, @Nullable URI endpoint, @Nullable JWKSet keys,
       @Nullable URI statusEndpoint) {
 
     /**
      * Constructor.
      *
      * @param entityId the entity identifier of the issuer
-     * @param endpoint the trust mark endpoint of the issuer
+     * @param endpoint the trust mark endpoint of the issuer, or {@code null}
      * @param keys the federation keys of the issuer, or {@code null}
      * @param statusEndpoint the trust mark status endpoint of the issuer, or {@code null}
      */
     public TrustMarkIssuer {
-      Objects.requireNonNull(endpoint, "endpoint must not be null");
       if (!StringUtils.hasText(entityId)) {
         throw new IllegalArgumentException("entityId must be set and not empty");
       }
     }
 
     /**
-     * Constructor for an issuer whose trust marks are not status checked.
+     * Constructor for an issuer without a configured status endpoint.
      *
      * @param entityId the entity identifier of the issuer
-     * @param endpoint the trust mark endpoint of the issuer
+     * @param endpoint the trust mark endpoint of the issuer, or {@code null}
      * @param keys the federation keys of the issuer, or {@code null}
      */
-    public TrustMarkIssuer(final @NonNull String entityId, final @NonNull URI endpoint, final @Nullable JWKSet keys) {
+    public TrustMarkIssuer(final @NonNull String entityId, final @Nullable URI endpoint, final @Nullable JWKSet keys) {
       this(entityId, endpoint, keys, null);
     }
 

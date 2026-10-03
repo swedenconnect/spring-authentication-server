@@ -15,6 +15,8 @@
  */
 package se.swedenconnect.spring.authnserver.autoconfigure;
 
+import java.util.List;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -159,7 +161,8 @@ public class AuthnServerAutoConfiguration {
       properties.applyTo(configurer);
       configurer.clientChangeTracker(tracker.getIfUnique());
       providers.orderedStream().forEach(configurer::authenticationProvider);
-      for (final AuthnServerProtocolConfigurerFactory factory : protocolFactories.orderedStream().toList()) {
+      final List<AuthnServerProtocolConfigurerFactory> factories = protocolFactories.orderedStream().toList();
+      for (final AuthnServerProtocolConfigurerFactory factory : factories) {
         configurer.protocol(factory.createConfigurer(configurer));
       }
 
@@ -167,6 +170,9 @@ public class AuthnServerAutoConfiguration {
 
       for (final AuthnServerConfigurerAdapter adapter : adapters.orderedStream().toList()) {
         adapter.configure(http, configurer);
+      }
+      for (final AuthnServerProtocolConfigurerFactory factory : factories) {
+        factory.afterAdapters(configurer);
       }
       final SecurityFilterChain chain = http.build();
       configuredServer.ifAvailable(c -> c.setConfigurer(configurer));

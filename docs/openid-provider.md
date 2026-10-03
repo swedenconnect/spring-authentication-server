@@ -957,14 +957,15 @@ authn-server:
       trust-marks:
         - type: https://id.swedenconnect.se/loa/loa3
           issuer: https://fed.swedenconnect.se/tmi-loa
-          endpoint: https://fed.swedenconnect.se/tmi-loa/trust_mark
           jwks: file:/opt/config/tmi-loa-jwks.json
       trust-mark-cache-directory: /var/op/trust-marks
 ```
 
 Each trust mark is fetched from the trust mark endpoint of its issuer (OpenID Federation 1.0, Section 8.6) when the
 application starts, and again when three quarters of its lifetime have passed. A trust mark without `exp` is kept as
-it is and never fetched again.
+it is and never fetched again. The trust mark endpoint is the configured `endpoint`, or else the
+`federation_trust_mark_endpoint` that the issuer publishes in its entity configuration, verified with the issuer's
+keys. An issuer that cannot be reached for its entity configuration is a failed fetch, handled as below.
 
 **The check.** A fetched trust mark is only published when it passes the check: its signature is verified with the
 configured keys of the issuer (`jwks`), `typ` must be `trust-mark+jwt`, `iss` must be the issuer, `sub` must be the

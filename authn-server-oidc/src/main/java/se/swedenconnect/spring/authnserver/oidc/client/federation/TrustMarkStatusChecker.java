@@ -15,6 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
+import java.net.URI;
 import java.text.ParseException;
 import java.time.Clock;
 import java.time.Duration;
@@ -47,8 +48,10 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.4">OpenID Federation 1.0, Section 8.4</a>.
  * <p>
  * A trust mark is checked when it has no {@code exp}, or when its {@code exp} is later than the next check. A trust
- * mark that expires before the next check is left to expire. The issuer must have a status endpoint configured in the
- * {@link FederationSettings}, otherwise its trust marks are not checked.
+ * mark that expires before the next check is left to expire. The status endpoint of the issuer is the one configured in
+ * the {@link FederationSettings}. When the checker has an {@link EntityConfigurationEndpoints}, an issuer without a
+ * configured status endpoint is checked at the one it publishes in its entity configuration. An issuer that has no
+ * status endpoint gets no status checks.
  * </p>
  * <p>
  * A trust mark that the issuer reports as anything but {@value #STATUS_ACTIVE} is removed from the cache entry, so a
@@ -92,6 +95,9 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
   /** The interval between two checks. */
   private final Duration interval;
 
+  /** Finds the status endpoint of an issuer that has none configured, or {@code null} to never look for one. */
+  private final EntityConfigurationEndpoints endpoints;
+
   /** The clock, so that tests can control time. */
   private final Clock clock;
 
@@ -123,6 +129,25 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
   public TrustMarkStatusChecker(final @NonNull FederationCache cache, final @NonNull FederationSettings settings,
       final @NonNull FederationClient federationClient, final @NonNull Duration interval,
       final @NonNull Clock clock) {
+    this(cache, settings, federationClient, null, interval, clock);
+  }
+
+  /**
+   * Constructor. With {@code endpoints}, an issuer that has no status endpoint configured is checked at the
+   * {@code federation_trust_mark_status_endpoint} that it publishes in its entity configuration, if it publishes one.
+   *
+   * @param cache where resolved clients are kept
+   * @param settings the settings of the federation
+   * @param federationClient the client making the calls
+   * @param endpoints finds the status endpoint of an issuer that has none configured, or {@code null} to check only
+   *     the issuers that have one configured
+   * @param interval the interval between two checks
+   * @param clock the clock to use
+   */
+  public TrustMarkStatusChecker(final @NonNull FederationCache cache, final @NonNull FederationSettings settings,
+      final @NonNull FederationClient federationClient, final @Nullable EntityConfigurationEndpoints endpoints,
+      final @NonNull Duration interval, final @NonNull Clock clock) {
+    this.endpoints = endpoints;
     this.cache = Objects.requireNonNull(cache, "cache must not be null");
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.federationClient = Objects.requireNonNull(federationClient, "federationClient must not be null");
@@ -201,25 +226,34 @@ public class TrustMarkStatusChecker implements Runnable, AutoCloseable {
    */
   private boolean isActive(final @NonNull String clientId, final @NonNull OnDemandTrustMark mark) {
     final FederationSettings.TrustMarkIssuer issuer = this.settings.getTrustMarkIssuer(mark.type());
-    if (issuer == null || issuer.statusEndpoint() == null) {
+    if (issuer == null || (issuer.statusEndpoint() == null && this.endpoints == null)) {
       log.debug("No trust mark status endpoint is configured for '{}' - the trust mark of '{}' is not checked",
           mark.type(), clientId);
       return true;
     }
     final String trustMark = Objects.requireNonNull(mark.trustMark());
     try {
+      final URI statusEndpoint = issuer.statusEndpoint() != null
+          ? issuer.statusEndpoint()
+          : this.endpoints.findEndpoint(issuer.entityId(), this.settings.getTrustMarkIssuerKeys(issuer),
+              HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT);
+      if (statusEndpoint == null) {
+        log.debug("The issuer {} publishes no trust mark status endpoint - the trust mark '{}' of '{}' is not checked",
+            issuer.entityId(), mark.type(), clientId);
+        return true;
+      }
       final TrustMarkStatusResponse response = this.federationClient.trustMarkStatus(new FederationRequest<>(
           new FederationTrustMarkStatusRequest(trustMark, issuer.entityId()),
-          Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT, issuer.statusEndpoint().toString())));
+          Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT, statusEndpoint.toString())));
       if (response == null || response.isError() || response.getSignedJWT() == null) {
-        throw new ClientRegistryException("No trust mark status response from " + issuer.statusEndpoint());
+        throw new ClientRegistryException("No trust mark status response from " + statusEndpoint);
       }
       final JWTClaimsSet claims = FederationJwtVerifier.verify(response.getSignedJWT(),
           TRUST_MARK_STATUS_RESPONSE_TYPE, this.settings.getTrustMarkIssuerKeys(issuer), issuer.entityId(), null,
           Set.of("iat", "trust_mark", "status"));
       if (!trustMark.equals(claims.getStringClaim("trust_mark"))) {
         throw new ClientRegistryException("The trust mark status response from %s is about another trust mark"
-            .formatted(issuer.statusEndpoint()));
+            .formatted(statusEndpoint));
       }
       final String status = claims.getStringClaim("status");
       if (STATUS_ACTIVE.equals(status)) {

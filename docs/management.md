@@ -320,9 +320,11 @@ When the trust marks are kept in Redis, every server instance reports the same.
 
 **Key:** `oidc-federation`
 
-The OpenID Federation services that the server calls: the resolver, and each trust mark issuer, whether it is called
+The OpenID Federation services that the server calls: the resolver, each trust mark issuer, whether it is called
 for the OpenID Provider's own trust marks, for a trust mark that a client is asked to hold, or for a trust mark status
-check.
+check, and each entity whose entity configuration is fetched to find an endpoint that is not configured, see
+[Clients from OpenID Federation](configuration.html#oidc-federation-clients). An entity configuration that cannot be
+fetched or verified, or that does not publish a needed endpoint, counts as a failure.
 
 The health is built from the calls that the server makes, never from calls made by the health check. A resolver
 answer that a client is not found is a successful call; any other error answer counts as a failure. Each service
@@ -355,7 +357,8 @@ failure is therefore still shown after a later call has succeeded.
 }
 ```
 
-A resolver is identified by its endpoint and a trust mark issuer by its entity identifier. When the federation cache
+A resolver is identified by its endpoint, and a trust mark issuer and an entity whose entity configuration is fetched
+(type `entity-configuration`) by their entity identifiers. When the federation cache
 is kept in Redis, so is this state, and every server instance reports the same.
 
 The calls are recorded by the `HttpFederationClient` bean that the auto-configuration declares. An application that

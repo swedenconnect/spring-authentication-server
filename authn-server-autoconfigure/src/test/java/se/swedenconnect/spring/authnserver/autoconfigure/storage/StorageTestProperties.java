@@ -47,6 +47,7 @@ final class StorageTestProperties {
       OIDC_KEY + "key.alias=rsa-sign",
       OIDC_KEY + "key.key-password=secret",
       "authn-server.oidc.federation.enabled=true",
+      "authn-server.oidc.federation.clients.enabled=false",
       "authn-server.oidc.federation.authority-hints[0]=https://ia.example.com",
       "authn-server.entity-information.ui-info.display-names.sv=Exempel",
       "authn-server.entity-information.ui-info.logotypes[0].url=https://cdn.example.com/logo.svg",

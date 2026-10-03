@@ -31,7 +31,8 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServ
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceState;
 
 /**
- * Health of the federation services that the OpenID Provider calls: the resolver and every trust mark issuer.
+ * Health of the federation services that the OpenID Provider calls: the resolver, every trust mark issuer, and every
+ * entity whose entity configuration is fetched to find an endpoint.
  * <p>
  * The health comes from the calls the server makes, never from calls made by the health check. Each service reports
  * its latest outcome, its most recent failure and the number of failed calls since the latest successful one, so that

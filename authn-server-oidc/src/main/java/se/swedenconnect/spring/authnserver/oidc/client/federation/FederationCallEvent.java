@@ -42,7 +42,10 @@ public class FederationCallEvent extends ApplicationEvent {
   /** The endpoint that was called. */
   private final String endpoint;
 
-  /** The entity identifier of the trust mark issuer, or {@code null} for a resolve call. */
+  /**
+   * The entity identifier of the trust mark issuer, or of the entity whose entity configuration is fetched, or
+   * {@code null} for a resolve call.
+   */
   private final String issuer;
 
   /** How the call went. */
@@ -56,7 +59,8 @@ public class FederationCallEvent extends ApplicationEvent {
    *
    * @param call the call that was made
    * @param endpoint the endpoint that was called
-   * @param issuer the entity identifier of the trust mark issuer, or {@code null} for a resolve call
+   * @param issuer the entity identifier of the trust mark issuer, or of the entity whose entity configuration is
+   *     fetched, or {@code null} for a resolve call
    * @param outcome how the call went
    * @param error what went wrong, or {@code null} if the call succeeded
    */
@@ -89,9 +93,9 @@ public class FederationCallEvent extends ApplicationEvent {
   }
 
   /**
-   * Gets the entity identifier of the trust mark issuer.
+   * Gets the entity identifier of the trust mark issuer, or of the entity whose entity configuration is fetched.
    *
-   * @return the issuer, or {@code null} for a resolve call
+   * @return the entity identifier, or {@code null} for a resolve call
    */
   public @Nullable String getIssuer() {
     return this.issuer;
@@ -130,17 +134,22 @@ public class FederationCallEvent extends ApplicationEvent {
    * @return the kind of service
    */
   public @NonNull ServiceType getServiceType() {
-    return this.call == Call.RESOLVE ? ServiceType.RESOLVER : ServiceType.TRUST_MARK_ISSUER;
+    return switch (this.call) {
+      case RESOLVE -> ServiceType.RESOLVER;
+      case ENTITY_CONFIGURATION -> ServiceType.ENTITY_CONFIGURATION;
+      case TRUST_MARK, TRUST_MARK_STATUS -> ServiceType.TRUST_MARK_ISSUER;
+    };
   }
 
   /**
-   * Gets the identity of the service that was called: the endpoint of a resolver, and the entity identifier of a
-   * trust mark issuer, so that the trust mark endpoint and the status endpoint of an issuer count as one service.
+   * Gets the identity of the service that was called: the endpoint of a resolver, the entity identifier of a trust
+   * mark issuer, so that the trust mark endpoint and the status endpoint of an issuer count as one service, and the
+   * entity identifier of an entity whose entity configuration is fetched.
    *
    * @return the identity of the service
    */
   public @NonNull String getServiceId() {
-    return this.getServiceType() == ServiceType.TRUST_MARK_ISSUER && this.issuer != null ? this.issuer : this.endpoint;
+    return this.getServiceType() != ServiceType.RESOLVER && this.issuer != null ? this.issuer : this.endpoint;
   }
 
   /**
@@ -155,7 +164,13 @@ public class FederationCallEvent extends ApplicationEvent {
     TRUST_MARK,
 
     /** A trust mark status request, OpenID Federation 1.0, Section 8.4. */
-    TRUST_MARK_STATUS
+    TRUST_MARK_STATUS,
+
+    /**
+     * A request for the entity configuration of an entity, OpenID Federation 1.0, Section 9, made to find an endpoint
+     * that the entity publishes.
+     */
+    ENTITY_CONFIGURATION
 
   }
 
@@ -168,7 +183,10 @@ public class FederationCallEvent extends ApplicationEvent {
     RESOLVER,
 
     /** A trust mark issuer. */
-    TRUST_MARK_ISSUER
+    TRUST_MARK_ISSUER,
+
+    /** An entity whose entity configuration is fetched to find its endpoints. */
+    ENTITY_CONFIGURATION
 
   }
 

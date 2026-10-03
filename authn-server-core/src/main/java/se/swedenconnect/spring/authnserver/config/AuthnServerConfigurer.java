@@ -424,6 +424,26 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   }
 
   /**
+   * Gets the client registry backends that have been added with {@link #clientRegistryBackend(ClientRegistryBackend)},
+   * in the order they were added. The backends of the protocol configurers are not included.
+   *
+   * @return the added backends
+   */
+  public @NonNull List<ClientRegistryBackend> getClientRegistryBackends() {
+    return List.copyOf(this.clientRegistryBackends);
+  }
+
+  /**
+   * Tells whether a client registry has been assigned with {@link #clientRegistry(ClientRegistry)}, in which case the
+   * added backends are not used.
+   *
+   * @return {@code true} if a client registry has been assigned and {@code false} otherwise
+   */
+  public boolean isClientRegistryAssigned() {
+    return this.clientRegistry != null;
+  }
+
+  /**
    * Assigns the object that is told when a client appears in or disappears from the client registry. It is given to
    * every backend of the registry when the configurer is initialized. Without one, no changes are tracked.
    *

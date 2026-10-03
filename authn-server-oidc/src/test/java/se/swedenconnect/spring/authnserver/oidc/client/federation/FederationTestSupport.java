@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +51,7 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Subordi
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkListingRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMarkStatusResponse;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
  * Support for the OpenID Federation tests: keys, client metadata and the signed JWTs that the federation endpoints
@@ -170,6 +172,26 @@ abstract class FederationTestSupport {
   }
 
   /**
+   * Creates a signed entity configuration.
+   *
+   * @param key the key to sign with
+   * @param entityId the entity identifier, the issuer and subject
+   * @param federationEntity the {@code federation_entity} metadata
+   * @param expiresAt when the entity configuration expires
+   * @return a {@link SignedJWT}
+   */
+  static SignedJWT entityConfiguration(final ECKey key, final String entityId,
+      final Map<String, Object> federationEntity, final Instant expiresAt) {
+    return sign(key, EntityConfigurationEndpoints.ENTITY_CONFIGURATION_TYPE, new JWTClaimsSet.Builder()
+        .issuer(entityId)
+        .subject(entityId)
+        .issueTime(new Date())
+        .expirationTime(Date.from(expiresAt))
+        .claim("metadata", Map.of(EntityType.FEDERATION_ENTITY.getValue(), federationEntity))
+        .build());
+  }
+
+  /**
    * Creates a signed trust mark status response.
    *
    * @param key the key to sign with
@@ -243,10 +265,23 @@ abstract class FederationTestSupport {
     /** The trust mark status requests made. */
     final List<FederationRequest<FederationTrustMarkStatusRequest>> trustMarkStatusRequests = new ArrayList<>();
 
+    /** The entity configurations that are answered, by entity identifier. Others fail as unreachable. */
+    final Map<String, SignedJWT> entityConfigurations = new HashMap<>();
+
+    /** The entity identifiers whose entity configurations were asked for, in order. */
+    final List<String> entityConfigurationRequests = new ArrayList<>();
+
+    /** The endpoint of the last resolve request. */
+    Object lastResolveEndpoint;
+
+    /** The endpoint of the last trust mark request. */
+    Object lastTrustMarkEndpoint;
+
     @Override
     public SignedJWT resolve(final FederationRequest<ResolveRequest> request) {
       this.resolveCalls++;
       this.lastResolveRequest = request.parameters();
+      this.lastResolveEndpoint = request.federationEntityMetadata().get(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT);
       return this.resolveResponse;
     }
 
@@ -254,12 +289,20 @@ abstract class FederationTestSupport {
     public SignedJWT trustMark(final FederationRequest<TrustMarkRequest> request) {
       this.trustMarkCalls++;
       this.lastTrustMarkRequest = request.parameters();
+      this.lastTrustMarkEndpoint =
+          request.federationEntityMetadata().get(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT);
       return this.trustMarkResponse;
     }
 
     @Override
     public SignedJWT entityConfiguration(final FederationRequest<EntityConfigurationRequest> request) {
-      throw new UnsupportedOperationException();
+      final String entityId = request.parameters().entityID().getValue();
+      this.entityConfigurationRequests.add(entityId);
+      final SignedJWT entityConfiguration = this.entityConfigurations.get(entityId);
+      if (entityConfiguration == null) {
+        throw new ClientRegistryException("%s could not be reached".formatted(entityId));
+      }
+      return entityConfiguration;
     }
 
     @Override

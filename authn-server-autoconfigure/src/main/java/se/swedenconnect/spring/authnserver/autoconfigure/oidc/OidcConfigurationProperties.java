@@ -825,6 +825,16 @@ public class OidcConfigurationProperties {
     private Duration trustMarkRetryInterval;
 
     /**
+     * The trust anchor of the federation. Required when clients are resolved through the federation.
+     */
+    private final TrustAnchorProperties trustAnchor = new TrustAnchorProperties();
+
+    /**
+     * The client source that resolves clients through the federation.
+     */
+    private final FederationClientsProperties clients = new FederationClientsProperties();
+
+    /**
      * Tells whether federation is enabled.
      *
      * @return whether federation is enabled
@@ -967,6 +977,628 @@ public class OidcConfigurationProperties {
     public void setTrustMarkRetryInterval(final @Nullable Duration trustMarkRetryInterval) {
       this.trustMarkRetryInterval = trustMarkRetryInterval;
     }
+
+    /**
+     * Gets the trust anchor properties.
+     *
+     * @return the trust anchor properties
+     */
+    public @NonNull TrustAnchorProperties getTrustAnchor() {
+      return this.trustAnchor;
+    }
+
+    /**
+     * Gets the properties of the client source that resolves clients through the federation.
+     *
+     * @return the client source properties
+     */
+    public @NonNull FederationClientsProperties getClients() {
+      return this.clients;
+    }
+  }
+
+  /**
+   * The trust anchor of the federation, that the OpenID Provider resolves clients against.
+   */
+  public static class TrustAnchorProperties {
+
+    /**
+     * The entity identifier of the trust anchor.
+     */
+    private String entityId;
+
+    /**
+     * A JWK Set document holding the federation keys of the trust anchor.
+     */
+    private Resource jwks;
+
+    /**
+     * Gets the entity identifier.
+     *
+     * @return the entity identifier, or {@code null} if not assigned
+     */
+    public @Nullable String getEntityId() {
+      return this.entityId;
+    }
+
+    /**
+     * Assigns the entity identifier.
+     *
+     * @param entityId the entity identifier
+     */
+    public void setEntityId(final @Nullable String entityId) {
+      this.entityId = entityId;
+    }
+
+    /**
+     * Gets the location of the federation keys.
+     *
+     * @return the location of the federation keys, or {@code null} if not assigned
+     */
+    public @Nullable Resource getJwks() {
+      return this.jwks;
+    }
+
+    /**
+     * Assigns the location of the federation keys.
+     *
+     * @param jwks the location of the federation keys
+     */
+    public void setJwks(final @Nullable Resource jwks) {
+      this.jwks = jwks;
+    }
+
+
+  }
+
+  /**
+   * The client source that resolves clients through OpenID Federation.
+   */
+  public static class FederationClientsProperties {
+
+    /**
+     * Whether clients are resolved through the federation. Only used when federation is enabled. Defaults to true.
+     */
+    private boolean enabled = true;
+
+    /**
+     * The resolver that clients are resolved through. Defaults to a resolver at the trust anchor.
+     */
+    private final ResolverProperties resolver = new ResolverProperties();
+
+    /**
+     * The issuers that are asked for a trust mark that a client does not hold, one per trust mark type. A type
+     * that has no issuer here is never asked for.
+     */
+    private List<TrustMarkIssuerProperties> trustMarkIssuers;
+
+    /**
+     * The interval between two checks of the status of the trust marks obtained from the issuers. Defaults to 1
+     * hour.
+     */
+    private Duration trustMarkStatusInterval;
+
+    /**
+     * How resolved clients are cached.
+     */
+    private final FederationCacheProperties cache = new FederationCacheProperties();
+
+    /**
+     * Gets whether clients are resolved through the federation.
+     *
+     * @return whether clients are resolved through the federation
+     */
+    public boolean isEnabled() {
+      return this.enabled;
+    }
+
+    /**
+     * Assigns whether clients are resolved through the federation.
+     *
+     * @param enabled whether clients are resolved through the federation
+     */
+    public void setEnabled(final boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    /**
+     * Gets the resolver properties.
+     *
+     * @return the resolver properties
+     */
+    public @NonNull ResolverProperties getResolver() {
+      return this.resolver;
+    }
+
+    /**
+     * Gets the trust mark issuers.
+     *
+     * @return the trust mark issuers, or {@code null} if not assigned
+     */
+    public @Nullable List<TrustMarkIssuerProperties> getTrustMarkIssuers() {
+      return this.trustMarkIssuers;
+    }
+
+    /**
+     * Assigns the trust mark issuers.
+     *
+     * @param trustMarkIssuers the trust mark issuers
+     */
+    public void setTrustMarkIssuers(final @Nullable List<TrustMarkIssuerProperties> trustMarkIssuers) {
+      this.trustMarkIssuers = trustMarkIssuers;
+    }
+
+    /**
+     * Gets the interval of the trust mark status checks.
+     *
+     * @return the interval of the trust mark status checks, or {@code null} if not assigned
+     */
+    public @Nullable Duration getTrustMarkStatusInterval() {
+      return this.trustMarkStatusInterval;
+    }
+
+    /**
+     * Assigns the interval of the trust mark status checks.
+     *
+     * @param trustMarkStatusInterval the interval of the trust mark status checks
+     */
+    public void setTrustMarkStatusInterval(final @Nullable Duration trustMarkStatusInterval) {
+      this.trustMarkStatusInterval = trustMarkStatusInterval;
+    }
+
+    /**
+     * Gets the cache properties.
+     *
+     * @return the cache properties
+     */
+    public @NonNull FederationCacheProperties getCache() {
+      return this.cache;
+    }
+
+
+  }
+
+  /**
+   * The resolver that clients are resolved through.
+   */
+  public static class ResolverProperties {
+
+    /**
+     * The entity identifier of the resolver. Defaults to the entity identifier of the trust anchor.
+     */
+    private String entityId;
+
+    /**
+     * The resolve endpoint. Defaults to the federation_resolve_endpoint that the resolver publishes in its
+     * entity configuration.
+     */
+    private URI endpoint;
+
+    /**
+     * A JWK Set document holding the federation keys of the resolver. Required when the resolver is not the
+     * trust anchor, and not used when it is.
+     */
+    private Resource jwks;
+
+    /**
+     * Gets the entity identifier.
+     *
+     * @return the entity identifier, or {@code null} if not assigned
+     */
+    public @Nullable String getEntityId() {
+      return this.entityId;
+    }
+
+    /**
+     * Assigns the entity identifier.
+     *
+     * @param entityId the entity identifier
+     */
+    public void setEntityId(final @Nullable String entityId) {
+      this.entityId = entityId;
+    }
+
+    /**
+     * Gets the resolve endpoint.
+     *
+     * @return the resolve endpoint, or {@code null} if not assigned
+     */
+    public @Nullable URI getEndpoint() {
+      return this.endpoint;
+    }
+
+    /**
+     * Assigns the resolve endpoint.
+     *
+     * @param endpoint the resolve endpoint
+     */
+    public void setEndpoint(final @Nullable URI endpoint) {
+      this.endpoint = endpoint;
+    }
+
+    /**
+     * Gets the location of the federation keys.
+     *
+     * @return the location of the federation keys, or {@code null} if not assigned
+     */
+    public @Nullable Resource getJwks() {
+      return this.jwks;
+    }
+
+    /**
+     * Assigns the location of the federation keys.
+     *
+     * @param jwks the location of the federation keys
+     */
+    public void setJwks(final @Nullable Resource jwks) {
+      this.jwks = jwks;
+    }
+
+
+  }
+
+  /**
+   * An issuer that is asked for trust marks of one type on demand.
+   */
+  public static class TrustMarkIssuerProperties {
+
+    /**
+     * The trust mark type.
+     */
+    private String type;
+
+    /**
+     * The entity identifier of the trust mark issuer.
+     */
+    private String issuer;
+
+    /**
+     * A JWK Set document holding the federation keys of the issuer. Required when the issuer is not the trust
+     * anchor, and not used when it is.
+     */
+    private Resource jwks;
+
+    /**
+     * The trust mark endpoint. Defaults to the federation_trust_mark_endpoint that the issuer publishes in its
+     * entity configuration.
+     */
+    private URI endpoint;
+
+    /**
+     * The trust mark status endpoint. Defaults to the federation_trust_mark_status_endpoint that the issuer
+     * publishes in its entity configuration. An issuer without one gets no status checks.
+     */
+    private URI statusEndpoint;
+
+    /**
+     * Gets the trust mark type.
+     *
+     * @return the trust mark type, or {@code null} if not assigned
+     */
+    public @Nullable String getType() {
+      return this.type;
+    }
+
+    /**
+     * Assigns the trust mark type.
+     *
+     * @param type the trust mark type
+     */
+    public void setType(final @Nullable String type) {
+      this.type = type;
+    }
+
+    /**
+     * Gets the issuer.
+     *
+     * @return the issuer, or {@code null} if not assigned
+     */
+    public @Nullable String getIssuer() {
+      return this.issuer;
+    }
+
+    /**
+     * Assigns the issuer.
+     *
+     * @param issuer the issuer
+     */
+    public void setIssuer(final @Nullable String issuer) {
+      this.issuer = issuer;
+    }
+
+    /**
+     * Gets the location of the federation keys.
+     *
+     * @return the location of the federation keys, or {@code null} if not assigned
+     */
+    public @Nullable Resource getJwks() {
+      return this.jwks;
+    }
+
+    /**
+     * Assigns the location of the federation keys.
+     *
+     * @param jwks the location of the federation keys
+     */
+    public void setJwks(final @Nullable Resource jwks) {
+      this.jwks = jwks;
+    }
+
+    /**
+     * Gets the trust mark endpoint.
+     *
+     * @return the trust mark endpoint, or {@code null} if not assigned
+     */
+    public @Nullable URI getEndpoint() {
+      return this.endpoint;
+    }
+
+    /**
+     * Assigns the trust mark endpoint.
+     *
+     * @param endpoint the trust mark endpoint
+     */
+    public void setEndpoint(final @Nullable URI endpoint) {
+      this.endpoint = endpoint;
+    }
+
+    /**
+     * Gets the trust mark status endpoint.
+     *
+     * @return the trust mark status endpoint, or {@code null} if not assigned
+     */
+    public @Nullable URI getStatusEndpoint() {
+      return this.statusEndpoint;
+    }
+
+    /**
+     * Assigns the trust mark status endpoint.
+     *
+     * @param statusEndpoint the trust mark status endpoint
+     */
+    public void setStatusEndpoint(final @Nullable URI statusEndpoint) {
+      this.statusEndpoint = statusEndpoint;
+    }
+
+
+  }
+
+  /**
+   * How resolved clients are cached.
+   */
+  public static class FederationCacheProperties {
+
+    /**
+     * How long an entry may live at the most, regardless of what the resolve response says. No limit by
+     * default.
+     */
+    private Duration maximumAge;
+
+    /**
+     * How long the answer that the resolver does not know a client is kept. Defaults to 1 minute.
+     */
+    private Duration notFoundTimeToLive;
+
+    /**
+     * The background job that refreshes the entries of frequently used clients before they expire.
+     */
+    private final FederationCacheRefreshProperties refresh = new FederationCacheRefreshProperties();
+
+    /**
+     * Gets the maximum age.
+     *
+     * @return the maximum age, or {@code null} if not assigned
+     */
+    public @Nullable Duration getMaximumAge() {
+      return this.maximumAge;
+    }
+
+    /**
+     * Assigns the maximum age.
+     *
+     * @param maximumAge the maximum age
+     */
+    public void setMaximumAge(final @Nullable Duration maximumAge) {
+      this.maximumAge = maximumAge;
+    }
+
+    /**
+     * Gets the time to live of a not found answer.
+     *
+     * @return the time to live of a not found answer, or {@code null} if not assigned
+     */
+    public @Nullable Duration getNotFoundTimeToLive() {
+      return this.notFoundTimeToLive;
+    }
+
+    /**
+     * Assigns the time to live of a not found answer.
+     *
+     * @param notFoundTimeToLive the time to live of a not found answer
+     */
+    public void setNotFoundTimeToLive(final @Nullable Duration notFoundTimeToLive) {
+      this.notFoundTimeToLive = notFoundTimeToLive;
+    }
+
+    /**
+     * Gets the refresh properties.
+     *
+     * @return the refresh properties
+     */
+    public @NonNull FederationCacheRefreshProperties getRefresh() {
+      return this.refresh;
+    }
+
+
+  }
+
+  /**
+   * The background job that refreshes the entries of frequently used clients before they expire.
+   */
+  public static class FederationCacheRefreshProperties {
+
+    /**
+     * Whether the job runs. Defaults to false.
+     */
+    private boolean enabled = false;
+
+    /**
+     * How often the job runs. Defaults to 1 minute.
+     */
+    private Duration interval;
+
+    /**
+     * How long before an entry expires that it is refreshed. Defaults to 5 minutes.
+     */
+    private Duration refreshAhead;
+
+    /**
+     * How many times a client must have been looked up within lookup-period to be refreshed. Defaults to 10.
+     */
+    private Integer minimumLookups;
+
+    /**
+     * The period that lookups are counted within. Defaults to 10 minutes.
+     */
+    private Duration lookupPeriod;
+
+    /**
+     * The largest number of clients that one run refreshes. Defaults to 100.
+     */
+    private Integer maximumClients;
+
+    /**
+     * The largest number of clients that lookups are counted for. Defaults to 1000.
+     */
+    private Integer maximumTrackedClients;
+
+    /**
+     * Gets whether the job runs.
+     *
+     * @return whether the job runs
+     */
+    public boolean isEnabled() {
+      return this.enabled;
+    }
+
+    /**
+     * Assigns whether the job runs.
+     *
+     * @param enabled whether the job runs
+     */
+    public void setEnabled(final boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    /**
+     * Gets the interval.
+     *
+     * @return the interval, or {@code null} if not assigned
+     */
+    public @Nullable Duration getInterval() {
+      return this.interval;
+    }
+
+    /**
+     * Assigns the interval.
+     *
+     * @param interval the interval
+     */
+    public void setInterval(final @Nullable Duration interval) {
+      this.interval = interval;
+    }
+
+    /**
+     * Gets how long ahead an entry is refreshed.
+     *
+     * @return how long ahead an entry is refreshed, or {@code null} if not assigned
+     */
+    public @Nullable Duration getRefreshAhead() {
+      return this.refreshAhead;
+    }
+
+    /**
+     * Assigns how long ahead an entry is refreshed.
+     *
+     * @param refreshAhead how long ahead an entry is refreshed
+     */
+    public void setRefreshAhead(final @Nullable Duration refreshAhead) {
+      this.refreshAhead = refreshAhead;
+    }
+
+    /**
+     * Gets the minimum number of lookups.
+     *
+     * @return the minimum number of lookups, or {@code null} if not assigned
+     */
+    public @Nullable Integer getMinimumLookups() {
+      return this.minimumLookups;
+    }
+
+    /**
+     * Assigns the minimum number of lookups.
+     *
+     * @param minimumLookups the minimum number of lookups
+     */
+    public void setMinimumLookups(final @Nullable Integer minimumLookups) {
+      this.minimumLookups = minimumLookups;
+    }
+
+    /**
+     * Gets the lookup period.
+     *
+     * @return the lookup period, or {@code null} if not assigned
+     */
+    public @Nullable Duration getLookupPeriod() {
+      return this.lookupPeriod;
+    }
+
+    /**
+     * Assigns the lookup period.
+     *
+     * @param lookupPeriod the lookup period
+     */
+    public void setLookupPeriod(final @Nullable Duration lookupPeriod) {
+      this.lookupPeriod = lookupPeriod;
+    }
+
+    /**
+     * Gets the maximum number of clients per run.
+     *
+     * @return the maximum number of clients per run, or {@code null} if not assigned
+     */
+    public @Nullable Integer getMaximumClients() {
+      return this.maximumClients;
+    }
+
+    /**
+     * Assigns the maximum number of clients per run.
+     *
+     * @param maximumClients the maximum number of clients per run
+     */
+    public void setMaximumClients(final @Nullable Integer maximumClients) {
+      this.maximumClients = maximumClients;
+    }
+
+    /**
+     * Gets the maximum number of tracked clients.
+     *
+     * @return the maximum number of tracked clients, or {@code null} if not assigned
+     */
+    public @Nullable Integer getMaximumTrackedClients() {
+      return this.maximumTrackedClients;
+    }
+
+    /**
+     * Assigns the maximum number of tracked clients.
+     *
+     * @param maximumTrackedClients the maximum number of tracked clients
+     */
+    public void setMaximumTrackedClients(final @Nullable Integer maximumTrackedClients) {
+      this.maximumTrackedClients = maximumTrackedClients;
+    }
+
+
   }
 
   /**
@@ -1038,7 +1670,8 @@ public class OidcConfigurationProperties {
     private String issuer;
 
     /**
-     * The trust mark endpoint of the issuer.
+     * The trust mark endpoint of the issuer. Defaults to the federation_trust_mark_endpoint that the issuer publishes
+     * in its entity configuration.
      */
     private URI endpoint;
 
