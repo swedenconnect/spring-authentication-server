@@ -28,27 +28,33 @@ public enum OidcUnrecoverableError implements UnrecoverableError {
 
   /** The client is registered in a way that makes it impossible to answer its request. */
   INVALID_CLIENT_CONFIGURATION("authn-server.error.unrecoverable.oidc.client-configuration",
-      "The client is not correctly registered"),
+      "The client is not correctly registered", 500),
 
-  /** The authentication request lacks {@code client_id}, or cannot be processed before a response can be sent. */
+  /**
+   * The authentication request lacks {@code client_id}, or cannot be processed before a response can be sent. HTTP
+   * status 400.
+   */
   INVALID_AUTHN_REQUEST("authn-server.error.unrecoverable.oidc.invalid-request",
-      "The authentication request is invalid and cannot be answered"),
+      "The authentication request is invalid and cannot be answered", 400),
 
-  /** The client is not known. */
+  /** The client is not known. HTTP status 400. */
   UNKNOWN_CLIENT("authn-server.error.unrecoverable.oidc.unknown-client",
-      "The client has not been registered at the OpenID Provider"),
+      "The client has not been registered at the OpenID Provider", 400),
 
-  /** The client could not be looked up, since the client registry failed. */
+  /**
+   * The client could not be looked up, since a client source of the client registry could not be reached. HTTP status
+   * 503.
+   */
   CLIENT_LOOKUP_FAILED("authn-server.error.unrecoverable.oidc.client-lookup-failed",
-      "The client could not be looked up"),
+      "The client could not be checked right now - try again later", 503),
 
-  /** The redirect URI is missing, or is not registered for the client. */
+  /** The redirect URI is missing, or is not registered for the client. HTTP status 400. */
   INVALID_REDIRECT_URI("authn-server.error.unrecoverable.oidc.redirect-uri",
-      "The redirect URI is missing or has not been registered for the client"),
+      "The redirect URI is missing or has not been registered for the client", 400),
 
-  /** The response mode is not supported. The OpenID Provider answers with HTTP status 400. */
+  /** The response mode is not supported. HTTP status 400, as OpenID Connect Core, Section 3.1.2.6, requires. */
   UNSUPPORTED_RESPONSE_MODE("authn-server.error.unrecoverable.oidc.response-mode",
-      "The requested response mode is not supported");
+      "The requested response mode is not supported", 400);
 
   /** The message code for resolving the error message. */
   private final String messageCode;
@@ -56,15 +62,20 @@ public enum OidcUnrecoverableError implements UnrecoverableError {
   /** The description of the error. */
   private final String description;
 
+  /** The HTTP status of the error page. */
+  private final int httpStatus;
+
   /**
    * Constructor.
    *
    * @param messageCode the message code for resolving the error message
    * @param description the description of the error
+   * @param httpStatus the HTTP status of the error page
    */
-  OidcUnrecoverableError(final String messageCode, final String description) {
+  OidcUnrecoverableError(final String messageCode, final String description, final int httpStatus) {
     this.messageCode = messageCode;
     this.description = description;
+    this.httpStatus = httpStatus;
   }
 
   /** {@inheritDoc} */
@@ -77,6 +88,12 @@ public enum OidcUnrecoverableError implements UnrecoverableError {
   @Override
   public @NonNull String getDescription() {
     return this.description;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int getHttpStatus() {
+    return this.httpStatus;
   }
 
 }

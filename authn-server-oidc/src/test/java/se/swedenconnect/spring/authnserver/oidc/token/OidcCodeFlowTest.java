@@ -16,9 +16,9 @@
 package se.swedenconnect.spring.authnserver.oidc.token;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import jakarta.servlet.Filter;
+import jakarta.servlet.RequestDispatcher;
 
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -414,9 +414,13 @@ class OidcCodeFlowTest {
   }
 
   @Test
-  void aClientAskingForEncryptionThatCannotBeUsedEndsAtAnErrorPage() {
+  void aClientAskingForEncryptionThatCannotBeUsedEndsAtAnErrorPage() throws Exception {
     this.start(c -> {}, new TestProvider("direct", LOA3));
-    assertThatThrownBy(() -> this.send(get(AUTHZ_PATH, params(BAD_ENC_CLIENT))))
+    final MockHttpServletRequest request = get(AUTHZ_PATH, params(BAD_ENC_CLIENT));
+    final MockHttpServletResponse response = this.send(request);
+    assertThat(response.getStatus()).isEqualTo(500);
+    assertThat(response.getRedirectedUrl()).isNull();
+    assertThat(request.getAttribute(RequestDispatcher.ERROR_EXCEPTION))
         .isInstanceOfSatisfying(UnrecoverableErrorException.class,
             e -> assertThat(e.getError()).isEqualTo(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION));
   }
@@ -1099,8 +1103,9 @@ class OidcCodeFlowTest {
   @Test
   void anUnknownClientIsAuditedWithTheNamedClientAsPrincipal() throws Exception {
     this.start(c -> {}, new TestProvider("direct", LOA3));
-    assertThatThrownBy(() -> this.send(get(AUTHZ_PATH, params("https://unknown.example.com"))))
-        .isInstanceOf(UnrecoverableErrorException.class);
+    final MockHttpServletResponse response = this.send(get(AUTHZ_PATH, params("https://unknown.example.com")));
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(response.getRedirectedUrl()).isNull();
 
     final AuditCollector audit = this.audit();
     assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
@@ -1119,7 +1124,7 @@ class OidcCodeFlowTest {
     this.start(c -> {}, new TestProvider("direct", LOA3));
     final Map<String, String> params = params(RSA_CLIENT);
     params.remove("client_id");
-    assertThatThrownBy(() -> this.send(get(AUTHZ_PATH, params))).isInstanceOf(UnrecoverableErrorException.class);
+    assertThat(this.send(get(AUTHZ_PATH, params)).getStatus()).isEqualTo(400);
 
     final AuditCollector audit = this.audit();
     assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
@@ -1127,6 +1132,21 @@ class OidcCodeFlowTest {
       assertThat(e.getPrincipal()).isEqualTo("unknown");
       assertThat(AuditCollector.data(e, "requester")).containsEntry("verified", false).doesNotContainKey("id");
     });
+  }
+
+  @Test
+  void anUnregisteredRedirectUriIsAuditedOnceWithTheNamedClient() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Map<String, String> params = params(RSA_CLIENT);
+    params.put("redirect_uri", "https://evil.example.com/cb");
+    final MockHttpServletResponse response = this.send(get(AUTHZ_PATH, params));
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(response.getRedirectedUrl()).isNull();
+
+    final AuditCollector audit = this.audit();
+    assertThat(audit.getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+    assertThat(AuditCollector.data(audit.get("authn_unrecoverable_error"), "error"))
+        .containsEntry("code", OidcUnrecoverableError.INVALID_REDIRECT_URI.getMessageCode());
   }
 
   @Test

@@ -16,9 +16,9 @@
 package se.swedenconnect.spring.authnserver.oidc.authnrequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import jakarta.servlet.Filter;
+import jakarta.servlet.RequestDispatcher;
 
 import java.io.IOException;
 import java.net.URI;
@@ -379,10 +379,10 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void anInvalidRequestObjectWithoutUsableRedirectUriIsUnrecoverable() {
+  void anInvalidRequestObjectWithoutUsableRedirectUriIsUnrecoverable() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = Map.of("client_id", CLIENT_ID, "request", "not-a-jwt");
-    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_AUTHN_REQUEST);
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_AUTHN_REQUEST, 400);
   }
 
   @Test
@@ -459,12 +459,12 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void aPublicClientIsAClientConfigurationError() {
+  void aPublicClientIsAClientConfigurationError() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params(PUBLIC_CLIENT_ID);
     params.put("code_challenge", CHALLENGE);
     params.put("code_challenge_method", "S256");
-    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION);
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION, 500);
   }
 
   @Test
@@ -517,36 +517,36 @@ class OidcAuthnRequestProcessingTest {
   // Errors
 
   @Test
-  void anUnknownClientIsUnrecoverable() {
+  void anUnknownClientIsUnrecoverable() throws Exception {
     this.start(c -> {});
-    this.assertUnrecoverable(get(params("https://unknown.example.com")), OidcUnrecoverableError.UNKNOWN_CLIENT);
+    this.assertUnrecoverable(get(params("https://unknown.example.com")), OidcUnrecoverableError.UNKNOWN_CLIENT, 400);
   }
 
   @Test
-  void aMissingClientIdIsUnrecoverable() {
+  void aMissingClientIdIsUnrecoverable() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
     params.remove("client_id");
-    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_AUTHN_REQUEST);
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_AUTHN_REQUEST, 400);
   }
 
   @Test
-  void aRegistryFailureIsToldApartFromAnUnknownClient() {
+  void aRegistryFailureIsToldApartFromAnUnknownClient() throws Exception {
     this.start(c -> {});
     backend.failing = true;
-    this.assertUnrecoverable(get(params()), OidcUnrecoverableError.CLIENT_LOOKUP_FAILED);
+    this.assertUnrecoverable(get(params()), OidcUnrecoverableError.CLIENT_LOOKUP_FAILED, 503);
   }
 
   @Test
-  void anInvalidOrMissingRedirectUriIsUnrecoverable() {
+  void anInvalidOrMissingRedirectUriIsUnrecoverable() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
     params.put("redirect_uri", "https://rp.example.com/other");
-    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI);
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
     params.put("redirect_uri", REDIRECT_URI + "/");
-    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI);
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
     params.remove("redirect_uri");
-    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI);
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
   }
 
   @Test
@@ -816,11 +816,11 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void aRegistryFailureDuringAcceptanceIsUnrecoverable() {
+  void aRegistryFailureDuringAcceptanceIsUnrecoverable() throws Exception {
     this.start(c -> c.configurableRequesterAcceptance()
         .addPredicate(new RequiredMarksRequesterPredicate(AuthenticationProtocol.OIDC, List.of(List.of(TRUST_MARK)))));
     backend.failOnRequestMark = true;
-    this.assertUnrecoverable(get(params()), OidcUnrecoverableError.CLIENT_LOOKUP_FAILED);
+    this.assertUnrecoverable(get(params()), OidcUnrecoverableError.CLIENT_LOOKUP_FAILED, 503);
   }
 
   // Helpers
@@ -852,8 +852,16 @@ class OidcAuthnRequestProcessingTest {
     return RESULT.get();
   }
 
-  private void assertUnrecoverable(final MockHttpServletRequest request, final OidcUnrecoverableError error) {
-    assertThatThrownBy(() -> this.send(request))
+  /**
+   * Asserts that the request ends at the error page with the expected status, and is never redirected.
+   */
+  private void assertUnrecoverable(final MockHttpServletRequest request, final OidcUnrecoverableError error,
+      final int status) throws Exception {
+    final MockHttpServletResponse response = this.send(request);
+    assertThat(response.getStatus()).isEqualTo(status);
+    assertThat(response.getRedirectedUrl()).isNull();
+    assertThat(response.getHeader("Location")).isNull();
+    assertThat(request.getAttribute(RequestDispatcher.ERROR_EXCEPTION))
         .isInstanceOfSatisfying(UnrecoverableErrorException.class, e -> assertThat(e.getError()).isEqualTo(error));
     assertThat(RESULT.get()).isNull();
   }

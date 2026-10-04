@@ -60,7 +60,7 @@ public class UnrecoverableErrorViewResolver implements ErrorViewResolver {
    * @param exception the exception, may be {@code null}
    * @return the error, or {@code null} if there is none
    */
-  private static @Nullable UnrecoverableErrorException findError(final @Nullable Object exception) {
+  static @Nullable UnrecoverableErrorException findError(final @Nullable Object exception) {
     Throwable t = exception instanceof final Throwable throwable ? throwable : null;
     while (t != null) {
       if (t instanceof final UnrecoverableErrorException error) {

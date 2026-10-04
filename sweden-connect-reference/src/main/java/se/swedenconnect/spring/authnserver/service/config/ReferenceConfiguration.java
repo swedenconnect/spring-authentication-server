@@ -28,14 +28,18 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.thymeleaf.spring6.SpringTemplateEngine;
+
+import jakarta.servlet.DispatcherType;
 
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
@@ -184,6 +188,21 @@ public class ReferenceConfiguration {
   @Bean
   UnrecoverableErrorViewResolver unrecoverableErrorViewResolver() {
     return new UnrecoverableErrorViewResolver();
+  }
+
+  /**
+   * Registers the filter that makes the error page the answer to every error that cannot be reported back to the
+   * requester, also when the request does not accept HTML.
+   *
+   * @return a {@link FilterRegistrationBean}
+   */
+  @Bean
+  FilterRegistrationBean<UnrecoverableErrorPageFilter> unrecoverableErrorPageFilter() {
+    final FilterRegistrationBean<UnrecoverableErrorPageFilter> registration =
+        new FilterRegistrationBean<>(new UnrecoverableErrorPageFilter());
+    registration.setDispatcherTypes(DispatcherType.ERROR);
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+    return registration;
   }
 
   /**

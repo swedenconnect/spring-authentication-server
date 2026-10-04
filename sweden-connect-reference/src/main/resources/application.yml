@@ -126,6 +126,7 @@ authn-server-reference:
       - http://id.elegnamnden.se/loa/1.0/loa3
       - http://id.swedenconnect.se/loa/1.0/uncertified-loa3
       - http://id.elegnamnden.se/loa/1.0/loa2
+      - http://id.elegnamnden.se/loa/1.0/loa4
       - http://id.elegnamnden.se/loa/1.0/eidas-nf-low
       - http://id.elegnamnden.se/loa/1.0/eidas-nf-sub
       - http://id.elegnamnden.se/loa/1.0/eidas-nf-high
@@ -134,6 +135,8 @@ authn-server-reference:
       - http://id.swedenconnect.se/ec/1.0/loa2-name
       - http://id.elegnamnden.se/ec/1.0/loa3-pnr
       - http://id.swedenconnect.se/ec/1.0/loa3-name
+      - http://id.elegnamnden.se/ec/1.0/loa4-pnr
+      - http://id.swedenconnect.se/ec/1.0/loa4-name
       - http://id.elegnamnden.se/ec/1.0/eidas-pnr-delivery
       - http://id.elegnamnden.se/sprop/1.0/scal2
       - http://id.elegnamnden.se/sprop/1.0/mobile-auth

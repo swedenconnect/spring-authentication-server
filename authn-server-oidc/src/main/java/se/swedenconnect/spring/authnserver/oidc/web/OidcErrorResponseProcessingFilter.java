@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.oidc.web;
 
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,7 +27,6 @@ import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.web.util.ThrowableAnalyzer;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -40,7 +40,6 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.audit.OidcAuditData;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorMapping;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorResponseException;
-import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseSender;
 import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseTarget;
 
@@ -53,12 +52,16 @@ import se.swedenconnect.spring.authnserver.oidc.response.OidcResponseTarget;
  * as an {@link UnrecoverableErrorException}.
  * </p>
  * <p>
- * An {@link UnrecoverableErrorException} for {@link OidcUnrecoverableError#UNSUPPORTED_RESPONSE_MODE} is answered with
- * HTTP status 400, as OpenID Connect Core, Section 3.1.2.6, requires. Other unrecoverable errors, and other
- * exceptions, are passed on.
+ * An {@link UnrecoverableErrorException} is never redirected to the client, see OAuth 2.0 (RFC 6749), Section 4.1.2.1.
+ * It is answered with the server's error page, through {@link HttpServletResponse#sendError(int, String)}, with the
+ * HTTP status of the error, see {@link se.swedenconnect.spring.authnserver.error.UnrecoverableError#getHttpStatus()},
+ * and with the exception as the {@link RequestDispatcher#ERROR_EXCEPTION} request attribute, the same way as an
+ * exception that leaves the filter chain. An unknown client, a missing {@code client_id} and a missing or unregistered
+ * redirect URI give 400, and a client that could not be looked up since a client source failed gives 503. Other
+ * exceptions are passed on.
  * </p>
  * <p>
- * An error response that is sent is audited as an {@code authn_error_response} event, and the HTTP status 400 as an
+ * An error response that is sent is audited as an {@code authn_error_response} event, and an unrecoverable error as an
  * {@code authn_unrecoverable_error} event.
  * </p>
  *
@@ -114,12 +117,13 @@ public class OidcErrorResponseProcessingFilter extends OncePerRequestFilter {
 
       if (this.throwableAnalyzer.getFirstThrowableOfType(UnrecoverableErrorException.class, causeChain)
           instanceof final UnrecoverableErrorException unrecoverable) {
-        if (unrecoverable.getError() == OidcUnrecoverableError.UNSUPPORTED_RESPONSE_MODE && !response.isCommitted()) {
-          this.eventPublisher.publishUnrecoverableError(request, unrecoverable);
-          response.sendError(HttpStatus.BAD_REQUEST.value(), unrecoverable.getMessage());
-          return;
+        if (response.isCommitted()) {
+          throw e;
         }
-        throw e;
+        this.eventPublisher.publishUnrecoverableError(request, unrecoverable);
+        request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, unrecoverable);
+        response.sendError(unrecoverable.getError().getHttpStatus(), unrecoverable.getMessage());
+        return;
       }
 
       final ErrorObject error;

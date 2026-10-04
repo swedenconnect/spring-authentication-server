@@ -18,9 +18,12 @@ package se.swedenconnect.spring.authnserver.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.http.HttpResponse;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import com.nimbusds.jose.util.JSONObjectUtils;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.autoconfigure.ConfiguredAuthnServer;
@@ -48,6 +51,20 @@ class PublishedInformationTest extends AbstractCompleteProfileTest {
         .contains(">Sweden Connect Reference IdP<", ">Sweden Connect Referens-IdP<")
         .contains(">Sweden Connect Reference Authentication Service<", ">Sweden Connect referens-legitimeringstjänst<")
         .doesNotContain("Reference OP", "Referens-OP");
+  }
+
+  @Test
+  void loa2Loa3AndLoa4AreOfferedByBothProtocols() throws Exception {
+    final HttpResponse<String> saml = new TestBrowser().get(BASE_URL + "/saml2/metadata");
+    assertThat(saml.body())
+        .contains(">" + SamlFlowTest.LOA2 + "<", ">" + SamlFlowTest.LOA3 + "<", ">" + SamlFlowTest.LOA4 + "<")
+        .contains(">http://id.elegnamnden.se/ec/1.0/loa4-pnr<");
+
+    final HttpResponse<String> discovery = new TestBrowser().get(BASE_URL + "/.well-known/openid-configuration");
+    assertThat(discovery.statusCode()).isEqualTo(200);
+    final Map<String, Object> document = JSONObjectUtils.parse(discovery.body());
+    assertThat(JSONObjectUtils.getStringList(document, "acr_values_supported"))
+        .contains(OidcFlowTest.LOA2, OidcFlowTest.LOA3, OidcFlowTest.LOA4);
   }
 
   @Test

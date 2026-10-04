@@ -635,11 +635,15 @@ authn-server:
 <a name="oidc-clients"></a>
 ### Clients
 
-The OpenID Provider needs at least one source of clients, and the application does not start without one. The
-simplest source is `authn-server.oidc.clients`, a list where each entry is either a file or one client given inline.
-Clients from a client repository or from OpenID Federation are added in an
-[adapter](#adjusting-the-configuration-in-code), see
-[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends).
+The OpenID Provider takes its clients from two sources that are set up with properties: the configured clients of
+`authn-server.oidc.clients`, described here, and the clients resolved through OpenID Federation, see
+[Clients from OpenID Federation](#oidc-federation-clients). An OpenID Provider may use either of them, or both, in which
+case the configured clients are asked first. A client repository, or a client source of the application's own, is
+added in an [adapter](#adjusting-the-configuration-in-code), see
+[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends). An OpenID Provider without any
+client source does not start.
+
+`authn-server.oidc.clients` is a list where each entry is either a file or one client given inline.
 
 | Property | Description |
 | :--- | :--- |

@@ -507,6 +507,15 @@ The core defines the two that do not depend on a protocol, in
 [`CommonUnrecoverableError`][CommonUnrecoverableError]: an internal error and an invalid session. Each protocol module
 adds its own as its request processing is built, which is why `UnrecoverableError` is an interface and not an enum.
 
+The error page is the application's own, chosen through Spring Boot's error handling: a view for the `/error`
+dispatch that finds the `UnrecoverableErrorException` in the `jakarta.servlet.error.exception` request attribute and
+shows the message that its message code resolves to. An error may give the HTTP status of the page,
+`getHttpStatus()`, which the OpenID Provider uses for the errors of the authorization endpoint, see
+[Failures](openid-provider.html#failures); the default is 500. The Sweden Connect reference shows how, with
+[`UnrecoverableErrorViewResolver`](https://github.com/swedenconnect/spring-authentication-server/blob/main/sweden-connect-reference/src/main/java/se/swedenconnect/spring/authnserver/service/config/UnrecoverableErrorViewResolver.java),
+and with a filter that makes the page the answer also when the request does not accept HTML, since Spring Boot answers
+such a request with JSON.
+
 ## Modules with pages of their own
 
 Most modules cannot authenticate the user inside the call to `authenticate`. They need to show a login screen, poll a

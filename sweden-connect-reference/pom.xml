@@ -34,6 +34,8 @@
   <properties>
     <flexmark.version>0.64.8</flexmark.version>
     <jsoup.version>1.23.2</jsoup.version>
+    <!-- The architecture of the image that jib:dockerBuild@local builds. Set by the profiles below. -->
+    <jib.local.architecture>amd64</jib.local.architecture>
   </properties>
 
   <dependencies>
@@ -184,7 +186,8 @@
 
       <!--
         The container image. Neither execution runs in the normal build:
-          mvn jib:dockerBuild@local - builds local/sweden-connect-reference-authn-server:<version> to the local Docker
+          mvn jib:dockerBuild@local - builds local/sweden-connect-reference-authn-server:<version> to the local Docker,
+                                      for the architecture of the machine it runs on
           mvn jib:build             - builds for linux/amd64 and linux/arm64 and pushes to ghcr.io
         -->
       <plugin>
@@ -226,6 +229,14 @@
               <goal>dockerBuild</goal>
             </goals>
             <configuration>
+              <from>
+                <platforms>
+                  <platform>
+                    <os>linux</os>
+                    <architecture>${jib.local.architecture}</architecture>
+                  </platform>
+                </platforms>
+              </from>
               <to>
                 <image>local/${project.artifactId}</image>
                 <tags>
@@ -284,6 +295,34 @@
 
         </plugins>
       </build>
+    </profile>
+
+    <!--
+      The local image is built for the architecture of the machine. The JVM reports arm64 as aarch64 (or arm64), and
+      Docker names it arm64. Any other machine gets amd64.
+      -->
+    <profile>
+      <id>local-image-aarch64</id>
+      <activation>
+        <os>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <jib.local.architecture>arm64</jib.local.architecture>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>local-image-arm64</id>
+      <activation>
+        <os>
+          <arch>arm64</arch>
+        </os>
+      </activation>
+      <properties>
+        <jib.local.architecture>arm64</jib.local.architecture>
+      </properties>
     </profile>
 
   </profiles>

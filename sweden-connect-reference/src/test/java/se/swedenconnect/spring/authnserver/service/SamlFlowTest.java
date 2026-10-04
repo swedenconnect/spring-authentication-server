@@ -75,6 +75,8 @@ class SamlFlowTest extends AbstractCompleteProfileTest {
 
   static final String LOA2 = "http://id.elegnamnden.se/loa/1.0/loa2";
 
+  static final String LOA4 = "http://id.elegnamnden.se/loa/1.0/loa4";
+
   static final String USER = "197705232382";
 
   static final String OTHER_USER = "188803099368";
@@ -113,6 +115,26 @@ class SamlFlowTest extends AbstractCompleteProfileTest {
     assertThat(TestBrowser.startTag(next, "selectSimulatedUser")).doesNotContain("disabled");
     assertThat(TestBrowser.selectedOption(next, "selectSimulatedUser")).isEqualTo(USER);
     assertThat(TestBrowser.selectedOption(next, "selectLoa")).isEqualTo(LOA2);
+  }
+
+  @Test
+  void aUserIsAuthenticatedAtLoa4() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final HttpResponse<String> page = this.startAuthentication(browser, SP, r -> r.setRequestedAuthnContext(
+        RequestedAuthnContextBuilder.builder()
+            .comparison(AuthnContextComparisonTypeEnumeration.EXACT)
+            .authnContextClassRefs(LOA4)
+            .build()));
+    assertThat(page.statusCode()).isEqualTo(200);
+    // A single level of assurance is not offered as a choice
+    assertThat(TestBrowser.inputValue(page.body(), "loa")).isEqualTo(LOA4);
+
+    final Assertion assertion = this.assertion(this.complete(browser, page.body(), Map.of(
+        "action", "ok",
+        "personalIdentityNumber", USER,
+        "loa", LOA4)));
+    assertThat(assertion.getAuthnStatements().getFirst().getAuthnContext().getAuthnContextClassRef().getURI())
+        .isEqualTo(LOA4);
   }
 
   @Test

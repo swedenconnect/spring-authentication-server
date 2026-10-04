@@ -70,7 +70,14 @@ final class TestBrowser {
    * Sends a GET request.
    */
   HttpResponse<String> get(final String url) throws Exception {
-    return this.client.send(HttpRequest.newBuilder(URI.create(url)).header("Accept", ACCEPT).GET().build(),
+    return this.get(url, ACCEPT);
+  }
+
+  /**
+   * Sends a GET request with the supplied Accept header.
+   */
+  HttpResponse<String> get(final String url, final String accept) throws Exception {
+    return this.client.send(HttpRequest.newBuilder(URI.create(url)).header("Accept", accept).GET().build(),
         HttpResponse.BodyHandlers.ofString());
   }
 

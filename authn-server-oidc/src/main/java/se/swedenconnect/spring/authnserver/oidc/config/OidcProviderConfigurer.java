@@ -1025,9 +1025,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** {@inheritDoc} */
   @Override
   protected @NonNull String getMissingClientRegistryBackendHint() {
-    return "assign clients with authn-server.oidc.clients, or add a client registry backend (configured clients, "
-        + "a client repository, OpenID Federation or one of the application's own) in an "
-        + "AuthnServerConfigurerAdapter";
+    return "assign clients with authn-server.oidc.clients, resolve clients through OpenID Federation with "
+        + "authn-server.oidc.federation.clients, or add a client registry backend (configured clients, a client "
+        + "repository or one of the application's own) in an AuthnServerConfigurerAdapter";
   }
 
   /**

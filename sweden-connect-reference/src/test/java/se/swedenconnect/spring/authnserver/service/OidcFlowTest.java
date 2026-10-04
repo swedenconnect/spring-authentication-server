@@ -73,6 +73,8 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
 
   static final String LOA2 = "http://id.elegnamnden.se/loa/1.0/loa2";
 
+  static final String LOA4 = "http://id.elegnamnden.se/loa/1.0/loa4";
+
   static final String USER = "197705232382";
 
   static final String NATURAL_PERSON_NUMBER = "https://id.oidc.se/scope/naturalPersonNumber";
@@ -118,6 +120,25 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
     final JWTClaimsSet userInfo = this.userInfo(tokens.getOIDCTokens().getBearerAccessToken());
     assertThat(userInfo.getSubject()).isEqualTo(idClaims.getSubject());
     assertThat(userInfo.getStringClaim(ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME)).isEqualTo(USER);
+  }
+
+  @Test
+  void aUserIsAuthenticatedAtLoa4() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final Map<String, String> request = authorizationRequest("openid " + NATURAL_PERSON_NUMBER);
+    request.put("acr_values", LOA4);
+
+    final HttpResponse<String> page = browser.follow(browser.get(authorizeUrl(request)), BASE_URL);
+    assertThat(page.statusCode()).isEqualTo(200);
+    // A single level of assurance is not offered as a choice
+    assertThat(TestBrowser.inputValue(page.body(), "loa")).isEqualTo(LOA4);
+
+    final Map<String, String> response = this.complete(browser, page.body(), Map.of(
+        "action", "ok",
+        "personalIdentityNumber", USER,
+        "loa", LOA4));
+    final OIDCTokenResponse tokens = this.token(response.get("code"));
+    assertThat(tokens.getOIDCTokens().getIDToken().getJWTClaimsSet().getStringClaim("acr")).isEqualTo(LOA4);
   }
 
   @Test

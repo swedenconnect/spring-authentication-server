@@ -278,12 +278,14 @@ the `state` of the request. The second part checks the request and builds the re
 ### Clients
 
 The clients are found in the client registry, through its OpenID Connect backends and in their configured order, see
-[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends). The OpenID Provider needs at
-least one client source, and the application does not start without one.
+[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends).
 
 Clients that the deployment configures itself are given with `authn-server.oidc.clients`, in JSON files or inline, see
-[Clients](configuration.html#oidc-clients). A client repository, OpenID Federation, or a client source of the
-application's own, is added in an [adapter](configuration.html#adjusting-the-configuration-in-code):
+[Clients](configuration.html#oidc-clients), and clients resolved through OpenID Federation with
+`authn-server.oidc.federation.clients`, see [Clients from OpenID Federation](configuration.html#oidc-federation-clients).
+An OpenID Provider may use either, or both, in which case the configured clients are asked first. An OpenID Provider
+without any client source does not start. A client repository, or a client source of the application's own, is added
+in an [adapter](configuration.html#adjusting-the-configuration-in-code):
 
 ```java
 @Bean
@@ -441,28 +443,33 @@ are read, as plain parameters or from a request object.
 <a name="failures"></a>
 ### Failures
 
-Until the client and the redirect URI are known, there is nowhere safe to send a response. Failures up to that point
-end at the OpenID Provider as an `UnrecoverableErrorException`, with one of the errors of
-[`OidcUnrecoverableError`][OidcUnrecoverableError]. After that point, a failure is sent to the redirect URI as an error
-response, with an `error_description` meant for the client's logs.
+Until the client and the redirect URI are known, there is nowhere safe to send a response, and OAuth 2.0 (RFC 6749),
+Section 4.1.2.1, forbids redirecting the user to a redirect URI that is missing, invalid or not registered, or for a
+client that is missing or invalid. Failures up to that point end at the OpenID Provider as an
+`UnrecoverableErrorException`, with one of the errors of [`OidcUnrecoverableError`][OidcUnrecoverableError]. The user is
+shown the server's error page, never a redirect, with the HTTP status of the error: the response is sent with
+`sendError`, with the exception as the `jakarta.servlet.error.exception` request attribute, so the error page is chosen
+the same way as for the unrecoverable errors of SAML. Each is audited as an `authn_unrecoverable_error` event, with the
+`client_id` as the request names it. After that point, a failure is sent to the redirect URI as an error response, with
+an `error_description` meant for the client's logs.
 
 | Failure | Outcome |
 | :--- | :--- |
-| `client_id` is missing | Unrecoverable (`INVALID_AUTHN_REQUEST`) |
-| The client is not known | Unrecoverable (`UNKNOWN_CLIENT`) |
-| The client is registered with the token endpoint authentication method `none` | Unrecoverable (`INVALID_CLIENT_CONFIGURATION`) |
-| The client registry fails when the client is looked up | Unrecoverable (`CLIENT_LOOKUP_FAILED`) |
-| `redirect_uri` is missing or not registered | Unrecoverable (`INVALID_REDIRECT_URI`) |
-| `response_mode` is not `query` or `form_post` | HTTP status 400 (`UNSUPPORTED_RESPONSE_MODE`) |
-| The request object cannot be fetched or decoded, and the plain parameters give no redirect URI | Unrecoverable (`INVALID_AUTHN_REQUEST`) |
-| The client asks for an encrypted ID token with algorithms that are not allowed, or has no key for them | Unrecoverable (`INVALID_CLIENT_CONFIGURATION`) |
+| `client_id` is missing | Error page, 400 (`INVALID_AUTHN_REQUEST`) |
+| The client is not known | Error page, 400 (`UNKNOWN_CLIENT`) |
+| The client is registered with the token endpoint authentication method `none` | Error page, 500 (`INVALID_CLIENT_CONFIGURATION`) |
+| A client source fails when the client is looked up, for example a federation resolver that cannot be reached, so the OpenID Provider cannot tell whether the client exists | Error page, 503 (`CLIENT_LOOKUP_FAILED`) |
+| `redirect_uri` is missing or not registered | Error page, 400 (`INVALID_REDIRECT_URI`) |
+| `response_mode` is not `query` or `form_post` | Error page, 400 (`UNSUPPORTED_RESPONSE_MODE`) |
+| The request object cannot be fetched or decoded, and the plain parameters give no redirect URI | Error page, 400 (`INVALID_AUTHN_REQUEST`) |
+| The client asks for an encrypted ID token with algorithms that are not allowed, or has no key for them | Error page, 500 (`INVALID_CLIENT_CONFIGURATION`) |
 | `request_uri` is not registered, or cannot be fetched | `invalid_request_uri` |
 | The request object is invalid, not signed when it must be, or signed with the wrong algorithm | `invalid_request_object` |
 | `response_type` is not `code` | `unsupported_response_type` |
 | A parameter is missing or invalid, such as `scope` without `openid`, `state`, `prompt`, `max_age` or `id_token_hint` | `invalid_request` |
 | PKCE is missing when required, or uses `plain`, also by leaving out `code_challenge_method` | `invalid_request` |
 | The client is not accepted | `unauthorized_client` |
-| The client registry fails during the acceptance check | Unrecoverable (`CLIENT_LOOKUP_FAILED`) |
+| The client registry fails during the acceptance check | Error page, 503 (`CLIENT_LOOKUP_FAILED`) |
 | None of the essential `acr` values is supported | `unmet_authentication_requirements` |
 | The user message or the signature request is invalid | `invalid_request` |
 

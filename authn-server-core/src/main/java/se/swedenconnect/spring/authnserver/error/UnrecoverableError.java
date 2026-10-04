@@ -43,4 +43,13 @@ public interface UnrecoverableError {
    */
   @NonNull String getDescription();
 
+  /**
+   * Gets the HTTP status that the error page is shown with, when the protocol sets one. The default is 500.
+   *
+   * @return the HTTP status
+   */
+  default int getHttpStatus() {
+    return 500;
+  }
+
 }

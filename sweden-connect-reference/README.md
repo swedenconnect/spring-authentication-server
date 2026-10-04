@@ -54,8 +54,10 @@ The image exposes port 8443 for the service and port 8444 for the Actuator.
 
 The [default configuration](src/main/resources/application.yml) holds defaults only. It ships no base URL, entity ID,
 issuer, metadata, keys or key stores, so the service does not start until the deployment supplies them. When something
-is missing, startup fails with a list of the settings to add. The OpenID Connect clients are not on that list; when
-they are missing, the server itself stops startup with a message that names `authn-server.oidc.clients`:
+is missing, startup fails with a list of the settings to add. The OpenID Connect clients are not on that list. The
+OpenID Provider takes its clients from `authn-server.oidc.clients`, from an OpenID Federation, or from both, see
+[OpenID Connect clients](#openid-connect-clients); with neither, the server itself stops startup with a message that
+names what to add:
 
 ```
 The Sweden Connect reference authentication server has no defaults for these settings, and the deployment has not
@@ -96,7 +98,7 @@ required when the protocol is enabled; both are enabled by default.
 | `authn-server.saml.metadata-providers[]` | The sources of the SAML Service Provider metadata, for example the metadata of the Sweden Connect federation. See [Service Provider metadata](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#sp-metadata). |
 | `authn-server.oidc.issuer` | The issuer identifier of the OpenID Provider. It is also its OpenID Federation entity identifier. It must be the base URL, or begin with it. |
 | `authn-server.oidc.keys.signing[]` | The signing keys of the OpenID Provider. See [Keys](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-keys). |
-| `authn-server.oidc.clients[]` | The OpenID Connect clients, in JSON files or inline, see [OpenID Connect clients](#openid-connect-clients). |
+| `authn-server.oidc.clients[]` | The OpenID Connect clients, in JSON files or inline, unless every client is resolved through an OpenID Federation, see [OpenID Connect clients](#openid-connect-clients). |
 
 The keys are configured through [credentials-support](https://docs.swedenconnect.se/credentials-support/), preferably as
 credential bundles that the settings refer to. A complete example:
@@ -211,6 +213,12 @@ client the same treatment as a federation client that holds a trust mark of that
 
 The clients are read at startup only, so a changed file takes effect when the service is restarted. They become the
 `properties` source of the [client registry](https://docs.swedenconnect.se/spring-authentication-server/client-registry.html#openid-connect-three-backends).
+
+A deployment that joins an OpenID Federation also, or instead, accepts clients resolved through the federation, with
+`authn-server.oidc.federation.clients` and the trust anchor, see
+[Clients from OpenID Federation](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-federation-clients).
+The configured clients are asked first, so a configured client wins over what the federation says about the same
+`client_id`.
 The `client_name` and `logo_uri` of a client are shown on the pages, in the language of the page where the metadata
 gives one. Only `private_key_jwt` is enabled at the token endpoint by default, see
 [The token endpoint and tokens](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-token-endpoint)
