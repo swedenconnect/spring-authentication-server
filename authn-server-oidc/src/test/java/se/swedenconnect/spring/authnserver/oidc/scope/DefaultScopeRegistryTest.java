@@ -77,8 +77,8 @@ class DefaultScopeRegistryTest {
 
   @Test
   void theSignApprovalScopeAsksForNoClaims() {
-    assertThat(BuiltInScopes.SIGN_APPROVAL.getValue()).isEqualTo("https://id.oidc.se/scope/signApproval");
-    assertThat(BuiltInScopes.SIGN_APPROVAL.getClaimRequirements()).isNull();
+    assertThat(ScopeConstants.SIGN_APPROVAL.getValue()).isEqualTo("https://id.oidc.se/scope/signApproval");
+    assertThat(ScopeConstants.SIGN_APPROVAL.getClaimRequirements()).isNull();
   }
 
   @Test

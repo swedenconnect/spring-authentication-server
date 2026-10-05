@@ -59,7 +59,6 @@ import se.swedenconnect.spring.authnserver.message.GenericSignMessage;
 import se.swedenconnect.spring.authnserver.message.GenericUserMessage;
 import se.swedenconnect.spring.authnserver.message.LocalizedMessage;
 import se.swedenconnect.spring.authnserver.oidc.authentication.OidcAuthenticationRequirements;
-import se.swedenconnect.spring.authnserver.oidc.scope.BuiltInScopes;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
@@ -447,7 +446,7 @@ public class SimulatedAuthenticationController
     }
     if (requirements instanceof final OidcAuthenticationRequirements oidc) {
       return oidc.getScopes().contains(ScopeConstants.SIGN.getValue())
-          || oidc.getScopes().contains(BuiltInScopes.SIGN_APPROVAL.getValue());
+          || oidc.getScopes().contains(ScopeConstants.SIGN_APPROVAL.getValue());
     }
     return false;
   }

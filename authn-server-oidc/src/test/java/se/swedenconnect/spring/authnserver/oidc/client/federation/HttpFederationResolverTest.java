@@ -64,7 +64,7 @@ class HttpFederationResolverTest extends FederationTestSupport {
     assertThat(resolved.expiresAt()).isEqualTo(expiresAt);
     assertThat(client.lastResolveRequest.subject()).isEqualTo(CLIENT_ID);
     assertThat(client.lastResolveRequest.trustAnchor()).isEqualTo(TRUST_ANCHOR);
-    assertThat(client.lastResolveRequest.type()).isEqualTo("openid_relying_party");
+    assertThat(client.lastResolveRequest.types()).containsExactly("openid_relying_party");
   }
 
   @Test

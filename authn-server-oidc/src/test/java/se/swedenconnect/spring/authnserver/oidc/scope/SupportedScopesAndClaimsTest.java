@@ -61,7 +61,7 @@ class SupportedScopesAndClaimsTest {
 
     assertThat(result.scopes()).containsExactlyInAnyOrder(OPENID, PROFILE, NATURAL_PERSON_INFO);
     assertThat(result.scopes()).doesNotContain(NATURAL_PERSON_NUMBER, OidcScopeValue.EMAIL.getValue(), SIGN,
-        BuiltInScopes.SIGN_APPROVAL.getValue());
+        ScopeConstants.SIGN_APPROVAL.getValue());
     assertThat(result.scopes().getFirst()).isEqualTo(OPENID);
   }
 
@@ -85,11 +85,11 @@ class SupportedScopesAndClaimsTest {
   @Test
   void aProviderThatDeclaresScopesOffersExactlyThose() {
     final TestAuthenticationProvider declaring = new TestAuthenticationProvider("declaring", List.of(),
-        List.of(AttributeIdentifiers.GIVEN_NAME), List.of(BuiltInScopes.SIGN_APPROVAL.getValue()));
+        List.of(AttributeIdentifiers.GIVEN_NAME), List.of(ScopeConstants.SIGN_APPROVAL.getValue()));
 
     final SupportedScopesAndClaims result = this.resolve(List.of(declaring), null, null);
 
-    assertThat(result.scopes()).containsExactly(OPENID, BuiltInScopes.SIGN_APPROVAL.getValue());
+    assertThat(result.scopes()).containsExactly(OPENID, ScopeConstants.SIGN_APPROVAL.getValue());
     assertThat(result.claims()).containsExactly("given_name", "sub");
   }
 

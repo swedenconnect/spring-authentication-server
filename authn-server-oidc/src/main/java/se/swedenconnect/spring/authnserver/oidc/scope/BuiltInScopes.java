@@ -29,7 +29,8 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.OidcClaimConstants;
  * define.
  * <p>
  * The scopes of OpenID Connect Core are found in {@link OidcScopeValue} and the scopes of the Claims and Scopes
- * Specification for the Swedish OpenID Connect Profile in {@link ScopeConstants}.
+ * Specification for the Swedish OpenID Connect Profile and of the Signature Extension for OpenID Connect in
+ * {@link ScopeConstants}.
  * </p>
  *
  * @author Martin Lindström
@@ -38,13 +39,6 @@ public class BuiltInScopes {
 
   /** The prefix for scopes defined by Sweden Connect. */
   public static final String SWEDEN_CONNECT_SCOPE_PREFIX = "https://id.swedenconnect.se/scope/";
-
-  /**
-   * The signature approval scope of the Signature Extension for OpenID Connect. It tells the OpenID Provider that the
-   * request is a request for signature approval, and asks for no claims of its own.
-   */
-  public static final OidcScopeValue SIGN_APPROVAL =
-      new OidcScopeValue("https://id.oidc.se/scope/signApproval", null);
 
   /**
    * The eIDAS natural person identity scope of the OpenID Connect Claims and Scopes Specification for Sweden Connect.
@@ -83,7 +77,7 @@ public class BuiltInScopes {
         ScopeConstants.NATURAL_PERSON_PERSONAL_NUMBER,
         ScopeConstants.NATURAL_PERSON_ORGANIZATIONAL_IDENTITY,
         ScopeConstants.SIGN,
-        SIGN_APPROVAL,
+        ScopeConstants.SIGN_APPROVAL,
         EIDAS_NATURAL_PERSON_IDENTITY,
         EIDAS_SWEDISH_IDENTITY);
   }

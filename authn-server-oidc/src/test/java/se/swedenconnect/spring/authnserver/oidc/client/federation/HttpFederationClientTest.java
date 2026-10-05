@@ -90,7 +90,7 @@ class HttpFederationClientTest extends FederationTestSupport {
     final int port = this.startServer();
 
     final SignedJWT answer = new HttpFederationClient().resolve(new FederationRequest<>(
-        new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, "openid_relying_party", Boolean.FALSE),
+        new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, List.of("openid_relying_party"), Boolean.FALSE),
         Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT,
             "http://localhost:%d/resolve".formatted(port))));
 
@@ -101,6 +101,36 @@ class HttpFederationClientTest extends FederationTestSupport {
         .contains("sub=https%3A%2F%2Fclient.example.com")
         .contains("trust_anchor=https%3A%2F%2Fta.example.com")
         .contains("entity_type=openid_relying_party");
+  }
+
+  @Test
+  void eachEntityTypeIsSentAsAParameterOfItsOwn() throws Exception {
+    final ECKey key = key("k1");
+    this.body = resolveResponse(key, RESOLVER, CLIENT_ID, clientMetadata("The Client"),
+        Set.of(), Instant.now().plus(1, ChronoUnit.HOURS)).serialize();
+    final int port = this.startServer();
+
+    new HttpFederationClient().resolve(new FederationRequest<>(
+        new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, List.of("openid_relying_party", "federation_entity"),
+            Boolean.FALSE),
+        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, "http://localhost:%d/resolve".formatted(port))));
+
+    assertThat(this.queries).hasSize(1);
+    assertThat(this.queries.get(0))
+        .contains("entity_type=openid_relying_party&entity_type=federation_entity");
+  }
+
+  @Test
+  void noEntityTypeParameterIsSentWithoutTypes() throws Exception {
+    final ECKey key = key("k1");
+    this.body = resolveResponse(key, RESOLVER, CLIENT_ID, clientMetadata("The Client"),
+        Set.of(), Instant.now().plus(1, ChronoUnit.HOURS)).serialize();
+    final int port = this.startServer();
+
+    new HttpFederationClient().resolve(this.resolveRequest(port));
+
+    assertThat(this.queries).hasSize(1);
+    assertThat(this.queries.get(0)).doesNotContain("entity_type");
   }
 
   @Test

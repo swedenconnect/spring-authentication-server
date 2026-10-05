@@ -112,8 +112,10 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
     final StringBuilder query = new StringBuilder();
     appendParameter(query, "sub", parameters.subject());
     appendParameter(query, "trust_anchor", parameters.trustAnchor());
-    if (StringUtils.hasText(parameters.type())) {
-      appendParameter(query, "entity_type", parameters.type());
+    if (parameters.types() != null) {
+      parameters.types().stream()
+          .filter(StringUtils::hasText)
+          .forEach(type -> appendParameter(query, "entity_type", type));
     }
     final String endpoint = endpoint(request, FEDERATION_RESOLVE_ENDPOINT);
     return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,

@@ -37,7 +37,6 @@ import se.swedenconnect.spring.authnserver.authentication.provider.redirect.Abst
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.ResumedAuthenticationToken;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
-import se.swedenconnect.spring.authnserver.oidc.scope.BuiltInScopes;
 import se.swedenconnect.spring.authnserver.service.users.SimulatedUser;
 
 /**
@@ -67,7 +66,7 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
       ScopeConstants.NATURAL_PERSON_INFO.getValue(),
       ScopeConstants.NATURAL_PERSON_PERSONAL_NUMBER.getValue(),
       ScopeConstants.SIGN.getValue(),
-      BuiltInScopes.SIGN_APPROVAL.getValue());
+      ScopeConstants.SIGN_APPROVAL.getValue());
 
   /** The name of the provider. */
   private final String name;

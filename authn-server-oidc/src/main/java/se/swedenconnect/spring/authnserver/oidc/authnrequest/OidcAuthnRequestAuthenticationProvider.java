@@ -55,6 +55,7 @@ import net.minidev.json.JSONObject;
 
 import se.oidc.nimbus.claims.ParameterConstants;
 import se.oidc.nimbus.claims.ScopeConstants;
+import se.oidc.nimbus.signrequest.SignRequest;
 import se.oidc.nimbus.usermessage.UserMessage;
 import se.swedenconnect.spring.authnserver.audit.AuditFlowData;
 import se.swedenconnect.spring.authnserver.audit.AuditRequester;
@@ -73,7 +74,6 @@ import se.swedenconnect.spring.authnserver.oidc.error.OidcErrorResponseException
 import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
-import se.swedenconnect.spring.authnserver.oidc.scope.BuiltInScopes;
 import se.swedenconnect.spring.authnserver.oidc.token.IdTokenBuilder;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
@@ -568,7 +568,7 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
       throws OidcErrorResponseException {
 
     final boolean sign = scopes.contains(ScopeConstants.SIGN.getValue());
-    final boolean signApproval = scopes.contains(BuiltInScopes.SIGN_APPROVAL.getValue());
+    final boolean signApproval = scopes.contains(ScopeConstants.SIGN_APPROVAL.getValue());
     if (!sign && !signApproval) {
       if (getParameter(token, ParameterConstants.SIGN_REQUEST_PARAM_NAME) != null) {
         log.debug("Signature request received without a sign scope - ignored [{}]", logString);
@@ -603,37 +603,48 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
           token.getClientMetadata(), "signature request", logString).claims().toJSONObject();
     }
 
-    final Object tbsData = signRequest.get("tbs_data");
-    if (sign && !(tbsData instanceof String)) {
+    if (signRequest.get("tbs_data") != null && !(signRequest.get("tbs_data") instanceof String)) {
+      throw invalidRequest("The tbs_data of the signature request is not a string", logString);
+    }
+    final SignRequest parsed;
+    try {
+      parsed = SignRequest.parse(new JSONObject(signRequest));
+    }
+    catch (final com.nimbusds.oauth2.sdk.ParseException e) {
+      throw invalidRequest("Invalid signature request - " + e.getMessage(), logString);
+    }
+    // The library leaves the check of tbs_data against the scope to the caller ...
+    final String tbsData = parsed.getTbsData() != null ? parsed.getTbsData().toString() : null;
+    if (sign && tbsData == null) {
       throw invalidRequest("The signature request has no tbs_data", logString);
     }
     if (!sign && tbsData != null) {
       throw invalidRequest("The signature request must not hold tbs_data for signature approval", logString);
     }
-    if (!(signRequest.get("sign_message") instanceof final Map<?, ?> signMessage)) {
-      throw invalidRequest("The signature request has no sign_message", logString);
-    }
     try {
-      final UserMessage message = UserMessage.parse(new JSONObject(toStringKeyMap(signMessage)));
+      final UserMessage message = parsed.getSignMessage();
       final GenericSignMessage result = new GenericSignMessage(toLocalizedMessages(message),
-          toMimeType(message.getMimeType()), true, (String) tbsData);
+          toMimeType(message.getMimeType()), true, tbsData);
       log.debug("Signature request present - {} [{}]", sign ? "sign" : "sign approval", logString);
       return result;
     }
-    catch (final com.nimbusds.oauth2.sdk.ParseException | IllegalArgumentException e) {
+    catch (final IllegalArgumentException e) {
       throw invalidRequest("Invalid signature request - " + e.getMessage(), logString);
     }
   }
 
   /**
-   * Turns the messages of a {@link UserMessage} into localized messages.
+   * Turns the messages of a {@link UserMessage} into localized messages. {@link UserMessage} has decoded the Base64
+   * encoding of each message, and {@link LocalizedMessage} holds it encoded, so the text is encoded again.
    *
    * @param message the message
    * @return the localized messages
+   * @throws IllegalArgumentException for an empty message
    */
   private static @NonNull List<LocalizedMessage> toLocalizedMessages(final @NonNull UserMessage message) {
     return message.getMessages().stream()
-        .map(m -> new LocalizedMessage(m.getLanguage() != null ? m.getLanguage().toString() : null, m.getMessage()))
+        .map(m -> LocalizedMessage.ofText(m.getLanguage() != null ? m.getLanguage().toString() : null,
+            m.getMessage()))
         .toList();
   }
 

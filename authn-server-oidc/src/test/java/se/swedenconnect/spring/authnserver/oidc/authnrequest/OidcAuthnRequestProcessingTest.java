@@ -700,6 +700,36 @@ class OidcAuthnRequestProcessingTest {
     html.put("mime_type", "text/html");
     params.put(ParameterConstants.USER_MESSAGE_PARAM_NAME, html.toJSONString());
     assertError(this.send(get(params)), "invalid_request", "state-1");
+
+    // Not Base64
+    final JSONObject notBase64 = new JSONObject();
+    notBase64.put("message#sv", "Hej på dig");
+    params.put(ParameterConstants.USER_MESSAGE_PARAM_NAME, notBase64.toJSONString());
+    assertError(this.send(get(params)), "invalid_request", "state-1");
+
+    // Empty
+    final JSONObject empty = new JSONObject();
+    empty.put("message", "");
+    params.put(ParameterConstants.USER_MESSAGE_PARAM_NAME, empty.toJSONString());
+    assertError(this.send(get(params)), "invalid_request", "state-1");
+  }
+
+  @Test
+  void aUserMessageIsHandedOnWithItsText() throws Exception {
+    this.start(c -> oidc(c).supportsUserMessage(true));
+    final Map<String, String> params = params();
+    final JSONObject message = new JSONObject();
+    message.put("message", encode("Välkommen – åäö"));
+    message.put("message#en", encode(" "));
+    params.put(ParameterConstants.USER_MESSAGE_PARAM_NAME, message.toJSONString());
+
+    final GenericUserMessage userMessage = requirements(this.process(get(params))).getUserMessage();
+    assertThat(userMessage).isNotNull();
+    assertThat(userMessage.getMimeType()).isEqualTo(MessageMimeType.TEXT_PLAIN);
+    assertThat(userMessage.getDefaultMessage()).isNotNull();
+    assertThat(userMessage.getDefaultMessage().getText()).isEqualTo("Välkommen – åäö");
+    assertThat(userMessage.getDefaultMessage().message()).isEqualTo(encode("Välkommen – åäö"));
+    assertThat(userMessage.getMessage("en").getText()).isEqualTo(" ");
   }
 
   @Test
@@ -778,6 +808,71 @@ class OidcAuthnRequestProcessingTest {
         .claim("prompt", "login consent")
         .claim(ParameterConstants.SIGN_REQUEST_PARAM_NAME, signRequest(false)).build()).serialize());
     assertError(this.send(post(params)), "invalid_request", "state-1");
+  }
+
+  @Test
+  void signRequestsWithInvalidContentsAreRejected() throws Exception {
+    this.start(c -> {});
+    final Map<String, String> params = params();
+    params.put("scope", "openid " + SIGN_SCOPE);
+    params.put("prompt", "login consent");
+
+    // tbs_data is not Base64
+    Map<String, Object> signRequest = signRequest(true);
+    signRequest.put("tbs_data", "not Base64!");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+
+    // tbs_data is empty
+    signRequest.put("tbs_data", "");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+
+    // tbs_data is not a string
+    signRequest.put("tbs_data", 1234);
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+
+    // No sign_message
+    signRequest = signRequest(true);
+    signRequest.remove("sign_message");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+
+    // sign_message is not an object
+    signRequest.put("sign_message", "I sign");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+
+    // The message is not Base64
+    signRequest.put("sign_message", new JSONObject(Map.of("message#en", "I sign!")));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+
+    // The sign message is HTML
+    signRequest.put("sign_message", new JSONObject(Map.of("message#en", encode("I sign"), "mime_type", "text/html")));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+  }
+
+  @Test
+  void aSignMessageIsHandedOnWithItsText() throws Exception {
+    this.start(c -> {});
+    final Map<String, String> params = params();
+    params.put("scope", "openid " + SIGN_APPROVAL_SCOPE);
+    params.put("prompt", "login consent");
+    final Map<String, Object> signRequest = new HashMap<>();
+    signRequest.put("sign_message", new JSONObject(Map.of(
+        "message", encode("Jag godkänner – åäö"), "message#en", encode("I approve"), "mime_type", "text/markdown")));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+
+    final GenericSignMessage signMessage = requirements(this.process(post(params))).getSignMessage();
+    assertThat(signMessage).isNotNull();
+    assertThat(signMessage.getTbsData()).isNull();
+    assertThat(signMessage.getMimeType()).isEqualTo(MessageMimeType.TEXT_MARKDOWN);
+    assertThat(signMessage.getDefaultMessage()).isNotNull();
+    assertThat(signMessage.getDefaultMessage().getText()).isEqualTo("Jag godkänner – åäö");
+    assertThat(signMessage.getMessage("en").getText()).isEqualTo("I approve");
   }
 
   @Test

@@ -107,7 +107,7 @@ public class HttpFederationResolver implements FederationResolver {
     Objects.requireNonNull(clientId, "clientId must not be null");
 
     final ResolveRequest request = new ResolveRequest(clientId, this.settings.trustAnchor().entityId(),
-        EntityType.OPENID_RELYING_PARTY.getValue(), Boolean.FALSE);
+        List.of(EntityType.OPENID_RELYING_PARTY.getValue()), Boolean.FALSE);
     final URI endpoint = this.settings.resolver().endpoint() != null
         ? this.settings.resolver().endpoint()
         : this.endpoints.getEndpoint(this.settings.resolver().entityId(), this.settings.getResolverKeys(),
