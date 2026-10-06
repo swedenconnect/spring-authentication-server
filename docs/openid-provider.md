@@ -342,8 +342,9 @@ given as a plain parameter.
   `authn-server.oidc.authorization-request.require-signed-request-object` is `true`, and when the client has registered
   `request_object_signing_alg`. A client that has registered an algorithm must sign with that algorithm.
 
-For every request object, `client_id` and `iss`, when present, must be the `client_id` of the request, and a request
-object whose `exp` has passed, or whose `nbf` has not been reached, is rejected. The clock skew of the OpenID Provider
+For every request object, `client_id` and `iss`, when present, must be the `client_id` of the request, and
+`response_type`, when also given as a plain parameter, must match it, as OpenID Connect Core, Section 6.1, requires. A
+request object whose `exp` has passed, or whose `nbf` has not been reached, is rejected. The clock skew of the OpenID Provider
 applies.
 
 If a request object cannot be fetched or decoded, there may be no redirect URI to answer to, since the request object

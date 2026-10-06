@@ -57,7 +57,8 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * <p>
  * A request object, passed by value ({@code request}) or by reference ({@code request_uri}), is decoded by the
  * {@link RequestObjectDecoder}, and its parameters replace those of the request, as OpenID Connect Core, Section
- * 6.3.3, states. A {@code request_uri} is only fetched if it is one of the client's registered {@code request_uris}.
+ * 6.3.3, states. A {@code response_type} in the request object must match the one sent as a plain parameter. A
+ * {@code request_uri} is only fetched if it is one of the client's registered {@code request_uris}.
  * </p>
  * <p>
  * An unknown client, a client registered with the token endpoint authentication method {@code none}, which is not
@@ -163,6 +164,7 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
       }
       try {
         requestObject = this.resolveRequestObject(parameters, clientId, metadata, logString);
+        checkResponseType(parameters, requestObject, logString);
       }
       catch (final OidcErrorResponseException e) {
         if (fallback == null) {
@@ -259,6 +261,42 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
     }
     log.debug("Fetched request object from '{}' [{}]", requestUri, logString);
     return this.requestObjectDecoder.decodeRequestObject(fetched, clientId, metadata, logString);
+  }
+
+  /**
+   * Checks that the {@code response_type} of the request object matches the {@code response_type} sent as a plain
+   * parameter, when both are present, as OpenID Connect Core, Section 6.1, requires. The {@code client_id} is checked
+   * when the request object is decoded.
+   *
+   * @param parameters the parameters of the request
+   * @param requestObject the request object
+   * @param logString the log string
+   * @throws OidcErrorResponseException with {@code invalid_request_object} if the values differ
+   */
+  private static void checkResponseType(final @NonNull Map<String, List<String>> parameters,
+      final RequestObjectDecoder.@NonNull DecodedJwt requestObject, final @NonNull String logString)
+      throws OidcErrorResponseException {
+
+    final Object inRequestObject = requestObject.claims().getClaim("response_type");
+    final String plain = getFirstValue(parameters, "response_type");
+    if (inRequestObject == null || plain == null) {
+      return;
+    }
+    if (!toValueSet(plain).equals(toValueSet(String.valueOf(inRequestObject)))) {
+      log.info("The response_type of the request object does not match the request [{}]", logString);
+      throw new OidcErrorResponseException(OAuth2Error.INVALID_REQUEST_OBJECT,
+          "The response_type of the request object does not match the request");
+    }
+  }
+
+  /**
+   * Splits a space-separated value, such as {@code response_type}, into a set of values.
+   *
+   * @param value the value
+   * @return the values
+   */
+  private static @NonNull Set<String> toValueSet(final @NonNull String value) {
+    return Set.copyOf(Arrays.asList(StringUtils.tokenizeToStringArray(value, " ")));
   }
 
   /**
