@@ -17,6 +17,8 @@ package se.swedenconnect.spring.authnserver.oidc.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,18 @@ class OidcResponseSenderTest {
         new ErrorObject("invalid_request", "Missing value"));
     assertThat(response.getRedirectedUrl()).isEqualTo(
         "https://rp.example.com/cb?x=1&error=invalid_request&error_description=Missing%20value&state=a%20b%26c");
+  }
+
+  @Test
+  void stateIsReturnedUnchangedWhenDecodedAsFormData() throws Exception {
+    final String state = "a b+c/d=e&f%g";
+    final MockHttpServletResponse response = new MockHttpServletResponse();
+    this.sender.send(new MockHttpServletRequest(), response,
+        new OidcResponseTarget("client", "https://rp.example.com/cb", "query", state), Map.of("code", "abc"));
+    final String redirect = response.getRedirectedUrl();
+    assertThat(redirect).isEqualTo("https://rp.example.com/cb?code=abc&state=a%20b%2Bc%2Fd%3De%26f%25g");
+    final String encoded = redirect.substring(redirect.indexOf("state=") + "state=".length());
+    assertThat(URLDecoder.decode(encoded, StandardCharsets.UTF_8)).isEqualTo(state);
   }
 
   @Test
