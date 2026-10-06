@@ -439,7 +439,8 @@ are read, as plain parameters or from a request object.
 - **Authentication provider**, `https://id.oidc.se/param/authnProvider`. Becomes the requested authentication
   provider.
 - **Signature request**, `https://id.oidc.se/param/signRequest`. Read when the scope `https://id.oidc.se/scope/sign`
-  or `https://id.oidc.se/scope/signApproval` is requested and offered, and otherwise ignored. It must then be present,
+  or `https://id.oidc.se/scope/signApproval` is requested and offered. Without one of these scopes, a signature request
+  is answered with `invalid_request`, as Section 5.1 of the extension requires. With one of them, it must be present,
   either as a JWT of its own signed with the client's key, which may also be encrypted, or as a JSON object in a signed
   request object. `prompt` must hold both `login` and `consent`. For the sign scope, `tbs_data` must be present, and
   for sign approval only, it must not be. The sign message becomes a sign message that must be shown, with the data

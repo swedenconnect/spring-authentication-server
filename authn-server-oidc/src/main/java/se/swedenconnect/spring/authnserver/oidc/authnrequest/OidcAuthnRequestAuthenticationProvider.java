@@ -559,10 +559,11 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
 
   /**
    * Extracts the sign message of a signature request, following the Signature Extension for OpenID Connect. A
-   * signature request is only processed when the sign scope or the sign approval scope is requested and offered. The
-   * signature request parameter must then be present and signed, either as a JWT of its own or in a signed request
-   * object, and {@code prompt} must hold {@code login} and {@code consent}. The data to be signed must be present for
-   * the sign scope, and must not be present for sign approval only.
+   * signature request is only processed when the sign scope or the sign approval scope is requested and offered, and
+   * a signature request parameter without one of them is rejected. The signature request parameter must then be
+   * present and signed, either as a JWT of its own or in a signed request object, and {@code prompt} must hold
+   * {@code login} and {@code consent}. The data to be signed must be present for the sign scope, and must not be
+   * present for sign approval only.
    *
    * @param token the request token
    * @param scopes the honoured scopes
@@ -579,7 +580,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
     final boolean signApproval = scopes.contains(ScopeConstants.SIGN_APPROVAL.getValue());
     if (!sign && !signApproval) {
       if (getParameter(token, ParameterConstants.SIGN_REQUEST_PARAM_NAME) != null) {
-        log.debug("Signature request received without a sign scope - ignored [{}]", logString);
+        // Signature Extension for OpenID Connect, Section 5.1 ...
+        throw invalidRequest("A signature request requires the sign or the sign approval scope", logString);
       }
       return null;
     }
