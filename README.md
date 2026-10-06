@@ -13,31 +13,30 @@ OpenID Provider, or an authentication server that acts as both, according to the
 User authentication is implemented once and is used by both protocols, including single sign-on
 across SAML and OpenID Connect.
 
+The repository also contains a reference implementation for a service that acts both as SAML Identity Provider and an OIDC OpenID Provider.
+
 -----
 
 ## About
 
 The repository comprises of the following modules:
 
-- `authn-server-core` - Protocol-neutral support for user authentication, single sign-on,
+- [authn-server-core](authn-server-core) - Protocol-neutral support for user authentication, single sign-on,
 authentication requirements and the user identity model.
 
-- `authn-server-saml` - The Spring Security implementation of a SAML Identity Provider.
+- [authn-server-saml](authn-server-saml) - The Spring Security implementation of a SAML Identity Provider.
 
-- `authn-server-oidc` - The Spring Security implementation of an OpenID Provider.
+- [authn-server-oidc](authn-server-oidc) - The Spring Security implementation of an OpenID Provider.
 
-- `authn-server-autoconfigure` - Spring Boot autoconfiguration for the authentication server.
+- [authn-server-autoconfigure](authn-server-autoconfigure) - Spring Boot autoconfiguration for the authentication server.
 
 - Spring Boot starters:
 
-    - `authn-server-saml-spring-boot-starter` - SAML Identity Provider only.
+    - [authn-server-saml-spring-boot-starter](authn-server-oidc-spring-boot-starter) - SAML Identity Provider only.
 
-    - `authn-server-oidc-spring-boot-starter` - OpenID Provider only.
+    - [authn-server-oidc-spring-boot-starter](authn-server-oidc-spring-boot-starter) - OpenID Provider only.
 
-    A server that offers both protocols includes both starters.
-
-The [sweden-connect-reference](sweden-connect-reference) module is the Sweden Connect reference authentication
-server, a SAML Identity Provider and OpenID Provider with simulated user authentication, built on the libraries.
+- [sweden-connect-reference](sweden-connect-reference) - A module that is the Sweden Connect reference authentication server, a SAML Identity Provider and OpenID Provider with simulated user authentication, built on the libraries.
 
 ## Documentation
 
