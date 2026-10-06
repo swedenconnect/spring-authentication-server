@@ -8,7 +8,7 @@
 
 ### Version 1.0.0
 
-**Date:** _Not yet released_
+**Date:** 2026-10-06
 
 - Initial version.
 
