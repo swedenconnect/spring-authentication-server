@@ -84,7 +84,8 @@ git pull
 
 1. Checks that the working tree is clean and that a branch is checked out. On `main` it also checks
    that `main` is not behind `origin/main`, so that the merged release is there.
-2. Checks that the version in the POMs is a release version of the form X.Y.Z and not a snapshot.
+2. Checks that the version in the POMs is a release version of the form X.Y.Z and not a snapshot,
+   and that `LibraryVersion.java` declares the `MAJOR`, `MINOR` and `PATCH` constants.
 3. Suggests the next snapshot version, the released version with the last number raised by one
    and `-SNAPSHOT` added. You confirm it, or type another version as X.Y.Z, and `-SNAPSHOT` is
    added.
@@ -93,10 +94,11 @@ git pull
    exist yet, here or on `origin`. If any check fails the script stops and the repository is
    exactly as it was.
 5. Creates the bump branch, if it is making one.
-6. Sets the version in every `pom.xml`.
+6. Sets the version in every `pom.xml`, and the `MAJOR`, `MINOR` and `PATCH` constants in
+   `LibraryVersion.java` in `authn-server-core`.
 7. Adds a section for the coming version at the top of `docs/release-notes.md`, with the date
    `_Not yet released_`. If the file already has a section for that version it is left as it is.
-8. Commits both as `build: bump version after X.Y.Z` and pushes the branch.
+8. Commits the changes as `build: bump version after X.Y.Z` and pushes the branch.
 
 Then open a pull request from the bump branch into `main` and merge it. The bump branch holds no
 tagged commit, so any of the merge buttons will do.
