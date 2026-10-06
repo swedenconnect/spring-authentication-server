@@ -165,6 +165,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** Whether {@code state} is required. */
   private boolean requireState = true;
 
+  /** Whether a request without {@code prompt} is treated as {@code prompt=login}. */
+  private boolean loginWithoutPrompt = true;
+
   /** The token endpoint. */
   private String tokenEndpoint = DEFAULT_TOKEN_ENDPOINT;
 
@@ -412,6 +415,28 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
    */
   public boolean isRequireState() {
     return this.requireState;
+  }
+
+  /**
+   * Assigns whether an authentication request without {@code prompt} is treated as {@code prompt=login}, as the OpenID
+   * Connect Profile for Sweden Connect, Section 2.2.1, requires. Defaults to {@code true}. When {@code false}, such a
+   * request may be answered with single sign-on.
+   *
+   * @param loginWithoutPrompt whether a request without {@code prompt} is treated as {@code prompt=login}
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer loginWithoutPrompt(final boolean loginWithoutPrompt) {
+    this.loginWithoutPrompt = loginWithoutPrompt;
+    return this;
+  }
+
+  /**
+   * Tells whether an authentication request without {@code prompt} is treated as {@code prompt=login}.
+   *
+   * @return {@code true} if a request without {@code prompt} is treated as {@code prompt=login}
+   */
+  public boolean isLoginWithoutPrompt() {
+    return this.loginWithoutPrompt;
   }
 
   /**
@@ -955,6 +980,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     provider.setRequirePkce(this.requirePkce);
     provider.setRequireSignedRequestObject(this.requireSignedRequestObject);
     provider.setRequireState(this.requireState);
+    provider.setLoginWithoutPrompt(this.loginWithoutPrompt);
     provider.setIdTokenBuilder(idTokenBuilder);
 
     final OidcAuthnRequestProcessingFilter processingFilter =

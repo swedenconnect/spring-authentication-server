@@ -10,10 +10,13 @@
 
 **Date:** _Not yet released_
 
-- An OpenID Provider may now offer a scope without supporting all of its claims. `claims_supported` lists only the
-  claims that the OpenID Provider can deliver.
-- The Sweden Connect reference server delivers a simulated user's coordination number as a coordination number, not
-  as a personal identity number.
+- An OpenID Provider may now offer a scope without supporting all of its claims. `claims_supported` lists only the claims that the OpenID Provider can deliver.
+- The Sweden Connect reference server delivers a simulated user's coordination number as a coordination number, not as a personal identity number.
+- An OpenID Provider treats an authentication request without `prompt` as `prompt=login`, as the OpenID Connect Profile for Sweden Connect requires. This can be turned off for deployments outside Sweden Connect. See [#12](https://github.com/swedenconnect/spring-authentication-server/issues/12).
+- A request object whose `response_type` differs from the one in the request is rejected. See [#13](https://github.com/swedenconnect/spring-authentication-server/issues/13).
+- A client assertion without `iat` is accepted. See [#14](https://github.com/swedenconnect/spring-authentication-server/issues/14).
+- A `+` in `state` is returned unchanged to the Relying Party. See [#15](https://github.com/swedenconnect/spring-authentication-server/issues/15).
+- An authentication request with a signature request, but without the sign or sign approval scope, is rejected. See [#16](https://github.com/swedenconnect/spring-authentication-server/issues/16).
 
 -----
 

@@ -745,6 +745,7 @@ in [The OpenID Provider](openid-provider.html#authentication-requests). These pr
 | `require-pkce` | Whether PKCE is required. When `false`, it is optional. The `plain` method is never accepted, and public clients are not supported. | `false` |
 | `require-signed-request-object` | Whether request objects must be signed. When `false`, an unsigned request object is accepted, unless the client has registered `request_object_signing_alg`. The discovery document declares `none` as a request object signing algorithm only when this is `false`. | `false` |
 | `require-state` | Whether authentication requests must carry `state`. When `false`, a request without `state` is accepted, and its response carries no `state`. | `true` |
+| `login-without-prompt` | Whether an authentication request without `prompt` is treated as `prompt=login`, as the OpenID Connect Profile for Sweden Connect, Section 2.2.1, requires. When `false`, such a request may be answered with single sign-on. | `true` |
 
 ```yaml
 authn-server:

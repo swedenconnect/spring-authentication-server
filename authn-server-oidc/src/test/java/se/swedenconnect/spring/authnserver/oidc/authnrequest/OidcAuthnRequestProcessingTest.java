@@ -276,7 +276,6 @@ class OidcAuthnRequestProcessingTest {
     this.start(c -> {});
     final UserAuthenticationInputToken token = this.process(post(params()));
     assertThat(requirements(token).getScopes()).containsExactly("openid");
-    assertThat(requirements(token).isForceAuthn()).isFalse();
   }
 
   @Test
@@ -404,6 +403,17 @@ class OidcAuthnRequestProcessingTest {
     // The audience may also be the authorization endpoint
     final Map<String, String> params = params();
     params.put("request", sign(requestObjectClaims().audience(AUTHZ_ENDPOINT).build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
+  void theResponseTypeOfTheRequestObjectMustMatchTheRequest() throws Exception {
+    this.start(c -> {});
+    final Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().claim("response_type", "code id_token").build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request_object", "state-1");
+
+    params.put("request", sign(requestObjectClaims().build(), CLIENT_KEY));
     this.process(post(params));
   }
 
@@ -595,6 +605,24 @@ class OidcAuthnRequestProcessingTest {
 
     params.put("prompt", "none login");
     assertError(this.send(get(params)), "invalid_request", "state-1");
+  }
+
+  @Test
+  void aRequestWithoutPromptForcesAuthentication() throws Exception {
+    this.start(c -> {});
+    final OidcAuthenticationRequirements requirements = requirements(this.process(get(params())));
+    assertThat(requirements.isForceAuthn()).isTrue();
+    assertThat(requirements.isPassiveAuthn()).isFalse();
+
+    final Map<String, String> params = params();
+    params.put("prompt", "consent");
+    assertThat(requirements(this.process(get(params))).isForceAuthn()).isFalse();
+  }
+
+  @Test
+  void aRequestWithoutPromptMayBeAnsweredWithSsoWhenConfigured() throws Exception {
+    this.start(c -> oidc(c).loginWithoutPrompt(false));
+    assertThat(requirements(this.process(get(params()))).isForceAuthn()).isFalse();
   }
 
   @Test
@@ -876,11 +904,12 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void aSignRequestWithoutSignScopeIsIgnored() throws Exception {
+  void aSignRequestWithoutSignScopeIsRejected() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, "anything");
-    assertThat(requirements(this.process(get(params))).getSignMessage()).isNull();
+    params.put("prompt", "login consent");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest(true)), CLIENT_KEY));
+    assertError(this.send(get(params)), "invalid_request", "state-1");
   }
 
   // Requester acceptance

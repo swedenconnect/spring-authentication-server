@@ -342,8 +342,9 @@ given as a plain parameter.
   `authn-server.oidc.authorization-request.require-signed-request-object` is `true`, and when the client has registered
   `request_object_signing_alg`. A client that has registered an algorithm must sign with that algorithm.
 
-For every request object, `client_id` and `iss`, when present, must be the `client_id` of the request, and a request
-object whose `exp` has passed, or whose `nbf` has not been reached, is rejected. The clock skew of the OpenID Provider
+For every request object, `client_id` and `iss`, when present, must be the `client_id` of the request, and
+`response_type`, when also given as a plain parameter, must match it, as OpenID Connect Core, Section 6.1, requires. A
+request object whose `exp` has passed, or whose `nbf` has not been reached, is rejected. The clock skew of the OpenID Provider
 applies.
 
 If a request object cannot be fetched or decoded, there may be no redirect URI to answer to, since the request object
@@ -391,6 +392,7 @@ The result is the protocol-neutral authentication requirements, as an
 | `prompt=login` | Force authentication. |
 | `prompt=none` | Passive authentication. `none` together with another value is `invalid_request`. |
 | `prompt=consent` | Consent required. |
+| No `prompt` | Force authentication, as the OpenID Connect Profile for Sweden Connect, Section 2.2.1, requires. Single sign-on is then only used when the request holds `prompt` without `login`. With `authn-server.oidc.authorization-request.login-without-prompt` set to `false`, a request without `prompt` may be answered with single sign-on. |
 | `max_age` | The maximum authentication age. `max_age=0` is the same as `prompt=login`. |
 | `scope` | The requested scopes that the OpenID Provider offers. Other scopes are ignored, as OpenID Connect Core says for scopes that are not understood. |
 | `scope` and `claims` | The requested attributes. The offered scopes are expanded into their claims, the `claims` parameter is merged in, and the claims are mapped to generic attributes, see [What a request asks for](attributes.html#what-a-request-asks-for). |
@@ -437,7 +439,8 @@ are read, as plain parameters or from a request object.
 - **Authentication provider**, `https://id.oidc.se/param/authnProvider`. Becomes the requested authentication
   provider.
 - **Signature request**, `https://id.oidc.se/param/signRequest`. Read when the scope `https://id.oidc.se/scope/sign`
-  or `https://id.oidc.se/scope/signApproval` is requested and offered, and otherwise ignored. It must then be present,
+  or `https://id.oidc.se/scope/signApproval` is requested and offered. Without one of these scopes, a signature request
+  is answered with `invalid_request`, as Section 5.1 of the extension requires. With one of them, it must be present,
   either as a JWT of its own signed with the client's key, which may also be encrypted, or as a JSON object in a signed
   request object. `prompt` must hold both `login` and `consent`. For the sign scope, `tbs_data` must be present, and
   for sign approval only, it must not be. The sign message becomes a sign message that must be shown, with the data
@@ -580,7 +583,7 @@ A client assertion, for `private_key_jwt` and `client_secret_jwt`, must hold:
 - `aud` holding the URL of the token endpoint or the issuer, as the Swedish OpenID Connect Profile, Section 3.1.1,
   recommends,
 - `exp`, which has not passed,
-- `iat`, which is not in the future,
+- `iat`, if present, which is not in the future. It is optional, as OpenID Connect Core, Section 9, says,
 - `jti`, which has not been used before. The value is remembered until the assertion expires.
 
 The clock skew of the OpenID Provider applies. A `private_key_jwt` assertion may be signed with `RS256`, `RS384`,

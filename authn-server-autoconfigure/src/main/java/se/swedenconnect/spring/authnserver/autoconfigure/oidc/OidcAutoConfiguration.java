@@ -413,6 +413,9 @@ public class OidcAutoConfiguration {
     if (authorizationRequest.getRequireState() != null) {
       configurer.requireState(authorizationRequest.getRequireState());
     }
+    if (authorizationRequest.getLoginWithoutPrompt() != null) {
+      configurer.loginWithoutPrompt(authorizationRequest.getLoginWithoutPrompt());
+    }
     if (properties.getSignUserInfo() != null) {
       configurer.signUserInfo(properties.getSignUserInfo());
     }

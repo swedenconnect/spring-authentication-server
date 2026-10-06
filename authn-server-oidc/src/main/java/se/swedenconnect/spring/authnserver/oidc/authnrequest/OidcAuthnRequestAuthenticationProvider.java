@@ -86,7 +86,8 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.RequesterAcceptan
  * It follows OpenID Connect Core, Section 3.1.2, and the Swedish OpenID Connect Profile, Section 2. In this order: the
  * parameters are parsed, {@code response_type} must be {@code code}, {@code state} must be present unless it is
  * optional, an unsigned request object is rejected when signed request objects are required, the requester acceptance
- * is checked, and PKCE is checked. Then the requirements are built: {@code prompt}, {@code max_age},
+ * is checked, and PKCE is checked. Then the requirements are built: {@code prompt}, where a missing {@code prompt} is
+ * treated as {@code prompt=login} unless that is turned off, {@code max_age},
  * {@code id_token_hint}, {@code login_hint}, {@code ui_locales}, the requested attributes from the offered scopes and
  * the {@code claims} parameter, the authentication contexts, and the extensions for user messages, authentication
  * providers and signature requests.
@@ -145,6 +146,9 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
 
   /** Whether {@code state} is required. */
   private boolean requireState = true;
+
+  /** Whether a request without {@code prompt} is treated as {@code prompt=login}. */
+  private boolean loginWithoutPrompt = true;
 
   /** Checks that an ID token can be encrypted for the client, or {@code null}. */
   private IdTokenBuilder idTokenBuilder;
@@ -283,6 +287,10 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
       requirements.setForceAuthn(prompt.contains(Prompt.Type.LOGIN));
       requirements.setPassiveAuthn(prompt.contains(Prompt.Type.NONE));
       requirements.setConsentRequired(prompt.contains(Prompt.Type.CONSENT));
+    }
+    else if (this.loginWithoutPrompt) {
+      log.debug("No prompt in request - treated as prompt=login [{}]", logString);
+      requirements.setForceAuthn(true);
     }
     if (request.getMaxAge() < -1) {
       throw invalidRequest("Invalid max_age parameter", logString);
@@ -551,10 +559,11 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
 
   /**
    * Extracts the sign message of a signature request, following the Signature Extension for OpenID Connect. A
-   * signature request is only processed when the sign scope or the sign approval scope is requested and offered. The
-   * signature request parameter must then be present and signed, either as a JWT of its own or in a signed request
-   * object, and {@code prompt} must hold {@code login} and {@code consent}. The data to be signed must be present for
-   * the sign scope, and must not be present for sign approval only.
+   * signature request is only processed when the sign scope or the sign approval scope is requested and offered, and
+   * a signature request parameter without one of them is rejected. The signature request parameter must then be
+   * present and signed, either as a JWT of its own or in a signed request object, and {@code prompt} must hold
+   * {@code login} and {@code consent}. The data to be signed must be present for the sign scope, and must not be
+   * present for sign approval only.
    *
    * @param token the request token
    * @param scopes the honoured scopes
@@ -571,7 +580,8 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
     final boolean signApproval = scopes.contains(ScopeConstants.SIGN_APPROVAL.getValue());
     if (!sign && !signApproval) {
       if (getParameter(token, ParameterConstants.SIGN_REQUEST_PARAM_NAME) != null) {
-        log.debug("Signature request received without a sign scope - ignored [{}]", logString);
+        // Signature Extension for OpenID Connect, Section 5.1 ...
+        throw invalidRequest("A signature request requires the sign or the sign approval scope", logString);
       }
       return null;
     }
@@ -746,6 +756,17 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    */
   public void setRequireState(final boolean requireState) {
     this.requireState = requireState;
+  }
+
+  /**
+   * Assigns whether a request without {@code prompt} is treated as {@code prompt=login}, as the OpenID Connect Profile
+   * for Sweden Connect, Section 2.2.1, requires. Defaults to {@code true}. When {@code false}, a request without
+   * {@code prompt} may be answered with single sign-on.
+   *
+   * @param loginWithoutPrompt whether a request without {@code prompt} is treated as {@code prompt=login}
+   */
+  public void setLoginWithoutPrompt(final boolean loginWithoutPrompt) {
+    this.loginWithoutPrompt = loginWithoutPrompt;
   }
 
 }

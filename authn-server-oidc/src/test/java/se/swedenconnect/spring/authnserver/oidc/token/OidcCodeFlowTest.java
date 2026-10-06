@@ -486,9 +486,20 @@ class OidcCodeFlowTest {
   }
 
   @Test
-  void singleSignOnKeepsTheOriginalAuthTime() throws Exception {
+  void aRequestWithoutPromptIsNotAnsweredWithSingleSignOn() throws Exception {
     final TestProvider provider = new TestProvider("direct", LOA3);
     this.start(c -> {}, provider);
+    final Instant first = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
+    Thread.sleep(1100);
+    final Instant second = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
+    assertThat(provider.calls).isEqualTo(2);
+    assertThat(second).isAfter(first);
+  }
+
+  @Test
+  void singleSignOnKeepsTheOriginalAuthTime() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    this.start(c -> oidc(c).loginWithoutPrompt(false), provider);
     final Instant first = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
     Thread.sleep(1100);
     final Instant second = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
@@ -822,7 +833,6 @@ class OidcCodeFlowTest {
         assertionClaims(RSA_CLIENT).expirationTime(Date.from(now.minusSeconds(120))).build(),
         assertionClaims(RSA_CLIENT).expirationTime(null).build(),
         assertionClaims(RSA_CLIENT).issueTime(Date.from(now.plusSeconds(600))).build(),
-        assertionClaims(RSA_CLIENT).issueTime(null).build(),
         assertionClaims(RSA_CLIENT).jwtID(null).build(),
         assertionClaims(RSA_CLIENT).subject("https://other.example.com").build());
     for (final JWTClaimsSet claims : invalid) {
@@ -833,6 +843,14 @@ class OidcCodeFlowTest {
     // The issuer is also accepted as audience
     final String code = this.authorize(params(RSA_CLIENT)).get("code");
     assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT).audience(BASE_URL).build(),
+        CLIENT_RSA, "rsa-key")), code, REDIRECT_URI, null).getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void aClientAssertionWithoutIatIsAccepted() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final String code = this.authorize(params(RSA_CLIENT)).get("code");
+    assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT).issueTime(null).build(),
         CLIENT_RSA, "rsa-key")), code, REDIRECT_URI, null).getStatus()).isEqualTo(200);
   }
 

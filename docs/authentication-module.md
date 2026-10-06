@@ -355,7 +355,8 @@ user who signed in at a SAML Service Provider can be let straight through at an 
 
 These are checked before any policy or voter, and no configuration turns them off:
 
-- The requester asked for a new authentication, with `ForceAuthn` or `prompt=login`.
+- The requester asked for a new authentication, with `ForceAuthn` or `prompt=login`. An OpenID Connect request without
+  `prompt` asks for it too, unless that is turned off, see [The OpenID Provider](openid-provider.html#what-the-request-is-turned-into).
 - The previous authentication is older than the maximum authentication age the requester accepts.
 - The previous authentication may not be reused, which is the case when a sign message was displayed for it.
 - The request carries a sign message. A signature is approved by the user every time, see the Deployment Profile,
