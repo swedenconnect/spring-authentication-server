@@ -391,6 +391,7 @@ The result is the protocol-neutral authentication requirements, as an
 | `prompt=login` | Force authentication. |
 | `prompt=none` | Passive authentication. `none` together with another value is `invalid_request`. |
 | `prompt=consent` | Consent required. |
+| No `prompt` | Force authentication, as the OpenID Connect Profile for Sweden Connect, Section 2.2.1, requires. Single sign-on is then only used when the request holds `prompt` without `login`. With `authn-server.oidc.authorization-request.login-without-prompt` set to `false`, a request without `prompt` may be answered with single sign-on. |
 | `max_age` | The maximum authentication age. `max_age=0` is the same as `prompt=login`. |
 | `scope` | The requested scopes that the OpenID Provider offers. Other scopes are ignored, as OpenID Connect Core says for scopes that are not understood. |
 | `scope` and `claims` | The requested attributes. The offered scopes are expanded into their claims, the `claims` parameter is merged in, and the claims are mapped to generic attributes, see [What a request asks for](attributes.html#what-a-request-asks-for). |

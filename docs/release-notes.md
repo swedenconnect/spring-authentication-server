@@ -14,6 +14,7 @@
   claims that the OpenID Provider can deliver.
 - The Sweden Connect reference server delivers a simulated user's coordination number as a coordination number, not
   as a personal identity number.
+- An OpenID Provider treats an authentication request without `prompt` as `prompt=login`, as the OpenID Connect Profile for Sweden Connect requires. This can be turned off for deployments outside Sweden Connect. See [#12](https://github.com/swedenconnect/spring-authentication-server/issues/12).
 
 -----
 

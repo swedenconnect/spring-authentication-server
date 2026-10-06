@@ -2086,6 +2086,12 @@ public class OidcConfigurationProperties {
     private Boolean requireState;
 
     /**
+     * Whether an authentication request without prompt is treated as prompt=login, as the OpenID Connect Profile for
+     * Sweden Connect requires. Defaults to true. When false, such a request may be answered with single sign-on.
+     */
+    private Boolean loginWithoutPrompt;
+
+    /**
      * Gets whether PKCE is required.
      *
      * @return whether PKCE is required, or {@code null} for the default
@@ -2137,6 +2143,24 @@ public class OidcConfigurationProperties {
      */
     public void setRequireState(final @Nullable Boolean requireState) {
       this.requireState = requireState;
+    }
+
+    /**
+     * Gets whether an authentication request without prompt is treated as prompt=login.
+     *
+     * @return whether a request without prompt is treated as prompt=login, or {@code null} for the default
+     */
+    public @Nullable Boolean getLoginWithoutPrompt() {
+      return this.loginWithoutPrompt;
+    }
+
+    /**
+     * Assigns whether an authentication request without prompt is treated as prompt=login.
+     *
+     * @param loginWithoutPrompt whether a request without prompt is treated as prompt=login
+     */
+    public void setLoginWithoutPrompt(final @Nullable Boolean loginWithoutPrompt) {
+      this.loginWithoutPrompt = loginWithoutPrompt;
     }
   }
 
