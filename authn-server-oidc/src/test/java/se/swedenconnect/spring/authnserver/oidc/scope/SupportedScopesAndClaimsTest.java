@@ -90,7 +90,7 @@ class SupportedScopesAndClaimsTest {
     final SupportedScopesAndClaims result = this.resolve(List.of(declaring), null, null);
 
     assertThat(result.scopes()).containsExactly(OPENID, ScopeConstants.SIGN_APPROVAL.getValue());
-    assertThat(result.claims()).containsExactly("given_name", "sub");
+    assertThat(result.claims()).containsExactly("sub", "given_name");
   }
 
   @Test
@@ -108,20 +108,26 @@ class SupportedScopesAndClaimsTest {
         this.resolve(List.of(PERSON), List.of(OidcScopeValue.PHONE.getValue()), null);
 
     assertThat(result.scopes()).containsExactly(OPENID, OidcScopeValue.PHONE.getValue());
-    assertThat(result.claims()).contains("given_name", ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME,
-        "phone_number", "phone_number_verified", "sub");
-    assertThat(result.claims()).doesNotContain("zoneinfo");
+    assertThat(result.claims()).contains("given_name", ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME, "sub");
+    assertThat(result.claims()).doesNotContain("phone_number", "phone_number_verified", "zoneinfo");
   }
 
   @Test
-  void theClaimsHoldEveryClaimOfEveryOfferedScope() {
+  void theClaimsAreOnlyThoseThatAreDeliveredOrConfigured() {
     final SupportedScopesAndClaims result = this.resolve(List.of(PERSON), null, List.of("custom_claim"));
 
-    for (final String scope : result.scopes()) {
-      assertThat(result.claims()).containsAll(this.registry.getScope(scope).getClaimNames());
-    }
-    assertThat(result.claims()).contains("zoneinfo", "website", "sub", "custom_claim",
-        ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME);
+    assertThat(result.scopes()).contains(PROFILE);
+    assertThat(result.claims()).containsExactlyInAnyOrder("sub", "custom_claim",
+        ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME, "given_name", "family_name", "name", "birthdate");
+    assertThat(result.claims()).doesNotContain("zoneinfo", "website", "nickname", "updated_at");
+  }
+
+  @Test
+  void aConfiguredClaimOfAnOfferedScopeIsSupported() {
+    final SupportedScopesAndClaims result = this.resolve(List.of(PERSON), null, List.of("zoneinfo"));
+
+    assertThat(result.claims()).contains("zoneinfo");
+    assertThat(result.claims()).doesNotContain("website");
   }
 
   @Test

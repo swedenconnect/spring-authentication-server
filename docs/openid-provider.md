@@ -228,11 +228,14 @@ The OpenID Provider offers the union of the scopes over all providers. The `open
 The settings of the OpenID Provider change this:
 
 - `authn-server.oidc.scopes`, when set, replaces the derived scopes. Every scope must be in the scope registry.
-- `authn-server.oidc.claims` is added to the claims of the providers. The claims also count when scopes are derived.
+- `authn-server.oidc.claims` is added to the claims of the providers. The claims also count when scopes are derived,
+  and they are published in `claims_supported`.
 
-**The supported claims** are the claims of the providers, the configured claims, and every claim of every offered
-scope. The last part is required by Section 5.1 of the Sweden Connect metadata requirements, even when a non-essential
-claim of an offered scope is not delivered by any provider.
+**The supported claims** are `sub`, the claims of the providers and the configured claims. The claims of the offered
+scopes are not added, so `claims_supported` lists only the claims that the OpenID Provider can deliver. An OpenID
+Provider that offers `profile` but only delivers names and date of birth publishes those claims, and not `nickname`,
+`picture` or `zoneinfo`. A claim that should be published even though no provider delivers it is added with
+`authn-server.oidc.claims`.
 
 **Authentication contexts.** `acr_values_supported` is the union of the authentication context URIs of the providers,
 `getSupportedAuthnContextUris()`. It is not configurable.

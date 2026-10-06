@@ -816,7 +816,8 @@ authentication providers declare, see
 [The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
 
 - `scopes` replaces the derived scopes. Each scope must be in the scope registry, and `openid` is always offered.
-- `claims` is added to the claims of the providers, and the claims also count when scopes are derived.
+- `claims` is added to the claims of the providers. The claims count when scopes are derived and are published as
+  `claims_supported`. The claims of the offered scopes are not added automatically.
 
 ```yaml
 authn-server:

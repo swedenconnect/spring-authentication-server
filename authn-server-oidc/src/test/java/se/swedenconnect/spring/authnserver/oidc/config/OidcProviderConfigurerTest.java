@@ -97,8 +97,8 @@ class OidcProviderConfigurerTest {
         JWEAlgorithm.ECDH_ES_A192KW, JWEAlgorithm.ECDH_ES_A256KW);
     assertThat(metadata.getScopes().toStringList()).contains("openid", "profile",
         "https://id.oidc.se/scope/naturalPersonInfo");
-    assertThat(metadata.getClaims()).contains("sub", "given_name", "zoneinfo",
-        "https://id.oidc.se/claim/personalIdentityNumber");
+    assertThat(metadata.getClaims()).contains("sub", "given_name", "https://id.oidc.se/claim/personalIdentityNumber");
+    assertThat(metadata.getClaims()).doesNotContain("zoneinfo");
     assertThat(metadata.getACRs()).extracting(Identifier::getValue).containsExactly(LOA3, LOA4);
     assertThat(metadata.getSubjectTypes()).containsExactly(SubjectType.PUBLIC, SubjectType.PAIRWISE);
     assertThat(metadata.getUILocales()).extracting(LangTag::toString).containsExactly("sv", "en");
@@ -219,8 +219,8 @@ class OidcProviderConfigurerTest {
     final OIDCProviderMetadata metadata = this.build();
 
     assertThat(metadata.getScopes().toStringList()).containsExactly("openid", "email");
-    assertThat(metadata.getClaims()).contains("email", "email_verified", "https://example.com/claim/employee",
-        "given_name");
+    assertThat(metadata.getClaims()).contains("https://example.com/claim/employee", "given_name");
+    assertThat(metadata.getClaims()).doesNotContain("email", "email_verified");
   }
 
   @Test
