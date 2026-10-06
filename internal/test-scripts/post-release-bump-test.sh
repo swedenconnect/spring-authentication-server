@@ -78,6 +78,31 @@ equals "in docs/release-notes.md the rest is kept" "$(cat "${HERE}/../../docs/re
   "$(awk '/^### Version 99.0.0$/{skip=8} skip>0{skip--; next} {print}' "$notes")"
 
 echo
+echo "== LibraryVersion.java =="
+
+lib="${WORK}/LibraryVersion.java"
+printf '%s' "$SANDBOX_LIBRARY_VERSION" > "$lib"
+equals "the sandbox file has the constants" "0" "$(has_library_version_constants "$lib"; echo $?)"
+set_library_version 2.10.3 "$lib"
+equals "the constants are set to the version" \
+  $'  private static final int MAJOR = 2;\n  private static final int MINOR = 10;\n  private static final int PATCH = 3;' \
+  "$(grep 'private static final int' "$lib")"
+equals "the rest of the file is kept" "${SANDBOX_LIBRARY_VERSION}x" \
+  "$(sed -e 's/MAJOR = 2;/MAJOR = 0;/' -e 's/MINOR = 10;/MINOR = 1;/' -e 's/PATCH = 3;/PATCH = 1;/' "$lib"; printf x)"
+equals "a missing file has no constants" "1" "$(has_library_version_constants "${WORK}/missing.java"; echo $?)"
+printf 'class X {\n  private static final int MAJOR = 1;\n  private static final int MINOR = 0;\n}\n' > "$lib"
+equals "a file without PATCH has no constants" "1" "$(has_library_version_constants "$lib"; echo $?)"
+
+real_lib="${WORK}/RealLibraryVersion.java"
+cp "${HERE}/../../${LIBRARY_VERSION}" "$real_lib"
+equals "the real LibraryVersion.java has the constants" "0" "$(has_library_version_constants "$real_lib"; echo $?)"
+set_library_version 99.98.97 "$real_lib"
+equals "in the real LibraryVersion.java the version is set" "99.98.97" \
+  "$(sed -nE 's/^ *private static final int (MAJOR|MINOR|PATCH) = ([0-9]+);/\2/p' "$real_lib" | paste -sd. -)"
+equals "in the real LibraryVersion.java nothing else changes" "3" \
+  "$(diff "${HERE}/../../${LIBRARY_VERSION}" "$real_lib" | grep -c '^>')"
+
+echo
 echo "== Running the script =="
 
 # --- a bump from main, after the release branch is merged ----------------------------------------
@@ -135,6 +160,9 @@ equals "a bump: the module poms are committed too" \
 equals "a bump: the commit names the released version" "build: bump version after 0.1.1" \
   "$(in_work "$dir" git log -1 --format=%s)"
 equals "a bump: one commit is added" "First commit" "$(in_work "$dir" git log -1 --format=%s HEAD~1)"
+equals "a bump: LibraryVersion.java is on the coming version" \
+  $'  private static final int MAJOR = 0;\n  private static final int MINOR = 1;\n  private static final int PATCH = 2;' \
+  "$(in_work "$dir" git show "HEAD:${SANDBOX_LIBRARY_VERSION_PATH}" | grep 'private static final int')"
 equals "a bump: the coming version is added to the release notes" \
   $'### Version 0.1.2\n\n**Date:** _Not yet released_\n\n-\n\n-----\n\n### Version 0.1.0' \
   "$(in_work "$dir" git show HEAD:docs/release-notes.md | sed -n '5,13p')"
@@ -163,6 +191,8 @@ answered "no and then a version" $'n\n1.0.0\n' "1.0.0-SNAPSHOT"
 
 dir="$(new_sandbox 0.1.1 v0.1.0)"
 run_in_sandbox "$dir" "$BUMP" $'0.2.0\n'
+equals "a typed version: LibraryVersion.java gets that version" "  private static final int MINOR = 2;" \
+  "$(in_work "$dir" git show "HEAD:${SANDBOX_LIBRARY_VERSION_PATH}" | grep 'MINOR')"
 equals "a typed version: the release notes get that version" "### Version 0.2.0" \
   "$(in_work "$dir" git show HEAD:docs/release-notes.md | grep -m1 '^### Version')"
 
@@ -208,6 +238,10 @@ stops_early "a dirty working tree" "$BUMP" "The working tree has changed or untr
 stops_early "a changed tracked file" "$BUMP" "The working tree has changed or untracked files" \
   $'\n' 0.1.1 \
   bash -c 'echo more >> docs/release-notes.md'
+
+stops_early "LibraryVersion.java is missing" "$BUMP" "is missing, or does not declare the MAJOR, MINOR and PATCH" \
+  $'\n' 0.1.1 \
+  bash -c "git rm -q '${SANDBOX_LIBRARY_VERSION_PATH}' && git commit -q -m 'Gone'"
 
 stops_early "no branch checked out" "$BUMP" "No branch is checked out" \
   $'\n' 0.1.1 \

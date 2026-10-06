@@ -37,6 +37,10 @@ absent() {
 # The release notes of a new sandbox, in the layout of docs/release-notes.md.
 SANDBOX_NOTES=$'# Release Notes\n\n-----\n\n### Version 0.1.0\n\n**Date:** 2026-01-01\n\n- First.\n\n-----\n\nCopyright\n'
 
+# The LibraryVersion.java of a new sandbox, with the version constants of the real file.
+SANDBOX_LIBRARY_VERSION_PATH="authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/LibraryVersion.java"
+SANDBOX_LIBRARY_VERSION=$'public final class LibraryVersion {\n\n  private static final int MAJOR = 0;\n  private static final int MINOR = 1;\n  private static final int PATCH = 1;\n\n}\n'
+
 # new_sandbox <version> [<tag> ...] - builds a throwaway repository whose POMs are at <version>, with
 # the given tags pushed to its origin. Prints its directory, which holds "work" (the working copy)
 # and "origin.git" (what the scripts push to).
@@ -78,6 +82,8 @@ MVN
     printf '<project><version>%s</version></project>\n' "$version" > pom.xml
     printf '<project><version>%s</version></project>\n' "$version" > modules/pom.xml
     printf '%s' "$SANDBOX_NOTES" > docs/release-notes.md
+    mkdir -p "$(dirname "$SANDBOX_LIBRARY_VERSION_PATH")"
+    printf '%s' "$SANDBOX_LIBRARY_VERSION" > "$SANDBOX_LIBRARY_VERSION_PATH"
     git add -A
     git commit --quiet -m "First commit"
     git remote add origin "$dir/origin.git"
@@ -118,6 +124,7 @@ state_of() {
     echo "tags $(git tag | sort | tr '\n' ' ')"
     echo "poms $(cat pom.xml modules/pom.xml)"
     echo "notes $(cat docs/release-notes.md)"
+    echo "library version $(cat "$SANDBOX_LIBRARY_VERSION_PATH" 2>/dev/null)"
     echo "status $(git status --porcelain)"
     echo "remote $(git ls-remote "$1/origin.git" | sort | tr '\n' ' ')"
   )

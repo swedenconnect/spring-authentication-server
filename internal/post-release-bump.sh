@@ -8,8 +8,8 @@
 # the bump is made on that branch.
 #
 # It reads the released version from the POMs, suggests the next snapshot version and lets you
-# confirm it or enter another one, sets that version in every pom.xml, adds a section for the
-# coming version to docs/release-notes.md, commits and pushes the branch.
+# confirm it or enter another one, sets that version in every pom.xml and in LibraryVersion.java,
+# adds a section for the coming version to docs/release-notes.md, commits and pushes the branch.
 #
 # See internal/release.md.
 set -euo pipefail
@@ -19,6 +19,8 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/release.sh"
 
 RELEASE_NOTES="docs/release-notes.md"
+
+LIBRARY_VERSION="authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/LibraryVersion.java"
 
 # Prints the snapshot version that development continues on after the given release version.
 next_snapshot_version() {
@@ -54,6 +56,31 @@ add_release_notes_section() {
     { print; last = $0 }
     END { if (!done) { if (last != "") print ""; section() } }
   ' "$file" > "$tmp"
+  cat "$tmp" > "$file"
+  rm -f "$tmp"
+}
+
+# Succeeds if the given file declares the MAJOR, MINOR and PATCH constants that
+# set_library_version updates.
+has_library_version_constants() {
+  local file="$1" name
+  [ -f "$file" ] || return 1
+  for name in MAJOR MINOR PATCH; do
+    grep -qE "^[[:space:]]*private static final int ${name} = [0-9]+;" "$file" || return 1
+  done
+}
+
+# Sets the MAJOR, MINOR and PATCH constants of the given LibraryVersion.java to the given X.Y.Z
+# version.
+set_library_version() {
+  local version="$1" file="$2" major minor patch tmp
+  IFS=. read -r major minor patch <<< "$version"
+  tmp="$(mktemp)"
+  sed -E \
+    -e "s/^([[:space:]]*private static final int MAJOR = )[0-9]+;/\1${major};/" \
+    -e "s/^([[:space:]]*private static final int MINOR = )[0-9]+;/\1${minor};/" \
+    -e "s/^([[:space:]]*private static final int PATCH = )[0-9]+;/\1${patch};/" \
+    "$file" > "$tmp"
   cat "$tmp" > "$file"
   rm -f "$tmp"
 }
@@ -108,6 +135,11 @@ main() {
 
   if [ "$current_branch" = "$MAIN_BRANCH" ] && ! main_is_up_to_date; then
     echo "$MAIN_BRANCH is behind $REMOTE/$MAIN_BRANCH. Pull it first, so the merged release is here." >&2
+    exit 1
+  fi
+
+  if ! has_library_version_constants "$LIBRARY_VERSION"; then
+    echo "$LIBRARY_VERSION is missing, or does not declare the MAJOR, MINOR and PATCH constants." >&2
     exit 1
   fi
 
@@ -172,10 +204,13 @@ main() {
   echo "Setting the version to $snapshot_version in every pom.xml ..."
   mvn versions:set -DnewVersion="$snapshot_version" -DprocessAllModules=true -DgenerateBackupPoms=false
 
+  echo "Setting the version to $version in $LIBRARY_VERSION ..."
+  set_library_version "$version" "$LIBRARY_VERSION"
+
   echo "Adding version $version to $RELEASE_NOTES ..."
   add_release_notes_section "$version" "$RELEASE_NOTES"
 
-  git add -- '**/pom.xml' pom.xml "$RELEASE_NOTES"
+  git add -- '**/pom.xml' pom.xml "$LIBRARY_VERSION" "$RELEASE_NOTES"
   git commit -m "$(bump_commit_message "$released_version")"
 
   echo "Pushing '$branch' to $REMOTE ..."
