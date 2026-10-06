@@ -407,6 +407,17 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
+  void theResponseTypeOfTheRequestObjectMustMatchTheRequest() throws Exception {
+    this.start(c -> {});
+    final Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().claim("response_type", "code id_token").build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request_object", "state-1");
+
+    params.put("request", sign(requestObjectClaims().build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
   void aRequestObjectSignedWithAnotherKeyIsRejected() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
