@@ -236,8 +236,9 @@ class OidcAutoConfigurationTest {
           assertThat(metadata.getACRs()).extracting(Identifier::getValue).containsExactly(LOA3);
           assertThat(metadata.getScopes().toStringList())
               .containsExactlyInAnyOrder("openid", "profile", "https://id.oidc.se/scope/naturalPersonInfo");
-          assertThat(metadata.getClaims()).contains("sub", "given_name", "family_name", "zoneinfo",
+          assertThat(metadata.getClaims()).contains("sub", "given_name", "family_name",
               "https://id.oidc.se/claim/personalIdentityNumber");
+          assertThat(metadata.getClaims()).doesNotContain("zoneinfo");
           assertThat(metadata.getUILocales()).extracting(LangTag::toString).containsExactly("sv", "en");
           assertThat(metadata.getCustomParameter(ParameterConstants.USER_MESSAGE_SUPPORTED_PARAM_NAME))
               .isEqualTo(true);
@@ -314,7 +315,8 @@ class OidcAutoConfigurationTest {
           final String json = get(context, DISCOVERY).getContentAsString();
           final OIDCProviderMetadata metadata = OIDCProviderMetadata.parse(json);
           assertThat(metadata.getScopes().toStringList()).containsExactly("openid", "email", "phone");
-          assertThat(metadata.getClaims()).contains("https://example.com/claim/employee", "email", "phone_number");
+          assertThat(metadata.getClaims()).contains("https://example.com/claim/employee");
+          assertThat(metadata.getClaims()).doesNotContain("email", "phone_number");
           assertThat(metadata.getServiceDocsURI()).isEqualTo(URI.create("https://op.example.com/docs"));
           assertThat(metadata.supportsFrontChannelLogout()).isTrue();
           assertThat(metadata.getCustomParameters().get("example_list"))

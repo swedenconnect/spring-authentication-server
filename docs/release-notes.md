@@ -10,7 +10,8 @@
 
 **Date:** _Not yet released_
 
--
+- An OpenID Provider may now offer a scope without supporting all of its claims. `claims_supported` lists only the
+  claims that the OpenID Provider can deliver.
 
 -----
 

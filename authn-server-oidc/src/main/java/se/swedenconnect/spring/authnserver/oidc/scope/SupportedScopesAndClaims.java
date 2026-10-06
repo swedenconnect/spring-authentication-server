@@ -44,9 +44,9 @@ import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
  * </p>
  * <p>
  * The OpenID Provider offers the union over all providers, or the configured scopes when they are set. The
- * {@code openid} scope is always offered. The supported claims are the claims of the providers, the configured claims
- * and every claim of every offered scope, as Sweden Connect OpenID Connect Metadata Requirements, Section 5.1,
- * requires.
+ * {@code openid} scope is always offered. The supported claims are {@code sub}, the claims of the providers and the
+ * configured claims. The claims of the offered scopes are not added, so an offered scope may have claims that are not
+ * supported. A claim that the providers do not deliver, but that should be published, is configured.
  * </p>
  *
  * @param scopes the offered scopes
@@ -92,6 +92,7 @@ public record SupportedScopesAndClaims(@NonNull List<String> scopes, @NonNull Li
     final List<String> addedClaims = configuredClaims != null ? configuredClaims : List.of();
 
     final Set<String> claims = new LinkedHashSet<>();
+    claims.add(IDTokenClaimsSet.SUB_CLAIM_NAME);
     final Set<String> derivedScopes = new LinkedHashSet<>();
     derivedScopes.add(OidcScopeValue.OPENID.getValue());
 
@@ -131,12 +132,6 @@ public record SupportedScopesAndClaims(@NonNull List<String> scopes, @NonNull Li
       scopes = derivedScopes;
     }
 
-    for (final String scope : scopes) {
-      final Set<ClaimRequirement> requirements = getScope(scopeRegistry, scope, "offered").getClaimRequirements();
-      if (requirements != null) {
-        requirements.forEach(r -> claims.add(r.name()));
-      }
-    }
     return new SupportedScopesAndClaims(List.copyOf(scopes), List.copyOf(claims));
   }
 
