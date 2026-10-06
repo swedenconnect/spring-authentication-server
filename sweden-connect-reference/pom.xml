@@ -276,28 +276,6 @@
   <profiles>
 
     <!--
-      The reference is a service, not a library, and is never published to Maven Central. The parent excludes it from
-      the published bundle, so there is nothing to sign.
-      -->
-    <profile>
-      <id>release</id>
-      <build>
-        <plugins>
-
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.2.8</version>
-            <configuration>
-              <skip>true</skip>
-            </configuration>
-          </plugin>
-
-        </plugins>
-      </build>
-    </profile>
-
-    <!--
       The local image is built for the architecture of the machine. The JVM reports arm64 as aarch64 (or arm64), and
       Docker names it arm64. Any other machine gets amd64.
       -->

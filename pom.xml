@@ -485,14 +485,6 @@
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-deploy-plugin</artifactId>
-        <configuration>
-          <skip>true</skip>
-        </configuration>
-      </plugin>
-
       <!-- run mvn jacoco:report -->
       <plugin>
         <groupId>org.jacoco</groupId>
@@ -558,6 +550,10 @@
             </executions>
           </plugin>
 
+          <!--
+            Every module of the build is published, the reference service included. Nothing lists the modules, so a
+            module added later is published too. A module that must not be published sets maven.deploy.skip.
+            -->
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
@@ -566,10 +562,6 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
-              <!-- The reference is a service, not a library, and is never published to Maven Central -->
-              <excludeArtifacts>
-                <excludeArtifact>sweden-connect-reference-authn-server</excludeArtifact>
-              </excludeArtifacts>
             </configuration>
           </plugin>
 

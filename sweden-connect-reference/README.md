@@ -32,7 +32,9 @@ the configuration of both protocols, the security of the pages, the response pag
 ## Building
 
 The service is a module of the Spring Authentication Server build, and is built and tested by `mvn clean verify` from
-the root of the repository. It is never published to Maven Central.
+the root of the repository. Each release is published to Maven Central, as
+`se.swedenconnect.spring.authnserver:sweden-connect-reference-authn-server`, and as a container image to
+`ghcr.io/swedenconnect/sweden-connect-reference-authn-server`, tagged with the version and with `latest`.
 
 The container image is built with [Jib](https://github.com/GoogleContainerTools/jib), from the `amazoncorretto:25.0.1`
 base image. Neither build runs as part of the normal build. Build and install the project first, with
