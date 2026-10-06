@@ -904,11 +904,12 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void aSignRequestWithoutSignScopeIsIgnored() throws Exception {
+  void aSignRequestWithoutSignScopeIsRejected() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, "anything");
-    assertThat(requirements(this.process(get(params))).getSignMessage()).isNull();
+    params.put("prompt", "login consent");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest(true)), CLIENT_KEY));
+    assertError(this.send(get(params)), "invalid_request", "state-1");
   }
 
   // Requester acceptance
