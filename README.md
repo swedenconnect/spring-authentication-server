@@ -44,6 +44,8 @@ See [https://docs.swedenconnect.se/spring-authentication-server](https://docs.sw
 
 Also, see the [Release Notes](https://docs.swedenconnect.se/spring-authentication-server/release-notes.html).
 
+For maintainers, [Releasing](internal/release.md) describes how a release is made and published.
+
 -----
 
 Copyright &copy; 2026, [Sweden Connect](https://www.swedenconnect.se). Licensed under version 2.0 of the [Apache License](http://www.apache.org/licenses/LICENSE-2.0).

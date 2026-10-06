@@ -1,0 +1,62 @@
+# Publishes the Docker image of the reference service when a version tag is pushed.
+#
+# The Maven version is set by internal/release.sh and committed before tagging, so the tag must match it: the tag
+# v1.0.0 requires the version 1.0.0 in the POMs. The image is tagged with the version and with latest.
+name: Release Docker image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Narrowed to what building and pushing the image requires.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Check that the tag matches the Maven version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout --no-transfer-progress)
+          if [[ "${VERSION}" == *-SNAPSHOT ]]; then
+            echo "::error::The Maven version ${VERSION} is a snapshot - set the release version in the POMs before tagging"
+            exit 1
+          fi
+          if [[ "${TAG}" != "v${VERSION}" ]]; then
+            echo "::error::The tag ${TAG} does not match the Maven version ${VERSION} - expected the tag v${VERSION}"
+            exit 1
+          fi
+
+      # Jib reads the credentials that this login stores, so the workflow token is all it needs.
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # This is a multi-module build, so the reactor modules the reference depends on have to be
+      # installed before the image is built from sweden-connect-reference alone.
+      - name: Install the reactor modules
+        run: mvn clean install --no-transfer-progress
+
+      # The Jib setup of the reference builds for linux/amd64 and linux/arm64 and pushes to
+      # ghcr.io/swedenconnect/sweden-connect-reference-authn-server:<version>. latest is added here.
+      - name: Build and publish image
+        working-directory: sweden-connect-reference
+        run: mvn clean package jib:build -Djib.to.tags=latest --no-transfer-progress
