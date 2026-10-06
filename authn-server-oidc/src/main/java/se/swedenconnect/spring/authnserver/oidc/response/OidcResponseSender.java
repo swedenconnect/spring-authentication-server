@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,14 +27,14 @@ import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
 import org.springframework.web.util.UriComponentsBuilder;
-import org.springframework.web.util.UriUtils;
 
 import com.nimbusds.oauth2.sdk.ErrorObject;
 
 /**
  * Sends responses to the client's redirect URI, in the response mode of the request: as query parameters of a
  * redirect ({@code query}), or posted by a {@link ResponsePage} ({@code form_post}). The {@code state} of the request
- * is added when the request had one.
+ * is added when the request had one. Query parameters are encoded so that a client that decodes them as
+ * {@code application/x-www-form-urlencoded} gets back exactly the values sent.
  *
  * @author Martin Lindström
  */
@@ -82,9 +83,19 @@ public class OidcResponseSender {
       return;
     }
     final UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(target.redirectUri());
-    allParameters.forEach((name, value) -> builder.queryParam(UriUtils.encodeQueryParam(name, StandardCharsets.UTF_8),
-        UriUtils.encodeQueryParam(value, StandardCharsets.UTF_8)));
+    allParameters.forEach((name, value) -> builder.queryParam(encode(name), encode(value)));
     response.sendRedirect(builder.build(true).toUriString());
+  }
+
+  /**
+   * Encodes a query parameter name or value in the {@code application/x-www-form-urlencoded} format, as RFC 6749,
+   * Appendix B, requires. A space is encoded as {@code %20}, which decodes to a space both as form data and as a URI.
+   *
+   * @param value the value to encode
+   * @return the encoded value
+   */
+  private static @NonNull String encode(final @NonNull String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
   }
 
   /**
