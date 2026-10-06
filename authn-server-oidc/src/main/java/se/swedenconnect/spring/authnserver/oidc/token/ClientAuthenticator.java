@@ -67,10 +67,10 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * <p>
  * A client assertion ({@code private_key_jwt} and {@code client_secret_jwt}) must have {@code iss} and {@code sub}
  * equal to the {@code client_id}, {@code aud} holding the token endpoint or the issuer, as the Swedish OpenID Connect
- * Profile, Section 3.1.1, recommends, an {@code exp} that has not passed, an {@code iat} that is not in the future
- * and a {@code jti} that has not been used before. A {@code private_key_jwt} assertion is verified with the keys of the
- * client, and a {@code client_secret_jwt} assertion with the client secret. A client that has registered
- * {@code token_endpoint_auth_signing_alg} must use that algorithm.
+ * Profile, Section 3.1.1, recommends, an {@code exp} that has not passed, an {@code iat}, if present, that is not
+ * in the future and a {@code jti} that has not been used before. A {@code private_key_jwt} assertion is verified with
+ * the keys of the client, and a {@code client_secret_jwt} assertion with the client secret. A client that has
+ * registered {@code token_endpoint_auth_signing_alg} must use that algorithm.
  * </p>
  * <p>
  * The client secret is the {@value OidcClientRecord#CLIENT_SECRET} field of the client metadata.
@@ -283,10 +283,8 @@ public class ClientAuthenticator {
     if (now.isAfter(expiresAt.plus(this.clockSkew))) {
       throw invalidClient("The client assertion has expired", logString);
     }
-    if (claims.getIssueTime() == null) {
-      throw invalidClient("The client assertion has no iat", logString);
-    }
-    if (claims.getIssueTime().toInstant().isAfter(now.plus(this.clockSkew))) {
+    // iat is optional (OpenID Connect Core, Section 9), but is checked when present ...
+    if (claims.getIssueTime() != null && claims.getIssueTime().toInstant().isAfter(now.plus(this.clockSkew))) {
       throw invalidClient("The iat of the client assertion is in the future", logString);
     }
     if (claims.getJWTID() == null || claims.getJWTID().isBlank()) {

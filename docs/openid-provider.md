@@ -582,7 +582,7 @@ A client assertion, for `private_key_jwt` and `client_secret_jwt`, must hold:
 - `aud` holding the URL of the token endpoint or the issuer, as the Swedish OpenID Connect Profile, Section 3.1.1,
   recommends,
 - `exp`, which has not passed,
-- `iat`, which is not in the future,
+- `iat`, if present, which is not in the future. It is optional, as OpenID Connect Core, Section 9, says,
 - `jti`, which has not been used before. The value is remembered until the assertion expires.
 
 The clock skew of the OpenID Provider applies. A `private_key_jwt` assertion may be signed with `RS256`, `RS384`,
