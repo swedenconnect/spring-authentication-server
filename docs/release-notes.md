@@ -8,7 +8,7 @@
 
 ### Version 1.0.1
 
-**Date:** _Not yet released_
+**Date:** 2026-10-06
 
 - An OpenID Provider may now offer a scope without supporting all of its claims. `claims_supported` lists only the claims that the OpenID Provider can deliver.
 - The Sweden Connect reference server delivers a simulated user's coordination number as a coordination number, not as a personal identity number.
