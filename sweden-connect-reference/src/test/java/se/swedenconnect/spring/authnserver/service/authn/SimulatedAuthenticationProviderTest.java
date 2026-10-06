@@ -57,7 +57,7 @@ class SimulatedAuthenticationProviderTest {
     assertThat(this.provider.getSupportedAuthnContextUris()).containsExactly(LOA3);
     assertThat(this.provider.getEntityCategories()).containsExactly("http://id.elegnamnden.se/ec/1.0/loa3-pnr");
     assertThat(this.provider.getSupportedAttributes()).contains(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER,
-        AttributeIdentifiers.DATE_OF_BIRTH);
+        AttributeIdentifiers.COORDINATION_NUMBER, AttributeIdentifiers.DATE_OF_BIRTH);
     assertThat(this.provider.getSupportedScopes()).contains("openid", "https://id.oidc.se/scope/sign",
         "https://id.oidc.se/scope/signApproval", "https://id.oidc.se/scope/naturalPersonNumber");
     assertThat(this.provider.supportsUserAuthenticationToken(token(user(), null))).isTrue();
@@ -79,6 +79,19 @@ class SimulatedAuthenticationProviderTest {
     assertThat(user.getAttribute(AttributeIdentifiers.DISPLAY_NAME).getValue()).isEqualTo("Frida Kranstege");
     assertThat(user.getAttribute(AttributeIdentifiers.DATE_OF_BIRTH).getValue()).isEqualTo(LocalDate.of(1977, 5, 23));
     assertThat(user.isSignMessageDisplayed()).isFalse();
+  }
+
+  @Test
+  void aUserWithACoordinationNumberGetsTheCoordinationNumberAttribute() {
+    final SimulatedUser simulated = user();
+    simulated.setPersonalNumber("197010632391");
+    final AuthenticatedUser user =
+        this.provider.createUserAuthentication(resumed(token(simulated, null))).getAuthenticatedUser();
+
+    assertThat(user.getUsername()).isEqualTo("197010632391");
+    assertThat(user.getPrimaryAttribute()).isEqualTo(AttributeIdentifiers.COORDINATION_NUMBER);
+    assertThat(user.getAttribute(AttributeIdentifiers.COORDINATION_NUMBER).getValue()).isEqualTo("197010632391");
+    assertThat(user.getAttribute(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER)).isNull();
   }
 
   @Test

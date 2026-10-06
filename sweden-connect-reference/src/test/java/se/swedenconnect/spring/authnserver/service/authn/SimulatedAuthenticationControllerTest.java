@@ -78,6 +78,11 @@ class SimulatedAuthenticationControllerTest {
         AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, false, List.of("197705232382"), null)));
     assertThat(SimulatedAuthenticationController.getRequestedPersonalIdentityNumber(requirements))
         .isEqualTo("197705232382");
+
+    requirements.setRequestedAttributes(List.of(new GenericRequestedAttribute(
+        AttributeIdentifiers.COORDINATION_NUMBER, false, List.of("197010632391"), null)));
+    assertThat(SimulatedAuthenticationController.getRequestedPersonalIdentityNumber(requirements))
+        .isEqualTo("197010632391");
   }
 
   @Test

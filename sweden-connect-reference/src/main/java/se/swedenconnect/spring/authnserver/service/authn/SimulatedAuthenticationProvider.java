@@ -31,6 +31,7 @@ import com.nimbusds.openid.connect.sdk.OIDCScopeValue;
 import se.oidc.nimbus.claims.ScopeConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
+import se.swedenconnect.spring.authnserver.attributes.SwedishIdentityNumbers;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.UserAuthentication;
 import se.swedenconnect.spring.authnserver.authentication.provider.redirect.AbstractUserRedirectAuthenticationProvider;
@@ -51,6 +52,7 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
   /** The attributes that the provider delivers. */
   private static final List<String> SUPPORTED_ATTRIBUTES = List.of(
       AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER,
+      AttributeIdentifiers.COORDINATION_NUMBER,
       AttributeIdentifiers.GIVEN_NAME,
       AttributeIdentifiers.SURNAME,
       AttributeIdentifiers.DISPLAY_NAME,
@@ -138,7 +140,9 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
   }
 
   /**
-   * Turns the user that was selected in the user picker into the authentication result.
+   * Turns the user that was selected in the user picker into the authentication result. A user whose number is a
+   * coordination number is delivered with the coordination number attribute, and other users with the personal
+   * identity number attribute.
    */
   @Override
   protected @NonNull UserAuthentication createUserAuthentication(final @NonNull ResumedAuthenticationToken token)
@@ -150,9 +154,13 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
     }
     final SimulatedUser user = simulated.getUser();
 
+    final String number = Objects.requireNonNull(user.getPersonalNumber(), "personalNumber must not be null");
+    final String identityAttribute = SwedishIdentityNumbers.isCoordinationNumber(number)
+        ? AttributeIdentifiers.COORDINATION_NUMBER
+        : AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER;
+
     final List<GenericAttribute<?>> attributes = new ArrayList<>();
-    attributes.add(GenericAttribute.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER,
-        Objects.requireNonNull(user.getPersonalNumber(), "personalNumber must not be null")));
+    attributes.add(GenericAttribute.of(identityAttribute, number));
     addIfPresent(attributes, AttributeIdentifiers.GIVEN_NAME, user.getGivenName());
     addIfPresent(attributes, AttributeIdentifiers.SURNAME, user.getSurname());
     addIfPresent(attributes, AttributeIdentifiers.DISPLAY_NAME, user.getDisplayName());
@@ -161,8 +169,7 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
       attributes.add(GenericAttribute.of(AttributeIdentifiers.DATE_OF_BIRTH, dateOfBirth));
     }
 
-    final AuthenticatedUser authenticatedUser = new AuthenticatedUser(attributes,
-        AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, simulated.getLoa(), simulated.getAuthnInstant(),
+    final AuthenticatedUser authenticatedUser = new AuthenticatedUser(attributes, identityAttribute, simulated.getLoa(), simulated.getAuthnInstant(),
         simulated.getClientIpAddress());
     if (simulated.isSignMessageDisplayed()) {
       authenticatedUser.setSignMessageDisplayed(true, simulated.getSignMessageLanguage());

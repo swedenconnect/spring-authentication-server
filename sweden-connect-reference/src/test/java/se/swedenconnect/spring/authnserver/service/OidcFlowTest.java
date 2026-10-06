@@ -77,6 +77,8 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
 
   static final String USER = "197705232382";
 
+  static final String COORDINATION_NUMBER_USER = "197010632391";
+
   static final String NATURAL_PERSON_NUMBER = "https://id.oidc.se/scope/naturalPersonNumber";
 
   static final PrivateKey CLIENT_KEY = loadClientKey();
@@ -120,6 +122,26 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
     final JWTClaimsSet userInfo = this.userInfo(tokens.getOIDCTokens().getBearerAccessToken());
     assertThat(userInfo.getSubject()).isEqualTo(idClaims.getSubject());
     assertThat(userInfo.getStringClaim(ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME)).isEqualTo(USER);
+  }
+
+  @Test
+  void aUserWithACoordinationNumberGetsTheCoordinationNumberClaim() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final Map<String, String> request = authorizationRequest("openid " + NATURAL_PERSON_NUMBER);
+    request.put("acr_values", LOA3);
+
+    final HttpResponse<String> page = browser.follow(browser.get(authorizeUrl(request)), BASE_URL);
+    assertThat(page.statusCode()).isEqualTo(200);
+    final Map<String, String> response = this.complete(browser, page.body(), Map.of(
+        "action", "ok",
+        "personalIdentityNumber", COORDINATION_NUMBER_USER,
+        "loa", LOA3));
+
+    final OIDCTokenResponse tokens = this.token(response.get("code"));
+    final JWTClaimsSet idClaims = tokens.getOIDCTokens().getIDToken().getJWTClaimsSet();
+    assertThat(idClaims.getStringClaim(ClaimConstants.COORDINATION_NUMBER_CLAIM_NAME))
+        .isEqualTo(COORDINATION_NUMBER_USER);
+    assertThat(idClaims.getClaim(ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME)).isNull();
   }
 
   @Test
