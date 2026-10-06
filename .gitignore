@@ -36,4 +36,5 @@ out
 hs_err_pid*
 /.apt_generated/
 
-reference-code
+/reference-code
+/sandbox
