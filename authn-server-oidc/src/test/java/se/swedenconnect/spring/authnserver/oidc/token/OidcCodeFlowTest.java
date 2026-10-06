@@ -486,9 +486,20 @@ class OidcCodeFlowTest {
   }
 
   @Test
-  void singleSignOnKeepsTheOriginalAuthTime() throws Exception {
+  void aRequestWithoutPromptIsNotAnsweredWithSingleSignOn() throws Exception {
     final TestProvider provider = new TestProvider("direct", LOA3);
     this.start(c -> {}, provider);
+    final Instant first = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
+    Thread.sleep(1100);
+    final Instant second = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
+    assertThat(provider.calls).isEqualTo(2);
+    assertThat(second).isAfter(first);
+  }
+
+  @Test
+  void singleSignOnKeepsTheOriginalAuthTime() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    this.start(c -> oidc(c).loginWithoutPrompt(false), provider);
     final Instant first = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();
     Thread.sleep(1100);
     final Instant second = this.codeFlow(params(RSA_CLIENT)).idToken().getDateClaim("auth_time").toInstant();

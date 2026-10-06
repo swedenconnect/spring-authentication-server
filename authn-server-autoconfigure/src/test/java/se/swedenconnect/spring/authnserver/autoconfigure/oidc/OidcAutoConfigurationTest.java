@@ -338,7 +338,8 @@ class OidcAutoConfigurationTest {
         .withPropertyValues("authn-server.oidc.endpoints.authorization=/authz",
             "authn-server.oidc.authorization-request.require-pkce=true",
             "authn-server.oidc.authorization-request.require-signed-request-object=true",
-            "authn-server.oidc.authorization-request.require-state=false")
+            "authn-server.oidc.authorization-request.require-state=false",
+            "authn-server.oidc.authorization-request.login-without-prompt=false")
         .withUserConfiguration(CaptureConfiguration.class)
         .run(context -> {
           assertThat(context).hasNotFailed();
@@ -347,6 +348,7 @@ class OidcAutoConfigurationTest {
           assertThat(oidc.isRequirePkce()).isTrue();
           assertThat(oidc.isRequireSignedRequestObject()).isTrue();
           assertThat(oidc.isRequireState()).isFalse();
+          assertThat(oidc.isLoginWithoutPrompt()).isFalse();
 
           final OIDCProviderMetadata metadata =
               OIDCProviderMetadata.parse(get(context, DISCOVERY).getContentAsString());
@@ -412,6 +414,7 @@ class OidcAutoConfigurationTest {
           assertThat(oidc.isRequirePkce()).isFalse();
           assertThat(oidc.isRequireSignedRequestObject()).isFalse();
           assertThat(oidc.isRequireState()).isTrue();
+          assertThat(oidc.isLoginWithoutPrompt()).isTrue();
           assertThat(CaptureConfiguration.CONFIGURER.get().getRequesterAcceptance())
               .isSameAs(RequesterAcceptance.acceptAll());
           final OIDCProviderMetadata metadata =

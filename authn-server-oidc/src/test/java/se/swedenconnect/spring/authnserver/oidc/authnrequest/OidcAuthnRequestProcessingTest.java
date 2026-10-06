@@ -276,7 +276,6 @@ class OidcAuthnRequestProcessingTest {
     this.start(c -> {});
     final UserAuthenticationInputToken token = this.process(post(params()));
     assertThat(requirements(token).getScopes()).containsExactly("openid");
-    assertThat(requirements(token).isForceAuthn()).isFalse();
   }
 
   @Test
@@ -595,6 +594,24 @@ class OidcAuthnRequestProcessingTest {
 
     params.put("prompt", "none login");
     assertError(this.send(get(params)), "invalid_request", "state-1");
+  }
+
+  @Test
+  void aRequestWithoutPromptForcesAuthentication() throws Exception {
+    this.start(c -> {});
+    final OidcAuthenticationRequirements requirements = requirements(this.process(get(params())));
+    assertThat(requirements.isForceAuthn()).isTrue();
+    assertThat(requirements.isPassiveAuthn()).isFalse();
+
+    final Map<String, String> params = params();
+    params.put("prompt", "consent");
+    assertThat(requirements(this.process(get(params))).isForceAuthn()).isFalse();
+  }
+
+  @Test
+  void aRequestWithoutPromptMayBeAnsweredWithSsoWhenConfigured() throws Exception {
+    this.start(c -> oidc(c).loginWithoutPrompt(false));
+    assertThat(requirements(this.process(get(params()))).isForceAuthn()).isFalse();
   }
 
   @Test
