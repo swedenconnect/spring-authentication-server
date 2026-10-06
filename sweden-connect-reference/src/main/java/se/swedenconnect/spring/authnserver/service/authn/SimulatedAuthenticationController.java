@@ -412,15 +412,17 @@ public class SimulatedAuthenticationController
   }
 
   /**
-   * Gets the personal identity number that the requester asks for, from a SAML {@code PrincipalSelection} or an OpenID
-   * Connect claims request with a value. Both arrive as a requested attribute that carries the value.
+   * Gets the personal identity number, or coordination number, that the requester asks for, from a SAML
+   * {@code PrincipalSelection} or an OpenID Connect claims request with a value. Both arrive as a requested attribute
+   * that carries the value.
    *
    * @param requirements the authentication requirements
-   * @return the personal identity number, or {@code null} if none is requested
+   * @return the personal identity number or coordination number, or {@code null} if none is requested
    */
   static @Nullable String getRequestedPersonalIdentityNumber(final @NonNull AuthenticationRequirements requirements) {
     return requirements.getRequestedAttributes().stream()
-        .filter(a -> AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER.equals(a.getIdentifier()))
+        .filter(a -> AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER.equals(a.getIdentifier())
+            || AttributeIdentifiers.COORDINATION_NUMBER.equals(a.getIdentifier()))
         .flatMap(a -> a.getRequestedValues().stream())
         .map(Serializable::toString)
         .filter(StringUtils::hasText)
