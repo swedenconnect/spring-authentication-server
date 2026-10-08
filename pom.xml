@@ -22,7 +22,7 @@
   <groupId>se.swedenconnect.spring.authnserver</groupId>
   <artifactId>spring-authentication-server-parent</artifactId>
   <packaging>pom</packaging>
-  <version>1.0.2-SNAPSHOT</version>
+  <version>1.0.2</version>
 
   <name>Sweden Connect :: Spring Authentication Server :: Parent POM</name>
   <description>Parent POM for Spring Authentication Server libraries</description>
