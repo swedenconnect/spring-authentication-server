@@ -23,6 +23,9 @@ jobs:
   deploy:
     name: Deploy to Maven Central
     runs-on: ubuntu-latest
+    env:
+      # The Maven version used by every step. See "Install Maven" below.
+      PINNED_MAVEN_VERSION: '3.9.16'
 
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +35,24 @@ jobs:
           distribution: 'temurin'
           java-version: '25'
           cache: 'maven'
+
+      # Workaround: the runner image ships Maven 3.10, whose Resolver 2.x makes the Central
+      # publishing plugin put maven-metadata-local.xml and _remote.repositories into the bundle, and
+      # Central rejects it. Maven 3.9 is therefore put first on PATH for every later step, the version
+      # check included. Remove this step when central-publishing-maven-plugin works with Maven 3.10.
+      # The download is checked against the SHA-512 that Maven Central publishes next to it.
+      - name: Install Maven ${{ env.PINNED_MAVEN_VERSION }}
+        run: |
+          set -euo pipefail
+          base="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${PINNED_MAVEN_VERSION}"
+          archive="apache-maven-${PINNED_MAVEN_VERSION}-bin.tar.gz"
+          cd "${RUNNER_TEMP}"
+          curl -fsSL -o "${archive}" "${base}/${archive}"
+          expected="$(curl -fsSL "${base}/${archive}.sha512" | awk '{print $1}')"
+          echo "${expected}  ${archive}" | sha512sum -c -
+          tar -xzf "${archive}"
+          echo "${RUNNER_TEMP}/apache-maven-${PINNED_MAVEN_VERSION}/bin" >> "${GITHUB_PATH}"
+          "${RUNNER_TEMP}/apache-maven-${PINNED_MAVEN_VERSION}/bin/mvn" --version
 
       # setup-java writes a settings.xml holding the github server alone, which this build does not
       # use. Publishing needs the central server, so the file is replaced here. The values are
