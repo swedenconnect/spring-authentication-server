@@ -189,7 +189,10 @@ files as the `swedenconnect-bot` Central user. Nothing is published by hand.
 
 ### What the workflow does
 
-1. Checks out the tag and sets up Java 25 from Temurin.
+1. Checks out the tag and sets up Java 25 from Temurin. It also installs Maven 3.9.16 from Maven
+   Central, checked against its published SHA-512, and uses it instead of the runner's Maven 3.10.
+   With Maven 3.10 the Central publishing plugin produces a bundle that Central rejects. This is a
+   workaround, to be removed when the plugin works with Maven 3.10.
 2. Checks the version, before anything is built, so that a mismatch publishes nothing. Every module
    that is published must be at the version the tag names, and that version must not be a snapshot.
 3. Builds the whole project with `mvn -Prelease clean deploy`, tests included. The Redis tests use
