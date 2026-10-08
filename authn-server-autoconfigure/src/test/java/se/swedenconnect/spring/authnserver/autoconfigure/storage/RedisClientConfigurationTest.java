@@ -18,6 +18,7 @@ package se.swedenconnect.spring.authnserver.autoconfigure.storage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
@@ -32,6 +33,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -105,7 +107,7 @@ class RedisClientConfigurationTest {
   void lettuceChecksTheHostNameByDefault() {
     this.tls(TRUSTED, "lettuce").run(context -> assertThat(context).hasFailed().getFailure()
         .hasStackTraceContaining("the Redis connection does not work")
-        .hasStackTraceContaining("No subject alternative DNS name matching"));
+        .satisfies(RedisClientConfigurationTest::assertHostNameRejected));
   }
 
   @Test
@@ -130,7 +132,7 @@ class RedisClientConfigurationTest {
   void jedisChecksTheHostNameByDefault() {
     this.tls(TRUSTED, "jedis").run(context -> assertThat(context).hasFailed().getFailure()
         .hasStackTraceContaining("the Redis connection does not work")
-        .hasStackTraceContaining("No subject alternative DNS name matching"));
+        .satisfies(RedisClientConfigurationTest::assertHostNameRejected));
   }
 
   @Test
@@ -212,6 +214,19 @@ class RedisClientConfigurationTest {
         "spring.data.redis.ssl.enabled=true",
         "spring.data.redis.ssl.bundle=redis",
         "spring.ssl.bundle.pem.redis.truststore.certificate=file:" + trust.caFile);
+  }
+
+  /**
+   * Asserts that the failure was caused by the host name check of the address that the test connects to. The JDK
+   * words the message differently for a host name and for an IP address, and the address is {@code localhost} on a
+   * developer machine but may be the IP address of the Docker host when the build runs in a container.
+   */
+  private static void assertHostNameRejected(final Throwable failure) {
+    final StringWriter stackTrace = new StringWriter();
+    failure.printStackTrace(new PrintWriter(stackTrace));
+    assertThat(stackTrace.toString()).containsPattern(Pattern.compile(
+        "No subject alternative (DNS name|names) matching (IP address )?%s found"
+            .formatted(Pattern.quote(TLS_REDIS.getHost()))));
   }
 
   private void useStore(final AccessTokenStore store) {
