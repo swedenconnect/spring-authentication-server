@@ -578,6 +578,7 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `issuer` | The issuer identifier. It must be the base URL, or begin with the base URL followed by a path. The discovery document is published at the issuer followed by `/.well-known/openid-configuration`. | The base URL |
 | `sso.*` | The single sign-on policy for OpenID Connect, see [Single sign-on](#single-sign-on). | `authn-server.sso.*` |
 | `clock-skew` | The clock skew for OpenID Connect. | `authn-server.clock-skew` |
+| `max-jwt-age` | The maximum age of a JWT that a client signs, measured from its `iat`: signed request objects, signature request JWTs and client assertions. The clock skew is added to it. A JWT without `iat` is accepted. Must be positive when set. | No maximum age |
 | `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the `https://id.oidc.se/param/userMessage` parameter is read, and the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. When they are not, the parameter is ignored. | `authn-server.supports-user-message` |
 | `subject-identifier.*` | The subject identifier settings for OpenID Connect. | `authn-server.subject-identifier.*` |
 | `keys.*` | The signing and decryption keys, see [Keys](#oidc-keys). | Required |
@@ -755,7 +756,8 @@ authn-server:
       require-signed-request-object: true
 ```
 
-The clock skew, `authn-server.oidc.clock-skew`, applies to the `exp` and `nbf` of request objects.
+The clock skew, `authn-server.oidc.clock-skew`, applies to the `exp`, `nbf` and `iat` of request objects, and is added
+to the maximum age, `authn-server.oidc.max-jwt-age`, of signed request objects.
 
 <a name="oidc-requester-acceptance"></a>
 ### Requester acceptance

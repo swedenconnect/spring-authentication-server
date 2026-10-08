@@ -404,6 +404,35 @@ class OidcAutoConfigurationTest {
   }
 
   @Test
+  void theMaximumJwtAgeIsUnsetByDefaultAndAppliedWhenAssigned() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class)
+              .getMaxJwtAge()).isNull();
+        });
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.max-jwt-age=5m")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class)
+              .getMaxJwtAge()).isEqualTo(Duration.ofMinutes(5));
+        });
+  }
+
+  @Test
+  void aZeroOrNegativeMaximumJwtAgeFailsStartup() {
+    for (final String value : List.of("0s", "-1m")) {
+      this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+          .withPropertyValues("authn-server.oidc.max-jwt-age=" + value)
+          .run(context -> assertThat(context).hasFailed()
+              .getFailure().rootCause().hasMessageContaining("maximum JWT age must be positive"));
+    }
+  }
+
+  @Test
   void theAuthorizationRequestDefaultsApply() {
     this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
         .withUserConfiguration(CaptureConfiguration.class)

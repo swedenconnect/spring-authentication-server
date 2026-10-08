@@ -344,8 +344,12 @@ given as a plain parameter.
 
 For every request object, `client_id` and `iss`, when present, must be the `client_id` of the request, and
 `response_type`, when also given as a plain parameter, must match it, as OpenID Connect Core, Section 6.1, requires. A
-request object whose `exp` has passed, or whose `nbf` has not been reached, is rejected. The clock skew of the OpenID Provider
-applies.
+request object whose `exp` has passed, or whose `nbf` has not been reached, is rejected.
+
+The `iat` of a signed request object is optional. When present, it must not be in the future, and when
+`authn-server.oidc.max-jwt-age` is set, the request object must not be older than that. There is no maximum age by
+default, since a client may sign a request object once and reuse it through `request_uri`. The `iat` of an unsigned
+request object is not checked. The clock skew of the OpenID Provider applies to all of these checks.
 
 If a request object cannot be fetched or decoded, there may be no redirect URI to answer to, since the request object
 may be what holds it. The error is sent to the client when the plain parameters of the request hold a registered
@@ -430,7 +434,7 @@ challenge, is kept as the protocol request data of the request, an
 
 The parameters of
 [Authentication Request Parameter Extensions for the Swedish OpenID Connect Profile](https://www.oidc.se/specifications/request-parameter-extensions-1_1.html)
-and the [Signature Extension for OpenID Connect](https://www.oidc.se/specifications/oidc-signature-extension-1_1.html)
+and the [Signature Extension for OpenID Connect](https://www.oidc.se/specifications/oidc-signature-extension-1_2.html)
 are read, as plain parameters or from a request object.
 
 - **User message**, `https://id.oidc.se/param/userMessage`. Read only when user messages are supported for OpenID
@@ -442,7 +446,10 @@ are read, as plain parameters or from a request object.
   or `https://id.oidc.se/scope/signApproval` is requested and offered. Without one of these scopes, a signature request
   is answered with `invalid_request`, as Section 5.1 of the extension requires. With one of them, it must be present,
   either as a JWT of its own signed with the client's key, which may also be encrypted, or as a JSON object in a signed
-  request object. `prompt` must hold both `login` and `consent`. For the sign scope, `tbs_data` must be present, and
+  request object. A JWT of its own must hold `iss`, which must be the `client_id`, and `aud`, which must be the issuer
+  or the URL of the authorization endpoint, the same rules as for a signed request object (Section 3.1.2 of the
+  extension). Its `exp`, `nbf` and `iat` are checked as for a signed [request object](#request-objects), including
+  the maximum age. `prompt` must hold both `login` and `consent`. For the sign scope, `tbs_data` must be present, and
   for sign approval only, it must not be. The sign message becomes a sign message that must be shown, with the data
   to be signed. A signature request that breaks a rule is answered with `invalid_request`.
 
@@ -471,6 +478,7 @@ an `error_description` meant for the client's logs.
 | The client asks for an encrypted ID token with algorithms that are not allowed, or has no key for them | Error page, 500 (`INVALID_CLIENT_CONFIGURATION`) |
 | `request_uri` is not registered, or cannot be fetched | `invalid_request_uri` |
 | The request object is invalid, not signed when it must be, or signed with the wrong algorithm | `invalid_request_object` |
+| A signed request object has an `iat` in the future, or is older than `authn-server.oidc.max-jwt-age` | `invalid_request_object` |
 | `response_type` is not `code` | `unsupported_response_type` |
 | A parameter is missing or invalid, such as `scope` without `openid`, `state`, `prompt`, `max_age` or `id_token_hint` | `invalid_request` |
 | PKCE is missing when required, or uses `plain`, also by leaving out `code_challenge_method` | `invalid_request` |
@@ -478,6 +486,7 @@ an `error_description` meant for the client's logs.
 | The client registry fails during the acceptance check | Error page, 503 (`CLIENT_LOOKUP_FAILED`) |
 | None of the essential `acr` values is supported | `unmet_authentication_requirements` |
 | The user message or the signature request is invalid | `invalid_request` |
+| A signature request JWT lacks `iss` or `aud`, has the wrong `iss` or `aud`, has an `iat` in the future, or is older than `authn-server.oidc.max-jwt-age` | `invalid_request` |
 
 The errors that the authentication step reports are mapped as described in
 [Errors](authentication-module.html#errors).
@@ -543,6 +552,7 @@ Section 4.1.2, says. Every response, also an error response, carries `Cache-Cont
 | Failure | Error |
 | :--- | :--- |
 | No client authentication, an unknown client, a wrong secret or signature, a method that is not enabled or not the registered one, or an invalid or reused client assertion | `invalid_client` (HTTP status 401) |
+| A client assertion with an `iat` in the future, or older than `authn-server.oidc.max-jwt-age` | `invalid_client` (HTTP status 401) |
 | More than one client authentication method | `invalid_request` |
 | `grant_type` other than `authorization_code` | `unsupported_grant_type` |
 | `grant_type` or `code` missing | `invalid_request` |
@@ -583,7 +593,8 @@ A client assertion, for `private_key_jwt` and `client_secret_jwt`, must hold:
 - `aud` holding the URL of the token endpoint or the issuer, as the Swedish OpenID Connect Profile, Section 3.1.1,
   recommends,
 - `exp`, which has not passed,
-- `iat`, if present, which is not in the future. It is optional, as OpenID Connect Core, Section 9, says,
+- `iat`, if present, which is not in the future, and not older than `authn-server.oidc.max-jwt-age` when that is set.
+  It is optional, as OpenID Connect Core, Section 9, says,
 - `jti`, which has not been used before. The value is remembered until the assertion expires.
 
 The clock skew of the OpenID Provider applies. A `private_key_jwt` assertion may be signed with `RS256`, `RS384`,

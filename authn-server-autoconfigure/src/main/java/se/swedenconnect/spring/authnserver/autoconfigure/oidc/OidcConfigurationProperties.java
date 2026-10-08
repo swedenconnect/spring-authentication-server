@@ -73,6 +73,12 @@ public class OidcConfigurationProperties {
   private Duration clockSkew;
 
   /**
+   * The maximum age of a JWT that a client signs (signed request objects, signature request JWTs and client
+   * assertions), measured from its iat. The clock skew is added. No value means that the age is not checked.
+   */
+  private Duration maxJwtAge;
+
+  /**
    * Whether user messages are supported for OpenID Connect. Overrides authn-server.supports-user-message.
    */
   private Boolean supportsUserMessage;
@@ -240,6 +246,24 @@ public class OidcConfigurationProperties {
    */
   public void setClockSkew(final @Nullable Duration clockSkew) {
     this.clockSkew = clockSkew;
+  }
+
+  /**
+   * Gets the maximum age of a JWT that a client signs.
+   *
+   * @return the maximum age, or {@code null} for no limit
+   */
+  public @Nullable Duration getMaxJwtAge() {
+    return this.maxJwtAge;
+  }
+
+  /**
+   * Assigns the maximum age of a JWT that a client signs.
+   *
+   * @param maxJwtAge the maximum age, or {@code null} for no limit
+   */
+  public void setMaxJwtAge(final @Nullable Duration maxJwtAge) {
+    this.maxJwtAge = maxJwtAge;
   }
 
   /**

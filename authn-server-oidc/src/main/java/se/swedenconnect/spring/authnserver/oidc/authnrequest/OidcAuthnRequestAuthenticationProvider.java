@@ -561,9 +561,10 @@ public class OidcAuthnRequestAuthenticationProvider implements AuthenticationPro
    * Extracts the sign message of a signature request, following the Signature Extension for OpenID Connect. A
    * signature request is only processed when the sign scope or the sign approval scope is requested and offered, and
    * a signature request parameter without one of them is rejected. The signature request parameter must then be
-   * present and signed, either as a JWT of its own or in a signed request object, and {@code prompt} must hold
-   * {@code login} and {@code consent}. The data to be signed must be present for the sign scope, and must not be
-   * present for sign approval only.
+   * present and signed, either as a JWT of its own, which must hold {@code iss} and {@code aud} (Signature Extension
+   * for OpenID Connect 1.2, Section 3.1.2), or in a signed request object, and {@code prompt} must hold {@code login}
+   * and {@code consent}. The data to be signed must be present for the sign scope, and must not be present for sign
+   * approval only.
    *
    * @param token the request token
    * @param scopes the honoured scopes

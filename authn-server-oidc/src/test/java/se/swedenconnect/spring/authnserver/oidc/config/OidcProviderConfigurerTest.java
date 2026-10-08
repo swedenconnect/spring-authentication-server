@@ -163,6 +163,10 @@ class OidcProviderConfigurerTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.idTokenLifetime(Duration.ZERO)))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("ID token lifetime");
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.maxJwtAge(Duration.ZERO)))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("maximum JWT age");
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.maxJwtAge(Duration.ofSeconds(-1))))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("maximum JWT age");
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.tokenEndpoint("token")))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("token endpoint");
   }

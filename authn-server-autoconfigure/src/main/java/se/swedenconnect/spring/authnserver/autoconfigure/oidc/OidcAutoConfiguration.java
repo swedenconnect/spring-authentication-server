@@ -367,6 +367,7 @@ public class OidcAutoConfiguration {
           properties.getSso().toPolicy(server.getSsoPolicy(), OidcConfigurationProperties.PREFIX + ".sso"));
     }
     configurer.clockSkew(properties.getClockSkew());
+    configurer.maxJwtAge(properties.getMaxJwtAge());
     configurer.supportsUserMessage(properties.getSupportsUserMessage());
     configurer.subjectIdentifierSecret(properties.getSubjectIdentifier().getSecretBytes());
     configurer.subjectIdentifierHashAlgorithm(properties.getSubjectIdentifier().getHashAlgorithm());
