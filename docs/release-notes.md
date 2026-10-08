@@ -8,7 +8,7 @@
 
 ### Version 1.0.2
 
-**Date:** _Not yet released_
+**Date:** 2026-10-08
 
 - An OpenID Provider follows version 1.2 of the Signature Extension for OpenID Connect. A signature request sent as a JWT of its own must now hold `iss` and `aud`, so clients that leave them out are rejected. See [#21](https://github.com/swedenconnect/spring-authentication-server/issues/21).
 - A new setting, `authn-server.oidc.max-jwt-age`, limits how old a request object, signature request or client assertion signed by a client may be. A JWT signed by a client is also rejected if its `iat` is in the future. See [#21](https://github.com/swedenconnect/spring-authentication-server/issues/21).
