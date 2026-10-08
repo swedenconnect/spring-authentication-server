@@ -855,6 +855,58 @@ class OidcCodeFlowTest {
   }
 
   @Test
+  void anOldClientAssertionIsAcceptedWithoutMaximumAge() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+    final Instant now = Instant.now();
+    final String code = this.authorize(params(RSA_CLIENT)).get("code");
+    assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT)
+        .issueTime(Date.from(now.minus(Duration.ofDays(1)))).build(), CLIENT_RSA, "rsa-key")), code, REDIRECT_URI,
+        null).getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void theIatOfAClientAssertionIsCheckedAgainstTheMaximumAgeAndTheClockSkew() throws Exception {
+    // The clock skew is the default, 30 seconds
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofMinutes(2)), new TestProvider("direct", LOA3));
+    final Instant now = Instant.now();
+    for (final Instant iat : List.of(now.minusSeconds(160), now.plusSeconds(40))) {
+      final String code = this.authorize(params(RSA_CLIENT)).get("code");
+      assertTokenError(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT).issueTime(Date.from(iat))
+          .build(), CLIENT_RSA, "rsa-key")), code, REDIRECT_URI, null), 401, "invalid_client");
+    }
+    for (final Instant iat : List.of(now.minusSeconds(140), now.plusSeconds(20))) {
+      final String code = this.authorize(params(RSA_CLIENT)).get("code");
+      assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT).issueTime(Date.from(iat))
+          .build(), CLIENT_RSA, "rsa-key")), code, REDIRECT_URI, null).getStatus()).isEqualTo(200);
+    }
+    // Without iat
+    final String code = this.authorize(params(RSA_CLIENT)).get("code");
+    assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT).issueTime(null).build(),
+        CLIENT_RSA, "rsa-key")), code, REDIRECT_URI, null).getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void theMaximumAgeAppliesToClientSecretJwt() throws Exception {
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofMinutes(2))
+        .clientAuthenticationMethods(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_JWT)),
+        new TestProvider("direct", LOA3));
+    final Instant now = Instant.now();
+    String code = this.authorize(params(SECRET_JWT_CLIENT)).get("code");
+    SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256),
+        assertionClaims(SECRET_JWT_CLIENT).issueTime(Date.from(now.minusSeconds(160))).build());
+    jwt.sign(new MACSigner(SECRET.getBytes(StandardCharsets.UTF_8)));
+    assertTokenError(this.token(assertion(SECRET_JWT_CLIENT, jwt.serialize()), code, REDIRECT_URI, null), 401,
+        "invalid_client");
+
+    code = this.authorize(params(SECRET_JWT_CLIENT)).get("code");
+    jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256),
+        assertionClaims(SECRET_JWT_CLIENT).issueTime(Date.from(now.minusSeconds(140))).build());
+    jwt.sign(new MACSigner(SECRET.getBytes(StandardCharsets.UTF_8)));
+    assertThat(this.token(assertion(SECRET_JWT_CLIENT, jwt.serialize()), code, REDIRECT_URI, null).getStatus())
+        .isEqualTo(200);
+  }
+
+  @Test
   void aClientAssertionMayOnlyBeUsedOnce() throws Exception {
     this.start(c -> {}, new TestProvider("direct", LOA3));
     final Map<String, String> assertion = privateKeyJwt(RSA_CLIENT, CLIENT_RSA, "rsa-key");

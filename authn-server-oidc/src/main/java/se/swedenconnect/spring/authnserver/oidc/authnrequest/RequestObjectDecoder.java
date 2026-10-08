@@ -65,8 +65,13 @@ import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
  * The claims are checked as OpenID Connect Core, Section 6.3, and the Swedish OpenID Connect Profile, Section 2.1.7,
  * describe: {@code client_id} and {@code iss}, when present, must be the {@code client_id} of the request, and
  * {@code aud}, when present, must hold the issuer or the authorization endpoint of the OpenID Provider. A signed
- * request object must hold {@code iss} and {@code aud}. A JWT past its {@code exp}, or before its {@code nbf}, is
- * rejected.
+ * request object, and a signed signature request parameter (Signature Extension for OpenID Connect 1.2, Section 5.1),
+ * must hold {@code iss} and {@code aud}. A JWT past its {@code exp}, or before its {@code nbf}, is rejected.
+ * </p>
+ * <p>
+ * The {@code iat} of a signed JWT is optional. When present, it must not be in the future, and, if a maximum age is
+ * assigned, see {@link #setMaxJwtAge(Duration)}, it must not be older than that. The clock skew applies to all time
+ * checks. Unsigned JWTs are not checked against {@code iat}.
  * </p>
  *
  * @author Martin Lindström
@@ -94,6 +99,9 @@ public class RequestObjectDecoder {
   /** The allowed clock skew. */
   private final Duration clockSkew;
 
+  /** The maximum age of a signed JWT, measured from its {@code iat}, or {@code null} for no limit. */
+  private Duration maxJwtAge;
+
   /**
    * Constructor.
    *
@@ -113,6 +121,19 @@ public class RequestObjectDecoder {
   }
 
   /**
+   * Assigns the maximum age of a signed JWT, measured from its {@code iat}. The clock skew is added to it. A JWT
+   * without {@code iat} is accepted. Defaults to {@code null}, which means that the age is not checked.
+   *
+   * @param maxJwtAge the maximum age, or {@code null} for no limit
+   */
+  public void setMaxJwtAge(final @Nullable Duration maxJwtAge) {
+    if (maxJwtAge != null && (maxJwtAge.isNegative() || maxJwtAge.isZero())) {
+      throw new IllegalArgumentException("maxJwtAge must be positive");
+    }
+    this.maxJwtAge = maxJwtAge;
+  }
+
+  /**
    * Decodes a request object.
    *
    * @param requestObject the request object
@@ -128,7 +149,8 @@ public class RequestObjectDecoder {
   }
 
   /**
-   * Decodes a JWT sent as a request parameter, such as the signature request parameter. It must be signed.
+   * Decodes a JWT sent as a request parameter, such as the signature request parameter. It must be signed, and hold
+   * {@code iss} and {@code aud}.
    *
    * @param jwt the JWT
    * @param clientId the {@code client_id} of the request
@@ -215,7 +237,7 @@ public class RequestObjectDecoder {
       throw invalid(requestObject, "The %s could not be parsed".formatted(name), logString, null);
     }
 
-    this.checkClaims(claims, clientId, signingAlgorithm != null && requestObject, requestObject, name, logString);
+    this.checkClaims(claims, clientId, signingAlgorithm != null, requestObject, name, logString);
     log.debug("Decoded {} - signed: {}, encrypted: {} [{}]", name,
         signingAlgorithm != null ? signingAlgorithm.getName() : "no", encrypted, logString);
     return new DecodedJwt(claims, signingAlgorithm, encrypted);
@@ -306,14 +328,15 @@ public class RequestObjectDecoder {
    *
    * @param claims the claims
    * @param clientId the {@code client_id} of the request
-   * @param requireIssuerAndAudience whether {@code iss} and {@code aud} are required
+   * @param signed whether the JWT is signed, which makes {@code iss} and {@code aud} required and {@code iat}
+   *          checked
    * @param requestObject whether the JWT is a request object
    * @param name what the JWT is
    * @param logString the log string
    * @throws OidcErrorResponseException for invalid claims
    */
   private void checkClaims(final @NonNull JWTClaimsSet claims, final @NonNull String clientId,
-      final boolean requireIssuerAndAudience, final boolean requestObject, final @NonNull String name,
+      final boolean signed, final boolean requestObject, final @NonNull String name,
       final @NonNull String logString) throws OidcErrorResponseException {
 
     final Map<String, Object> json = claims.toJSONObject();
@@ -326,7 +349,7 @@ public class RequestObjectDecoder {
         throw invalid(requestObject, "The iss of the %s is not the client".formatted(name), logString, null);
       }
     }
-    else if (requireIssuerAndAudience) {
+    else if (signed) {
       throw invalid(requestObject, "The %s has no iss".formatted(name), logString, null);
     }
     final List<String> audience = claims.getAudience();
@@ -336,7 +359,7 @@ public class RequestObjectDecoder {
             "The aud of the %s is neither the issuer nor the authorization endpoint".formatted(name), logString, null);
       }
     }
-    else if (requireIssuerAndAudience) {
+    else if (signed) {
       throw invalid(requestObject, "The %s has no aud".formatted(name), logString, null);
     }
     final Instant now = Instant.now();
@@ -347,6 +370,15 @@ public class RequestObjectDecoder {
     if (claims.getNotBeforeTime() != null
         && now.isBefore(claims.getNotBeforeTime().toInstant().minus(this.clockSkew))) {
       throw invalid(requestObject, "The %s is not yet valid".formatted(name), logString, null);
+    }
+    if (signed && claims.getIssueTime() != null) {
+      final Instant issued = claims.getIssueTime().toInstant();
+      if (issued.isAfter(now.plus(this.clockSkew))) {
+        throw invalid(requestObject, "The iat of the %s is in the future".formatted(name), logString, null);
+      }
+      if (this.maxJwtAge != null && now.isAfter(issued.plus(this.maxJwtAge).plus(this.clockSkew))) {
+        throw invalid(requestObject, "The %s is too old".formatted(name), logString, null);
+      }
     }
   }
 

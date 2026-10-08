@@ -693,6 +693,14 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
+  void theMaximumJwtAgeDoesNotApplyToTheIdTokenHint() throws Exception {
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofMinutes(2)));
+    final Map<String, String> params = params();
+    params.put("id_token_hint", idToken(BASE_URL, CLIENT_ID, OP_SIGN, Instant.now().minusSeconds(3600)));
+    assertThat(requirements(this.process(get(params))).getIdTokenHintSubject()).isEqualTo("subject-1");
+  }
+
+  @Test
   void anIdTokenHintNotIssuedByThisOpForTheClientIsRejected() throws Exception {
     this.start(c -> {});
     for (final String hint : List.of(
@@ -776,13 +784,35 @@ class OidcAuthnRequestProcessingTest {
     params.put("scope", "openid " + SIGN_SCOPE);
     params.put("prompt", "login consent");
     params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
-        sign(new JWTClaimsSet.Builder(JWTClaimsSet.parse(signRequest(true))).issuer(CLIENT_ID).build(), CLIENT_KEY));
+        sign(signRequestClaims(signRequest(true)).build(), CLIENT_KEY));
 
     final GenericSignMessage signMessage = requirements(this.process(post(params))).getSignMessage();
     assertThat(signMessage).isNotNull();
     assertThat(signMessage.isMustShow()).isTrue();
     assertThat(signMessage.getTbsData()).isEqualTo(encode("to be signed"));
     assertThat(signMessage.getMessage("en").getText()).isEqualTo("I sign");
+  }
+
+  @Test
+  void aSignRequestAsASignedParameterMustHoldIssAndAud() throws Exception {
+    this.start(c -> {});
+    final List<JWTClaimsSet> invalid = List.of(
+        signRequestClaims(signRequest(true)).issuer(null).build(),
+        signRequestClaims(signRequest(true)).audience((String) null).build(),
+        signRequestClaims(signRequest(true)).issuer(OTHER_CLIENT_ID).build(),
+        signRequestClaims(signRequest(true)).audience("https://other.example.com").build());
+    for (final JWTClaimsSet claims : invalid) {
+      final Map<String, String> params = signParams();
+      params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(claims, CLIENT_KEY));
+      assertError(this.send(post(params)), "invalid_request", "state-1");
+    }
+    // Both the issuer and the authorization endpoint are accepted as audience
+    for (final String audience : List.of(BASE_URL, AUTHZ_ENDPOINT)) {
+      final Map<String, String> params = signParams();
+      params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+          sign(signRequestClaims(signRequest(true)).audience(audience).build(), CLIENT_KEY));
+      assertThat(requirements(this.process(post(params))).getSignMessage()).isNotNull();
+    }
   }
 
   @Test
@@ -807,7 +837,7 @@ class OidcAuthnRequestProcessingTest {
     params.put("scope", "openid " + SIGN_SCOPE);
     params.put("prompt", "login");
     params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
-        sign(JWTClaimsSet.parse(signRequest(true)), CLIENT_KEY));
+        sign(signRequestClaims(signRequest(true)).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // Missing parameter
@@ -821,12 +851,14 @@ class OidcAuthnRequestProcessingTest {
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // No tbs_data for sign
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest(false)), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(false)).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // tbs_data for approval
     params.put("scope", "openid " + SIGN_APPROVAL_SCOPE);
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest(true)), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // In an unsigned request object
@@ -848,38 +880,38 @@ class OidcAuthnRequestProcessingTest {
     // tbs_data is not Base64
     Map<String, Object> signRequest = signRequest(true);
     signRequest.put("tbs_data", "not Base64!");
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // tbs_data is empty
     signRequest.put("tbs_data", "");
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // tbs_data is not a string
     signRequest.put("tbs_data", 1234);
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // No sign_message
     signRequest = signRequest(true);
     signRequest.remove("sign_message");
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // sign_message is not an object
     signRequest.put("sign_message", "I sign");
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // The message is not Base64
     signRequest.put("sign_message", new JSONObject(Map.of("message#en", "I sign!")));
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
 
     // The sign message is HTML
     signRequest.put("sign_message", new JSONObject(Map.of("message#en", encode("I sign"), "mime_type", "text/html")));
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
     assertError(this.send(post(params)), "invalid_request", "state-1");
   }
 
@@ -892,7 +924,7 @@ class OidcAuthnRequestProcessingTest {
     final Map<String, Object> signRequest = new HashMap<>();
     signRequest.put("sign_message", new JSONObject(Map.of(
         "message", encode("Jag godkänner – åäö"), "message#en", encode("I approve"), "mime_type", "text/markdown")));
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(signRequestClaims(signRequest).build(), CLIENT_KEY));
 
     final GenericSignMessage signMessage = requirements(this.process(post(params))).getSignMessage();
     assertThat(signMessage).isNotNull();
@@ -904,11 +936,88 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
+  void anOldIatIsAcceptedWithoutMaximumJwtAge() throws Exception {
+    this.start(c -> {});
+    final Date dayOld = Date.from(Instant.now().minus(Duration.ofDays(1)));
+    Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().issueTime(dayOld).build(), CLIENT_KEY));
+    this.process(post(params));
+
+    params = signParams();
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(dayOld).build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
+  void anIatInTheFutureBeyondTheClockSkewIsRejected() throws Exception {
+    // The clock skew is the default, 30 seconds
+    this.start(c -> {});
+    final Instant now = Instant.now();
+    Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().issueTime(Date.from(now.plusSeconds(40))).build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request_object", "state-1");
+    params.put("request", sign(requestObjectClaims().issueTime(Date.from(now.plusSeconds(20))).build(), CLIENT_KEY));
+    this.process(post(params));
+
+    params = signParams();
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(Date.from(now.plusSeconds(40))).build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(Date.from(now.plusSeconds(20))).build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
+  void theIatOfASignedRequestObjectIsCheckedAgainstTheMaximumJwtAge() throws Exception {
+    // The clock skew is the default, 30 seconds
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofMinutes(2)));
+    final Instant now = Instant.now();
+    final Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().issueTime(Date.from(now.minusSeconds(160))).build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request_object", "state-1");
+    params.put("request", sign(requestObjectClaims().issueTime(Date.from(now.minusSeconds(140))).build(), CLIENT_KEY));
+    this.process(post(params));
+    params.put("request", sign(requestObjectClaims().issueTime(null).build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
+  void theIatOfASignRequestIsCheckedAgainstTheMaximumJwtAge() throws Exception {
+    // The clock skew is the default, 30 seconds
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofMinutes(2)));
+    final Instant now = Instant.now();
+    final Map<String, String> params = signParams();
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(Date.from(now.minusSeconds(160))).build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(Date.from(now.minusSeconds(140))).build(), CLIENT_KEY));
+    this.process(post(params));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(null).build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
+  void unsignedRequestObjectsAreNotCheckedAgainstIat() throws Exception {
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofMinutes(2)));
+    final Instant now = Instant.now();
+    final Map<String, String> params = params();
+    for (final Instant iat : List.of(now.minus(Duration.ofDays(1)), now.plusSeconds(600))) {
+      params.put("request", new PlainJWT(requestObjectClaims().issueTime(Date.from(iat)).build()).serialize());
+      this.process(post(params));
+    }
+  }
+
+  @Test
   void aSignRequestWithoutSignScopeIsRejected() throws Exception {
     this.start(c -> {});
     final Map<String, String> params = params();
     params.put("prompt", "login consent");
-    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, sign(JWTClaimsSet.parse(signRequest(true)), CLIENT_KEY));
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).build(), CLIENT_KEY));
     assertError(this.send(get(params)), "invalid_request", "state-1");
   }
 
@@ -1026,6 +1135,13 @@ class OidcAuthnRequestProcessingTest {
     return params;
   }
 
+  private static Map<String, String> signParams() {
+    final Map<String, String> params = params();
+    params.put("scope", "openid " + SIGN_SCOPE);
+    params.put("prompt", "login consent");
+    return params;
+  }
+
   private static MockHttpServletRequest get(final Map<String, String> params) {
     final MockHttpServletRequest request = new MockHttpServletRequest("GET", AUTHZ_PATH);
     params.forEach(request::addParameter);
@@ -1111,6 +1227,14 @@ class OidcAuthnRequestProcessingTest {
     }
     signRequest.put("sign_message", signMessage);
     return signRequest;
+  }
+
+  private static JWTClaimsSet.Builder signRequestClaims(final Map<String, Object> signRequest) throws Exception {
+    return new JWTClaimsSet.Builder(JWTClaimsSet.parse(signRequest))
+        .issuer(CLIENT_ID)
+        .audience(BASE_URL)
+        .issueTime(new Date())
+        .expirationTime(Date.from(Instant.now().plusSeconds(300)));
   }
 
   private static String encode(final String text) {
