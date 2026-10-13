@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -33,6 +34,14 @@ import java.util.Set;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jwt.SignedJWT;
@@ -66,6 +75,9 @@ class HttpFederationClientTest extends FederationTestSupport {
 
   /** The methods and bodies that the server was called with. */
   private final List<String> requests = new ArrayList<>();
+
+  /** The responses that the client received, when made with {@link #recordingClient()}. */
+  private final List<RecordedResponse> responses = new ArrayList<>();
 
   /** What the server answers. */
   private int status = 200;
@@ -334,10 +346,216 @@ class HttpFederationClientTest extends FederationTestSupport {
     assertThatThrownBy(() -> client.trustMarkedListing(null)).isInstanceOf(UnsupportedOperationException.class);
   }
 
+  @Test
+  void theResponseIsClosedAfterASuccessfulResolve() throws Exception {
+    this.body = resolveResponse(key("k1"), RESOLVER, CLIENT_ID, clientMetadata("The Client"),
+        Set.of(), Instant.now().plus(1, ChronoUnit.HOURS)).serialize();
+    final int port = this.startServer();
+
+    assertThat(this.recordingClient().resolve(this.resolveRequest(port))).isNotNull();
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedAfterASuccessfulTrustMarkRequest() throws Exception {
+    this.body = trustMark(key("k1"), TRUST_MARK_ISSUER, CLIENT_ID, MARK_ONE, null).serialize();
+    final int port = this.startServer();
+
+    assertThat(this.recordingClient().trustMark(this.trustMarkRequest(port))).isNotNull();
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedAfterASuccessfulTrustMarkStatusRequest() throws Exception {
+    final ECKey key = key("k1");
+    final String trustMark = trustMark(key, TRUST_MARK_ISSUER, CLIENT_ID, MARK_ONE, null).serialize();
+    this.body = trustMarkStatus(key, TRUST_MARK_ISSUER, trustMark, "active").serialize();
+    final int port = this.startServer();
+
+    assertThat(this.recordingClient().trustMarkStatus(this.trustMarkStatusRequest(trustMark, port)).isError())
+        .isFalse();
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedAfterASuccessfulEntityConfigurationRequest() throws Exception {
+    final int port = this.startServer();
+    final String entityId = "http://localhost:%d".formatted(port);
+    this.body = entityConfiguration(key("k1"), entityId, Map.of(), Instant.now().plus(1, ChronoUnit.HOURS))
+        .serialize();
+
+    assertThat(this.recordingClient().entityConfiguration(this.entityConfigurationRequest(entityId))).isNotNull();
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenAResolveRequestIsAnsweredNotFound() throws Exception {
+    this.status = 404;
+    this.body = "not found";
+    final int port = this.startServer();
+
+    assertThat(this.recordingClient().resolve(this.resolveRequest(port))).isNull();
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenATrustMarkRequestIsAnsweredNotFound() throws Exception {
+    this.status = 404;
+    final int port = this.startServer();
+
+    assertThat(this.recordingClient().trustMark(this.trustMarkRequest(port))).isNull();
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenATrustMarkStatusRequestIsAnsweredNotFound() throws Exception {
+    this.status = 404;
+    this.body = "not found";
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().trustMarkStatus(this.trustMarkStatusRequest("a.b.c", port)))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("404");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenAnEntityConfigurationRequestIsAnsweredNotFound() throws Exception {
+    this.status = 404;
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().entityConfiguration(
+        this.entityConfigurationRequest("http://localhost:%d".formatted(port))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("404");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenTheEndpointAnswersWithAnotherError() throws Exception {
+    this.status = 500;
+    this.body = "server error";
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().resolve(this.resolveRequest(port)))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("500");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenTheEndpointAnswersWithAClientError() throws Exception {
+    this.status = 400;
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().trustMarkStatus(this.trustMarkStatusRequest("a.b.c", port)))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("400");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenTheEndpointAnswersWithAnEmptyBody() throws Exception {
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().resolve(this.resolveRequest(port)))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("empty body");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenTheEndpointAnswersWithABlankBody() throws Exception {
+    this.body = "  \n ";
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().trustMark(this.trustMarkRequest(port)))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("empty body");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void theResponseIsClosedWhenTheEndpointDoesNotAnswerWithASignedJwt() throws Exception {
+    this.body = "not a jwt";
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().resolve(this.resolveRequest(port)))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("signed JWT");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void everyResponseIsClosedOverManyCallsWithTheSameClient() throws Exception {
+    final HttpFederationClient client = this.recordingClient();
+    final int port = this.startServer();
+    final int calls = 20;
+
+    for (int i = 0; i < calls; i++) {
+      this.status = 404;
+      this.body = "";
+      assertThat(client.trustMark(this.trustMarkRequest(port))).isNull();
+      this.status = 500;
+      this.body = "server error";
+      assertThatThrownBy(() -> client.resolve(this.resolveRequest(port)))
+          .isInstanceOf(ClientRegistryException.class);
+    }
+    this.assertEveryResponseClosed(2 * calls);
+  }
+
+  @Test
+  void noResponseIsRecordedWhenTheEndpointCannotBeReached() {
+    assertThatThrownBy(() -> this.recordingClient().resolve(new FederationRequest<>(
+        new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, null, Boolean.FALSE),
+        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, "http://localhost:1/resolve"))))
+        .isInstanceOf(ClientRegistryException.class);
+    assertThat(this.responses).isEmpty();
+  }
+
   private FederationRequest<ResolveRequest> resolveRequest(final int port) {
     return new FederationRequest<>(new ResolveRequest(CLIENT_ID, TRUST_ANCHOR, null, Boolean.FALSE),
         Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT,
             URI.create("http://localhost:%d/resolve".formatted(port)).toString()));
+  }
+
+  private FederationRequest<TrustMarkRequest> trustMarkRequest(final int port) {
+    return new FederationRequest<>(
+        new TrustMarkRequest(new EntityID(CLIENT_ID), new EntityID(TRUST_MARK_ISSUER), new EntityID(MARK_ONE)),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_ENDPOINT, "http://localhost:%d/trust_mark".formatted(port)));
+  }
+
+  private FederationRequest<FederationTrustMarkStatusRequest> trustMarkStatusRequest(
+      final String trustMark, final int port) {
+    return new FederationRequest<>(new FederationTrustMarkStatusRequest(trustMark, TRUST_MARK_ISSUER),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
+            "http://localhost:%d/trust_mark_status".formatted(port)));
+  }
+
+  private FederationRequest<EntityConfigurationRequest> entityConfigurationRequest(final String entityId) {
+    return new FederationRequest<>(new EntityConfigurationRequest(new EntityID(entityId), null));
+  }
+
+  /**
+   * Creates a client whose {@link RestClient} records every response it receives in {@link #responses}.
+   *
+   * @return the client
+   */
+  private HttpFederationClient recordingClient() {
+    return new HttpFederationClient(RestClient.builder()
+        .requestFactory(new RecordingRequestFactory(new SimpleClientHttpRequestFactory(), this.responses))
+        .build());
+  }
+
+  /**
+   * Asserts that the client received the given number of responses and closed every one of them.
+   *
+   * @param expected the expected number of responses
+   */
+  private void assertEveryResponseClosed(final int expected) {
+    assertThat(this.responses).hasSize(expected).allSatisfy(r -> assertThat(r.isClosed())
+        .as("response %s was closed", r.getStatusCode())
+        .isTrue());
   }
 
   /**
@@ -367,6 +585,102 @@ class HttpFederationClientTest extends FederationTestSupport {
     exchange.sendResponseHeaders(this.status, bytes.length);
     try (final OutputStream out = exchange.getResponseBody()) {
       out.write(bytes);
+    }
+  }
+
+  /**
+   * A request factory that wraps a real one and records every response that its requests receive.
+   */
+  private record RecordingRequestFactory(ClientHttpRequestFactory delegate, List<RecordedResponse> responses)
+      implements ClientHttpRequestFactory {
+
+    @Override
+    public ClientHttpRequest createRequest(final URI uri, final HttpMethod httpMethod) throws IOException {
+      final ClientHttpRequest request = this.delegate.createRequest(uri, httpMethod);
+      return new ClientHttpRequest() {
+
+        @Override
+        public ClientHttpResponse execute() throws IOException {
+          final RecordedResponse response = new RecordedResponse(request.execute());
+          RecordingRequestFactory.this.responses.add(response);
+          return response;
+        }
+
+        @Override
+        public OutputStream getBody() throws IOException {
+          return request.getBody();
+        }
+
+        @Override
+        public HttpMethod getMethod() {
+          return request.getMethod();
+        }
+
+        @Override
+        public URI getURI() {
+          return request.getURI();
+        }
+
+        @Override
+        public Map<String, Object> getAttributes() {
+          return request.getAttributes();
+        }
+
+        @Override
+        public HttpHeaders getHeaders() {
+          return request.getHeaders();
+        }
+      };
+    }
+  }
+
+  /**
+   * A response that records whether it was closed.
+   */
+  private static class RecordedResponse implements ClientHttpResponse {
+
+    /** The real response. */
+    private final ClientHttpResponse delegate;
+
+    /** The status of the response, read when it was received. */
+    private final HttpStatusCode statusCode;
+
+    /** Whether the response was closed. */
+    private boolean closed;
+
+    RecordedResponse(final ClientHttpResponse delegate) throws IOException {
+      this.delegate = delegate;
+      this.statusCode = delegate.getStatusCode();
+    }
+
+    boolean isClosed() {
+      return this.closed;
+    }
+
+    @Override
+    public HttpStatusCode getStatusCode() {
+      return this.statusCode;
+    }
+
+    @Override
+    public String getStatusText() throws IOException {
+      return this.delegate.getStatusText();
+    }
+
+    @Override
+    public InputStream getBody() throws IOException {
+      return this.delegate.getBody();
+    }
+
+    @Override
+    public HttpHeaders getHeaders() {
+      return this.delegate.getHeaders();
+    }
+
+    @Override
+    public void close() {
+      this.closed = true;
+      this.delegate.close();
     }
   }
 

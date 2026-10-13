@@ -10,7 +10,7 @@
 
 **Date:** _Not yet released_
 
--
+- The OpenID Provider's federation client closes every HTTP response. Before, a 404 or error answer from a resolver or trust mark issuer left the connection in use, and once all connections were taken, the next federation call, for example fetching the OpenID Provider's own trust marks, waited three minutes before failing. See [#30](https://github.com/swedenconnect/spring-authentication-server/issues/30).
 
 -----
 

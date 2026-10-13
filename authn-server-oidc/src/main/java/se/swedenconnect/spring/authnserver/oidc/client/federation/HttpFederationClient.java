@@ -203,7 +203,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
               throw new ClientRegistryException(
                   "The %s endpoint %s did not answer with a signed JWT".formatted(what, endpoint), e);
             }
-          }, false);
+          });
       this.publish(call, endpoint, issuer, FederationCallEvent.Outcome.SUCCESS, null);
       return response;
     }
