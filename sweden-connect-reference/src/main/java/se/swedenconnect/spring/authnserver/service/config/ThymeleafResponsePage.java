@@ -32,6 +32,7 @@ import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.saml.response.ResponsePage;
 
 /**
@@ -40,7 +41,8 @@ import se.swedenconnect.spring.authnserver.saml.response.ResponsePage;
  * response mode.
  * <p>
  * The template gets the URL to post to as {@code action}, and the parameters to post as {@code parameters}, a map
- * of name to value.
+ * of name to value, and the protocol of the response as {@value PageProtocol#MODEL_ATTRIBUTE}, see
+ * {@link PageProtocol}.
  * </p>
  *
  * @author Martin Lindström
@@ -81,16 +83,33 @@ public class ThymeleafResponsePage
     if (relayState != null) {
       parameters.put("RelayState", relayState);
     }
-    this.sendResponse(httpServletRequest, httpServletResponse, destination, parameters);
+    this.render(httpServletRequest, httpServletResponse, destination, parameters, AuthenticationProtocol.SAML);
   }
 
   /**
-   * Writes the page that posts an OpenID Connect response, and is also used for the SAML response.
+   * Writes the page that posts an OpenID Connect response.
    */
   @Override
   public void sendResponse(final @NonNull HttpServletRequest httpServletRequest,
       final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
       final @NonNull Map<String, String> parameters) throws IOException {
+    this.render(httpServletRequest, httpServletResponse, destination, parameters, AuthenticationProtocol.OIDC);
+  }
+
+  /**
+   * Renders the page.
+   *
+   * @param httpServletRequest the HTTP servlet request
+   * @param httpServletResponse the HTTP servlet response
+   * @param destination the URL to post to
+   * @param parameters the parameters to post
+   * @param protocol the protocol of the response, which decides the heading and title of the page
+   * @throws IOException for errors writing the page
+   */
+  private void render(final @NonNull HttpServletRequest httpServletRequest,
+      final @NonNull HttpServletResponse httpServletResponse, final @NonNull String destination,
+      final @NonNull Map<String, String> parameters, final @NonNull AuthenticationProtocol protocol)
+      throws IOException {
 
     final JakartaServletWebApplication application =
         JakartaServletWebApplication.buildApplication(httpServletRequest.getServletContext());
@@ -98,6 +117,7 @@ public class ThymeleafResponsePage
         RequestContextUtils.getLocale(httpServletRequest));
     context.setVariable("action", destination);
     context.setVariable("parameters", parameters);
+    context.setVariable(PageProtocol.MODEL_ATTRIBUTE, PageProtocol.value(protocol));
 
     httpServletResponse.setContentType(TEXT_HTML_UTF8.toString());
     httpServletResponse.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-store");

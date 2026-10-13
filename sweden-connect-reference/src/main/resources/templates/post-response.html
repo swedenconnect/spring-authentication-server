@@ -31,7 +31,7 @@
 
             <div class="row">
               <div class="col-sm-12 content-heading">
-                <h2 th:text="#{idp.msg.heading}">Heading</h2>
+                <h2 th:text="${protocol} ? #{${'idp.msg.heading.' + protocol}} : #{idp.msg.heading}">Heading</h2>
               </div>
               <div class="col-sm-12">
                 <p class="info" th:text="#{idp.msg.nojs}">No Javascript</p>

@@ -158,6 +158,26 @@ final class TestBrowser {
   }
 
   /**
+   * Gets the browser title of a page.
+   */
+  static String title(final String html) {
+    return elementText(html, "title");
+  }
+
+  /**
+   * Gets the text of the first {@code h2} element of a page, which is the page heading.
+   */
+  static String heading(final String html) {
+    return elementText(html, "h2");
+  }
+
+  private static String elementText(final String html, final String element) {
+    final Matcher matcher = Pattern.compile("<%s[^>]*>(.*?)</%s>".formatted(element, element), Pattern.DOTALL)
+        .matcher(html);
+    return matcher.find() ? HtmlUtils.htmlUnescape(matcher.group(1).trim()) : null;
+  }
+
+  /**
    * Gets the start tag of the element with the given id.
    */
   static String startTag(final String html, final String id) {
