@@ -86,6 +86,28 @@ class AuthorizationErrorPageTest extends AbstractCompleteProfileTest {
   }
 
   @Test
+  void theErrorPageHasTheNeutralTitle() throws Exception {
+    final Map<String, String> request = request();
+    request.put("client_id", "https://unknown.test.local");
+    final HttpResponse<String> english = new TestBrowser().get(authorizeUrl(request));
+    assertThat(TestBrowser.title(english.body())).isEqualTo("Sweden Connect Reference Authentication Service");
+    assertThat(english.body()).doesNotContain("Reference OP").doesNotContain("Reference IdP")
+        .doesNotContain("OpenID Provider</title>");
+
+    request.put("lang", "sv");
+    final HttpResponse<String> swedish = new TestBrowser().get(authorizeUrl(request));
+    assertThat(TestBrowser.title(swedish.body())).isEqualTo("Sweden Connect referenslegitimeringstjänst");
+    assertThat(swedish.body()).doesNotContain("Referens-OP");
+  }
+
+  @Test
+  void theGenericErrorPageHasTheNeutralTitle() throws Exception {
+    final HttpResponse<String> response = new TestBrowser().get(BASE_URL + "/extauth/no-such-page");
+    assertThat(response.statusCode()).isEqualTo(404);
+    assertThat(TestBrowser.title(response.body())).isEqualTo("Sweden Connect Reference Authentication Service");
+  }
+
+  @Test
   void aRequestThatDoesNotAcceptHtmlStillGetsTheErrorPage() throws Exception {
     final Map<String, String> request = request();
     request.put("client_id", "https://unknown.test.local");

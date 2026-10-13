@@ -42,7 +42,7 @@
         type="image/x-icon">
   <meta name="theme-color" content="#ffffff">
 
-  <title th:text="#{idp.msg.title}">Page Title</title>
+  <title th:text="${protocol} ? #{${'idp.msg.title.' + protocol}} : #{idp.msg.title}">Page Title</title>
 
 </head>
 

@@ -208,6 +208,35 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   }
 
   @Test
+  void thePagesOfAnOidcLoginNameTheOpenIdProvider() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final Map<String, String> request = authorizationRequest("openid " + NATURAL_PERSON_NUMBER);
+    request.put("response_mode", "form_post");
+    final String html = browser.follow(browser.get(authorizeUrl(request)), BASE_URL).body();
+    assertThat(TestBrowser.title(html)).isEqualTo("Sweden Connect Reference OpenID Provider");
+    assertThat(TestBrowser.heading(html)).isEqualTo("Sweden Connect Reference OP");
+    assertThat(html).contains("What is the Sweden Connect reference OP?")
+        .doesNotContain("Reference IdP").doesNotContain("Identity Provider</title>");
+
+    final String responsePage = this.responsePage(browser, html);
+    assertThat(TestBrowser.title(responsePage)).isEqualTo("Sweden Connect Reference OpenID Provider");
+    assertThat(TestBrowser.heading(responsePage)).isEqualTo("Sweden Connect Reference OP");
+  }
+
+  @Test
+  void thePagesOfAnOidcLoginNameTheOpenIdProviderInSwedish() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final Map<String, String> request = authorizationRequest("openid " + NATURAL_PERSON_NUMBER);
+    request.put("response_mode", "form_post");
+    final String first = browser.follow(browser.get(authorizeUrl(request)), BASE_URL).body();
+    final String html = browser.get(BASE_URL + "/extauth?authnId=" + TestBrowser.inputValue(first, "authnId")
+        + "&lang=sv").body();
+    assertThat(TestBrowser.title(html)).isEqualTo("Sweden Connect referenslegitimeringstjänst");
+    assertThat(TestBrowser.heading(html)).isEqualTo("Sweden Connect Referens-OP");
+    assertThat(html).contains("Vad är Sweden Connect referens-OP?").doesNotContain("Referens-IdP");
+  }
+
+  @Test
   void aSimulatedErrorIsSentToTheClient() throws Exception {
     final TestBrowser browser = new TestBrowser();
     final Map<String, String> request = authorizationRequest("openid " + NATURAL_PERSON_NUMBER);
@@ -235,6 +264,21 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
     final String location = TestBrowser.location(response);
     assertThat(location).startsWith(REDIRECT_URI);
     return TestBrowser.queryParameters(location);
+  }
+
+  /**
+   * Completes the user picker with the default user and returns the page that posts the response in the
+   * {@code form_post} response mode.
+   */
+  private String responsePage(final TestBrowser browser, final String html) throws Exception {
+    final HttpResponse<String> page = browser.follow(browser.post(BASE_URL + TestBrowser.formAction(html), Map.of(
+        "action", "ok",
+        "personalIdentityNumber", USER,
+        "loa", LOA3,
+        "authnId", TestBrowser.inputValue(html, "authnId"))), BASE_URL);
+    assertThat(page.statusCode()).isEqualTo(200);
+    assertThat(TestBrowser.formAction(page.body())).isEqualTo(REDIRECT_URI);
+    return page.body();
   }
 
   private OIDCTokenResponse token(final String code) throws Exception {

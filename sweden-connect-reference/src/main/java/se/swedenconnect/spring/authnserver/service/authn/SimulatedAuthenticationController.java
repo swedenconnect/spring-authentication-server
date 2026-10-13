@@ -66,6 +66,7 @@ import se.swedenconnect.spring.authnserver.saml.authentication.SamlAuthenticatio
 import se.swedenconnect.spring.authnserver.service.authn.model.SelectedUserModel;
 import se.swedenconnect.spring.authnserver.service.authn.model.UiModel;
 import se.swedenconnect.spring.authnserver.service.config.CookieGenerator;
+import se.swedenconnect.spring.authnserver.service.config.PageProtocol;
 import se.swedenconnect.spring.authnserver.service.config.ReferenceConfiguration;
 import se.swedenconnect.spring.authnserver.service.config.UnrecoverableErrorViewResolver;
 import se.swedenconnect.spring.authnserver.service.config.UiProperties;
@@ -230,6 +231,7 @@ public class SimulatedAuthenticationController
     mav.addObject("result", new SelectedUserModel());
     mav.addObject("authnId", token.getAuthnId());
     mav.addObject("errors", SIMULATED_ERRORS);
+    mav.addObject(PageProtocol.MODEL_ATTRIBUTE, PageProtocol.value(inputToken.getRequester().protocol()));
     return mav;
   }
 

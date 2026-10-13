@@ -275,6 +275,45 @@ class SamlFlowTest extends AbstractCompleteProfileTest {
     final HttpResponse<String> response = new TestBrowser().get(BASE_URL + "/extauth?authnId=unknown");
     assertThat(response.statusCode()).isEqualTo(400);
     assertThat(response.body()).contains("An error occurred").contains("session data was not found");
+    // The protocol is not known, so the title is neutral
+    assertThat(TestBrowser.title(response.body())).isEqualTo("Sweden Connect Reference Authentication Service");
+  }
+
+  @Test
+  void thePagesOfASamlLoginNameTheIdentityProvider() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final String html = this.startAuthentication(browser, SP, r -> {}).body();
+    assertThat(TestBrowser.title(html)).isEqualTo("Sweden Connect Reference Identity Provider");
+    assertThat(TestBrowser.heading(html)).isEqualTo("Sweden Connect Reference IdP");
+    assertThat(html).contains("What is the Sweden Connect reference IdP?").doesNotContain("Reference OP");
+
+    final String responsePage = this.responsePage(browser, html);
+    assertThat(TestBrowser.title(responsePage)).isEqualTo("Sweden Connect Reference Identity Provider");
+    assertThat(TestBrowser.heading(responsePage)).isEqualTo("Sweden Connect Reference IdP");
+  }
+
+  @Test
+  void thePagesOfASamlLoginNameTheIdentityProviderInSwedish() throws Exception {
+    final TestBrowser browser = new TestBrowser();
+    final String authnId = TestBrowser.inputValue(this.startAuthentication(browser, SP, r -> {}).body(), "authnId");
+    final String html = browser.get(BASE_URL + "/extauth?authnId=" + authnId + "&lang=sv").body();
+    assertThat(TestBrowser.title(html)).isEqualTo("Sweden Connect referenslegitimeringstjänst");
+    assertThat(TestBrowser.heading(html)).isEqualTo("Sweden Connect Referens-IdP");
+    assertThat(html).contains("Vad är Sweden Connect referens-IdP?").doesNotContain("Referens-OP");
+  }
+
+  /**
+   * Completes the user picker with the default user and returns the page that posts the SAML response.
+   */
+  private String responsePage(final TestBrowser browser, final String html) throws Exception {
+    final HttpResponse<String> page = browser.follow(browser.post(BASE_URL + TestBrowser.formAction(html), Map.of(
+        "action", "ok",
+        "personalIdentityNumber", USER,
+        "loa", LOA3,
+        "authnId", TestBrowser.inputValue(html, "authnId"))), BASE_URL);
+    assertThat(page.statusCode()).isEqualTo(200);
+    assertThat(TestBrowser.inputValue(page.body(), "SAMLResponse")).isNotNull();
+    return page.body();
   }
 
   /**
