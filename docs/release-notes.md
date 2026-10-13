@@ -8,7 +8,7 @@
 
 ### Version 1.0.3
 
-**Date:** _Not yet released_
+**Date:** 2026-10-13
 
 - The OpenID Provider's federation client closes every HTTP response. Before, a 404 or error answer from a resolver or trust mark issuer left the connection in use, and once all connections were taken, the next federation call, for example fetching the OpenID Provider's own trust marks, waited three minutes before failing. See [#30](https://github.com/swedenconnect/spring-authentication-server/issues/30).
 - The reference service shows "Reference OP" in the page heading and title during OpenID Connect logins, and "Reference IdP" only during SAML logins. See [#29](https://github.com/swedenconnect/spring-authentication-server/issues/29).
