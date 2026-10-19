@@ -308,8 +308,8 @@ class OidcAuthnRequestProcessingTest {
   void anEncryptedRequestObjectIsDecrypted() throws Exception {
     this.start(c -> {});
     final JWTClaimsSet claims = requestObjectClaims().claim("login_hint", "hint").build();
-    final Map<String, String> params = Map.of("client_id", CLIENT_ID, "request",
-        encrypt(new Payload(SignedJWT.parse(sign(claims, CLIENT_KEY)))));
+    final Map<String, String> params = Map.of("client_id", CLIENT_ID, "response_type", "code", "scope", "openid",
+        "request", encrypt(new Payload(SignedJWT.parse(sign(claims, CLIENT_KEY)))));
 
     assertThat(requirements(this.process(post(params))).getLoginHint()).isEqualTo("hint");
   }
@@ -318,8 +318,8 @@ class OidcAuthnRequestProcessingTest {
   void anEncryptedUnsignedRequestObjectIsAcceptedByDefault() throws Exception {
     this.start(c -> {});
     final JWTClaimsSet claims = requestObjectClaims().claim("login_hint", "hint").build();
-    final Map<String, String> params = Map.of("client_id", CLIENT_ID, "request",
-        encrypt(new Payload(new PlainJWT(claims).serialize())));
+    final Map<String, String> params = Map.of("client_id", CLIENT_ID, "response_type", "code", "scope", "openid",
+        "request", encrypt(new Payload(new PlainJWT(claims).serialize())));
 
     assertThat(requirements(this.process(post(params))).getLoginHint()).isEqualTo("hint");
   }
@@ -341,7 +341,8 @@ class OidcAuthnRequestProcessingTest {
     this.start(c -> {});
     REQUEST_OBJECTS.put(URI.create(REQUEST_URI),
         sign(requestObjectClaims().claim("login_hint", "from-uri").build(), CLIENT_KEY));
-    final Map<String, String> params = Map.of("client_id", CLIENT_ID, "request_uri", REQUEST_URI + "#hash");
+    final Map<String, String> params = Map.of("client_id", CLIENT_ID, "response_type", "code", "scope", "openid",
+        "request_uri", REQUEST_URI + "#hash");
 
     assertThat(requirements(this.process(get(params))).getLoginHint()).isEqualTo("from-uri");
     assertThat(FETCHED).containsExactly(URI.create(REQUEST_URI));
@@ -415,6 +416,98 @@ class OidcAuthnRequestProcessingTest {
 
     params.put("request", sign(requestObjectClaims().build(), CLIENT_KEY));
     this.process(post(params));
+  }
+
+  @Test
+  void responseTypeAndScopeMustBeSentAsPlainParametersWithARequestObject() throws Exception {
+    this.start(c -> {});
+    REQUEST_OBJECTS.put(URI.create(REQUEST_URI), sign(requestObjectClaims().build(), CLIENT_KEY));
+    for (final String name : List.of("request", "request_uri")) {
+      final String value = "request".equals(name) ? sign(requestObjectClaims().build(), CLIENT_KEY) : REQUEST_URI;
+
+      // Missing response_type
+      Map<String, String> params = params();
+      params.remove("response_type");
+      params.put(name, value);
+      assertError(this.send(get(params)), "invalid_request", "state-1");
+
+      // Missing scope
+      params = params();
+      params.remove("scope");
+      params.put(name, value);
+      assertError(this.send(post(params)), "invalid_request", "state-1");
+
+      // A scope without openid, even though the request object holds openid
+      params = params();
+      params.put("scope", "profile openidx");
+      params.put(name, value);
+      assertError(this.send(get(params)), "invalid_request", "state-1");
+
+      // openid among other scopes is enough
+      params = params();
+      params.put("scope", "profile openid");
+      params.put(name, value);
+      this.process(get(params));
+    }
+  }
+
+  @Test
+  void aMissingPlainParameterIsSentToTheRedirectUriOfTheRequestObject() throws Exception {
+    this.start(c -> {});
+    final JWTClaimsSet claims = requestObjectClaims().claim("response_mode", "form_post").build();
+    REQUEST_OBJECTS.put(URI.create(REQUEST_URI), sign(claims, CLIENT_KEY));
+    for (final Map.Entry<String, String> ro : Map.of(
+        "request", sign(claims, CLIENT_KEY), "request_uri", REQUEST_URI).entrySet()) {
+      for (final String missing : List.of("response_type", "scope")) {
+        // Only client_id and the request object are sent as plain parameters, apart from the tested one
+        final Map<String, String> params = new LinkedHashMap<>();
+        params.put("client_id", CLIENT_ID);
+        params.put(ro.getKey(), ro.getValue());
+        if (!"response_type".equals(missing)) {
+          params.put("response_type", "code");
+        }
+        if (!"scope".equals(missing)) {
+          params.put("scope", "openid");
+        }
+        final MockHttpServletResponse response = this.send(get(params));
+        assertThat(RESULT.get()).isNull();
+        assertThat(response.getRedirectedUrl()).isNull();
+        assertThat(response.getContentAsString())
+            .contains("action=\"" + REDIRECT_URI + "\"")
+            .contains("name=\"error\" value=\"invalid_request\"")
+            .contains("name=\"state\" value=\"state-1\"");
+      }
+    }
+  }
+
+  @Test
+  void aMissingPlainParameterWithoutUsableRedirectUriIsUnrecoverable() throws Exception {
+    this.start(c -> {});
+    // No redirect_uri anywhere
+    final JWTClaimsSet noRedirect = new JWTClaimsSet.Builder(requestObjectClaims().build())
+        .claim("redirect_uri", null).build();
+    final Map<String, String> params = new LinkedHashMap<>();
+    params.put("client_id", CLIENT_ID);
+    params.put("request", sign(noRedirect, CLIENT_KEY));
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
+
+    // Unregistered redirect_uri in the request object
+    params.put("request",
+        sign(requestObjectClaims().claim("redirect_uri", "https://attacker.example.com").build(), CLIENT_KEY));
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
+
+    // Unsupported response_mode in the request object
+    params.put("request", sign(requestObjectClaims().claim("response_mode", "fragment").build(), CLIENT_KEY));
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.UNSUPPORTED_RESPONSE_MODE, 400);
+  }
+
+  @Test
+  void theScopeOfTheRequestObjectIsUsedWhenItDiffersFromThePlainScope() throws Exception {
+    this.start(c -> {});
+    final Map<String, String> params = params();
+    params.put("scope", "openid " + PNR_SCOPE);
+    params.put("request", sign(requestObjectClaims().claim("scope", "openid profile").build(), CLIENT_KEY));
+    assertThat(requirements(this.process(get(params))).getScopes()).containsExactly("openid", "profile");
   }
 
   @Test

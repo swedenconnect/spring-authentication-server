@@ -10,7 +10,7 @@
 
 **Date:** _Not yet released_
 
--
+- When an OpenID Connect authentication request uses a request object, the OpenID Provider requires `response_type`, and a `scope` holding `openid`, to also be sent as ordinary request parameters, as OpenID Connect Core requires. Clients that send them only inside the request object are rejected. See [#35](https://github.com/swedenconnect/spring-authentication-server/issues/35).
 
 -----
 
