@@ -61,6 +61,11 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * {@code request_uri} is only fetched if it is one of the client's registered {@code request_uris}.
  * </p>
  * <p>
+ * When a request object is used, {@code response_type}, and a {@code scope} holding {@code openid}, must still be sent
+ * as plain parameters, as OpenID Connect Core, Section 6.1, requires. If not, the error is sent to the client using
+ * the redirect URI and response mode of the merged parameters.
+ * </p>
+ * <p>
  * An unknown client, a client registered with the token endpoint authentication method {@code none}, which is not
  * supported, a failing client registry, and a missing or unregistered redirect URI end at the OpenID Provider
  * as an {@link UnrecoverableErrorException}, since there is nowhere safe to send a response. So does a response mode
@@ -201,6 +206,10 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
     OidcResponseTarget.setOnRequest(request, target);
     auditContext.setRequester(AuditRequester.of(record, true));
 
+    if (requestObject != null) {
+      checkPlainParameters(parameters, logString);
+    }
+
     return new OidcAuthnRequestAuthenticationToken(record, merged, requestObject, target);
   }
 
@@ -286,6 +295,31 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
       log.info("The response_type of the request object does not match the request [{}]", logString);
       throw new OidcErrorResponseException(OAuth2Error.INVALID_REQUEST_OBJECT,
           "The response_type of the request object does not match the request");
+    }
+  }
+
+  /**
+   * Checks that {@code response_type}, and a {@code scope} holding {@code openid}, are sent as plain parameters when a
+   * request object is used, as OpenID Connect Core, Section 6.1, requires. The values in the request object do not
+   * replace them.
+   *
+   * @param parameters the plain parameters of the request
+   * @param logString the log string
+   * @throws OidcErrorResponseException with {@code invalid_request} if a parameter is missing or invalid
+   */
+  private static void checkPlainParameters(final @NonNull Map<String, List<String>> parameters,
+      final @NonNull String logString) throws OidcErrorResponseException {
+
+    if (getFirstValue(parameters, "response_type") == null) {
+      log.info("Missing response_type as plain parameter in request with request object [{}]", logString);
+      throw new OidcErrorResponseException(OAuth2Error.INVALID_REQUEST,
+          "The response_type parameter must be given as a plain parameter when a request object is used");
+    }
+    final String scope = getFirstValue(parameters, "scope");
+    if (scope == null || !toValueSet(scope).contains("openid")) {
+      log.info("Missing scope with openid as plain parameter in request with request object [{}]", logString);
+      throw new OidcErrorResponseException(OAuth2Error.INVALID_REQUEST,
+          "A scope parameter holding openid must be given as a plain parameter when a request object is used");
     }
   }
 
