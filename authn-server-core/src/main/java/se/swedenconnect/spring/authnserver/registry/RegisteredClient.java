@@ -33,6 +33,7 @@ import se.swedenconnect.spring.authnserver.authentication.Requester;
  * @param marks the marks that the client holds
  * @param source where the client came from: a SAML metadata source or the name of an OpenID Connect backend
  * @param expiresAt when the data of the client expires, or {@code null} if it does not
+ * @param invalidReason why the client is marked as invalid, or {@code null} if it is not
  * @author Martin Lindström
  */
 public record RegisteredClient(
@@ -40,7 +41,8 @@ public record RegisteredClient(
     @Nullable String organizationNumber,
     @NonNull Set<String> marks,
     @NonNull String source,
-    @Nullable Instant expiresAt) {
+    @Nullable Instant expiresAt,
+    @Nullable String invalidReason) {
 
   /**
    * Constructor.
@@ -50,6 +52,7 @@ public record RegisteredClient(
    * @param marks the marks that the client holds
    * @param source where the client came from
    * @param expiresAt when the data of the client expires, or {@code null}
+   * @param invalidReason why the client is marked as invalid, or {@code null} if it is not
    */
   public RegisteredClient {
     Objects.requireNonNull(requester, "requester must not be null");
@@ -58,7 +61,21 @@ public record RegisteredClient(
   }
 
   /**
-   * Creates the entry for a client from its record.
+   * Constructor for a client that is not marked as invalid.
+   *
+   * @param requester the requester
+   * @param organizationNumber the organisation number, or {@code null}
+   * @param marks the marks that the client holds
+   * @param source where the client came from
+   * @param expiresAt when the data of the client expires, or {@code null}
+   */
+  public RegisteredClient(final @NonNull Requester requester, final @Nullable String organizationNumber,
+      final @NonNull Set<String> marks, final @NonNull String source, final @Nullable Instant expiresAt) {
+    this(requester, organizationNumber, marks, source, expiresAt, null);
+  }
+
+  /**
+   * Creates the entry for a client from its record, marked as invalid if the record is.
    *
    * @param record the record of the client
    * @param source where the client came from
@@ -67,7 +84,8 @@ public record RegisteredClient(
    */
   public static @NonNull RegisteredClient of(final @NonNull RequesterRecord record, final @NonNull String source,
       final @Nullable Instant expiresAt) {
-    return new RegisteredClient(record.requester(), record.organizationNumber(), record.marks(), source, expiresAt);
+    return new RegisteredClient(record.requester(), record.organizationNumber(), record.marks(), source, expiresAt,
+        record.invalidReason());
   }
 
 }

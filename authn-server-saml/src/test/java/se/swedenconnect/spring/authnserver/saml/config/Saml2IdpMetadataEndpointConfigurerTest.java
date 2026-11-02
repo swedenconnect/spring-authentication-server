@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.Mockito.mock;
 
+import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,6 +77,8 @@ import se.swedenconnect.spring.authnserver.saml.nameid.DefaultNameIDGeneratorFac
  * @author Martin Lindström
  */
 class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
+
+  private static final byte[] SECRET = "test-secret".getBytes(StandardCharsets.UTF_8);
 
   private static final String BASE_URL = "https://idp.example.com/auth";
 
@@ -490,8 +493,8 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
   }
 
   private static void init(final Saml2IdpConfigurer saml) {
-    new AuthnServerConfigurer().baseUrl(BASE_URL).protocol(saml.metadataResolver(mock(MetadataResolver.class)))
-        .init(mock(HttpSecurity.class));
+    new AuthnServerConfigurer().baseUrl(BASE_URL).subjectIdentifierSecret(SECRET)
+        .protocol(saml.metadataResolver(mock(MetadataResolver.class))).init(mock(HttpSecurity.class));
   }
 
   private static EntityDescriptor descriptor(final AuthnServerConfigurer server, final Saml2IdpConfigurer saml,
@@ -507,7 +510,8 @@ class Saml2IdpMetadataEndpointConfigurerTest extends OpenSamlTestBase {
       customizer.accept(m);
       metadata[0] = m;
     });
-    server.protocol(saml.metadataResolver(mock(MetadataResolver.class))).init(mock(HttpSecurity.class));
+    server.subjectIdentifierSecret(SECRET)
+        .protocol(saml.metadataResolver(mock(MetadataResolver.class))).init(mock(HttpSecurity.class));
     return metadata[0].createEntityDescriptorContainer();
   }
 

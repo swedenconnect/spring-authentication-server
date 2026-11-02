@@ -74,8 +74,8 @@ public abstract class AbstractSubjectIdentifierGeneratorFactory {
   }
 
   /**
-   * Assigns the server secret that takes part in the computation of the identifiers. Assigning a secret is strongly
-   * recommended, see {@link AbstractSubjectIdentifierGenerator}.
+   * Assigns the server secret that takes part in the computation of the identifiers. A secret should always be
+   * assigned, see {@link AbstractSubjectIdentifierGenerator}.
    *
    * @param secret the secret, or {@code null} for no secret
    */

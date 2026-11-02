@@ -36,9 +36,13 @@ import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 
+import se.swedenconnect.spring.authnserver.autoconfigure.ConfiguredAuthnServer;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
+
 /**
  * Tests that a request from a client that the configured clients do not know, when the federation cannot be reached,
  * shows the error page with HTTP status 503, and that the server starts although the federation cannot be reached.
+ * Also that the reference does not check the {@code sector_identifier_uri} of federation clients.
  *
  * @author Martin Lindström
  */
@@ -68,6 +72,12 @@ class UnreachableFederationTest {
         "--authn-server.oidc.federation.keys[0].credential.bundle=oidc-sign",
         "--authn-server.oidc.federation.trust-anchor.entity-id=" + unreachable,
         "--authn-server.oidc.federation.trust-anchor.jwks=file:" + trustAnchorKeys)) {
+
+      // The Federation Operator checks the sector_identifier_uri in the Sweden Connect federation, so the reference
+      // OpenID Provider does not
+      assertThat(context.getBean(ConfiguredAuthnServer.class).getClientRegistryBackends(FederationClientBackend.class))
+          .singleElement()
+          .satisfies(b -> assertThat(b.getPairwiseClientCheck().isSectorIdentifierUriChecked()).isFalse());
 
       final Instant start = Instant.now();
       final String clientId = "https://federation-rp.test.local";

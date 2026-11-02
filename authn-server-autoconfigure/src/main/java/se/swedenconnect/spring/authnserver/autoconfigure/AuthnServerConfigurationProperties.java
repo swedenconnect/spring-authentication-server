@@ -383,8 +383,10 @@ public class AuthnServerConfigurationProperties {
   public static class SubjectIdentifierProperties {
 
     /**
-     * The secret that takes part in the computation of subject identifiers. Assigning a secret is strongly
-     * recommended. The UTF-8 bytes of the string are used.
+     * The secret that takes part in the computation of subject identifiers, shared by SAML and OpenID Connect. Each
+     * enabled protocol needs a secret, this one or its own. Under authn-server.saml.subject-identifier, an empty
+     * value turns the secret off for SAML. The secret must not change once identifiers have been issued. The UTF-8
+     * bytes of the string are used.
      */
     private String secret;
 

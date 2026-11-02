@@ -63,6 +63,12 @@ public final class AuthnAuditTypes {
   /** A client disappeared from the client registry. A system operation, so the type has no {@code authn_} prefix. */
   public static final AuditType CLIENT_REMOVED = AuditType.of("client_removed");
 
+  /**
+   * A client in the client registry was marked as invalid. A system operation, so the type has no {@code authn_}
+   * prefix.
+   */
+  public static final AuditType CLIENT_INVALID = AuditType.of("client_invalid");
+
   // Hidden constructor
   private AuthnAuditTypes() {
   }

@@ -135,6 +135,23 @@ and the path of its metadata:
 }
 ```
 
+An OpenID Federation client that is marked as invalid, since its registration has an error, also has `valid` set to
+`false` and the reason in `invalid-reason`, both in the list and when it is shown alone. Such a client is never
+authenticated, see [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of
+[The client registry](client-registry.html). Once the client has fixed its registration, `POST /actuator/clients/oidc`
+resolves and checks it again at once:
+
+```json
+{
+  "protocol" : "oidc",
+  "id" : "https://rp.example.com",
+  "source" : "federation",
+  "expires-at" : "2026-10-02T09:14:31Z",
+  "valid" : false,
+  "invalid-reason" : "the document at the sector_identifier_uri does not list the redirect URI https://rp.example.com/cb"
+}
+```
+
 The answer of an update tells what happened in `outcome`, with a description in `message`:
 
 | Outcome | Description |

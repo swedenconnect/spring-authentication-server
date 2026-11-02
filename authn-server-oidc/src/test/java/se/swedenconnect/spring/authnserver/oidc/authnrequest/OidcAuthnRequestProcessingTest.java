@@ -180,6 +180,7 @@ class OidcAuthnRequestProcessingTest {
     @Bean
     SecurityFilterChain filterChain(final HttpSecurity http) throws Exception {
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+          .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
           .baseUrl(BASE_URL)
           .clientRegistryBackend(backend)
           .authenticationProvider(new TestAuthenticationProvider("test", List.of(LOA3, LOA4),
@@ -1170,6 +1171,29 @@ class OidcAuthnRequestProcessingTest {
     this.assertUnrecoverable(get(params()), OidcUnrecoverableError.CLIENT_LOOKUP_FAILED, 503);
   }
 
+  // Clients marked as invalid
+
+  @Test
+  void aClientMarkedAsInvalidGetsInvalidClientAtItsRedirectUriAndIsNotAuthenticated() throws Exception {
+    this.start(c -> {});
+    backend.invalidReason = "the document at the sector_identifier_uri does not list the redirect URI " + REDIRECT_URI;
+
+    final MockHttpServletResponse response = this.send(get(params()));
+
+    assertError(response, "invalid_client", "state-1");
+    assertThat(query(response).get("error_description")).contains(backend.invalidReason);
+  }
+
+  @Test
+  void aClientMarkedAsInvalidWithAnUnregisteredRedirectUriEndsAtTheProvider() throws Exception {
+    this.start(c -> {});
+    backend.invalidReason = "the redirect_uris have 2 different hosts and there is no sector_identifier_uri";
+    final Map<String, String> params = params();
+    params.put("redirect_uri", "https://evil.example.com/callback");
+
+    this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
+  }
+
   // Helpers
 
   private void start(final Consumer<AuthnServerConfigurer> c) {
@@ -1379,6 +1403,8 @@ class OidcAuthnRequestProcessingTest {
 
     boolean failOnRequestMark = false;
 
+    String invalidReason;
+
     final List<String> obtainableMarks = new ArrayList<>();
 
     final List<String> requestedMarks = new ArrayList<>();
@@ -1402,7 +1428,8 @@ class OidcAuthnRequestProcessingTest {
           .filter(this.requestedMarks::contains).toList());
       return switch (identifier) {
         case CLIENT_ID -> new OidcClientRecord(CLIENT_ID,
-            metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null, true), marks).toRequesterRecord();
+            metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null, true), marks).toRequesterRecord()
+            .withInvalidReason(this.invalidReason);
         case OTHER_CLIENT_ID -> new OidcClientRecord(OTHER_CLIENT_ID,
             metadata(ClientAuthenticationMethod.CLIENT_SECRET_BASIC, null, false), marks).toRequesterRecord();
         case PUBLIC_CLIENT_ID -> new OidcClientRecord(PUBLIC_CLIENT_ID,

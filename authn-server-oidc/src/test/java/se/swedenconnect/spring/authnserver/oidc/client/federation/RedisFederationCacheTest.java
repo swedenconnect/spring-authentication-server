@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,6 +38,7 @@ import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.oidc.RedisTestNodes;
+import se.swedenconnect.spring.authnserver.registry.ClientUpdateResult;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 
 /**
@@ -112,6 +114,38 @@ class RedisFederationCacheTest extends FederationTestSupport {
     this.cacheB.remove(CLIENT_ID);
     assertThat(this.cacheA.get(CLIENT_ID)).isNull();
     assertThat(this.cacheA.getEntries()).isEmpty();
+  }
+
+  @Test
+  void theCheckOfAPairwiseClientIsSharedByTheNodes() {
+    final String sector = "https://sector.example.com/redirects.json";
+    final String callback = CLIENT_ID + "/cb";
+    final FederationClientBackendTest.StubResolver resolver = new FederationClientBackendTest.StubResolver();
+    resolver.answerFor = id -> new ResolvedClient(id, pairwiseMetadata("The Client", sector, callback), Set.of(),
+        this.clock.instant().plus(VALIDITY));
+    final StubSectorIdentifierFetcher fetcher = new StubSectorIdentifierFetcher();
+    fetcher.documents.put(sector, List.of(callback));
+    final FederationClientBackend backendA = new FederationClientBackend(resolver, (id, type) -> null, this.cacheA,
+        FederationCacheSettings.defaults(), this.clock);
+    final FederationClientBackend backendB = new FederationClientBackend(resolver, (id, type) -> null, this.cacheB,
+        FederationCacheSettings.defaults(), this.clock);
+    backendA.setPairwiseClientCheck(new PairwiseClientCheck(fetcher));
+    backendB.setPairwiseClientCheck(new PairwiseClientCheck(fetcher));
+
+    assertThat(backendA.lookup(CLIENT_ID).isValid()).isTrue();
+    assertThat(backendB.update(CLIENT_ID).outcome()).isEqualTo(ClientUpdateResult.Outcome.UPDATED);
+
+    assertThat(resolver.calls).isEqualTo(2);
+    assertThat(fetcher.calls).containsExactly(sector);
+    assertThat(this.cacheA.get(CLIENT_ID).verifiedSector()).isEqualTo(new VerifiedSector(sector, Set.of(callback)));
+
+    // An invalid mark is seen by both nodes
+    fetcher.documents.put(sector, List.of());
+    resolver.answerFor = id -> new ResolvedClient(id, pairwiseMetadata("The Client", sector, callback, callback + "2"),
+        Set.of(), this.clock.instant().plus(VALIDITY));
+    backendA.update(CLIENT_ID);
+    assertThat(backendB.lookup(CLIENT_ID).isValid()).isFalse();
+    assertThat(backendB.lookup(CLIENT_ID).invalidReason()).contains(callback + "2");
   }
 
   @Test

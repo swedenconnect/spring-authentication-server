@@ -77,6 +77,10 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * If the request object cannot be fetched or decoded, the error is sent to the client when the plain parameters of
  * the request hold a registered redirect URI and a supported response mode. Otherwise it ends at the OpenID Provider.
  * </p>
+ * <p>
+ * A client that the client registry has marked as invalid, see {@link RequesterRecord#isValid()}, gets
+ * {@code invalid_client} at its redirect URI, with an {@code error_description} saying what is wrong.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -205,6 +209,17 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
         new OidcResponseTarget(clientId, redirectUri, responseMode, getFirstValue(merged, "state"));
     OidcResponseTarget.setOnRequest(request, target);
     auditContext.setRequester(AuditRequester.of(record, true));
+
+    // A client marked as invalid is never authenticated. The error is deliberately sent to the redirect URI: only the
+    // client's pairwise setup failed, and its redirect_uri is still trusted. OpenID Federation 1.0, Section 12.1.3,
+    // can be read as forbidding a redirect when the RP metadata is invalid, but the RP needs to learn what is wrong,
+    // and the user is not helped by being shown the error.
+    //
+    if (!record.isValid()) {
+      log.info("The client is marked as invalid - {} [{}]", record.invalidReason(), logString);
+      throw new OidcErrorResponseException(OAuth2Error.INVALID_CLIENT,
+          "The client is marked as invalid: " + record.invalidReason());
+    }
 
     if (requestObject != null) {
       checkPlainParameters(parameters, logString);

@@ -20,8 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.servlet.Filter;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -39,12 +43,16 @@ import org.opensaml.security.credential.UsageType;
 import org.opensaml.security.x509.BasicX509Credential;
 import org.opensaml.xmlsec.signature.support.SignatureValidator;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.assertj.AssertableWebApplicationContext;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -97,7 +105,7 @@ class AuthnServerAutoConfigurationTest {
           AuthnServerAutoConfiguration.class));
 
   private static final String[] SAML = {
-      "authn-server.base-url=" + BASE_URL,
+      "authn-server.base-url=" + BASE_URL, "authn-server.subject-identifier.secret=test-secret",
       "authn-server.saml.enabled=true",
       CREDENTIALS + "default-credential.jks.store.location=classpath:credentials/idp-credentials.p12",
       CREDENTIALS + "default-credential.jks.store.password=secret",
@@ -125,6 +133,21 @@ class AuthnServerAutoConfigurationTest {
         final @NonNull List<String> authnContextUris) {
       throw new UnsupportedOperationException();
     }
+  }
+
+  /**
+   * Adds a YAML document to the environment, read as Spring Boot reads application.yml.
+   */
+  private static ApplicationContextInitializer<ConfigurableApplicationContext> yaml(final String yaml) {
+    return context -> {
+      try {
+        context.getEnvironment().getPropertySources().addFirst(new YamlPropertySourceLoader()
+            .load("test-yaml", new ByteArrayResource(yaml.getBytes(StandardCharsets.UTF_8))).getFirst());
+      }
+      catch (final IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    };
   }
 
   /** Captures the configurer. */
@@ -187,7 +210,8 @@ class AuthnServerAutoConfigurationTest {
 
   @Test
   void startupFailsWhenNoProtocolIsEnabled() {
-    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL)
+    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL,
+        "authn-server.subject-identifier.secret=test-secret")
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("No protocol is enabled"));
   }
@@ -199,7 +223,8 @@ class AuthnServerAutoConfigurationTest {
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("the authn-server-saml module is not on the classpath"));
 
-    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true")
+    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL,
+        "authn-server.subject-identifier.secret=test-secret", "authn-server.oidc.enabled=true")
         .withClassLoader(new FilteredClassLoader("se.swedenconnect.spring.authnserver.oidc"))
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("the authn-server-oidc module is not on the classpath"));
@@ -214,7 +239,8 @@ class AuthnServerAutoConfigurationTest {
 
   @Test
   void startupFailsWhenARequiredSamlValueIsMissing() {
-    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.saml.enabled=true")
+    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL,
+        "authn-server.subject-identifier.secret=test-secret", "authn-server.saml.enabled=true")
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("Missing SAML signing credential"));
 
@@ -322,7 +348,8 @@ class AuthnServerAutoConfigurationTest {
 
   @Test
   void anOidcOnlyServerStarts() {
-    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true",
+    this.runner.withPropertyValues("authn-server.base-url=" + BASE_URL,
+        "authn-server.subject-identifier.secret=test-secret", "authn-server.oidc.enabled=true",
             "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json",
             OIDC_KEY + "location=classpath:credentials/oidc-keys.p12", OIDC_KEY + "password=secret",
             OIDC_KEY + "type=PKCS12", "authn-server.oidc.keys.signing[0].credential.jks.key.alias=rsa-sign",
@@ -460,6 +487,53 @@ class AuthnServerAutoConfigurationTest {
           final EntityDescriptor ed = parse(get(context, "/adapted/metadata"));
           assertThat(ed.getEntityID()).isEqualTo("https://second.example.com");
         });
+  }
+
+  @Test
+  void anEmptySamlSecretTurnsTheSecretOffForSamlInEveryYamlForm() {
+    for (final String value : List.of("", " ~", " null", " \"\"")) {
+      this.runner.withPropertyValues(SAML)
+          .withInitializer(yaml("authn-server:\n  saml:\n    subject-identifier:\n      secret:" + value + "\n"))
+          .withUserConfiguration(CaptureConfiguration.class)
+          .run(context -> {
+            assertThat(context).as("secret:%s", value).hasNotFailed();
+            final Saml2IdpConfigurer saml =
+                CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(Saml2IdpConfigurer.class);
+            assertThat(saml.isSubjectIdentifierSecretDisabled()).as("secret:%s", value).isTrue();
+            assertThat(saml.getSubjectIdentifierSecret()).isNull();
+          });
+    }
+  }
+
+  @Test
+  void aSamlServerNeedsASecretUnlessItIsTurnedOff() {
+    final String[] withoutSecret = Arrays.stream(SAML)
+        .filter(p -> !p.startsWith("authn-server.subject-identifier.secret"))
+        .toArray(String[]::new);
+    this.runner.withPropertyValues(withoutSecret)
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("No subject identifier secret for SAML"));
+
+    this.runner.withPropertyValues(withoutSecret)
+        .withPropertyValues("authn-server.saml.subject-identifier.secret=")
+        .run(context -> assertThat(context).hasNotFailed());
+
+    this.runner.withPropertyValues(withoutSecret)
+        .withPropertyValues("authn-server.saml.subject-identifier.secret=saml-secret")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final Saml2IdpConfigurer saml =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(Saml2IdpConfigurer.class);
+          assertThat(saml.isSubjectIdentifierSecretDisabled()).isFalse();
+          assertThat(new String(saml.getSubjectIdentifierSecret(), StandardCharsets.UTF_8)).isEqualTo("saml-secret");
+        });
+
+    // An empty shared secret is not allowed
+    this.runner.withPropertyValues(withoutSecret)
+        .withPropertyValues("authn-server.subject-identifier.secret=")
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("Subject identifier secret must not be empty"));
   }
 
   @Test

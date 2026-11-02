@@ -23,8 +23,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Set;
 
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -55,6 +59,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import com.nimbusds.openid.connect.sdk.SubjectType;
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
+
 import se.swedenconnect.security.credential.spring.autoconfigure.ConvertersAutoConfiguration;
 import se.swedenconnect.security.credential.spring.autoconfigure.SpringCredentialBundlesAutoConfiguration;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
@@ -65,6 +72,7 @@ import se.swedenconnect.spring.authnserver.autoconfigure.saml.SamlAutoConfigurat
 import se.swedenconnect.spring.authnserver.autoconfigure.storage.AuthnServerStorageAutoConfiguration;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCallEvent;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.ResolvedClient;
 import se.swedenconnect.spring.authnserver.saml.metadata.SamlMetadataBackend;
 
 /**
@@ -163,6 +171,36 @@ class AuthnServerActuatorAutoConfigurationTest {
           .andExpect(status().isNotFound());
       mvc.perform(get("/actuator/clients/saml/other").param("id", ActuatorTestSupport.SP_ONE))
           .andExpect(status().isNotFound());
+    });
+  }
+
+  @Test
+  void aClientMarkedAsInvalidIsShownWithTheReason() throws Exception {
+    this.run(context -> {
+      final MockMvc mvc = mvc(context);
+      resolveFederationClient(context);
+      final String invalid = "https://invalid-rp.example.com";
+      final OIDCClientMetadata metadata = ActuatorTestSupport.clientMetadata("Invalid Client");
+      metadata.setSubjectType(SubjectType.PAIRWISE);
+      metadata.setRedirectionURIs(Set.of(URI.create("https://one.example.com/cb"),
+          URI.create("https://two.example.com/cb")));
+      ActuatorTestSupport.RESOLVED.put(invalid, new ResolvedClient(invalid, metadata, Set.of(),
+          Instant.now().plus(1, ChronoUnit.HOURS)));
+      assertThat(context.getBean(ConfiguredAuthnServer.class).getClientRegistry()
+          .lookup(AuthenticationProtocol.OIDC, invalid).isValid()).isFalse();
+
+      mvc.perform(get("/actuator/clients"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.clients[?(@.id == '%s')].valid".formatted(invalid)).value(false))
+          .andExpect(jsonPath("$.clients[?(@.id == '%s')].invalid-reason".formatted(invalid))
+              .value(Matchers.contains(Matchers.containsString("2 different hosts"))))
+          .andExpect(jsonPath("$.clients[?(@.id == '%s')].valid".formatted(ActuatorTestSupport.FEDERATION_CLIENT))
+              .isEmpty());
+
+      mvc.perform(get("/actuator/clients/oidc").param("id", invalid))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.valid").value(false))
+          .andExpect(jsonPath("$.invalid-reason").value(Matchers.containsString("no sector_identifier_uri")));
     });
   }
 

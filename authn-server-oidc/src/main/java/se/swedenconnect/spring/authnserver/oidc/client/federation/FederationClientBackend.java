@@ -54,6 +54,11 @@ import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
  * A {@link FederationClientCollector} fills the cache with the clients of the federation, so that a client is
  * normally found in the cache. A client that is not is resolved at its request.
  * </p>
+ * <p>
+ * Each time a client is resolved, a client with {@code subject_type} set to {@code pairwise} is checked by the
+ * {@link PairwiseClientCheck}. A client with a registration error stays in the cache, marked as invalid, and is never
+ * authenticated. It is reported to the {@link ClientChangeTracker} as invalid.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -91,6 +96,9 @@ public class FederationClientBackend implements ClientRegistryBackend {
 
   /** When a client was last resolved by this node, or {@code null}. */
   private volatile Instant lastResolved;
+
+  /** Checks the registration of pairwise clients. */
+  private volatile PairwiseClientCheck pairwiseClientCheck = new PairwiseClientCheck(new HttpSectorIdentifierFetcher());
 
   /**
    * Constructor.
@@ -138,6 +146,25 @@ public class FederationClientBackend implements ClientRegistryBackend {
    */
   public void setName(final @NonNull String name) {
     this.name = Objects.requireNonNull(name, "name must not be null");
+  }
+
+  /**
+   * Assigns the check of pairwise clients. The default checks the {@code sector_identifier_uri} with an
+   * {@link HttpSectorIdentifierFetcher}.
+   *
+   * @param pairwiseClientCheck the check
+   */
+  public void setPairwiseClientCheck(final @NonNull PairwiseClientCheck pairwiseClientCheck) {
+    this.pairwiseClientCheck = Objects.requireNonNull(pairwiseClientCheck, "pairwiseClientCheck must not be null");
+  }
+
+  /**
+   * Gets the check of pairwise clients.
+   *
+   * @return the check
+   */
+  public @NonNull PairwiseClientCheck getPairwiseClientCheck() {
+    return this.pairwiseClientCheck;
   }
 
   /** {@inheritDoc} */
@@ -197,7 +224,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
       entry = CachedClientRecord.notFound(identifier, now, this.settings.notFoundTimeToLive());
     }
     else {
-      entry = CachedClientRecord.found(resolved, now, this.settings.maximumAge());
+      entry = this.found(resolved, null, now);
     }
     this.cache.put(entry);
     this.reportResolved(entry);
@@ -261,13 +288,19 @@ public class FederationClientBackend implements ClientRegistryBackend {
           "Failed to resolve '%s' - the data held before is kept: %s".formatted(identifier, e.getMessage()));
     }
     final CachedClientRecord entry = resolved != null
-        ? CachedClientRecord.found(resolved, now, this.settings.maximumAge())
+        ? this.found(resolved, current != null && current.isFound() ? current : null, now)
         : CachedClientRecord.notFound(identifier, now, this.settings.notFoundTimeToLive());
     this.cache.put(entry);
     this.reportResolved(entry);
     if (resolved == null) {
       log.info("The client '{}' was resolved again on request and is no longer known by the resolver", identifier);
       return ClientUpdateResult.removed("The resolver reports '%s' as not found".formatted(identifier));
+    }
+    if (!entry.isValid()) {
+      log.info("The client '{}' was resolved again on request and is marked as invalid until {}: {}", identifier,
+          entry.expiresAt(), entry.invalidReason());
+      return ClientUpdateResult.updated("Resolved '%s' again, but it is marked as invalid until %s: %s".formatted(
+          identifier, entry.expiresAt(), entry.invalidReason()));
     }
     log.info("The client '{}' was resolved again on request, valid until {}", identifier, entry.expiresAt());
     return ClientUpdateResult.updated("Resolved '%s' again, valid until %s".formatted(identifier, entry.expiresAt()));
@@ -289,8 +322,25 @@ public class FederationClientBackend implements ClientRegistryBackend {
   }
 
   /**
-   * Reports the outcome of a resolution to the tracker: a client that was found is seen, and a client that was not
-   * found is removed. A failure to report is logged and does not affect the resolution.
+   * Creates the cache entry of a client that the resolver knows, with the outcome of the check of a pairwise client.
+   *
+   * @param resolved what the resolver answered
+   * @param earlier the earlier entry of the client, whose remembered check is used, or {@code null}
+   * @param now the current time
+   * @return a {@link CachedClientRecord}
+   */
+  @NonNull CachedClientRecord found(final @NonNull ResolvedClient resolved,
+      final @Nullable CachedClientRecord earlier, final @NonNull Instant now) {
+    final PairwiseClientCheck.Outcome outcome = this.pairwiseClientCheck.check(resolved.clientId(),
+        resolved.metadata(), earlier != null ? earlier.verifiedSector() : null);
+    return CachedClientRecord.found(resolved, now, this.settings.maximumAge())
+        .withCheck(outcome, now, this.settings.notFoundTimeToLive());
+  }
+
+  /**
+   * Reports the outcome of a resolution to the tracker: a client that was found is seen, a client that was found and
+   * marked as invalid is also reported as invalid, and a client that was not found is removed. A failure to report is
+   * logged and does not affect the resolution.
    *
    * @param entry the cache entry created from the resolution
    */
@@ -303,6 +353,9 @@ public class FederationClientBackend implements ClientRegistryBackend {
     try {
       if (entry.isFound()) {
         current.clientSeen(this.toKnownClient(entry));
+        if (entry.invalidReason() != null) {
+          current.clientInvalid(this.toKnownClient(entry), entry.invalidReason());
+        }
       }
       else {
         current.clientRemoved(new Requester(AuthenticationProtocol.OIDC, entry.clientId()), NOT_FOUND_REASON);
@@ -359,7 +412,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
   private @NonNull RegisteredClient toRegisteredClient(final @NonNull CachedClientRecord entry,
       final @NonNull Instant now) {
     final RequesterRecord record = new OidcClientRecord(entry.clientId(), Objects.requireNonNull(entry.metadata()),
-        entry.getMarks(now)).toRequesterRecord();
+        entry.getMarks(now)).toRequesterRecord().withInvalidReason(entry.invalidReason());
     return RegisteredClient.of(record, this.name, entry.expiresAt());
   }
 
@@ -375,14 +428,14 @@ public class FederationClientBackend implements ClientRegistryBackend {
   }
 
   /**
-   * Creates the protocol-neutral record from a cache entry.
+   * Creates the protocol-neutral record from a cache entry, marked as invalid if the entry is.
    *
    * @param entry the cache entry, which must hold a client
    * @return a {@link RequesterRecord}
    */
   private @NonNull RequesterRecord toRecord(final @NonNull CachedClientRecord entry) {
     return new OidcClientRecord(entry.clientId(), Objects.requireNonNull(entry.metadata()),
-        entry.getMarks(this.clock.instant())).toRequesterRecord();
+        entry.getMarks(this.clock.instant())).toRequesterRecord().withInvalidReason(entry.invalidReason());
   }
 
 }

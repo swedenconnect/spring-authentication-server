@@ -47,6 +47,7 @@ class DefaultConfigurationTest {
         .extracting(DeploymentSettingsCheck.MissingSetting::setting)
         .containsExactly(
             "authn-server.base-url",
+            "authn-server.subject-identifier.secret",
             "spring.ssl.bundle.(jks|pem).tls.keystore",
             "authn-server.saml.entity-id",
             "authn-server.saml.credentials.sign",

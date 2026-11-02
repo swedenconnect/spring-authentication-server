@@ -23,15 +23,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
@@ -51,8 +48,8 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
  * A server secret should be assigned with {@link #setSecret(byte[])}. Without a secret the identifier is a plain hash
  * of values that anyone may know, and since the number of possible Swedish personal identity numbers is small enough
  * to try them all, the identifier can be traced back to the person it was issued for. With a secret the identifier is
- * a MAC over the same data, and only the server can compute it. A warning is logged, once, when an identifier is
- * computed without a secret.
+ * a MAC over the same data, and only the server can compute it. The protocol configurers require a secret, except
+ * when it is turned off for SAML to keep the identifiers of an Identity Provider that has never used one.
  * </p>
  * <p>
  * A generator holds the secret, and is kept in the user session. Keep that in mind when the session is stored outside
@@ -68,12 +65,6 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
 
   /** The hash algorithm that is used unless another one is assigned, {@value}. */
   public static final String DEFAULT_HASH_ALGORITHM = "SHA-256";
-
-  /** Logger. */
-  private static final Logger log = LoggerFactory.getLogger(AbstractSubjectIdentifierGenerator.class);
-
-  /** Whether the warning about a missing server secret has been logged. */
-  private static final AtomicBoolean missingSecretWarned = new AtomicBoolean(false);
 
   /** The qualifier for the issuer, normally the SAML entityID or the OpenID Connect issuer. */
   private final String issuerQualifier;
@@ -136,10 +127,6 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
     final byte[] input = this.getInput(userId);
     try {
       if (this.secret == null) {
-        if (missingSecretWarned.compareAndSet(false, true)) {
-          log.warn("No server secret has been assigned for subject identifier generation - the identifiers that are "
-              + "generated can be traced back to the users they were issued for");
-        }
         return Base64.getEncoder().encodeToString(MessageDigest.getInstance(this.hashAlgorithm).digest(input));
       }
       final Mac mac = Mac.getInstance(macAlgorithm(this.hashAlgorithm));
@@ -212,8 +199,8 @@ public abstract class AbstractSubjectIdentifierGenerator implements SubjectIdent
   }
 
   /**
-   * Assigns the server secret that takes part in the computation of the identifier. Assigning a secret is strongly
-   * recommended, see the class description.
+   * Assigns the server secret that takes part in the computation of the identifier. A secret should always be
+   * assigned, see the class description.
    *
    * @param secret the secret, or {@code null} for no secret
    */

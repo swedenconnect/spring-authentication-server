@@ -53,6 +53,10 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Subordi
  * {@link FederationEntityStore}, and reused until it expires.
  * </p>
  * <p>
+ * Each client that is put in the cache is checked as when it is resolved at its request, see
+ * {@link PairwiseClientCheck}.
+ * </p>
+ * <p>
  * A run then renews every cached client whose entry expires before the next run, keeping the trust marks that have
  * been asked for on demand. When every listing call and every resolution of the walk succeeded, a cached client that
  * the walk did not find is resolved again; one that still resolves stays. A client that the resolver no longer knows
@@ -238,6 +242,9 @@ public class FederationClientCollector implements Runnable, AutoCloseable {
     /** The clients that have been resolved in this run, whatever the answer. */
     private final Set<String> resolved = new HashSet<>();
 
+    /** The clients that have been put in the cache in this run. */
+    private final Set<String> updated = new HashSet<>();
+
     /** The retained clients, keyed by {@code client_id}. */
     private final Map<String, RetainedClient> retainedClients = new HashMap<>();
 
@@ -331,11 +338,13 @@ public class FederationClientCollector implements Runnable, AutoCloseable {
     }
 
     /**
-     * Resolves every cached client whose entry expires before the next run, unless it has been resolved in this run.
+     * Resolves every cached client whose entry expires before the next run, unless it has been resolved in this run,
+     * or put in the cache in this run and marked as invalid.
      */
     void renew() {
       for (final CachedClientRecord entry : FederationClientCollector.this.backend.getCache().getEntries()) {
-        if (entry.isFound() && entry.expiresAt().isBefore(this.nextRun) && !this.resolved.contains(entry.clientId())) {
+        if (entry.isFound() && entry.expiresAt().isBefore(this.nextRun) && !this.resolved.contains(entry.clientId())
+            && !(this.updated.contains(entry.clientId()) && !entry.isValid())) {
           this.resolveAgain(entry, "renew");
         }
       }
@@ -432,17 +441,19 @@ public class FederationClientCollector implements Runnable, AutoCloseable {
     }
 
     /**
-     * Puts a client in the cache, keeping the trust marks of the earlier entry that have been asked for on demand.
+     * Puts a client in the cache, keeping the trust marks of the earlier entry that have been asked for on demand. A
+     * pairwise client is checked, see {@link PairwiseClientCheck}.
      *
      * @param client the resolved client
      * @param earlier the earlier entry, or {@code null}
      */
     private void put(final @NonNull ResolvedClient client, final @Nullable CachedClientRecord earlier) {
       final FederationClientBackend backend = FederationClientCollector.this.backend;
-      final CachedClientRecord entry = CachedClientRecord.found(client, this.now, backend.getSettings().maximumAge())
-          .carryOverTrustMarks(earlier != null && earlier.isFound() ? earlier : null, this.now);
+      final CachedClientRecord found = earlier != null && earlier.isFound() ? earlier : null;
+      final CachedClientRecord entry = backend.found(client, found, this.now).carryOverTrustMarks(found, this.now);
       backend.getCache().put(entry);
       backend.reportResolved(entry);
+      this.updated.add(client.clientId());
       if (this.retainedClients.remove(client.clientId()) != null) {
         FederationClientCollector.this.entityStore.removeRetainedClient(client.clientId());
       }

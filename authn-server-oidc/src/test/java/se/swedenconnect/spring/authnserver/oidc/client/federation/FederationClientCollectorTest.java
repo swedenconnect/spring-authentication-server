@@ -18,6 +18,7 @@ package se.swedenconnect.spring.authnserver.oidc.client.federation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEvent;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
 import se.swedenconnect.spring.authnserver.job.JobLock;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
@@ -59,6 +61,8 @@ class FederationClientCollectorTest extends FederationTestSupport {
   private static final String OP = "https://op.example.com";
 
   private static final String OTHER = "https://other.example.com";
+
+  private static final String SECTOR = "https://sector.example.com/redirects.json";
 
   private final List<ApplicationEvent> events = new ArrayList<>();
 
@@ -469,6 +473,59 @@ class FederationClientCollectorTest extends FederationTestSupport {
   /**
    * The parts of a test.
    */
+  @Test
+  void aPairwiseClientFoundByTheWalkIsCheckedAndTheCheckIsRemembered() {
+    final Fixture fixture = new Fixture(FederationCollectorSettings.defaults());
+    final StubSectorIdentifierFetcher fetcher = fixture.pairwiseCheck();
+    fixture.lister(TRUST_ANCHOR, RP_ONE, RP_TWO);
+    fixture.pairwiseRp(RP_ONE, SECTOR, RP_ONE + "/cb");
+    fixture.pairwiseRp(RP_TWO, null, RP_TWO + "/cb", "https://other-host.example.com/cb");
+    fetcher.documents.put(SECTOR, List.of(RP_ONE + "/cb"));
+
+    fixture.collector.collect();
+
+    assertThat(fixture.cache.get(RP_ONE).isValid()).isTrue();
+    assertThat(fixture.cache.get(RP_TWO).isValid()).isFalse();
+    assertThat(fixture.cache.get(RP_TWO).invalidReason()).contains("2 different hosts");
+    assertThat(this.events).filteredOn(ClientInvalidEvent.class::isInstance).singleElement()
+        .satisfies(e -> assertThat(((ClientInvalidEvent) e).getClient().identifier()).isEqualTo(RP_TWO));
+    assertThat(fetcher.calls).containsExactly(SECTOR);
+
+    // The entry is renewed with a fresh resolution, and the remembered check is used
+    fixture.clock.advance(Duration.ofMinutes(100));
+    fixture.collector.collect();
+    assertThat(fixture.resolver.calls.stream().filter(RP_ONE::equals)).hasSize(2);
+    assertThat(fixture.cache.get(RP_ONE).isValid()).isTrue();
+    assertThat(fetcher.calls).containsExactly(SECTOR);
+  }
+
+  @Test
+  void aClientWhoseTemporaryMarkHasRunOutIsCheckedAgainAlthoughItsResolveResultIsStored() {
+    final Fixture fixture = new Fixture(FederationCollectorSettings.defaults());
+    final StubSectorIdentifierFetcher fetcher = fixture.pairwiseCheck();
+    fixture.lister(TRUST_ANCHOR, RP_ONE);
+    fixture.pairwiseRp(RP_ONE, SECTOR, RP_ONE + "/cb");
+    fetcher.failure = new IOException("unreachable");
+
+    fixture.collector.collect();
+
+    assertThat(fixture.cache.get(RP_ONE).isValid()).isFalse();
+    assertThat(fixture.cache.get(RP_ONE).expiresAt())
+        .isEqualTo(fixture.clock.instant().plus(FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE));
+    // The entry expires before the next run, but it is not checked again in the same run
+    assertThat(fetcher.calls).hasSize(1);
+
+    fixture.clock.advance(Duration.ofMinutes(30));
+    fetcher.failure = null;
+    fetcher.documents.put(SECTOR, List.of(RP_ONE + "/cb"));
+    fixture.collector.collect();
+
+    assertThat(fixture.store.get(RP_ONE)).isNotNull();
+    assertThat(fixture.resolver.calls.stream().filter(RP_ONE::equals)).hasSize(1);
+    assertThat(fetcher.calls).hasSize(2);
+    assertThat(fixture.cache.get(RP_ONE).isValid()).isTrue();
+  }
+
   private class Fixture {
 
     final TestClock clock;
@@ -522,6 +579,18 @@ class FederationClientCollectorTest extends FederationTestSupport {
 
     void rp(final String entityId, final Duration validity) {
       this.entity(entityId, true, false, validity);
+    }
+
+    StubSectorIdentifierFetcher pairwiseCheck() {
+      final StubSectorIdentifierFetcher fetcher = new StubSectorIdentifierFetcher();
+      this.backend.setPairwiseClientCheck(new PairwiseClientCheck(fetcher));
+      return fetcher;
+    }
+
+    void pairwiseRp(final String entityId, final String sectorIdentifierUri, final String... redirectUris) {
+      this.resolver.entities.put(entityId, new ResolvedEntity(entityId,
+          pairwiseMetadata("Client " + entityId, sectorIdentifierUri, redirectUris), null, Set.of(), Instant.EPOCH));
+      this.resolver.validity.put(entityId, Duration.ofHours(2));
     }
 
     void op(final String entityId) {

@@ -49,6 +49,8 @@ import se.swedenconnect.spring.authnserver.authentication.Requester;
  *          {@code organization_identifier}, as a GLUE URI such as {@code urn:glue:iso6523:0007:5566778899}. The two
  *          forms differ, so code that compares requesters across protocols must handle both
  * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
+ * @param invalidReason why the requester is marked as invalid, or {@code null} if it is not. A requester that is
+ *          marked as invalid is never authenticated, see {@link #isValid()}
  * @author Martin Lindström
  */
 public record RequesterRecord(
@@ -57,7 +59,8 @@ public record RequesterRecord(
     @NonNull List<Logo> logos,
     @NonNull Set<String> marks,
     @Nullable String organizationNumber,
-    @NonNull Object protocolMetadata) {
+    @NonNull Object protocolMetadata,
+    @Nullable String invalidReason) {
 
   /**
    * Constructor.
@@ -68,6 +71,7 @@ public record RequesterRecord(
    * @param marks the marks that the requester holds
    * @param organizationNumber the organisation number of the requester, as published, or {@code null}
    * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
+   * @param invalidReason why the requester is marked as invalid, or {@code null} if it is not
    */
   public RequesterRecord {
     Objects.requireNonNull(requester, "requester must not be null");
@@ -75,6 +79,22 @@ public record RequesterRecord(
     displayNames = List.copyOf(Objects.requireNonNull(displayNames, "displayNames must not be null"));
     logos = List.copyOf(Objects.requireNonNull(logos, "logos must not be null"));
     marks = Set.copyOf(Objects.requireNonNull(marks, "marks must not be null"));
+  }
+
+  /**
+   * Constructor for a requester that is not marked as invalid.
+   *
+   * @param requester the requester that the record describes
+   * @param displayNames the names that the requester may be presented by
+   * @param logos the logotypes that the requester may be presented by
+   * @param marks the marks that the requester holds
+   * @param organizationNumber the organisation number of the requester, as published, or {@code null}
+   * @param protocolMetadata the metadata of the requester, in the form of the protocol it speaks
+   */
+  public RequesterRecord(final @NonNull Requester requester, final @NonNull List<DisplayName> displayNames,
+      final @NonNull List<Logo> logos, final @NonNull Set<String> marks, final @Nullable String organizationNumber,
+      final @NonNull Object protocolMetadata) {
+    this(requester, displayNames, logos, marks, organizationNumber, protocolMetadata, null);
   }
 
   /**
@@ -89,6 +109,28 @@ public record RequesterRecord(
   public RequesterRecord(final @NonNull Requester requester, final @NonNull List<DisplayName> displayNames,
       final @NonNull List<Logo> logos, final @NonNull Set<String> marks, final @NonNull Object protocolMetadata) {
     this(requester, displayNames, logos, marks, null, protocolMetadata);
+  }
+
+  /**
+   * Tells whether the requester is valid. A requester whose registration has an error, such as an OpenID Connect
+   * client whose {@code sector_identifier_uri} does not list its redirect URIs, is marked as invalid and is never
+   * authenticated.
+   *
+   * @return {@code true} if the requester is valid and {@code false} if it is marked as invalid
+   */
+  public boolean isValid() {
+    return this.invalidReason == null;
+  }
+
+  /**
+   * Creates a copy of the record where the requester is marked as invalid.
+   *
+   * @param reason why the requester is invalid, or {@code null} for a copy that is valid
+   * @return a {@link RequesterRecord}
+   */
+  public @NonNull RequesterRecord withInvalidReason(final @Nullable String reason) {
+    return new RequesterRecord(this.requester, this.displayNames, this.logos, this.marks, this.organizationNumber,
+        this.protocolMetadata, reason);
   }
 
   /**

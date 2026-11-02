@@ -27,6 +27,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.storage.ReplayCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
@@ -102,6 +104,9 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  */
 public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfigurer> {
 
+  /** Logger. */
+  private static final Logger log = LoggerFactory.getLogger(Saml2IdpConfigurer.class);
+
   /** The default SAML path, {@value}. */
   public static final String DEFAULT_PATH = "/saml2";
 
@@ -168,6 +173,9 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
 
   /** The factory for NameID generators, used for the NameID formats in the metadata. */
   private NameIDGeneratorFactory nameIdGeneratorFactory;
+
+  /** Whether NameIDs are computed without a secret. */
+  private boolean subjectIdentifierSecretDisabled = false;
 
   /** The maximum age of a received message. */
   private Duration maxMessageAge = DEFAULT_MAX_MESSAGE_AGE;
@@ -546,7 +554,8 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
   /**
    * Assigns the factory for {@code NameID} generators. It checks the {@code NameIDPolicy} of each request, and its
    * supported formats are declared in the metadata. Without a factory, a {@link DefaultNameIDGeneratorFactory} with the
-   * subject identifier secret and hash algorithm is used.
+   * subject identifier secret and hash algorithm is used, and a secret is then required unless it has been turned off
+   * with {@link #subjectIdentifierSecretDisabled(boolean)}.
    *
    * @param nameIdGeneratorFactory the factory
    * @return this configurer
@@ -555,6 +564,42 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
       final @Nullable NameIDGeneratorFactory nameIdGeneratorFactory) {
     this.nameIdGeneratorFactory = nameIdGeneratorFactory;
     return this;
+  }
+
+  /**
+   * Turns the subject identifier secret off for SAML, so that persistent {@code NameID}s are computed without a
+   * secret, and a shared secret is not used for SAML. This lets an Identity Provider moving from a server that never
+   * used a secret keep the persistent {@code NameID}s of its users. It wins over a secret assigned with
+   * {@link #subjectIdentifierSecret(byte[])}.
+   * <p>
+   * Identifiers computed without a secret can be traced back to the users they were issued for, so only turn the
+   * secret off when such identifiers have already been issued and must be kept. A warning is logged at startup.
+   * </p>
+   *
+   * @param disabled {@code true} to compute {@code NameID}s without a secret
+   * @return this configurer
+   */
+  public @NonNull Saml2IdpConfigurer subjectIdentifierSecretDisabled(final boolean disabled) {
+    this.subjectIdentifierSecretDisabled = disabled;
+    return this;
+  }
+
+  /**
+   * Tells whether the subject identifier secret is turned off for SAML.
+   *
+   * @return {@code true} if {@code NameID}s are computed without a secret and {@code false} otherwise
+   */
+  public boolean isSubjectIdentifierSecretDisabled() {
+    return this.subjectIdentifierSecretDisabled;
+  }
+
+  /**
+   * Gets the subject identifier secret that applies for SAML, which is none when it has been turned off with
+   * {@link #subjectIdentifierSecretDisabled(boolean)}.
+   */
+  @Override
+  public byte @Nullable [] getSubjectIdentifierSecret() {
+    return this.subjectIdentifierSecretDisabled ? null : super.getSubjectIdentifierSecret();
   }
 
   /**
@@ -837,8 +882,17 @@ public class Saml2IdpConfigurer extends AbstractProtocolConfigurer<Saml2IdpConfi
       this.activeNameIdGeneratorFactory = this.nameIdGeneratorFactory;
     }
     else {
+      final byte[] secret = this.getSubjectIdentifierSecret();
+      if (this.subjectIdentifierSecretDisabled) {
+        log.warn("The subject identifier secret is turned off for SAML - persistent NameIDs can be traced back to the "
+            + "users they were issued for");
+      }
+      else if (secret == null) {
+        throw new IllegalArgumentException("No subject identifier secret for SAML - assign a shared secret or one for "
+            + "SAML, or turn the secret off for SAML");
+      }
       final DefaultNameIDGeneratorFactory factory = new DefaultNameIDGeneratorFactory(this.getEntityId());
-      factory.setSecret(this.getSubjectIdentifierSecret());
+      factory.setSecret(secret);
       factory.setHashAlgorithm(this.getSubjectIdentifierHashAlgorithm());
       this.activeNameIdGeneratorFactory = factory;
     }

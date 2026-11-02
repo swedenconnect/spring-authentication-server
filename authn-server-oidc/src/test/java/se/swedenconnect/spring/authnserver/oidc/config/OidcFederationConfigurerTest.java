@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import jakarta.servlet.Filter;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -96,6 +97,7 @@ class OidcFederationConfigurerTest {
     @Bean
     SecurityFilterChain filterChain(final HttpSecurity http) throws Exception {
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+          .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
           .baseUrl(BASE_URL)
           .entityInformation(INFORMATION)
           .authenticationProvider(new TestAuthenticationProvider("one",

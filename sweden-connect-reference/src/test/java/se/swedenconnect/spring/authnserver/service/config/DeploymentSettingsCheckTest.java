@@ -61,6 +61,7 @@ class DeploymentSettingsCheckTest {
   void theSettingsOfADisabledProtocolAreNotRequired() {
     final MockEnvironment environment = new MockEnvironment()
         .withProperty("authn-server.base-url", "https://idp.example.com")
+        .withProperty("authn-server.subject-identifier.secret", "secret")
         .withProperty("server.ssl.enabled", "false")
         .withProperty("authn-server.saml.enabled", "false")
         .withProperty("authn-server.oidc.enabled", "true");
@@ -74,6 +75,31 @@ class DeploymentSettingsCheckTest {
         .extracting(DeploymentSettingsCheck.MissingSetting::setting)
         .containsExactly("authn-server.saml.entity-id", "authn-server.saml.credentials.sign",
             "authn-server.saml.credentials.encrypt", "authn-server.saml.metadata-providers");
+  }
+
+  @Test
+  void everyEnabledProtocolNeedsASubjectIdentifierSecret() {
+    final MockEnvironment environment = without("authn-server.subject-identifier");
+    assertThat(DeploymentSettingsCheck.check(environment))
+        .extracting(DeploymentSettingsCheck.MissingSetting::setting)
+        .containsExactly("authn-server.subject-identifier.secret");
+
+    // An empty SAML secret turns the secret off for SAML, but OpenID Connect still needs one
+    environment.setProperty("authn-server.saml.subject-identifier.secret", "");
+    assertThat(DeploymentSettingsCheck.check(environment))
+        .extracting(DeploymentSettingsCheck.MissingSetting::setting)
+        .containsExactly("authn-server.subject-identifier.secret");
+
+    environment.setProperty("authn-server.oidc.subject-identifier.secret", "");
+    assertThat(DeploymentSettingsCheck.check(environment)).isNotEmpty();
+
+    environment.setProperty("authn-server.oidc.subject-identifier.secret", "oidc-secret");
+    assertThat(DeploymentSettingsCheck.check(environment)).isEmpty();
+
+    final MockEnvironment samlOnly = without("authn-server.subject-identifier", "authn-server.oidc");
+    assertThat(DeploymentSettingsCheck.check(samlOnly)).isNotEmpty();
+    samlOnly.setProperty("authn-server.saml.subject-identifier.secret", "");
+    assertThat(DeploymentSettingsCheck.check(samlOnly)).isEmpty();
   }
 
   @Test
@@ -114,6 +140,7 @@ class DeploymentSettingsCheckTest {
     environment.getPropertySources().replace(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
         new SystemEnvironmentPropertySource(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, Map.of(
         "AUTHN_SERVER_BASE_URL", "https://idp.example.com",
+        "AUTHN_SERVER_SUBJECT_IDENTIFIER_SECRET", "secret",
         "SERVER_SSL_BUNDLE", "tls",
         "SPRING_SSL_BUNDLE_JKS_TLS_KEYSTORE_LOCATION", "file:/tls.p12",
         "AUTHN_SERVER_OIDC_ENABLED", "true",
@@ -125,6 +152,7 @@ class DeploymentSettingsCheckTest {
   /** The settings of a complete configuration. */
   private static final Map<String, String> COMPLETE = Map.ofEntries(
       Map.entry("authn-server.base-url", "https://idp.example.com"),
+      Map.entry("authn-server.subject-identifier.secret", "secret"),
       Map.entry("server.ssl.bundle", "tls"),
       Map.entry("spring.ssl.bundle.jks.tls.keystore.location", "classpath:tls.p12"),
       Map.entry("authn-server.saml.enabled", "true"),

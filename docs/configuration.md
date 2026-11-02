@@ -109,11 +109,13 @@ A server that offers both protocols includes both starters.
 ```
 
 A single-protocol starter never pulls in the other protocol. The smallest working SAML Identity Provider needs a base
-URL, a credential and a source of Service Provider metadata:
+URL, a subject identifier secret, a credential and a source of Service Provider metadata:
 
 ```yaml
 authn-server:
   base-url: https://idp.example.com
+  subject-identifier:
+    secret: ${SUBJECT_IDENTIFIER_SECRET}
   saml:
     enabled: true
     credentials:
@@ -127,11 +129,13 @@ authn-server:
 
 With this, the IdP metadata is published at `https://idp.example.com/saml2/metadata`.
 
-The smallest working OpenID Provider needs a base URL and a signing key:
+The smallest working OpenID Provider needs a base URL, a subject identifier secret and a signing key:
 
 ```yaml
 authn-server:
   base-url: https://op.example.com
+  subject-identifier:
+    secret: ${SUBJECT_IDENTIFIER_SECRET}
   oidc:
     enabled: true
     keys:
@@ -253,12 +257,26 @@ properties. Assign `SsoPolicy.forSessionLifetime()`, or a policy with no time li
 ### 4.2. Subject identifiers
 
 The SAML `NameID` and the OpenID Connect `sub` are computed from the user identity and a server secret, see
-[Attributes](attributes.html).
+[Section 5, "Identifying the user"](attributes.html#identifying-the-user) of [Attributes](attributes.html).
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
-| `secret` | The secret that takes part in the computation. The UTF-8 bytes of the string are used. Assigning a secret is strongly recommended. | None |
+| `secret` | The secret that takes part in the computation. The UTF-8 bytes of the string are used. | Required |
 | `hash-algorithm` | The JCE name of the hash algorithm. | `SHA-256` |
+
+The secret under `authn-server.subject-identifier` is shared by SAML and OpenID Connect, and
+`authn-server.saml.subject-identifier.secret` and `authn-server.oidc.subject-identifier.secret` override it. The server
+does not start if an enabled protocol has no secret, shared or its own. The secret must not change once identifiers have
+been issued, since that would give the users new identifiers.
+
+An empty `authn-server.saml.subject-identifier.secret` turns the secret off for SAML, and the shared secret is then not
+used for SAML. In YAML, `secret:`, `secret: ~`, `secret: null` and `secret: ""` all do this. A null in
+`SPRING_APPLICATION_JSON` does not, since Spring Boot treats it as a missing value; use an empty string there. This is
+only for an Identity Provider moving from saml-identity-provider that must keep its users' persistent `NameID`s, see
+[Section 10, "Migrating from saml-identity-provider"](#migrating-from-saml-identity-provider). Identifiers computed
+without a secret can be traced back to the users they were issued for, and a warning is logged at startup. OpenID
+Connect cannot turn the secret off, and an empty `authn-server.oidc.subject-identifier.secret` stops the server from
+starting.
 
 <a name="entity-information"></a>
 ### 4.3. Entity information
@@ -998,7 +1016,8 @@ federation that it is not a member of is not supported.
 | `clients.trust-mark-issuers[]` | The issuers that are asked for a trust mark that a client does not hold, one per trust mark type, see below. | - |
 | `clients.trust-mark-status-interval` | The interval between two checks of the status of the trust marks obtained from the issuers. | 1 hour |
 | `clients.cache.maximum-age` | How long a resolved client is kept at the most, regardless of what the resolve response says. | No limit |
-| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. | 1 minute |
+| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. A made-up `client_id` is remembered for this time too. It is also how long a pairwise client is marked as invalid when the document at its `sector_identifier_uri` cannot be fetched. | 5 minutes |
+| `clients.check-sector-identifier-uri` | Whether the document at the `sector_identifier_uri` of a pairwise client is fetched and checked to list all the client's `redirect_uris`, see below. | `true` |
 | `clients.collector.enabled` | Whether the background job that fills the cache with the clients of the federation runs, see below. | `true` |
 | `clients.collector.interval` | How often the job runs. | 30 minutes |
 | `clients.collector.intermediates[]` | The entity identifiers of the intermediates that the job starts from, instead of the trust anchor. | The trust anchor |
@@ -1040,6 +1059,13 @@ that dropped out by mistake has time to fix it. Such a client is logged at `WARN
 client from a broken one, a client that the federation has removed also keeps working until its entry expires. Set
 `clients.collector.keep-until-expiry` to `false` to drop such a client at once, when a removal must take effect
 immediately. See [Section 6.2, "Filling the cache from the federation"](client-registry.html#filling-the-cache) of [The client registry](client-registry.html).
+
+**Pairwise clients.** Each time a client with `subject_type` set to `pairwise` is resolved, its registration is
+checked. A client whose `redirect_uris` have more than one host and that has no `sector_identifier_uri`, or whose
+`sector_identifier_uri` document does not list all its `redirect_uris`, is marked as invalid and is never authenticated.
+See [Section 6.7, "Pairwise clients"](client-registry.html#pairwise-clients) of [The client registry](client-registry.html).
+Turn `clients.check-sector-identifier-uri` off only where someone else has done the check of the document, such as the
+Federation Operator in the Sweden Connect federation. The check of the redirect hosts applies also when it is off.
 
 **The order of the sources.** The configured clients of `authn-server.oidc.clients` are asked first, so an operator's
 entry overrides what the federation says about the same `client_id`. Client sources added in an
@@ -1433,6 +1459,12 @@ to `true`.
 
 Endpoints that were moved away from `/saml2` are set up by changing `authn-server.saml.path`, if they share a prefix,
 or by giving each endpoint relative to an empty SAML path.
+
+saml-identity-provider computes persistent `NameID`s without a secret. A secret is now required, and assigning one
+gives the Service Providers new `NameID`s for their users. An Identity Provider that must keep its users' `NameID`s
+turns the secret off for SAML with an empty `authn-server.saml.subject-identifier.secret`, see
+[Section 4.2, "Subject identifiers"](#subject-identifiers). If the server also offers OpenID Connect, it still needs a
+secret, shared or its own.
 
 The `saml.idp.audit.*` properties are gone. Auditing is done with spring-audit-support, and its repositories are
 configured with its `audit.*` properties. The audit event types and their data have changed as well, see

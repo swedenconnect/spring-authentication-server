@@ -165,7 +165,16 @@ public class SamlAutoConfiguration {
     }
     configurer.clockSkew(properties.getClockSkew());
     configurer.supportsUserMessage(properties.getSupportsUserMessage());
-    configurer.subjectIdentifierSecret(properties.getSubjectIdentifier().getSecretBytes());
+    // An empty secret turns the secret off for SAML. In YAML, "secret:", "secret: ~" and "secret: null" give an empty
+    // string as well as "secret: ''"
+    //
+    final String secret = properties.getSubjectIdentifier().getSecret();
+    if (secret != null && secret.isEmpty()) {
+      configurer.subjectIdentifierSecretDisabled(true);
+    }
+    else {
+      configurer.subjectIdentifierSecret(properties.getSubjectIdentifier().getSecretBytes());
+    }
     configurer.subjectIdentifierHashAlgorithm(properties.getSubjectIdentifier().getHashAlgorithm());
 
     if (properties.getMaxMessageAge() != null) {

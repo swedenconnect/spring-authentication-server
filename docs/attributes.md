@@ -477,22 +477,31 @@ A generator is kept in the user session until the response has been sent, so it 
 <a name="the-server-secret"></a>
 ### 5.1. The server secret
 
-Assign a server secret. Without one, the identifier is a plain hash of values that anyone may know, and since the number
-of possible Swedish personal identity numbers is small enough to try them all, the identifier can be traced back to the
-person it was issued for. With a secret, the identifier is a MAC over the same data and only the server can compute it.
+A server secret is required. Without one, the identifier is a plain hash of values that anyone may know, and since the
+number of possible Swedish personal identity numbers is small enough to try them all, the identifier can be traced back
+to the person it was issued for. With a secret, the identifier is a MAC over the same data and only the server can
+compute it.
 
-The secret is assigned to the factory that creates the generators, and reaches every generator it hands out:
+`authn-server.subject-identifier.secret` is shared by SAML and OpenID Connect, and each protocol can override it with
+`authn-server.saml.subject-identifier.secret` or `authn-server.oidc.subject-identifier.secret`, see
+[Section 3, "Shared settings"](configuration.html#shared-settings) of [Configuration](configuration.html). In code, the
+same is done with `subjectIdentifierSecret` on the shared configurer and on each protocol configurer. The server does
+not start if an enabled protocol has no secret, shared or its own. The check applies when the default generator
+factories are used; an application that assigns a factory of its own is responsible for its secret.
+
+The configurers hand the secret to the factory that creates the generators, and it reaches every generator the factory
+hands out. A factory that is created in code is given the secret in the same way:
 
 ```java
 DefaultNameIDGeneratorFactory nameIDGenerators = new DefaultNameIDGeneratorFactory("https://idp.example.com");
 nameIDGenerators.setSecret(secret);
 ```
 
-The secret is part of the identifier, so changing it changes every identifier the server issues. Treat it as something
-that is set once and kept, and back it up together with the server keys.
+The secret is part of the identifier, so changing it changes every identifier the server issues. The secret must not
+change once identifiers have been issued. Treat it as something that is set once and kept, and back it up together with
+the server keys.
 
-When no secret has been assigned, a warning is logged the first time an identifier is computed, saying that the
-identifiers can be traced back to the users they were issued for.
+SAML can turn the secret off, see [Section 5.2, "SAML"](#saml-1). OpenID Connect cannot.
 
 <a name="saml-1"></a>
 ### 5.2. SAML
@@ -517,10 +526,31 @@ user.
 [TransientNameIDGenerator] produces a new random value every time, so the secret plays no part in it.
 
 A deployment moving from an Identity Provider built on
-[saml-identity-provider](https://github.com/swedenconnect/saml-identity-provider) keeps its users' persistent
-`NameID`s as long as no secret is assigned: the value is then computed exactly as that library computes it. Assigning a
-secret gives the Service Providers new `NameID`s for their users, so it is a decision to take when the Identity Provider
-is set up rather than later.
+[saml-identity-provider](https://github.com/swedenconnect/saml-identity-provider), which computed persistent `NameID`s
+without a secret, keeps its users' `NameID`s by turning the secret off for SAML. The value is then computed exactly as
+that library computes it. The secret is turned off by giving `authn-server.saml.subject-identifier.secret` an empty
+value. In YAML, `secret:`, `secret: ~`, `secret: null` and `secret: ""` all do this, since Spring Boot reads a null in
+YAML as an empty string. A shared secret is then not used for SAML, while OpenID Connect still uses it:
+
+```yaml
+authn-server:
+  subject-identifier:
+    secret: ${SUBJECT_IDENTIFIER_SECRET}
+  saml:
+    subject-identifier:
+      secret: ""
+```
+
+A null in `SPRING_APPLICATION_JSON` does not turn the secret off, since Spring Boot treats it as a missing value, and
+the shared secret is then used. Use an empty string there instead. In code, the secret is turned off with
+`subjectIdentifierSecretDisabled(true)` on the `Saml2IdpConfigurer`, in a
+[configurer adapter](configuration.html#adapting-the-configuration) if the rest comes from the properties. A
+`subjectIdentifierSecret` of `null` still means that the shared secret is used.
+
+Only turn the secret off when persistent `NameID`s have already been issued without one and must be kept. Such
+identifiers can be traced back to the users they were issued for. A warning is logged at startup when the secret is
+turned off. A new Identity Provider always uses a secret, and an existing one that assigns a secret for the first time
+gives the Service Providers new `NameID`s for their users.
 
 <a name="openid-connect-1"></a>
 ### 5.3. OpenID Connect
@@ -545,8 +575,18 @@ compute the `sub` from. This is a client registration error, and the library rep
 on something else, such as the `client_id`: a fallback would give the client a `sub` that changes as soon as it
 registers the URI it should have registered from the start.
 
-Fetching the `sector_identifier_uri` and checking that the redirect URIs of the client are among the ones it lists, as
-OpenID Connect Dynamic Client Registration, Section 5, requires, belongs to client registration.
+The document at the `sector_identifier_uri` must list all the client's redirect URIs, as OpenID Connect Dynamic Client
+Registration, Section 5, requires. Otherwise a client could name another organization's host, get the same `sub` values
+as that organization's clients, and correlate their users. This is checked when a client is registered:
+
+- A client resolved through OpenID Federation is checked each time it is resolved, see
+  [Section 6.7, "Pairwise clients"](client-registry.html#pairwise-clients) of [The client registry](client-registry.html).
+  A client with a registration error is marked as invalid and never authenticated, see
+  [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients).
+- A client from the configuration or from a client repository is not checked. Its `subject_type`,
+  `sector_identifier_uri` and `redirect_uris` are expected to be correct with respect to each other, and to the
+  document, since the server does not check them. A client with several redirect hosts and no `sector_identifier_uri`
+  gets an error after the user has logged in.
 
 <a name="supplying-a-generator-of-your-own"></a>
 ### 5.4. Supplying a generator of your own

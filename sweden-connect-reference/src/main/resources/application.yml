@@ -146,7 +146,8 @@ authn-server:
   #
   # base-url: https://idp.example.com
 
-  # Recommended: the secret that takes part in the computation of the SAML NameID and the OIDC sub.
+  # DEPLOYMENT MUST ADD: the secret that takes part in the computation of the SAML NameID and the OIDC sub. It must
+  # never change, since that would give the users new identifiers. For example:
   #
   # subject-identifier:
   #   secret: <a secret of the deployment>
@@ -314,21 +315,24 @@ authn-server:
     # resolves through the federation under federation, with the trust anchor. The endpoints of the resolver and the
     # trust mark issuers are found in their entity configurations. For example:
     #
-    # federation:
-    #   enabled: true
-    #   authority-hints:
-    #     - https://intermediate.example.com
-    #   keys:
-    #     - credential:
-    #         bundle: oidc-federation
-    #   trust-anchor:
-    #     entity-id: https://ta.example.com
-    #     jwks: file:/opt/config/ta-jwks.json
-    #   clients:
-    #     trust-mark-issuers:
-    #       - type: https://tm.example.com/public-sector
-    #         issuer: https://tmi.example.com
-    #         jwks: file:/opt/config/tmi-jwks.json
+    federation:
+      # enabled: true
+      # authority-hints:
+      #   - https://intermediate.example.com
+      # keys:
+      #   - credential:
+      #       bundle: oidc-federation
+      # trust-anchor:
+      #   entity-id: https://ta.example.com
+      #   jwks: file:/opt/config/ta-jwks.json
+      clients:
+        # In the Sweden Connect federation the Federation Operator checks the sector_identifier_uri of pairwise
+        # clients, so the OpenID Provider does not.
+        check-sector-identifier-uri: false
+        # trust-mark-issuers:
+        #   - type: https://tm.example.com/public-sector
+        #     issuer: https://tmi.example.com
+        #     jwks: file:/opt/config/tmi-jwks.json
 
     ui-locales:
       - sv

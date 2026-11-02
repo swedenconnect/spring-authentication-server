@@ -32,9 +32,9 @@ import org.springframework.util.StringUtils;
 
 /**
  * Checks, before anything else is set up, that the deployment has supplied the settings that the reference has no
- * defaults for: the base URL, the SAML entity ID, the OpenID Connect issuer, the keys, the SAML metadata and the TLS
- * key store. When any of them is missing, startup fails with a {@link MissingDeploymentSettingsException} that names
- * all of them.
+ * defaults for: the base URL, the subject identifier secret, the SAML entity ID, the OpenID Connect issuer, the keys,
+ * the SAML metadata and the TLS key store. When any of them is missing, startup fails with a
+ * {@link MissingDeploymentSettingsException} that names all of them.
  * <p>
  * The settings of a protocol are only required when the protocol is enabled. The OpenID Connect clients are not
  * checked here, since the server itself stops startup when the OpenID Provider has no client source.
@@ -77,6 +77,11 @@ public class DeploymentSettingsCheck implements EnvironmentPostProcessor, Ordere
     if (!hasText(binder, "authn-server.base-url")) {
       missing.add(new MissingSetting("authn-server.base-url",
           "the base URL of the server, protocol, host, port and context path, for example https://idp.example.com"));
+    }
+    if (!hasSubjectIdentifierSecret(binder)) {
+      missing.add(new MissingSetting("authn-server.subject-identifier.secret",
+          "the secret that takes part in the computation of the SAML NameID and the OIDC sub, which must never "
+              + "change"));
     }
     if (binder.bind("server.ssl.enabled", Boolean.class).orElse(true)) {
       final String bundle = binder.bind("server.ssl.bundle", String.class).orElse(null);
@@ -124,6 +129,25 @@ public class DeploymentSettingsCheck implements EnvironmentPostProcessor, Ordere
       }
     }
     return missing;
+  }
+
+  /**
+   * Tells whether every enabled protocol has a subject identifier secret, the shared one or its own. An empty secret
+   * for SAML turns the secret off for SAML, and counts as given.
+   *
+   * @param binder the binder
+   * @return {@code true} if no secret is missing
+   */
+  private static boolean hasSubjectIdentifierSecret(final @NonNull Binder binder) {
+    if (hasText(binder, "authn-server.subject-identifier.secret")) {
+      return true;
+    }
+    if (binder.bind("authn-server.saml.enabled", Boolean.class).orElse(false)
+        && !binder.bind("authn-server.saml.subject-identifier.secret", String.class).isBound()) {
+      return false;
+    }
+    return !binder.bind("authn-server.oidc.enabled", Boolean.class).orElse(false)
+        || hasText(binder, "authn-server.oidc.subject-identifier.secret");
   }
 
   /**

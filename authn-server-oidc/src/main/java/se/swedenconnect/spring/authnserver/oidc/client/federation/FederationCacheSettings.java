@@ -28,15 +28,16 @@ import org.jspecify.annotations.Nullable;
  *          {@code null} for no limit. No limit is the default
  * @param notFoundTimeToLive how long the answer that the resolver does not know a client is kept, so that repeated
  *          requests for the same unknown {@code client_id} do not each reach the resolver. A resolver that fails is
- *          never cached
+ *          never cached. It is also how long a pairwise client is marked as invalid when its
+ *          {@code sector_identifier_uri} cannot be fetched
  * @author Martin Lindström
  */
 public record FederationCacheSettings(
     @Nullable Duration maximumAge,
     @NonNull Duration notFoundTimeToLive) {
 
-  /** The default time that the answer that a client is unknown is kept: one minute. */
-  public static final Duration DEFAULT_NOT_FOUND_TIME_TO_LIVE = Duration.ofMinutes(1);
+  /** The default time that the answer that a client is unknown is kept: five minutes. */
+  public static final Duration DEFAULT_NOT_FOUND_TIME_TO_LIVE = Duration.ofMinutes(5);
 
   /**
    * Constructor.

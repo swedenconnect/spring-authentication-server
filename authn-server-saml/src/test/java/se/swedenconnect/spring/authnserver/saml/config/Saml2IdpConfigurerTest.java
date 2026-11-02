@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import jakarta.servlet.Filter;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,7 @@ class Saml2IdpConfigurerTest extends OpenSamlTestBase {
     @Bean
     SecurityFilterChain filterChain(final HttpSecurity http) throws Exception {
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+          .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
           .baseUrl(BASE_URL)
           .protocol(new Saml2IdpConfigurer()
               .defaultCredential(TestCredentials.SIGN)

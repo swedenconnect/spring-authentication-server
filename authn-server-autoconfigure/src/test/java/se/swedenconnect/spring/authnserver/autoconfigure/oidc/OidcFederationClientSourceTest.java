@@ -175,7 +175,7 @@ class OidcFederationClientSourceTest {
             AuthnServerAutoConfiguration.class))
         .withUserConfiguration(MonitorConfiguration.class)
         .withPropertyValues(
-            "authn-server.base-url=https://op.example.com",
+            "authn-server.base-url=https://op.example.com", "authn-server.subject-identifier.secret=test-secret",
             "authn-server.oidc.enabled=true",
             "authn-server.oidc.keys.signing[0].credential.jks.store.location=classpath:credentials/oidc-keys.p12",
             "authn-server.oidc.keys.signing[0].credential.jks.store.password=secret",
@@ -416,6 +416,37 @@ class OidcFederationClientSourceTest {
     final FederationCacheSettings settings = OidcFederationClientSource.createCacheSettings(properties);
     assertThat(settings.maximumAge()).isEqualTo(Duration.ofHours(12));
     assertThat(settings.notFoundTimeToLive()).isEqualTo(Duration.ofMinutes(2));
+  }
+
+  @Test
+  void theNotFoundTimeDefaultsToFiveMinutes() {
+    assertThat(OidcFederationClientSource.createCacheSettings(
+        new OidcConfigurationProperties.FederationCacheProperties()).notFoundTimeToLive())
+        .isEqualTo(Duration.ofMinutes(5));
+  }
+
+  @Test
+  void theSectorIdentifierUriIsCheckedUnlessTurnedOff() throws Exception {
+    final OidcConfigurationProperties.FederationClientsProperties properties =
+        new OidcConfigurationProperties.FederationClientsProperties();
+    assertThat(properties.isCheckSectorIdentifierUri()).isTrue();
+    assertThat(OidcFederationClientSource.createPairwiseClientCheck(properties).isSectorIdentifierUriChecked())
+        .isTrue();
+    properties.setCheckSectorIdentifierUri(false);
+    assertThat(OidcFederationClientSource.createPairwiseClientCheck(properties).isSectorIdentifierUriChecked())
+        .isFalse();
+
+    this.runner().run(context -> {
+      assertThat(context).hasNotFailed();
+      assertThat(context.getBean(OidcFederationClientSource.class).getBackend().getPairwiseClientCheck()
+          .isSectorIdentifierUriChecked()).isTrue();
+    });
+    this.runner().withPropertyValues("authn-server.oidc.federation.clients.check-sector-identifier-uri=false")
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context.getBean(OidcFederationClientSource.class).getBackend().getPairwiseClientCheck()
+              .isSectorIdentifierUriChecked()).isFalse();
+        });
   }
 
   @Test

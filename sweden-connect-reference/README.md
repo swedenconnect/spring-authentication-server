@@ -94,6 +94,7 @@ required when the protocol is enabled; both are enabled by default.
 | Setting | Description |
 | :--- | :--- |
 | `authn-server.base-url` | The base URL of the server: protocol, host, port and context path, for example `https://idp.example.com`. Every URL of the server is built from it, see [Section 3, "URL layout"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#url-layout) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
+| `authn-server.subject-identifier.secret` | The secret that takes part in the computation of the SAML `NameID` and the OpenID Connect `sub`. No secret is shipped. It must never change once identifiers have been issued, since that would give the users new identifiers. See [Section 4.2, "Subject identifiers"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#subject-identifiers) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
 | `spring.ssl.bundle.*.tls` | The TLS key store of the server, as a Spring Boot [SSL bundle](https://docs.spring.io/spring-boot/reference/features/ssl.html) named `tls`, the bundle that `server.ssl.bundle` names. A JKS or PKCS#12 key store under `spring.ssl.bundle.jks.tls`, or PEM files under `spring.ssl.bundle.pem.tls`. |
 | `authn-server.saml.entity-id` | The SAML entity ID of the Identity Provider. |
 | `authn-server.saml.credentials.*` | The SAML signing key (`sign`) and encryption key (`encrypt`), or one key for both (`default-credential`). A metadata signing key (`metadata-sign`) is recommended. See [Section 5.1, "Credentials"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#credentials) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
@@ -221,6 +222,14 @@ A deployment that joins an OpenID Federation also, or instead, accepts clients r
 [Section 6.11, "Clients from OpenID Federation"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-federation-clients) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 The configured clients are asked first, so a configured client wins over what the federation says about the same
 `client_id`.
+
+The reference does not fetch the `sector_identifier_uri` of pairwise federation clients
+(`authn-server.oidc.federation.clients.check-sector-identifier-uri` is `false`), since the Federation Operator does
+this check in the Sweden Connect federation. A deployment in another federation where no one does this check turns it
+on, see
+[Section 6.7, "Pairwise clients"](https://docs.swedenconnect.se/spring-authentication-server/client-registry.html#pairwise-clients)
+of [The client registry](https://docs.swedenconnect.se/spring-authentication-server/client-registry.html). Configured
+clients are never checked, so their `sector_identifier_uri` and `redirect_uris` must be correct.
 The `client_name` and `logo_uri` of a client are shown on the pages, in the language of the page where the metadata
 gives one. Only `private_key_jwt` is enabled at the token endpoint by default, see
 [Section 6.6, "The token endpoint and tokens"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-token-endpoint) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html)
@@ -233,8 +242,10 @@ Everything the Spring Authentication Server offers is configured as described in
 [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). These are the
 settings that a deployment of the reference is most likely to change.
 
-**The subject identifier secret.** The SAML `NameID` and the OpenID Connect `sub` are computed with a secret. Setting
-`authn-server.subject-identifier.secret` is strongly recommended, see
+**The subject identifier secret for SAML.** An Identity Provider moving from saml-identity-provider, which computed
+persistent `NameID`s without a secret, keeps its users' `NameID`s by giving `authn-server.saml.subject-identifier.secret`
+an empty value. Such `NameID`s can be traced back to the users they were issued for, so only do this when they have
+already been issued and must be kept. OpenID Connect still needs the shared secret. See
 [Section 4.2, "Subject identifiers"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#subject-identifiers) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 
 **Context path.** The service has no context path. A deployment may add one with `server.servlet.context-path`, for

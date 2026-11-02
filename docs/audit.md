@@ -62,6 +62,8 @@ Source links in this guide point to the `main` branch of the
 
     5.6. [Client Removed](#client_removed)
 
+    5.7. [Client Invalid](#client_invalid)
+
 6. [**Changing what an event holds**](#replacing-a-transformer)
 
 <a name="setting-up-auditing"></a>
@@ -553,6 +555,25 @@ client. A federation client whose cache entry expires and is resolved again is n
 The events are written once for the whole deployment when the nodes share their state in Redis. A deployment that does
 not want them leaves them out with `audit.repository.exclude-events`.
 
+<a name="client_invalid"></a>
+### 5.7. Client Invalid
+
+**Type:** `client_invalid`
+
+**Description:** A client resolved through OpenID Federation was marked as invalid when it was resolved, since its
+registration has an error. The client stays in the client registry and in the clients endpoint, but is never
+authenticated, and its requests get `invalid_client`. The `reason` tells what is wrong. One such error is a client with
+`subject_type` set to `pairwise` whose document at its `sector_identifier_uri` does not list all its `redirect_uris`.
+See [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of [The client registry](client-registry.html).
+The event is written by the node that resolved the client, each time the client is resolved and marked.
+
+**Audit data:**
+
+| Parameter | Description | Type |
+| :--- | :--- | :--- |
+| `client` | The client, with the members of [Section 5.5, "Client Added"](#client_added). | Object |
+| `reason` | Why the client is invalid, for example `the document at the sector_identifier_uri does not list the redirect URI https://rp.example.com/cb`. | String |
+
 <a name="replacing-a-transformer"></a>
 ## 6. Changing what an event holds
 
@@ -573,6 +594,7 @@ Each event type has a transformer, registered as a bean by the auto-configuratio
 | `authn_credential_reload_error` | `CredentialReloadErrorEventTransformer` |
 | `client_added` | `ClientAddedEventTransformer` |
 | `client_removed` | `ClientRemovedEventTransformer` |
+| `client_invalid` | `ClientInvalidEventTransformer` |
 
 They are found in the
 [`se.swedenconnect.spring.authnserver.audit.transform`][transform-package] package. A transformer is only created if the

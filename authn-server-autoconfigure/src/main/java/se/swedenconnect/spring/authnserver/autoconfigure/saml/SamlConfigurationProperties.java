@@ -86,7 +86,8 @@ public class SamlConfigurationProperties {
   private Boolean supportsUserMessage;
 
   /**
-   * Subject identifier settings for SAML. Overrides authn-server.subject-identifier.
+   * Subject identifier settings for SAML. Overrides authn-server.subject-identifier. An empty secret turns the
+   * secret off for SAML, so that persistent NameIDs are computed without one.
    */
   private final SubjectIdentifierProperties subjectIdentifier = new SubjectIdentifierProperties();
 

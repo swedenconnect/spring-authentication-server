@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +56,7 @@ import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.TestAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.oidc.subject.DefaultSubjectGeneratorFactory;
 import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 
@@ -72,6 +74,7 @@ class OidcProviderConfigurerTest {
   private static final String LOA4 = "http://id.elegnamnden.se/loa/1.0/loa4";
 
   private final AuthnServerConfigurer server = new AuthnServerConfigurer()
+      .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
       .baseUrl(BASE_URL)
       .authenticationProvider(new TestAuthenticationProvider("one", List.of(LOA3),
           List.of(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, AttributeIdentifiers.GIVEN_NAME), List.of()))
@@ -132,6 +135,33 @@ class OidcProviderConfigurerTest {
         .containsExactly(JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.ECDH_ES);
     assertThat(metadata.getUserInfoJWEEncs()).containsExactly(EncryptionMethod.A128CBC_HS256,
         EncryptionMethod.A256CBC_HS512, EncryptionMethod.A128GCM, EncryptionMethod.A256GCM);
+  }
+
+  @Test
+  void aSubjectIdentifierSecretIsRequired() {
+    this.server.subjectIdentifierSecret(null);
+    assertThatThrownBy(this::build)
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("No subject identifier secret for OpenID Connect");
+
+    // The secret of OpenID Connect is enough
+    this.oidc.subjectIdentifierSecret("oidc-secret".getBytes(StandardCharsets.UTF_8));
+    assertThat(this.build().getSubjectTypes()).contains(SubjectType.PAIRWISE);
+  }
+
+  @Test
+  void anEmptySecretForOpenIdConnectIsRejected() {
+    this.server.protocol(this.oidc.subjectIdentifierSecret(new byte[0]));
+    assertThatThrownBy(() -> this.server.init(mock(HttpSecurity.class)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("subject identifier secret must not be empty");
+  }
+
+  @Test
+  void aSubjectGeneratorFactoryOfTheApplicationNeedsNoSecret() {
+    this.server.subjectIdentifierSecret(null);
+    this.oidc.subjectGeneratorFactory(new DefaultSubjectGeneratorFactory(BASE_URL));
+    assertThat(this.build().getSubjectTypes()).containsExactly(SubjectType.PUBLIC, SubjectType.PAIRWISE);
   }
 
   @Test

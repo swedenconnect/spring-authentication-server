@@ -37,6 +37,10 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @param trustMarkTypes the trust mark types of the resolve response
  * @param onDemandTrustMarks the trust marks that have been asked for on demand, keyed by type
  * @param expiresAt when the entry is no longer valid
+ * @param invalidReason why the client is marked as invalid, or {@code null} if it is not, see
+ *     {@link PairwiseClientCheck}
+ * @param verifiedSector the successful check of the client's {@code sector_identifier_uri} that is remembered, or
+ *     {@code null}
  * @author Martin Lindström
  */
 public record CachedClientRecord(
@@ -44,7 +48,9 @@ public record CachedClientRecord(
     @Nullable OIDCClientMetadata metadata,
     @NonNull Set<String> trustMarkTypes,
     @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
-    @NonNull Instant expiresAt) {
+    @NonNull Instant expiresAt,
+    @Nullable String invalidReason,
+    @Nullable VerifiedSector verifiedSector) {
 
   /**
    * Constructor.
@@ -54,6 +60,8 @@ public record CachedClientRecord(
    * @param trustMarkTypes the trust mark types of the resolve response
    * @param onDemandTrustMarks the trust marks that have been asked for on demand
    * @param expiresAt when the entry is no longer valid
+   * @param invalidReason why the client is marked as invalid, or {@code null}
+   * @param verifiedSector the successful check of the client's {@code sector_identifier_uri}, or {@code null}
    */
   public CachedClientRecord {
     Objects.requireNonNull(clientId, "clientId must not be null");
@@ -61,6 +69,21 @@ public record CachedClientRecord(
     trustMarkTypes = Set.copyOf(Objects.requireNonNull(trustMarkTypes, "trustMarkTypes must not be null"));
     onDemandTrustMarks =
         Map.copyOf(Objects.requireNonNull(onDemandTrustMarks, "onDemandTrustMarks must not be null"));
+  }
+
+  /**
+   * Constructor for an entry of a client that is not marked as invalid and has no remembered check.
+   *
+   * @param clientId the {@code client_id} of the client
+   * @param metadata the client metadata, or {@code null}
+   * @param trustMarkTypes the trust mark types of the resolve response
+   * @param onDemandTrustMarks the trust marks that have been asked for on demand
+   * @param expiresAt when the entry is no longer valid
+   */
+  public CachedClientRecord(final @NonNull String clientId, final @Nullable OIDCClientMetadata metadata,
+      final @NonNull Set<String> trustMarkTypes, final @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
+      final @NonNull Instant expiresAt) {
+    this(clientId, metadata, trustMarkTypes, onDemandTrustMarks, expiresAt, null, null);
   }
 
   /**
@@ -108,6 +131,39 @@ public record CachedClientRecord(
    */
   public boolean isFound() {
     return this.metadata != null;
+  }
+
+  /**
+   * Tells whether the client is valid, that is, not marked as invalid.
+   *
+   * @return {@code true} if the client is valid and {@code false} otherwise
+   */
+  public boolean isValid() {
+    return this.invalidReason == null;
+  }
+
+  /**
+   * Creates a copy of the entry with the outcome of the check of a pairwise client. A temporary mark makes the entry
+   * expire after the given time, unless it expires before that, so that the client is checked again when it is next
+   * resolved.
+   *
+   * @param outcome the outcome of the check
+   * @param now the current time
+   * @param temporaryMark how long a temporary mark lasts
+   * @return a {@link CachedClientRecord}
+   */
+  public @NonNull CachedClientRecord withCheck(final PairwiseClientCheck.@NonNull Outcome outcome,
+      final @NonNull Instant now, final @NonNull Duration temporaryMark) {
+    Objects.requireNonNull(outcome, "outcome must not be null");
+    Instant expiry = this.expiresAt;
+    if (outcome.temporary()) {
+      final Instant until = now.plus(temporaryMark);
+      if (until.isBefore(expiry)) {
+        expiry = until;
+      }
+    }
+    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, this.onDemandTrustMarks, expiry,
+        outcome.invalidReason(), outcome.verifiedSector());
   }
 
   /**
@@ -178,7 +234,8 @@ public record CachedClientRecord(
   private @NonNull CachedClientRecord withTrustMark(final @NonNull OnDemandTrustMark trustMark) {
     final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
     marks.put(trustMark.type(), trustMark);
-    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt);
+    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt,
+        this.invalidReason, this.verifiedSector);
   }
 
   /**
@@ -195,7 +252,8 @@ public record CachedClientRecord(
     }
     final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
     marks.remove(type);
-    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt);
+    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt,
+        this.invalidReason, this.verifiedSector);
   }
 
   /**

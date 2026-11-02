@@ -200,6 +200,7 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     @Bean
     SecurityFilterChain filterChain(final HttpSecurity http) throws Exception {
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+          .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
           .baseUrl(BASE_URL)
           .protocol(new Saml2IdpConfigurer()
               .defaultCredential(IDP_SIGN)

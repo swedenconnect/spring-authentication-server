@@ -200,6 +200,9 @@ public class ClientAuthenticator {
     if (record == null || !(record.protocolMetadata() instanceof final OIDCClientMetadata metadata)) {
       throw invalidClient("Client is not known", logString);
     }
+    if (!record.isValid()) {
+      throw invalidClient("The client is marked as invalid - " + record.invalidReason(), logString);
+    }
 
     final ClientAuthenticationMethod method = authentication.getMethod();
     final ClientAuthenticationMethod registered = Objects.requireNonNullElse(metadata.getTokenEndpointAuthMethod(),

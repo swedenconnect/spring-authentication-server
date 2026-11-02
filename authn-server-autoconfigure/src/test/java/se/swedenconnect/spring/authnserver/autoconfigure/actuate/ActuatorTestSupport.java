@@ -81,7 +81,7 @@ final class ActuatorTestSupport {
    */
   static String[] server(final Path metadata) {
     return new String[] {
-        "authn-server.base-url=" + BASE_URL,
+        "authn-server.base-url=" + BASE_URL, "authn-server.subject-identifier.secret=test-secret",
         "authn-server.saml.enabled=true",
         SAML_CREDENTIALS + "store.location=classpath:credentials/idp-credentials.p12",
         SAML_CREDENTIALS + "store.password=secret",

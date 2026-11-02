@@ -15,6 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
+import java.io.IOException;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -22,11 +23,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -38,6 +41,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.federation.entities.EntityType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
@@ -114,6 +118,33 @@ abstract class FederationTestSupport {
     final OIDCClientMetadata metadata = new OIDCClientMetadata();
     metadata.setName(name);
     metadata.setRedirectionURI(URI.create("https://client.example.com/callback"));
+    return metadata;
+  }
+
+  /**
+   * Creates client metadata for a client with {@code subject_type} set to {@code pairwise}.
+   *
+   * @param name the {@code client_name}
+   * @param sectorIdentifierUri the {@code sector_identifier_uri}, or {@code null}
+   * @param redirectUris the redirect URIs
+   * @return an {@link OIDCClientMetadata}
+   */
+  static OIDCClientMetadata pairwiseMetadata(final String name, final String sectorIdentifierUri,
+      final String... redirectUris) {
+    // Nimbus does not accept a sector_identifier_uri without https, so such a URI is given by a subclass
+    final boolean https = sectorIdentifierUri == null || sectorIdentifierUri.startsWith("https:");
+    final OIDCClientMetadata metadata = https ? new OIDCClientMetadata() : new OIDCClientMetadata() {
+      @Override
+      public URI getSectorIDURI() {
+        return URI.create(sectorIdentifierUri);
+      }
+    };
+    metadata.setName(name);
+    metadata.setSubjectType(SubjectType.PAIRWISE);
+    if (sectorIdentifierUri != null && https) {
+      metadata.setSectorIDURI(URI.create(sectorIdentifierUri));
+    }
+    metadata.setRedirectionURIs(Arrays.stream(redirectUris).map(URI::create).collect(Collectors.toSet()));
     return metadata;
   }
 
@@ -343,6 +374,31 @@ abstract class FederationTestSupport {
 
   }
 
+
+  /**
+   * A {@link SectorIdentifierFetcher} that answers with the documents of the test.
+   */
+  static class StubSectorIdentifierFetcher implements SectorIdentifierFetcher {
+
+    /** The documents by URI. A URI without a document gives an answer that is not an array of strings. */
+    final Map<String, List<String>> documents = new HashMap<>();
+
+    /** The failure to throw, or {@code null}. */
+    IOException failure;
+
+    /** The URIs that have been fetched. */
+    final List<String> calls = new ArrayList<>();
+
+    @Override
+    public List<String> fetch(final URI sectorIdentifierUri) throws IOException {
+      this.calls.add(sectorIdentifierUri.toString());
+      if (this.failure != null) {
+        throw this.failure;
+      }
+      return this.documents.get(sectorIdentifierUri.toString());
+    }
+
+  }
 
   /**
    * A clock that the test moves forward itself.

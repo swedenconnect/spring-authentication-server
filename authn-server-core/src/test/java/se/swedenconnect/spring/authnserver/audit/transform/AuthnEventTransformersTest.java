@@ -55,6 +55,7 @@ import se.swedenconnect.spring.authnserver.audit.events.AuthnUnrecoverableErrorE
 import se.swedenconnect.spring.authnserver.audit.events.AuthnUserAuthenticatedEvent;
 import se.swedenconnect.spring.authnserver.audit.events.AuthnUserInfoDeliveredEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticatedUser;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
@@ -278,6 +279,16 @@ class AuthnEventTransformersTest {
     assertThat(removed.getData().get("reason")).isEqualTo("the resolver reports the client as not found");
     assertThat(new ClientAddedEventTransformer().getEventType()).isEqualTo(ClientAddedEvent.class);
     assertThat(new ClientRemovedEventTransformer().getEventType()).isEqualTo(ClientRemovedEvent.class);
+
+    final AuditEvent invalid = this.transform(new ClientInvalidEventTransformer(),
+        new ClientInvalidEvent(rp, "the redirect_uris have 2 different hosts and there is no sector_identifier_uri"));
+    assertThat(invalid.getType()).isEqualTo("client_invalid");
+    assertThat(invalid.getPrincipal()).isEqualTo(AuditEvent.SYSTEM_PRINCIPAL);
+    assertThat(map(invalid, "client")).isEqualTo(
+        Map.of("protocol", "oidc", "id", "https://rp.example.com", "source", "federation"));
+    assertThat(invalid.getData().get("reason"))
+        .isEqualTo("the redirect_uris have 2 different hosts and there is no sector_identifier_uri");
+    assertThat(new ClientInvalidEventTransformer().getEventType()).isEqualTo(ClientInvalidEvent.class);
   }
 
   @Test

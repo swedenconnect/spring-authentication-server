@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import jakarta.servlet.Filter;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -112,7 +113,8 @@ class OidcAutoConfigurationTest {
       .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
           ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, OidcAutoConfiguration.class,
           AuthnServerAutoConfiguration.class))
-      .withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true",
+      .withPropertyValues("authn-server.base-url=" + BASE_URL,
+          "authn-server.subject-identifier.secret=test-secret", "authn-server.oidc.enabled=true",
           "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json");
 
   /** The same as the runner, but without any OIDC clients. */
@@ -120,7 +122,8 @@ class OidcAutoConfigurationTest {
       .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
           ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, OidcAutoConfiguration.class,
           AuthnServerAutoConfiguration.class))
-      .withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true");
+      .withPropertyValues("authn-server.base-url=" + BASE_URL,
+          "authn-server.subject-identifier.secret=test-secret", "authn-server.oidc.enabled=true");
 
   /** An inline client of the properties. */
   private static final String[] INLINE_CLIENT = {
@@ -401,6 +404,33 @@ class OidcAutoConfigurationTest {
         .withPropertyValues("authn-server.oidc.client-authentication-methods=none")
         .run(context -> assertThat(context).hasFailed()
             .getFailure().rootCause().hasMessageContaining("Unsupported OIDC client authentication method"));
+  }
+
+  @Test
+  void anOpenIdProviderNeedsASecretThatCannotBeTurnedOff() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.subject-identifier.secret=")
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("OIDC subject identifier secret must not be empty"));
+
+    new WebApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
+            ConvertersAutoConfiguration.class, SamlAutoConfiguration.class, OidcAutoConfiguration.class,
+            AuthnServerAutoConfiguration.class))
+        .withPropertyValues("authn-server.base-url=" + BASE_URL, "authn-server.oidc.enabled=true",
+            "authn-server.oidc.clients[0].location=classpath:clients/oidc-clients.json")
+        .withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+            .hasMessageContaining("No subject identifier secret for OpenID Connect"));
+
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.subject-identifier.secret=oidc-secret")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class)
+              .getSubjectIdentifierSecret()).isEqualTo("oidc-secret".getBytes(StandardCharsets.UTF_8));
+        });
   }
 
   @Test

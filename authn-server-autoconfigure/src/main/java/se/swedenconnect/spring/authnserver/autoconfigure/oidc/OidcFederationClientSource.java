@@ -47,7 +47,9 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationColl
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationResolver;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpSectorIdentifierFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpTrustMarkRequester;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.TrustMarkStatusChecker;
 
 /**
@@ -161,6 +163,7 @@ public class OidcFederationClientSource implements DisposableBean {
         new HttpTrustMarkRequester(settings, this.federationClient, endpoints),
         this.cache, createCacheSettings(this.properties.getClients().getCache()));
     source.setName(NAME);
+    source.setPairwiseClientCheck(createPairwiseClientCheck(this.properties.getClients()));
     server.clientRegistryBackend(source);
     this.backend = source;
 
@@ -279,6 +282,21 @@ public class OidcFederationClientSource implements DisposableBean {
     }
     return new FederationSettings(anchor,
         new FederationSettings.Resolver(resolverId, resolver.getEndpoint(), resolverKeys), issuers);
+  }
+
+  /**
+   * Creates the check of pairwise clients from the properties.
+   *
+   * @param properties the properties of the client source
+   * @return the check
+   */
+  static @NonNull PairwiseClientCheck createPairwiseClientCheck(
+      final OidcConfigurationProperties.@NonNull FederationClientsProperties properties) {
+    if (!properties.isCheckSectorIdentifierUri()) {
+      log.info("The sector_identifier_uri of pairwise federation clients is not checked");
+      return new PairwiseClientCheck(null);
+    }
+    return new PairwiseClientCheck(new HttpSectorIdentifierFetcher());
   }
 
   /**

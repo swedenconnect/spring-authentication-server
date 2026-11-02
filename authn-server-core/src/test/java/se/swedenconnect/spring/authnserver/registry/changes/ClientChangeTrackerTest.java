@@ -27,6 +27,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEvent;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -114,6 +115,22 @@ class ClientChangeTrackerTest {
     assertThat(this.removed()).containsExactly("https://rp.example.com");
     assertThat(((ClientAddedEvent) this.events.get(0)).getClient().organizationNumber())
         .isEqualTo("urn:glue:iso6523:0007:5566778899");
+  }
+
+  @Test
+  void aClientMarkedAsInvalidGivesAnEventAndStaysKnown() {
+    final ClientChangeTracker tracker = this.tracker(new InMemoryKnownClientStore());
+    final KnownClient rp = new KnownClient(new Requester(AuthenticationProtocol.OIDC, "https://rp.example.com"), null,
+        "federation");
+    tracker.clientSeen(rp);
+    tracker.clientInvalid(rp, "the reason");
+
+    assertThat(this.events).hasSize(2);
+    assertThat(this.events.get(1)).isInstanceOfSatisfying(ClientInvalidEvent.class, e -> {
+      assertThat(e.getClient()).isEqualTo(rp);
+      assertThat(e.getReason()).isEqualTo("the reason");
+    });
+    assertThat(tracker.getStore().getAll()).containsExactly(rp);
   }
 
   @Test

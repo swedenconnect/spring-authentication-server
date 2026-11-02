@@ -729,7 +729,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /**
    * Assigns the factory for subject generators. Its subject types are declared in the discovery document. Without a
-   * factory, a {@link DefaultSubjectGeneratorFactory} with the subject identifier secret and hash algorithm is used.
+   * factory, a {@link DefaultSubjectGeneratorFactory} with the subject identifier secret and hash algorithm is used,
+   * and a secret is then required.
    *
    * @param subjectGeneratorFactory the factory, or {@code null} for the default
    * @return this configurer
@@ -913,8 +914,13 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
       this.activeSubjectGeneratorFactory = this.subjectGeneratorFactory;
     }
     else {
+      final byte[] secret = this.getSubjectIdentifierSecret();
+      if (secret == null) {
+        throw new IllegalArgumentException(
+            "No subject identifier secret for OpenID Connect - assign a shared secret or one for OpenID Connect");
+      }
       final DefaultSubjectGeneratorFactory factory = new DefaultSubjectGeneratorFactory(this.getIssuer());
-      factory.setSecret(this.getSubjectIdentifierSecret());
+      factory.setSecret(secret);
       factory.setHashAlgorithm(this.getSubjectIdentifierHashAlgorithm());
       this.activeSubjectGeneratorFactory = factory;
     }

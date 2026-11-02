@@ -85,7 +85,8 @@ public class OidcConfigurationProperties {
   private Boolean supportsUserMessage;
 
   /**
-   * Subject identifier settings for OpenID Connect. Overrides authn-server.subject-identifier.
+   * Subject identifier settings for OpenID Connect. Overrides authn-server.subject-identifier. The secret cannot be
+   * turned off, and an empty secret stops the server from starting.
    */
   private final SubjectIdentifierProperties subjectIdentifier = new SubjectIdentifierProperties();
 
@@ -1104,6 +1105,13 @@ public class OidcConfigurationProperties {
     private Duration trustMarkStatusInterval;
 
     /**
+     * Whether the document at the sector_identifier_uri of a pairwise client is fetched and checked to list all the
+     * client's redirect_uris. Turn it off only where someone else, such as the Federation Operator, does this
+     * check. Defaults to true.
+     */
+    private boolean checkSectorIdentifierUri = true;
+
+    /**
      * How resolved clients are cached.
      */
     private final FederationCacheProperties cache = new FederationCacheProperties();
@@ -1174,6 +1182,24 @@ public class OidcConfigurationProperties {
      */
     public void setTrustMarkStatusInterval(final @Nullable Duration trustMarkStatusInterval) {
       this.trustMarkStatusInterval = trustMarkStatusInterval;
+    }
+
+    /**
+     * Gets whether the document at the sector_identifier_uri of a pairwise client is checked.
+     *
+     * @return whether the sector_identifier_uri is checked
+     */
+    public boolean isCheckSectorIdentifierUri() {
+      return this.checkSectorIdentifierUri;
+    }
+
+    /**
+     * Assigns whether the document at the sector_identifier_uri of a pairwise client is checked.
+     *
+     * @param checkSectorIdentifierUri whether the sector_identifier_uri is checked
+     */
+    public void setCheckSectorIdentifierUri(final boolean checkSectorIdentifierUri) {
+      this.checkSectorIdentifierUri = checkSectorIdentifierUri;
     }
 
     /**
@@ -1414,7 +1440,8 @@ public class OidcConfigurationProperties {
     private Duration maximumAge;
 
     /**
-     * How long the answer that the resolver does not know a client is kept. Defaults to 1 minute.
+     * How long the answer that the resolver does not know a client is kept, and how long a pairwise client is
+     * marked as invalid when its sector_identifier_uri cannot be fetched. Defaults to 5 minutes.
      */
     private Duration notFoundTimeToLive;
 

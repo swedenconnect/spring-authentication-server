@@ -194,9 +194,11 @@ public abstract class AbstractProtocolConfigurer<T extends AbstractProtocolConfi
   }
 
   /**
-   * Assigns the protocol's subject identifier secret, which wins over the shared secret.
+   * Assigns the protocol's subject identifier secret, which wins over the shared secret. When the default identifier
+   * generators are used, the server does not start if the protocol has no secret, shared or its own. Only SAML can
+   * turn the secret off, and that is expressed separately.
    *
-   * @param secret the secret, or {@code null} to use the shared secret
+   * @param secret the secret, or {@code null} to use the shared secret. An empty secret is not allowed
    * @return this configurer
    */
   public @NonNull T subjectIdentifierSecret(final byte @Nullable [] secret) {

@@ -40,6 +40,7 @@ import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 @SpringBootTest(classes = OidcStarterTest.TestApplication.class, properties = {
     "spring.application.name=authn-server-test",
     "authn-server.base-url=https://op.example.com",
+    "authn-server.subject-identifier.secret=test-secret",
     "authn-server.oidc.enabled=true",
     "authn-server.oidc.clients[0].client-id=https://rp.example.com",
     "authn-server.oidc.clients[0].metadata={\"redirect_uris\":[\"https://rp.example.com/cb\"]}",

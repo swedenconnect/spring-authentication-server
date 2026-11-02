@@ -27,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -146,6 +147,7 @@ class OidcAuditRedisTest {
           new RSAKey.Builder((RSAPublicKey) CLIENT_RSA.getPublicKey()).keyID("rsa-key").build()));
 
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+          .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
           .baseUrl(BASE_URL)
           .clientRegistryBackend(new ConfigurationClientBackend(List.of(OidcClientRecord.of(CLIENT, metadata))))
           .authenticationProvider(currentProvider)

@@ -45,6 +45,10 @@ Source links in this guide point to the `main` branch of the
 
     6.5. [Several nodes](#several-nodes)
 
+    6.6. [Invalid clients](#invalid-clients)
+
+    6.7. [Pairwise clients](#pairwise-clients)
+
 7. [**Deciding which requesters may use the server**](#requester-acceptance)
 
 <a name="looking-up-a-requester"></a>
@@ -302,7 +306,7 @@ Resolved clients are cached, because reaching the resolver on every request is n
 - The store is pluggable, so that the nodes of a deployment can share it. The default is
   [`InMemoryFederationCache`][InMemoryFederationCache], which is what a single node needs.
   [`RedisFederationCache`][RedisFederationCache] keeps the entries in Redis, shared by all nodes.
-- A client that the resolver does not know is cached as such for a short time, one minute by default, so that
+- A client that the resolver does not know is cached as such for a short time, five minutes by default, so that
   repeated requests with the same unknown `client_id` do not each reach the resolver. A resolver that fails is never
   cached.
 
@@ -466,6 +470,64 @@ The backend is added to the client registry with an `AuthnServerConfigurerAdapte
 [Section 6, "Clients added and removed"](management.html#clients-added-and-removed) of [Monitoring and managing the server](management.html), and the clients it holds can be listed and
 updated through the [clients endpoint](management.html#the-clients-endpoint).
 
+<a name="invalid-clients"></a>
+### 6.6. Invalid clients
+
+A client resolved through OpenID Federation is marked as invalid when it is resolved and its registration has an
+error. Its registration is checked each time it is resolved: at a request, by the
+[job that fills the cache](#filling-the-cache) or through the operator's re-resolve. The checks that are made, and how
+long a client stays marked, are described with each check, such as for
+[pairwise clients](#pairwise-clients).
+
+A client marked as invalid stays in the client registry and in the cache, and is shown in the
+[clients endpoint](management.html#the-clients-endpoint) as invalid, with the reason. It is never authenticated. Its
+authorization requests get `invalid_client` at its redirect URI, with an `error_description` saying what is wrong, and
+the user is not shown an error page. A token request from it gets `invalid_client` too. The redirect is deliberate:
+the registered `redirect_uri` is still trusted, and the relying party is the one that can fix its registration. OpenID
+Federation 1.0, Section 12.1.3, can be read as forbidding a redirect when the RP metadata is invalid.
+
+Every case is logged, and marking a client as invalid gives a [`client_invalid`](audit.html#client_invalid) audit
+event, where the `reason` tells what is wrong. A client whose registration has been fixed is valid again the next time
+it is resolved; `POST /actuator/clients/oidc` resolves it at once.
+
+<a name="pairwise-clients"></a>
+### 6.7. Pairwise clients
+
+A client with `subject_type` set to `pairwise` gets a `sub` computed from its sector identifier, the host of its
+`sector_identifier_uri`, see [Section 5.3, "OpenID Connect"](attributes.html#openid-connect-1) of
+[Attributes](attributes.html). If the server took the URI on trust, a client could name another organization's host,
+get the same `sub` values as that organization's clients, and correlate their users. So each time a federation client
+is resolved, the [`PairwiseClientCheck`][PairwiseClientCheck] checks its registration, and a client with an error is
+marked as invalid, see [Section 6.6, "Invalid clients"](#invalid-clients). An authorization request for a cached client
+never causes a fetch.
+
+| Situation | Result |
+| :--- | :--- |
+| There is no `sector_identifier_uri`, and `redirect_uris` have more than one host | Invalid until the client is next resolved |
+| The document at `sector_identifier_uri` does not list all `redirect_uris` | Invalid until the client is next resolved |
+| First check of the client, and the document cannot be fetched | Invalid for `clients.cache.not-found-time-to-live` |
+| `sector_identifier_uri` has changed, and the document cannot be fetched | Invalid for `clients.cache.not-found-time-to-live` |
+
+If only `redirect_uris` have changed and the document cannot be fetched, the client stays valid and the new metadata is
+used. The first row needs no fetch and applies also when the check of the document is turned off.
+
+The `sector_identifier_uri` must use `https` and return a JSON array holding all the client's `redirect_uris`. A URI
+without `https`, or a successful answer that is not such an array, counts as a document that does not list the
+`redirect_uris`. A host that cannot be reached, an answer other than 2xx, a redirect, which is not followed, or a body
+that is not JSON means that the document cannot be fetched. A call has a time limit and the answer a size limit, since
+the URI comes from client metadata.
+
+A successful check is remembered with the client's cache entry, per combination of `sector_identifier_uri` and
+`redirect_uris`, also across re-resolves and, with Redis, across nodes. The document is fetched again only when the
+combination changes. A client whose entry has expired and gone is checked as for the first time. When a temporary mark
+has run out, the client is checked again the next time it is resolved or found by the job, even if the job holds a
+valid resolve result for it.
+
+The check of the document is turned off with `authn-server.oidc.federation.clients.check-sector-identifier-uri: false`,
+or by giving the backend a `PairwiseClientCheck` without a fetcher. Do this only where someone else has done the check,
+such as the Federation Operator in the Sweden Connect federation. Clients from the configuration and from a client
+repository are never checked; their metadata is expected to be correct, since the server does not check it.
+
 <a name="requester-acceptance"></a>
 ## 7. Deciding which requesters may use the server
 
@@ -527,6 +589,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [ClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistry.java
 [ClientRegistryBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistryBackend.java
 [ClientRegistryException]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistryException.java
+[PairwiseClientCheck]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/PairwiseClientCheck.java
 [ClientRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ClientRepository.java
 [ConfigurableRequesterAcceptance]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/ConfigurableRequesterAcceptance.java
 [ConfigurationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ConfigurationClientBackend.java

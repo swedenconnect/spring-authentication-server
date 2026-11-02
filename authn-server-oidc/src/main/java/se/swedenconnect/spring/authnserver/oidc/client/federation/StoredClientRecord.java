@@ -38,10 +38,13 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @param trustMarkTypes the trust mark types of the resolve response
  * @param onDemandTrustMarks the trust marks that have been asked for on demand
  * @param expiresAt when the entry is no longer valid
+ * @param invalidReason why the client is marked as invalid, or {@code null}
+ * @param verifiedSector the successful check of the client's {@code sector_identifier_uri}, or {@code null}
  * @author Martin Lindström
  */
 record StoredClientRecord(@NonNull String clientId, @Nullable String metadata, @Nullable Set<String> trustMarkTypes,
-    @Nullable List<OnDemandTrustMark> onDemandTrustMarks, @NonNull Instant expiresAt) {
+    @Nullable List<OnDemandTrustMark> onDemandTrustMarks, @NonNull Instant expiresAt, @Nullable String invalidReason,
+    @Nullable VerifiedSector verifiedSector) {
 
   /**
    * Creates the stored form of a cache record.
@@ -52,7 +55,8 @@ record StoredClientRecord(@NonNull String clientId, @Nullable String metadata, @
   static @NonNull StoredClientRecord of(final @NonNull CachedClientRecord record) {
     return new StoredClientRecord(record.clientId(),
         record.metadata() != null ? record.metadata().toJSONObject().toJSONString() : null,
-        record.trustMarkTypes(), List.copyOf(record.onDemandTrustMarks().values()), record.expiresAt());
+        record.trustMarkTypes(), List.copyOf(record.onDemandTrustMarks().values()), record.expiresAt(),
+        record.invalidReason(), record.verifiedSector());
   }
 
   /**
@@ -67,7 +71,8 @@ record StoredClientRecord(@NonNull String clientId, @Nullable String metadata, @
         : this.onDemandTrustMarks.stream().collect(Collectors.toMap(OnDemandTrustMark::type, Function.identity()));
     return new CachedClientRecord(this.clientId,
         this.metadata != null ? OIDCClientMetadata.parse(JSONObjectUtils.parse(this.metadata)) : null,
-        this.trustMarkTypes != null ? this.trustMarkTypes : Set.of(), marks, this.expiresAt);
+        this.trustMarkTypes != null ? this.trustMarkTypes : Set.of(), marks, this.expiresAt, this.invalidReason,
+        this.verifiedSector);
   }
 
 }

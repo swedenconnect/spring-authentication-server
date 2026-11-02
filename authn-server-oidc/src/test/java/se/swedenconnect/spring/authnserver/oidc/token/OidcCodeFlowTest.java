@@ -88,6 +88,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeChallenge;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier;
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
+import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 import com.sun.net.httpserver.HttpServer;
 
@@ -120,6 +121,8 @@ import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.userinfo.UserInfoRequestProcessor;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
+import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 
 /**
  * End-to-end tests of the OpenID Connect code flow: the authentication request, the authentication of the user with a
@@ -165,6 +168,14 @@ class OidcCodeFlowTest {
   private static final String SECRET_JWT_CLIENT = "https://secret-jwt.example.com";
 
   private static final String SECRET = "a-client-secret-that-is-long-enough-for-hs256-0123456789";
+
+  private static final String PAIRWISE_ONE = "https://pairwise-one.example.com";
+
+  private static final String PAIRWISE_TWO = "https://pairwise-two.example.com";
+
+  private static final String PAIRWISE_OTHER_SECTOR = "https://pairwise-other.example.com";
+
+  private static final String INVALID_CLIENT = "https://invalid.example.com";
 
   private static final String LOA3 = "http://id.elegnamnden.se/loa/1.0/loa3";
 
@@ -215,6 +226,7 @@ class OidcCodeFlowTest {
     @Bean
     SecurityFilterChain filterChain(final HttpSecurity http) throws Exception {
       final AuthnServerConfigurer configurer = new AuthnServerConfigurer()
+          .subjectIdentifierSecret("test-secret".getBytes(StandardCharsets.UTF_8))
           .baseUrl(BASE_URL)
           .clientRegistryBackend(new ConfigurationClientBackend(clients()))
           .protocol(new OidcProviderConfigurer()
@@ -795,6 +807,45 @@ class OidcCodeFlowTest {
     final Map<String, String> response = query(this.send(this.appRequest(RESUME_PATH, authnId)));
     assertThat(response.get("error")).isEqualTo("access_denied");
     assertThat(response).doesNotContainKey("code");
+  }
+
+  // Pairwise subject identifiers
+
+  @Test
+  void aPairwiseSubIsTheSameForClientsOfTheSameSectorAndDiffersFromThePublicSub() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+
+    final String publicSub = this.codeFlow(params(RSA_CLIENT)).idToken().getSubject();
+    final String one = this.codeFlow(params(PAIRWISE_ONE)).idToken().getSubject();
+    final String two = this.codeFlow(params(PAIRWISE_TWO)).idToken().getSubject();
+    final String other = this.codeFlow(params(PAIRWISE_OTHER_SECTOR)).idToken().getSubject();
+
+    assertThat(one).isNotBlank().isEqualTo(two).isNotEqualTo(publicSub).isNotEqualTo(other).isNotEqualTo(PNR);
+    assertThat(other).isNotEqualTo(publicSub);
+
+    // The same user gets the same pairwise sub every time
+    assertThat(this.codeFlow(params(PAIRWISE_ONE)).idToken().getSubject()).isEqualTo(one);
+  }
+
+  // Clients marked as invalid
+
+  @Test
+  void aClientMarkedAsInvalidGetsInvalidClientAtTheAuthorizationAndTokenEndpoints() throws Exception {
+    final InvalidClientBackend backend = new InvalidClientBackend();
+    this.start(c -> c.clientRegistryBackend(backend), new TestProvider("direct", LOA3));
+    final String code = this.authorize(params(INVALID_CLIENT)).get("code");
+
+    backend.reason = "the document at the sector_identifier_uri cannot be fetched: HTTP status 503";
+    assertTokenError(this.token(privateKeyJwt(INVALID_CLIENT, CLIENT_RSA, "rsa-key"), code, REDIRECT_URI, null), 401,
+        "invalid_client");
+
+    // The authorization request is answered at the redirect URI, and the user is not authenticated
+    this.audit().clear();
+    final Map<String, String> response = query(this.send(get(AUTHZ_PATH, params(INVALID_CLIENT))));
+    assertThat(response.get("error")).isEqualTo("invalid_client");
+    assertThat(response.get("error_description")).contains(backend.reason);
+    assertThat(response.get("state")).isEqualTo("state-1");
+    assertThat(this.audit().getTypes()).containsExactly("authn_request_received", "authn_error_response");
   }
 
   // Token endpoint failures
@@ -1596,6 +1647,15 @@ class OidcCodeFlowTest {
     userInfoBadEnc.setUserInfoJWEAlg(JWEAlgorithm.RSA1_5);
     clients.add(OidcClientRecord.of(USERINFO_BAD_ENC_CLIENT, userInfoBadEnc));
 
+    for (final Map.Entry<String, String> e : Map.of(PAIRWISE_ONE, "https://sector.example.com/redirects.json",
+        PAIRWISE_TWO, "https://sector.example.com/redirects.json",
+        PAIRWISE_OTHER_SECTOR, "https://other-sector.example.com/redirects.json").entrySet()) {
+      final OIDCClientMetadata pairwise = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
+      pairwise.setSubjectType(SubjectType.PAIRWISE);
+      pairwise.setSectorIDURI(URI.create(e.getValue()));
+      clients.add(OidcClientRecord.of(e.getKey(), pairwise));
+    }
+
     for (final Map.Entry<String, ClientAuthenticationMethod> e : Map.of(
         BASIC_CLIENT, ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
         POST_CLIENT, ClientAuthenticationMethod.CLIENT_SECRET_POST,
@@ -1623,6 +1683,32 @@ class OidcCodeFlowTest {
         GenericAttribute.of(AttributeIdentifiers.GIVEN_NAME, "Kalle"),
         GenericAttribute.of(AttributeIdentifiers.SURNAME, "Kula")),
         AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, authnContext, Instant.now(), "127.0.0.1");
+  }
+
+  /** A client registry backend that holds one client, which the test may mark as invalid. */
+  private static final class InvalidClientBackend implements ClientRegistryBackend {
+
+    /** Why the client is invalid, or {@code null} while it is valid. */
+    volatile String reason;
+
+    @Override
+    public @NonNull String getName() {
+      return "invalid-test";
+    }
+
+    @Override
+    public @NonNull AuthenticationProtocol getProtocol() {
+      return AuthenticationProtocol.OIDC;
+    }
+
+    @Override
+    public @Nullable RequesterRecord lookup(final @NonNull String identifier) {
+      if (!INVALID_CLIENT.equals(identifier)) {
+        return null;
+      }
+      return OidcClientRecord.of(INVALID_CLIENT, metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT,
+          new JWKSet(rsaJwk(CLIENT_RSA, "rsa-key", null)))).toRequesterRecord().withInvalidReason(this.reason);
+    }
   }
 
   /** The ID token claims and the UserInfo claims of a code flow. */

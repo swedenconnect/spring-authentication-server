@@ -256,7 +256,8 @@ public class ClientsEndpoint {
   }
 
   /**
-   * Creates the JSON object of a client.
+   * Creates the JSON object of a client. A client marked as invalid has {@code valid} set to {@code false} and the
+   * reason in {@code invalid-reason}.
    *
    * @param client the client
    * @param details whether the marks are included
@@ -275,6 +276,10 @@ public class ClientsEndpoint {
     map.put("source", client.source());
     if (client.expiresAt() != null) {
       map.put("expires-at", client.expiresAt().toString());
+    }
+    if (client.invalidReason() != null) {
+      map.put("valid", false);
+      map.put("invalid-reason", client.invalidReason());
     }
     return map;
   }

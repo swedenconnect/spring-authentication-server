@@ -34,6 +34,7 @@ import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.context.SmartLifecycle;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
+import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -43,7 +44,8 @@ import se.swedenconnect.spring.authnserver.authentication.Requester;
  * {@link ClientAddedEvent} or a {@link ClientRemovedEvent} for each.
  * <p>
  * The backends of the registry report to the tracker: the full set of clients of a source, when it has been loaded or
- * refreshed, a single client that has been seen, or a client that its source no longer knows. The tracker compares
+ * refreshed, a single client that has been seen, a client that its source no longer knows, or a client that has
+ * been marked as invalid. The tracker compares
  * with the record of known clients in its {@link KnownClientStore}, so that the first report after a restart is
  * compared with the clients known before the restart. Without a previous record every client is reported as added.
  * </p>
@@ -168,6 +170,21 @@ public class ClientChangeTracker implements SmartLifecycle, ApplicationEventPubl
     Objects.requireNonNull(requester, "requester must not be null");
     Objects.requireNonNull(reason, "reason must not be null");
     this.store.removeAll(List.of(requester)).forEach(c -> this.removed(c, reason));
+  }
+
+  /**
+   * Reports a client that has been marked as invalid, and publishes a {@link ClientInvalidEvent}. The client stays in
+   * the record of known clients.
+   *
+   * @param client the client
+   * @param reason why the client is invalid
+   */
+  public void clientInvalid(final @NonNull KnownClient client, final @NonNull String reason) {
+    Objects.requireNonNull(client, "client must not be null");
+    Objects.requireNonNull(reason, "reason must not be null");
+    log.debug("Client '{}' ({}) from '{}' marked as invalid: {}", client.identifier(), client.protocol(),
+        client.source(), reason);
+    this.publish(new ClientInvalidEvent(client, reason));
   }
 
   /**

@@ -31,7 +31,7 @@ final class StorageTestProperties {
   static final String FEDERATION_KEY = "authn-server.oidc.federation.keys[0].credential.jks.";
 
   static final String[] SERVER = {
-      "authn-server.base-url=" + BASE_URL,
+      "authn-server.base-url=" + BASE_URL, "authn-server.subject-identifier.secret=test-secret",
       "authn-server.saml.enabled=true",
       SAML_CREDENTIALS + "store.location=classpath:credentials/idp-credentials.p12",
       SAML_CREDENTIALS + "store.password=secret",

@@ -337,7 +337,9 @@ public class AuthnServerConfigurer extends AbstractHttpConfigurer<AuthnServerCon
   }
 
   /**
-   * Assigns the shared secret used when subject identifiers are computed. Assigning a secret is strongly recommended.
+   * Assigns the shared secret used when subject identifiers are computed. Each enabled protocol needs a secret, the
+   * shared one or its own, see {@link AbstractProtocolConfigurer#subjectIdentifierSecret(byte[])}. The secret must
+   * not change once identifiers have been issued, since that would give the users new identifiers.
    *
    * @param secret the secret, or {@code null} for no secret
    * @return this configurer

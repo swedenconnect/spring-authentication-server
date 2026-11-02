@@ -127,6 +127,25 @@ class RequesterRecordTest {
     assertThat(Logo.of("https://x").getPrimaryLanguage()).isNull();
   }
 
+  @Test
+  void aRecordMayBeMarkedAsInvalid() {
+    final RequesterRecord record =
+        new RequesterRecord(REQUESTER, List.of(), List.of(), Set.of("mark-1"), "556677-8899", "metadata");
+    assertThat(record.isValid()).isTrue();
+    assertThat(record.invalidReason()).isNull();
+
+    final RequesterRecord invalid = record.withInvalidReason("the reason");
+    assertThat(invalid.isValid()).isFalse();
+    assertThat(invalid.invalidReason()).isEqualTo("the reason");
+    assertThat(invalid.withInvalidReason(null)).isEqualTo(record);
+
+    final RegisteredClient registered = RegisteredClient.of(invalid, "source", null);
+    assertThat(registered.invalidReason()).isEqualTo("the reason");
+    assertThat(registered.marks()).containsExactly("mark-1");
+    assertThat(RegisteredClient.of(record, "source", null).invalidReason()).isNull();
+    assertThat(new RegisteredClient(REQUESTER, null, Set.of(), "source", null).invalidReason()).isNull();
+  }
+
   private static RequesterRecord record() {
     return record(List.of(), List.of());
   }

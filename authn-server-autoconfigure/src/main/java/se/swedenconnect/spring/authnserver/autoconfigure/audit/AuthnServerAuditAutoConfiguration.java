@@ -29,6 +29,7 @@ import se.swedenconnect.spring.authnserver.audit.transform.AuthnUnrecoverableErr
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUserAuthenticatedEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.AuthnUserInfoDeliveredEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.ClientAddedEventTransformer;
+import se.swedenconnect.spring.authnserver.audit.transform.ClientInvalidEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.ClientRemovedEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialReloadErrorEventTransformer;
 import se.swedenconnect.spring.authnserver.audit.transform.CredentialReloadSuccessEventTransformer;
@@ -189,6 +190,17 @@ public class AuthnServerAuditAutoConfiguration {
   @ConditionalOnMissingBean
   @NonNull ClientRemovedEventTransformer clientRemovedEventTransformer() {
     return new ClientRemovedEventTransformer();
+  }
+
+  /**
+   * Creates the transformer for {@code client_invalid}.
+   *
+   * @return the transformer
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  @NonNull ClientInvalidEventTransformer clientInvalidEventTransformer() {
+    return new ClientInvalidEventTransformer();
   }
 
 }
