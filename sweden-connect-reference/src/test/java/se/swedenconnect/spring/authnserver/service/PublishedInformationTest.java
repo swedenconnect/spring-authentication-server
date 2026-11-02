@@ -90,6 +90,14 @@ class PublishedInformationTest extends AbstractCompleteProfileTest {
   }
 
   @Test
+  void theDiscoveryDocumentLinksToTheServiceDocumentation() throws Exception {
+    final Map<String, Object> document = JSONObjectUtils.parse(
+        new TestBrowser().get(BASE_URL + "/.well-known/openid-configuration").body());
+    assertThat(JSONObjectUtils.getString(document, "service_documentation"))
+        .isEqualTo("https://docs.swedenconnect.se/spring-authentication-server/service_documentation.html");
+  }
+
+  @Test
   void theOpenIdProviderMetadataHasTheOidcDisplayNamesAndTheSharedDescription() {
     final OidcEntityMetadata metadata = this.server.getConfigurer()
         .getProtocolConfigurer(OidcProviderConfigurer.class)
