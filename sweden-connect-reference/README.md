@@ -261,6 +261,12 @@ both protocols side by side. A normal deployment gives one shared display name u
 Service", is shared. See
 [Entity information](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#entity-information).
 
+**Scopes.** The OpenID Provider offers the scopes set in `authn-server.oidc.scopes`: `openid`, `profile`,
+`https://id.oidc.se/scope/naturalPersonInfo`, `https://id.oidc.se/scope/naturalPersonNumber` and
+`https://id.oidc.se/scope/signApproval`. The sign scope, `https://id.oidc.se/scope/sign`, is not offered, since the
+simulated authentication cannot sign, and a signature request that uses it is rejected. See
+[Scopes and claims](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-scopes-and-claims).
+
 **AJP.** The Tomcat AJP connector is off. A deployment behind a web server that speaks AJP turns it on:
 
 | Setting | Description | Default value |
@@ -347,8 +353,9 @@ levels of assurance, one of them.
   is selected and the selection is locked. This only applies when the person is in the list.
 
 - **Signatures.** For a signature service, a SAML Service Provider with the signature service entity category, or an
-  OpenID Connect client that asks for the `https://id.oidc.se/scope/sign` or `https://id.oidc.se/scope/signApproval`
-  scope, the page asks the user to sign, and shows the sign message. Plain text, Markdown and, for SAML, HTML are
+  OpenID Connect client that asks for the `https://id.oidc.se/scope/signApproval` scope, the page asks the user to
+  sign, and shows the sign message. The service does not offer `https://id.oidc.se/scope/sign`, since the simulated
+  authentication cannot produce a user signature. Plain text, Markdown and, for SAML, HTML are
   turned into HTML that is safe to show; a sign message that cannot be shown fails the request.
 
 - **User messages.** A user message from the requester is shown in the language of the page, when there is no sign

@@ -284,6 +284,15 @@ authn-server:
           en: Sweden Connect Reference OP
           sv: Sweden Connect Referens-OP
 
+    # The scopes that the OpenID Provider offers. The sign approval scope is offered so that signature services can
+    # be tested. The sign scope is not, since the simulated authentication cannot sign.
+    scopes:
+      - openid
+      - profile
+      - https://id.oidc.se/scope/naturalPersonInfo
+      - https://id.oidc.se/scope/naturalPersonNumber
+      - https://id.oidc.se/scope/signApproval
+
     # DEPLOYMENT MUST ADD: the OpenID Connect clients. Each entry is either a location, a file holding one client or
     # an array of clients as JSON, or one client given inline. For example:
     #

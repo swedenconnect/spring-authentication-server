@@ -164,12 +164,12 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   }
 
   @Test
-  void signatureRequestShowsTheSignMessage() throws Exception {
+  void signatureApprovalRequestShowsTheSignMessage() throws Exception {
     final TestBrowser browser = new TestBrowser();
     final Map<String, String> request =
-        authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
+        authorizationRequest("openid https://id.oidc.se/scope/signApproval " + NATURAL_PERSON_NUMBER);
     request.put("prompt", "login consent");
-    request.put("https://id.oidc.se/param/signRequest", this.signRequest("I sign the *contract*"));
+    request.put("https://id.oidc.se/param/signRequest", this.signRequest("I sign the *contract*", false));
 
     final String html = browser.follow(browser.get(authorizeUrl(request)), BASE_URL).body();
     assertThat(html).contains("requests your signature").contains("sign-message").contains("<em>contract</em>");
@@ -190,10 +190,10 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   @Test
   void aSignatureRequestIssuedLessThanTenMinutesAgoIsAccepted() throws Exception {
     final Map<String, String> request =
-        authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
+        authorizationRequest("openid https://id.oidc.se/scope/signApproval " + NATURAL_PERSON_NUMBER);
     request.put("prompt", "login consent");
     request.put("https://id.oidc.se/param/signRequest",
-        this.signRequest("I sign the *contract*", new Date(System.currentTimeMillis() - 9 * 60_000)));
+        this.signRequest("I sign the *contract*", false, new Date(System.currentTimeMillis() - 9 * 60_000)));
 
     final TestBrowser browser = new TestBrowser();
     final String html = browser.follow(browser.get(authorizeUrl(request)), BASE_URL).body();
@@ -203,19 +203,35 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   @Test
   void aSignatureRequestIssuedMoreThanTenMinutesAgoIsRejected() throws Exception {
     final Map<String, String> request =
-        authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
+        authorizationRequest("openid https://id.oidc.se/scope/signApproval " + NATURAL_PERSON_NUMBER);
     request.put("prompt", "login consent");
     request.put("https://id.oidc.se/param/signRequest",
-        this.signRequest("I sign the *contract*", new Date(System.currentTimeMillis() - 11 * 60_000)));
+        this.signRequest("I sign the *contract*", false, new Date(System.currentTimeMillis() - 11 * 60_000)));
 
-    final TestBrowser browser = new TestBrowser();
-    final HttpResponse<String> response = browser.follow(browser.get(authorizeUrl(request)), BASE_URL);
+    final HttpResponse<String> response = new TestBrowser().get(authorizeUrl(request));
     assertThat(TestBrowser.isRedirect(response)).isTrue();
     final String location = TestBrowser.location(response);
     assertThat(location).startsWith(REDIRECT_URI);
     assertThat(TestBrowser.queryParameters(location))
         .containsEntry("error", "invalid_request")
         .containsEntry("error_description", "The signature request is too old")
+        .containsEntry("state", request.get("state"));
+  }
+
+  @Test
+  void theSignScopeIsNotOfferedSoASignatureRequestWithItIsRejected() throws Exception {
+    final Map<String, String> request =
+        authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
+    request.put("prompt", "login consent");
+    request.put("https://id.oidc.se/param/signRequest", this.signRequest("I sign the *contract*", true));
+
+    final HttpResponse<String> response = new TestBrowser().get(authorizeUrl(request));
+    assertThat(TestBrowser.isRedirect(response)).isTrue();
+    final String location = TestBrowser.location(response);
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(TestBrowser.queryParameters(location))
+        .containsEntry("error", "invalid_request")
+        .containsEntry("error_description", "A signature request requires the sign or the sign approval scope")
         .containsEntry("state", request.get("state"));
   }
 
@@ -353,22 +369,25 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
     return ((RSAKey) jwks.getKeyByKeyId(keyId)).toRSAPublicKey();
   }
 
-  private String signRequest(final String markdown) throws Exception {
-    return this.signRequest(markdown, new Date());
+  private String signRequest(final String markdown, final boolean withDataToBeSigned) throws Exception {
+    return this.signRequest(markdown, withDataToBeSigned, new Date());
   }
 
-  private String signRequest(final String markdown, final Date issueTime) throws Exception {
+  private String signRequest(final String markdown, final boolean withDataToBeSigned, final Date issueTime)
+      throws Exception {
     final JSONObject signMessage = new JSONObject();
     signMessage.put("message#en", encode(markdown));
     signMessage.put("mime_type", "text/markdown");
-    final JWTClaimsSet claims = new JWTClaimsSet.Builder()
+    final JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
         .issuer(CLIENT_ID)
         .audience(BASE_URL)
         .issueTime(issueTime)
-        .claim("tbs_data", encode("data to be signed"))
-        .claim("sign_message", signMessage)
-        .build();
-    final SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("rp-key").build(), claims);
+        .claim("sign_message", signMessage);
+    if (withDataToBeSigned) {
+      claims.claim("tbs_data", encode("data to be signed"));
+    }
+    final SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("rp-key").build(),
+        claims.build());
     jwt.sign(new RSASSASigner(CLIENT_KEY));
     return jwt.serialize();
   }

@@ -68,6 +68,28 @@ class PublishedInformationTest extends AbstractCompleteProfileTest {
   }
 
   @Test
+  void theDiscoveryDocumentHasTheConfiguredScopesAndTheDeliveredClaims() throws Exception {
+    final Map<String, Object> document = JSONObjectUtils.parse(
+        new TestBrowser().get(BASE_URL + "/.well-known/openid-configuration").body());
+    assertThat(JSONObjectUtils.getStringList(document, "scopes_supported")).containsExactly(
+        "openid",
+        "profile",
+        "https://id.oidc.se/scope/naturalPersonInfo",
+        "https://id.oidc.se/scope/naturalPersonNumber",
+        "https://id.oidc.se/scope/signApproval");
+    assertThat(JSONObjectUtils.getStringList(document, "claims_supported")).containsExactlyInAnyOrder(
+        "sub",
+        "auth_time",
+        "acr",
+        "https://id.oidc.se/claim/personalIdentityNumber",
+        "https://id.oidc.se/claim/coordinationNumber",
+        "given_name",
+        "family_name",
+        "name",
+        "birthdate");
+  }
+
+  @Test
   void theOpenIdProviderMetadataHasTheOidcDisplayNamesAndTheSharedDescription() {
     final OidcEntityMetadata metadata = this.server.getConfigurer()
         .getProtocolConfigurer(OidcProviderConfigurer.class)
