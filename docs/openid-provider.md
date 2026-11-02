@@ -362,10 +362,11 @@ For every request object, `client_id` and `iss`, when present, must be the `clie
 `response_type`, when also given as a plain parameter, must match it, as OpenID Connect Core, Section 6.1, requires. A
 request object whose `exp` has passed, or whose `nbf` has not been reached, is rejected.
 
-The `iat` of a signed request object is optional. When present, it must not be in the future, and when
-`authn-server.oidc.max-jwt-age` is set, the request object must not be older than that. There is no maximum age by
-default, since a client may sign a request object once and reuse it through `request_uri`. The `iat` of an unsigned
-request object is not checked. The clock skew of the OpenID Provider applies to all of these checks.
+The `iat` of a signed request object is optional. When present, it must not be in the future, and the request object
+must not be older than `authn-server.oidc.max-jwt-age`, which defaults to 10 minutes. The check cannot be turned off,
+only set to another value. A deployment whose clients sign a request object once and reuse it through `request_uri`
+must set a value long enough for that. The `iat` of an unsigned request object is not checked. The clock skew of the
+OpenID Provider applies to all of these checks.
 
 If a request object cannot be fetched or decoded, there may be no redirect URI to answer to, since the request object
 may be what holds it. The error is sent to the client when the plain parameters of the request hold a registered
@@ -609,8 +610,8 @@ A client assertion, for `private_key_jwt` and `client_secret_jwt`, must hold:
 - `aud` holding the URL of the token endpoint or the issuer, as the Swedish OpenID Connect Profile, Section 3.1.1,
   recommends,
 - `exp`, which has not passed,
-- `iat`, if present, which is not in the future, and not older than `authn-server.oidc.max-jwt-age` when that is set.
-  It is optional, as OpenID Connect Core, Section 9, says,
+- `iat`, if present, which is not in the future, and not older than `authn-server.oidc.max-jwt-age`, by default 10
+  minutes. It is optional, as OpenID Connect Core, Section 9, says,
 - `jti`, which has not been used before. The value is remembered until the assertion expires.
 
 The clock skew of the OpenID Provider applies. A `private_key_jwt` assertion may be signed with `RS256`, `RS384`,

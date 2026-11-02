@@ -188,6 +188,37 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   }
 
   @Test
+  void aSignatureRequestIssuedLessThanTenMinutesAgoIsAccepted() throws Exception {
+    final Map<String, String> request =
+        authorizationRequest("openid https://id.oidc.se/scope/signApproval " + NATURAL_PERSON_NUMBER);
+    request.put("prompt", "login consent");
+    request.put("https://id.oidc.se/param/signRequest",
+        this.signRequest("I sign the *contract*", false, new Date(System.currentTimeMillis() - 9 * 60_000)));
+
+    final TestBrowser browser = new TestBrowser();
+    final String html = browser.follow(browser.get(authorizeUrl(request)), BASE_URL).body();
+    assertThat(html).contains("requests your signature");
+  }
+
+  @Test
+  void aSignatureRequestIssuedMoreThanTenMinutesAgoIsRejected() throws Exception {
+    final Map<String, String> request =
+        authorizationRequest("openid https://id.oidc.se/scope/signApproval " + NATURAL_PERSON_NUMBER);
+    request.put("prompt", "login consent");
+    request.put("https://id.oidc.se/param/signRequest",
+        this.signRequest("I sign the *contract*", false, new Date(System.currentTimeMillis() - 11 * 60_000)));
+
+    final HttpResponse<String> response = new TestBrowser().get(authorizeUrl(request));
+    assertThat(TestBrowser.isRedirect(response)).isTrue();
+    final String location = TestBrowser.location(response);
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(TestBrowser.queryParameters(location))
+        .containsEntry("error", "invalid_request")
+        .containsEntry("error_description", "The signature request is too old")
+        .containsEntry("state", request.get("state"));
+  }
+
+  @Test
   void theSignScopeIsNotOfferedSoASignatureRequestWithItIsRejected() throws Exception {
     final Map<String, String> request =
         authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
@@ -339,13 +370,18 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   }
 
   private String signRequest(final String markdown, final boolean withDataToBeSigned) throws Exception {
+    return this.signRequest(markdown, withDataToBeSigned, new Date());
+  }
+
+  private String signRequest(final String markdown, final boolean withDataToBeSigned, final Date issueTime)
+      throws Exception {
     final JSONObject signMessage = new JSONObject();
     signMessage.put("message#en", encode(markdown));
     signMessage.put("mime_type", "text/markdown");
     final JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
         .issuer(CLIENT_ID)
         .audience(BASE_URL)
-        .issueTime(new Date())
+        .issueTime(issueTime)
         .claim("sign_message", signMessage);
     if (withDataToBeSigned) {
       claims.claim("tbs_data", encode("data to be signed"));

@@ -69,9 +69,9 @@ import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
  * must hold {@code iss} and {@code aud}. A JWT past its {@code exp}, or before its {@code nbf}, is rejected.
  * </p>
  * <p>
- * The {@code iat} of a signed JWT is optional. When present, it must not be in the future, and, if a maximum age is
- * assigned, see {@link #setMaxJwtAge(Duration)}, it must not be older than that. The clock skew applies to all time
- * checks. Unsigned JWTs are not checked against {@code iat}.
+ * The {@code iat} of a signed JWT is optional. When present, it must not be in the future, nor older than the maximum
+ * age, see {@link #setMaxJwtAge(Duration)}. The clock skew applies to all time checks. Unsigned JWTs are not checked
+ * against {@code iat}.
  * </p>
  *
  * @author Martin Lindström
@@ -87,6 +87,9 @@ public class RequestObjectDecoder {
       JWSAlgorithm.PS256, JWSAlgorithm.PS384, JWSAlgorithm.PS512,
       JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512);
 
+  /** The default maximum age of a signed JWT, 10 minutes. */
+  public static final Duration DEFAULT_MAX_JWT_AGE = Duration.ofMinutes(10);
+
   /** The keys of the OpenID Provider. */
   private final OidcKeys keys;
 
@@ -99,8 +102,8 @@ public class RequestObjectDecoder {
   /** The allowed clock skew. */
   private final Duration clockSkew;
 
-  /** The maximum age of a signed JWT, measured from its {@code iat}, or {@code null} for no limit. */
-  private Duration maxJwtAge;
+  /** The maximum age of a signed JWT, measured from its {@code iat}. */
+  private Duration maxJwtAge = DEFAULT_MAX_JWT_AGE;
 
   /**
    * Constructor.
@@ -122,12 +125,13 @@ public class RequestObjectDecoder {
 
   /**
    * Assigns the maximum age of a signed JWT, measured from its {@code iat}. The clock skew is added to it. A JWT
-   * without {@code iat} is accepted. Defaults to {@code null}, which means that the age is not checked.
+   * without {@code iat} is accepted. Defaults to {@link #DEFAULT_MAX_JWT_AGE}. The check cannot be turned off.
    *
-   * @param maxJwtAge the maximum age, or {@code null} for no limit
+   * @param maxJwtAge the maximum age, which must be positive
    */
-  public void setMaxJwtAge(final @Nullable Duration maxJwtAge) {
-    if (maxJwtAge != null && (maxJwtAge.isNegative() || maxJwtAge.isZero())) {
+  public void setMaxJwtAge(final @NonNull Duration maxJwtAge) {
+    Objects.requireNonNull(maxJwtAge, "maxJwtAge must not be null");
+    if (maxJwtAge.isNegative() || maxJwtAge.isZero()) {
       throw new IllegalArgumentException("maxJwtAge must be positive");
     }
     this.maxJwtAge = maxJwtAge;
@@ -376,7 +380,7 @@ public class RequestObjectDecoder {
       if (issued.isAfter(now.plus(this.clockSkew))) {
         throw invalid(requestObject, "The iat of the %s is in the future".formatted(name), logString, null);
       }
-      if (this.maxJwtAge != null && now.isAfter(issued.plus(this.maxJwtAge).plus(this.clockSkew))) {
+      if (now.isAfter(issued.plus(this.maxJwtAge).plus(this.clockSkew))) {
         throw invalid(requestObject, "The %s is too old".formatted(name), logString, null);
       }
     }

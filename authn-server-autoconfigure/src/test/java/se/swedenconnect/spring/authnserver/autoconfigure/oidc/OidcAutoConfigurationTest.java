@@ -404,13 +404,22 @@ class OidcAutoConfigurationTest {
   }
 
   @Test
-  void theMaximumJwtAgeIsUnsetByDefaultAndAppliedWhenAssigned() {
+  void theMaximumJwtAgeDefaultsToTenMinutesAndIsAppliedWhenAssigned() {
     this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
         .withUserConfiguration(CaptureConfiguration.class)
         .run(context -> {
           assertThat(context).hasNotFailed();
           assertThat(CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class)
-              .getMaxJwtAge()).isNull();
+              .getMaxJwtAge()).isEqualTo(Duration.ofMinutes(10));
+        });
+    // An empty value cannot turn the check off
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.max-jwt-age=")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class)
+              .getMaxJwtAge()).isEqualTo(Duration.ofMinutes(10));
         });
     this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
         .withPropertyValues("authn-server.oidc.max-jwt-age=5m")

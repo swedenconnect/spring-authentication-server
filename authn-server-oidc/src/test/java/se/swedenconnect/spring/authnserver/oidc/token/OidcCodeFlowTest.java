@@ -855,13 +855,27 @@ class OidcCodeFlowTest {
   }
 
   @Test
-  void anOldClientAssertionIsAcceptedWithoutMaximumAge() throws Exception {
+  void theMaximumAgeOfAClientAssertionDefaultsToTenMinutes() throws Exception {
+    // The clock skew is the default, 30 seconds
     this.start(c -> {}, new TestProvider("direct", LOA3));
     final Instant now = Instant.now();
+    String code = this.authorize(params(RSA_CLIENT)).get("code");
+    assertTokenError(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT)
+        .issueTime(Date.from(now.minusSeconds(640))).build(), CLIENT_RSA, "rsa-key")), code, REDIRECT_URI, null),
+        401, "invalid_client");
+    code = this.authorize(params(RSA_CLIENT)).get("code");
+    assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT)
+        .issueTime(Date.from(now.minusSeconds(620))).build(), CLIENT_RSA, "rsa-key")), code, REDIRECT_URI,
+        null).getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void aConfiguredMaximumAgeReplacesTheDefaultForClientAssertions() throws Exception {
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofDays(2)), new TestProvider("direct", LOA3));
     final String code = this.authorize(params(RSA_CLIENT)).get("code");
     assertThat(this.token(assertion(RSA_CLIENT, sign(assertionClaims(RSA_CLIENT)
-        .issueTime(Date.from(now.minus(Duration.ofDays(1)))).build(), CLIENT_RSA, "rsa-key")), code, REDIRECT_URI,
-        null).getStatus()).isEqualTo(200);
+        .issueTime(Date.from(Instant.now().minus(Duration.ofDays(1)))).build(), CLIENT_RSA, "rsa-key")), code,
+        REDIRECT_URI, null).getStatus()).isEqualTo(200);
   }
 
   @Test

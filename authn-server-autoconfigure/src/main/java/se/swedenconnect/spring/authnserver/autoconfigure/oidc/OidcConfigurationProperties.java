@@ -74,7 +74,8 @@ public class OidcConfigurationProperties {
 
   /**
    * The maximum age of a JWT that a client signs (signed request objects, signature request JWTs and client
-   * assertions), measured from its iat. The clock skew is added. No value means that the age is not checked.
+   * assertions), measured from its iat. The clock skew is added. Defaults to 10 minutes. The check cannot be turned
+   * off.
    */
   private Duration maxJwtAge;
 
@@ -251,7 +252,7 @@ public class OidcConfigurationProperties {
   /**
    * Gets the maximum age of a JWT that a client signs.
    *
-   * @return the maximum age, or {@code null} for no limit
+   * @return the maximum age, or {@code null} for the default
    */
   public @Nullable Duration getMaxJwtAge() {
     return this.maxJwtAge;
@@ -260,7 +261,7 @@ public class OidcConfigurationProperties {
   /**
    * Assigns the maximum age of a JWT that a client signs.
    *
-   * @param maxJwtAge the maximum age, or {@code null} for no limit
+   * @param maxJwtAge the maximum age, or {@code null} for the default
    */
   public void setMaxJwtAge(final @Nullable Duration maxJwtAge) {
     this.maxJwtAge = maxJwtAge;

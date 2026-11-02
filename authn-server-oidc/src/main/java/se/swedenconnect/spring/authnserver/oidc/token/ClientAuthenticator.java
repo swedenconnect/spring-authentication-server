@@ -68,7 +68,7 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * A client assertion ({@code private_key_jwt} and {@code client_secret_jwt}) must have {@code iss} and {@code sub}
  * equal to the {@code client_id}, {@code aud} holding the token endpoint or the issuer, as the Swedish OpenID Connect
  * Profile, Section 3.1.1, recommends, an {@code exp} that has not passed, an {@code iat}, if present, that is not
- * in the future, nor older than the maximum age when one is assigned (see {@link #setMaxJwtAge(Duration)}), and a
+ * in the future, nor older than the maximum age (see {@link #setMaxJwtAge(Duration)}), and a
  * {@code jti} that has not been used before. The clock skew applies to all time checks. A {@code private_key_jwt}
  * assertion is verified with the keys of the client, and a {@code client_secret_jwt} assertion with the client secret.
  * A client that has registered {@code token_endpoint_auth_signing_alg} must use that algorithm.
@@ -88,6 +88,9 @@ public class ClientAuthenticator {
   public static final List<ClientAuthenticationMethod> SUPPORTED_METHODS = List.of(
       ClientAuthenticationMethod.PRIVATE_KEY_JWT, ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
       ClientAuthenticationMethod.CLIENT_SECRET_POST, ClientAuthenticationMethod.CLIENT_SECRET_JWT);
+
+  /** The default maximum age of a client assertion, 10 minutes. */
+  public static final Duration DEFAULT_MAX_JWT_AGE = Duration.ofMinutes(10);
 
   /** The algorithms accepted for {@code client_secret_jwt}. */
   public static final List<JWSAlgorithm> CLIENT_SECRET_JWT_ALGORITHMS =
@@ -111,8 +114,8 @@ public class ClientAuthenticator {
   /** The allowed clock skew. */
   private final Duration clockSkew;
 
-  /** The maximum age of a client assertion, measured from its {@code iat}, or {@code null} for no limit. */
-  private Duration maxJwtAge;
+  /** The maximum age of a client assertion, measured from its {@code iat}. */
+  private Duration maxJwtAge = DEFAULT_MAX_JWT_AGE;
 
   /**
    * Constructor.
@@ -143,12 +146,14 @@ public class ClientAuthenticator {
 
   /**
    * Assigns the maximum age of a client assertion, measured from its {@code iat}. The clock skew is added to it. An
-   * assertion without {@code iat} is accepted. Defaults to {@code null}, which means that the age is not checked.
+   * assertion without {@code iat} is accepted. Defaults to {@link #DEFAULT_MAX_JWT_AGE}. The check cannot be turned
+   * off.
    *
-   * @param maxJwtAge the maximum age, or {@code null} for no limit
+   * @param maxJwtAge the maximum age, which must be positive
    */
-  public void setMaxJwtAge(final @Nullable Duration maxJwtAge) {
-    if (maxJwtAge != null && (maxJwtAge.isNegative() || maxJwtAge.isZero())) {
+  public void setMaxJwtAge(final @NonNull Duration maxJwtAge) {
+    Objects.requireNonNull(maxJwtAge, "maxJwtAge must not be null");
+    if (maxJwtAge.isNegative() || maxJwtAge.isZero()) {
       throw new IllegalArgumentException("maxJwtAge must be positive");
     }
     this.maxJwtAge = maxJwtAge;
@@ -306,7 +311,7 @@ public class ClientAuthenticator {
       if (issued.isAfter(now.plus(this.clockSkew))) {
         throw invalidClient("The iat of the client assertion is in the future", logString);
       }
-      if (this.maxJwtAge != null && now.isAfter(issued.plus(this.maxJwtAge).plus(this.clockSkew))) {
+      if (now.isAfter(issued.plus(this.maxJwtAge).plus(this.clockSkew))) {
         throw invalidClient("The client assertion is too old", logString);
       }
     }
