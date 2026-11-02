@@ -29,6 +29,8 @@ import org.junit.jupiter.api.Test;
 
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.openid.connect.sdk.federation.entities.EntityType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
@@ -215,6 +217,88 @@ class HttpFederationResolverTest extends FederationTestSupport {
         Instant.now().plus(1, ChronoUnit.HOURS));
 
     assertThat(new HttpFederationResolver(settings, client).resolve(CLIENT_ID)).isNull();
+  }
+
+  @Test
+  void anEntityIsResolvedAskingForBothEntityTypes() {
+    final ECKey trustAnchorKey = key("ta");
+    final StubFederationClient client = new StubFederationClient();
+    final HttpFederationResolver resolver = new HttpFederationResolver(this.trustAnchorSettings(trustAnchorKey),
+        client);
+    final Instant expiresAt = Instant.now().plus(1, ChronoUnit.HOURS).truncatedTo(ChronoUnit.SECONDS);
+
+    // An intermediate that is also a client
+    client.resolveResponse = this.entityResponse(trustAnchorKey, CLIENT_ID, Map.of(
+        EntityType.OPENID_RELYING_PARTY.getValue(), clientMetadata("The Client").toJSONObject(),
+        EntityType.FEDERATION_ENTITY.getValue(), Map.of("federation_list_endpoint", "https://client.example.com/list")),
+        expiresAt);
+    final ResolvedEntity entity = resolver.resolveEntity(CLIENT_ID);
+    assertThat(client.lastResolveRequest.types()).containsExactly("openid_relying_party", "federation_entity");
+    assertThat(client.lastResolveRequest.trustAnchor()).isEqualTo(TRUST_ANCHOR);
+    assertThat(entity).isNotNull();
+    assertThat(entity.clientMetadata().getName()).isEqualTo("The Client");
+    assertThat(entity.listEndpoint()).isEqualTo("https://client.example.com/list");
+    assertThat(entity.expiresAt()).isEqualTo(expiresAt);
+    assertThat(entity.toClient()).isNotNull();
+
+    // A federation entity without a list endpoint, such as a trust mark issuer
+    client.resolveResponse = this.entityResponse(trustAnchorKey, CLIENT_ID, Map.of(
+        EntityType.FEDERATION_ENTITY.getValue(), Map.of("federation_trust_mark_endpoint", "https://x/tm")),
+        expiresAt);
+    assertThat(resolver.resolveEntity(CLIENT_ID)).isNotNull()
+        .satisfies(e -> assertThat(e.clientMetadata()).isNull())
+        .satisfies(e -> assertThat(e.listEndpoint()).isNull())
+        .satisfies(e -> assertThat(e.toClient()).isNull());
+
+    // An entity with none of the types asked for is the same as not found
+    client.resolveResponse = this.entityResponse(trustAnchorKey, CLIENT_ID, Map.of(
+        EntityType.OPENID_PROVIDER.getValue(), Map.of("issuer", CLIENT_ID)), expiresAt);
+    assertThat(resolver.resolveEntity(CLIENT_ID)).isNull();
+
+    client.resolveResponse = null;
+    assertThat(resolver.resolveEntity(CLIENT_ID)).isNull();
+  }
+
+  @Test
+  void aResolvedEntityIsVerifiedAsAClientIs() {
+    final ECKey trustAnchorKey = key("ta");
+    final StubFederationClient client = new StubFederationClient();
+    client.resolveResponse = this.entityResponse(key("other"), CLIENT_ID, Map.of(
+        EntityType.FEDERATION_ENTITY.getValue(), Map.of("federation_list_endpoint", "https://x/list")),
+        Instant.now().plus(1, ChronoUnit.HOURS));
+
+    assertThatThrownBy(() -> new HttpFederationResolver(this.trustAnchorSettings(trustAnchorKey), client)
+        .resolveEntity(CLIENT_ID))
+        .isInstanceOf(ClientRegistryException.class);
+  }
+
+  @Test
+  void theDefaultResolutionOfAnEntityResolvesItAsAClient() {
+    final ResolvedClient resolved =
+        new ResolvedClient(CLIENT_ID, clientMetadata("The Client"), Set.of(MARK_ONE), Instant.now());
+    final FederationResolver resolver = clientId -> CLIENT_ID.equals(clientId) ? resolved : null;
+
+    assertThat(resolver.resolveEntity(CLIENT_ID)).isNotNull().satisfies(e -> {
+      assertThat(e.listEndpoint()).isNull();
+      assertThat(e.toClient()).isEqualTo(resolved);
+    });
+    assertThat(resolver.resolveEntity("https://other.example.com")).isNull();
+  }
+
+  private FederationSettings trustAnchorSettings(final ECKey trustAnchorKey) {
+    return FederationSettings.of(new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, RESOLVE_ENDPOINT, null));
+  }
+
+  private SignedJWT entityResponse(final ECKey key, final String subject, final Map<String, Object> metadata,
+      final Instant expiresAt) {
+    return sign(key, HttpFederationResolver.RESOLVE_RESPONSE_TYPE, new JWTClaimsSet.Builder()
+        .issuer(TRUST_ANCHOR)
+        .subject(subject)
+        .issueTime(new Date())
+        .expirationTime(Date.from(expiresAt))
+        .claim("metadata", metadata)
+        .build());
   }
 
   @Test

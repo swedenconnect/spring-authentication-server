@@ -50,6 +50,10 @@ import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
  * client that the resolver reports as not found is reported as removed. A cache entry that expires and is resolved
  * again is neither.
  * </p>
+ * <p>
+ * A {@link FederationClientCollector} fills the cache with the clients of the federation, so that a client is
+ * normally found in the cache. A client that is not is resolved at its request.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -75,9 +79,6 @@ public class FederationClientBackend implements ClientRegistryBackend {
 
   /** The cache settings. */
   private final FederationCacheSettings settings;
-
-  /** How often each client is looked up. */
-  private final LookupTracker lookupTracker;
 
   /** The clock, so that tests can control time. */
   private final Clock clock;
@@ -122,8 +123,6 @@ public class FederationClientBackend implements ClientRegistryBackend {
     this.cache = Objects.requireNonNull(cache, "cache must not be null");
     this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.clock = Objects.requireNonNull(clock, "clock must not be null");
-    this.lookupTracker = this.cache.createLookupTracker(this.settings.refresh().maximumTrackedClients(),
-        this.settings.refresh().lookupPeriod(), clock);
   }
 
   /** {@inheritDoc} */
@@ -145,16 +144,6 @@ public class FederationClientBackend implements ClientRegistryBackend {
   @Override
   public @NonNull AuthenticationProtocol getProtocol() {
     return AuthenticationProtocol.OIDC;
-  }
-
-  /**
-   * Gets the count of lookups per client, which is what the background refresh job works from. It is created by the
-   * cache, so that the counts are kept where the cache is.
-   *
-   * @return the {@link LookupTracker} of the backend
-   */
-  public @NonNull LookupTracker getLookupTracker() {
-    return this.lookupTracker;
   }
 
   /** {@inheritDoc} */
@@ -195,7 +184,6 @@ public class FederationClientBackend implements ClientRegistryBackend {
    */
   private @NonNull CachedClientRecord entryFor(final @NonNull String identifier) throws ClientRegistryException {
     Objects.requireNonNull(identifier, "identifier must not be null");
-    this.lookupTracker.record(identifier);
 
     final CachedClientRecord cached = this.cache.get(identifier);
     if (cached != null) {

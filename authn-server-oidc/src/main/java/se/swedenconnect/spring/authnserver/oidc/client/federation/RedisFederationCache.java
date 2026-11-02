@@ -16,7 +16,6 @@
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,9 +45,7 @@ import se.swedenconnect.spring.authnserver.redis.RedisKeys;
  * can go through them, and it expires with the last of them.
  * </p>
  * <p>
- * The lookup counts are kept in Redis too, by a {@link RedisLookupTracker}, so that the threshold of the refresh job
- * applies to the traffic of all nodes, and the background jobs use a {@link RedisJobLock}, so that a round runs on one
- * node at a time.
+ * The background jobs use a {@link RedisJobLock}, so that a round runs on one node at a time.
  * </p>
  *
  * @author Martin Lindström
@@ -165,15 +162,6 @@ public class RedisFederationCache implements FederationCache {
     Objects.requireNonNull(clientId, "clientId must not be null");
     this.redisTemplate.delete(this.entryKey(clientId));
     this.redisTemplate.opsForZSet().remove(this.indexKey(), clientId);
-  }
-
-  /**
-   * Creates a {@link RedisLookupTracker}, so that the lookup counts are shared by all nodes.
-   */
-  @Override
-  public @NonNull LookupTracker createLookupTracker(final int maximumTrackedClients, final @NonNull Duration period,
-      final @NonNull Clock clock) {
-    return new RedisLookupTracker(this.redisTemplate, this.keyPrefix, maximumTrackedClients, period, clock);
   }
 
   /**

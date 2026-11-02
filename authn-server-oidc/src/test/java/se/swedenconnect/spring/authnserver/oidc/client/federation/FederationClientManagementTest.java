@@ -171,27 +171,6 @@ class FederationClientManagementTest extends FederationTestSupport {
   }
 
   @Test
-  void theRefresherReportsAClientThatIsNoLongerKnown() {
-    final FederationCacheSettings settings = new FederationCacheSettings(null,
-        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE,
-        new FederationCacheSettings.RefreshSettings(true, Duration.ofMinutes(1), Duration.ofMinutes(5), 1,
-            Duration.ofHours(1), 10, 100));
-    final FederationClientBackendTest.Fixture fixture = new FederationClientBackendTest.Fixture(settings);
-    fixture.backend.setClientChangeTracker(this.tracker());
-    fixture.resolver.answer = fixture.resolved(Duration.ofMinutes(3), Set.of());
-    fixture.backend.lookup(CLIENT_ID);
-
-    final FederationCacheRefresher refresher = new FederationCacheRefresher(fixture.backend);
-    fixture.resolver.answer = fixture.resolved(Duration.ofMinutes(3), Set.of());
-    assertThat(refresher.refresh()).isEqualTo(1);
-    fixture.resolver.answer = null;
-    assertThat(refresher.refresh()).isZero();
-
-    assertThat(this.added()).containsExactly(CLIENT_ID);
-    assertThat(this.removed()).containsExactly(CLIENT_ID);
-  }
-
-  @Test
   void theCachedClientsAreReportedWhenTheTrackerIsAssigned() {
     final FederationClientBackendTest.Fixture fixture =
         new FederationClientBackendTest.Fixture(FederationCacheSettings.defaults());

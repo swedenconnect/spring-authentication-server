@@ -32,6 +32,7 @@ import org.springframework.context.annotation.Configuration;
 
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerAutoConfiguration;
 import se.swedenconnect.spring.authnserver.autoconfigure.ConfiguredAuthnServer;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
@@ -161,14 +162,16 @@ public class AuthnServerActuatorAutoConfiguration {
      * Creates the health indicator of the federation services.
      *
      * @param monitor the monitor of the federation services
+     * @param entityStore where the clients kept although the resolver no longer knows them are recorded
      * @return an {@link OidcFederationHealthIndicator}
      */
     @Bean(OIDC_FEDERATION_HEALTH)
     @ConditionalOnBean(FederationServiceStateStore.class)
     @ConditionalOnMissingBean(name = OIDC_FEDERATION_HEALTH)
     @ConditionalOnEnabledHealthIndicator(OIDC_FEDERATION_HEALTH)
-    OidcFederationHealthIndicator oidcFederationHealthIndicator(final FederationServiceMonitor monitor) {
-      return new OidcFederationHealthIndicator(monitor);
+    OidcFederationHealthIndicator oidcFederationHealthIndicator(final FederationServiceMonitor monitor,
+        final ObjectProvider<FederationEntityStore> entityStore) {
+      return new OidcFederationHealthIndicator(monitor, entityStore.getIfUnique());
     }
 
   }

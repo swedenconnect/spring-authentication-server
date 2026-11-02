@@ -125,40 +125,20 @@ class FederationCacheTest extends FederationTestSupport {
 
   @Test
   void theSettingsAreValidated() {
-    assertThatThrownBy(() -> new FederationCacheSettings(Duration.ZERO, Duration.ofMinutes(1),
-        FederationCacheSettings.RefreshSettings.disabled())).isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new FederationCacheSettings(null, Duration.ZERO,
-        FederationCacheSettings.RefreshSettings.disabled())).isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> refresh(Duration.ZERO, Duration.ofMinutes(5), 1, Duration.ofMinutes(10), 1, 1))
+    assertThatThrownBy(() -> new FederationCacheSettings(Duration.ZERO, Duration.ofMinutes(1)))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(
-        () -> refresh(Duration.ofMinutes(1), Duration.ofMinutes(-1), 1, Duration.ofMinutes(10), 1, 1))
+    assertThatThrownBy(() -> new FederationCacheSettings(Duration.ofMinutes(-1), Duration.ofMinutes(1)))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> refresh(Duration.ofMinutes(1), Duration.ofMinutes(5), 0, Duration.ofMinutes(10), 1, 1))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> refresh(Duration.ofMinutes(1), Duration.ofMinutes(5), 1, Duration.ZERO, 1, 1))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> refresh(Duration.ofMinutes(1), Duration.ofMinutes(5), 1, Duration.ofMinutes(10), 0, 1))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> refresh(Duration.ofMinutes(1), Duration.ofMinutes(5), 1, Duration.ofMinutes(10), 1, 0))
+    assertThatThrownBy(() -> new FederationCacheSettings(null, Duration.ZERO))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
-  void theDefaultsAreNoMaximumAgeAndNoRefresh() {
+  void theDefaultsAreNoMaximumAge() {
     final FederationCacheSettings settings = FederationCacheSettings.defaults();
 
     assertThat(settings.maximumAge()).isNull();
     assertThat(settings.notFoundTimeToLive()).isEqualTo(FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE);
-    assertThat(settings.refresh().enabled()).isFalse();
-    assertThat(FederationCacheSettings.RefreshSettings.enabled(true).enabled()).isTrue();
-  }
-
-  private static FederationCacheSettings.RefreshSettings refresh(final Duration interval,
-      final Duration refreshAhead, final int minimumLookups, final Duration lookupPeriod, final int maximumClients,
-      final int maximumTrackedClients) {
-    return new FederationCacheSettings.RefreshSettings(true, interval, refreshAhead, minimumLookups, lookupPeriod,
-        maximumClients, maximumTrackedClients);
   }
 
 }

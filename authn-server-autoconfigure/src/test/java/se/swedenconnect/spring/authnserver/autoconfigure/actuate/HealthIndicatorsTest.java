@@ -36,7 +36,9 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCallEvent;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationServiceStateStore;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.RetainedClient;
 import se.swedenconnect.spring.authnserver.oidc.federation.InMemoryProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
@@ -92,6 +94,25 @@ class HealthIndicatorsTest {
         null));
     final Health health = new OidcFederationHealthIndicator(monitor).health();
     assertThat(health.getStatus()).isEqualTo(AuthnServerHealthStatus.WARNING);
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  void aRetainedClientIsShownAsAWarning() {
+    final FederationServiceMonitor monitor = new FederationServiceMonitor(new InMemoryFederationServiceStateStore());
+    final InMemoryFederationEntityStore store = new InMemoryFederationEntityStore();
+    assertThat(new OidcFederationHealthIndicator(monitor, store).health().getStatus()).isEqualTo(Status.UP);
+    assertThat(new OidcFederationHealthIndicator(monitor, store).health().getDetails())
+        .doesNotContainKey("retained-clients");
+
+    final Instant since = Instant.parse("2026-10-01T10:00:00Z");
+    store.putRetainedClient(new RetainedClient("https://rp.example.com", since, since.plusSeconds(3600)));
+    final Health health = new OidcFederationHealthIndicator(monitor, store).health();
+    assertThat(health.getStatus()).isEqualTo(AuthnServerHealthStatus.WARNING);
+    assertThat((List<Map<String, Object>>) health.getDetails().get("retained-clients")).singleElement()
+        .satisfies(r -> assertThat(r).containsEntry("id", "https://rp.example.com")
+            .containsEntry("not-found-since", "2026-10-01T10:00:00Z")
+            .containsEntry("kept-until", "2026-10-01T11:00:00Z"));
   }
 
   @SuppressWarnings("unchecked")

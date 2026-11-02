@@ -999,13 +999,10 @@ federation that it is not a member of is not supported.
 | `clients.trust-mark-status-interval` | The interval between two checks of the status of the trust marks obtained from the issuers. | 1 hour |
 | `clients.cache.maximum-age` | How long a resolved client is kept at the most, regardless of what the resolve response says. | No limit |
 | `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. | 1 minute |
-| `clients.cache.refresh.enabled` | Whether the background job that refreshes frequently used clients before they expire runs. | `false` |
-| `clients.cache.refresh.interval` | How often the job runs. | 1 minute |
-| `clients.cache.refresh.refresh-ahead` | How long before an entry expires that it is refreshed. | 5 minutes |
-| `clients.cache.refresh.minimum-lookups` | How many times a client must have been looked up within `lookup-period` to be refreshed. | 10 |
-| `clients.cache.refresh.lookup-period` | The period that lookups are counted within. | 10 minutes |
-| `clients.cache.refresh.maximum-clients` | The largest number of clients that one run refreshes. | 100 |
-| `clients.cache.refresh.maximum-tracked-clients` | The largest number of clients that lookups are counted for. | 1000 |
+| `clients.collector.enabled` | Whether the background job that fills the cache with the clients of the federation runs, see below. | `true` |
+| `clients.collector.interval` | How often the job runs. | 30 minutes |
+| `clients.collector.intermediates[]` | The entity identifiers of the intermediates that the job starts from, instead of the trust anchor. | The trust anchor |
+| `clients.collector.keep-until-expiry` | Whether a cached client that the resolver no longer knows is kept until its cache entry expires, instead of being dropped at once. | `true` |
 
 A trust mark issuer has:
 
@@ -1029,6 +1026,21 @@ or an entity configuration that does not publish a needed endpoint, is handled l
 call: the client is not resolved, or the trust mark not obtained, the failure shows in the
 [health of the federation services](management.html#oidc-federation-health), and the next request tries again.
 
+**Filling the cache.** A background job walks the federation, shortly after startup and then every 30 minutes, and
+puts every client it finds in the cache, so that a request does not have to wait for the resolver. It starts at the
+trust anchor, or at the intermediates of `clients.collector.intermediates`, asks each entity that publishes a
+`federation_list_endpoint` for its subordinates, and resolves each of them. It also renews the cached clients that
+would expire before the next run. A client that the job has not found yet is resolved at its first request, as
+before. In a large federation, starting from the trust anchor means one resolve request per entity of the federation
+after each start, and memory for every answer; give the intermediates whose clients matter to limit that.
+
+A cached client that the resolver no longer knows is by default kept until its cache entry expires, so that a client
+that dropped out by mistake has time to fix it. Such a client is logged at `WARN` and shown in the
+[health of the federation services](management.html#oidc-federation-health). Since the job cannot tell a removed
+client from a broken one, a client that the federation has removed also keeps working until its entry expires. Set
+`clients.collector.keep-until-expiry` to `false` to drop such a client at once, when a removal must take effect
+immediately. See [Section 6.2, "Filling the cache from the federation"](client-registry.html#filling-the-cache) of [The client registry](client-registry.html).
+
 **The order of the sources.** The configured clients of `authn-server.oidc.clients` are asked first, so an operator's
 entry overrides what the federation says about the same `client_id`. Client sources added in an
 [adapter](#adjusting-the-configuration-in-code) come next, and the federation source, named `federation`, last. A
@@ -1050,9 +1062,9 @@ authn-server:
           - type: https://tm.example.com/public-sector
             issuer: https://tmi.example.com
             jwks: file:/opt/config/tmi-jwks.json
-        cache:
-          refresh:
-            enabled: true
+        collector:
+          intermediates:
+            - https://im.example.com
 ```
 
 A standalone resolver, one that is not the trust anchor, is given with its own keys:
@@ -1145,7 +1157,7 @@ setting.
 | `authn-server.oidc.storage.authorization-codes` | Authorization codes. |
 | `authn-server.oidc.storage.access-tokens` | Access tokens. |
 | `authn-server.oidc.storage.client-assertions` | The `jti` values of used client assertions, `private_key_jwt` and `client_secret_jwt`. |
-| `authn-server.oidc.storage.federation-cache` | The cache of clients resolved through OpenID Federation, with its lookup counts and the lock of its background jobs, see [Section 7.7, "Background jobs and trust marks"](#background-jobs-in-a-cluster). |
+| `authn-server.oidc.storage.federation-cache` | The cache of clients resolved through OpenID Federation, the answers about the other entities of the federation, and the lock of the background jobs, see [Section 7.7, "Background jobs and trust marks"](#background-jobs-in-a-cluster). |
 | `authn-server.oidc.storage.trust-marks` | The OpenID Provider's own trust marks and their state. |
 
 The record of known clients, which tells which clients have been [added and removed](management.html#clients-added-and-removed)
@@ -1284,19 +1296,20 @@ have it yet.
 
 Some work runs in the background on every node. When its state is kept in Redis, one node at a time does it.
 
-**The federation cache.** The refresh of the federation cache and the status checks of the trust marks of clients,
-see [Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html), work on the federation cache. When the cache
-is kept in Redis:
+**The federation cache.** The job that fills the federation cache and the status checks of the trust marks of
+clients, see [Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html), work on the federation cache. When the
+cache is kept in Redis:
 
 - Each round of a job runs on one node. The node that starts a round takes a lock in Redis, held for the interval of
   the job, and the other nodes skip the round. A node that stops while it holds the lock blocks the job for at most
   one round.
-- The lookup counts that decide which clients the refresh renews are kept in Redis, so that the threshold applies to
-  the traffic of all nodes.
+- The answers about the entities of the federation, and the clients kept although the resolver no longer knows them,
+  are kept in Redis too, so that all nodes share them.
 
 The application sets up the federation backend and its jobs, see
 [Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html). With Spring Boot, a `FederationCache` bean is
-declared according to `authn-server.oidc.storage.federation-cache`, and the backend and the jobs are built from it.
+declared according to `authn-server.oidc.storage.federation-cache`, together with a `FederationEntityStore` bean, and
+the backend and the jobs are built from them.
 Kept in memory, the cache is written to `authn-server.cache-directory`, when given, so that it survives a restart.
 
 **The trust marks of the OpenID Provider.** When they are kept in Redis:

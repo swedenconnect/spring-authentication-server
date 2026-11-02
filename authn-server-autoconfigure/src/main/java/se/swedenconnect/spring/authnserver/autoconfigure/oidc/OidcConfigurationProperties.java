@@ -1109,6 +1109,11 @@ public class OidcConfigurationProperties {
     private final FederationCacheProperties cache = new FederationCacheProperties();
 
     /**
+     * The background job that fills the client cache with the clients of the federation.
+     */
+    private final FederationCollectorProperties collector = new FederationCollectorProperties();
+
+    /**
      * Gets whether clients are resolved through the federation.
      *
      * @return whether clients are resolved through the federation
@@ -1178,6 +1183,15 @@ public class OidcConfigurationProperties {
      */
     public @NonNull FederationCacheProperties getCache() {
       return this.cache;
+    }
+
+    /**
+     * Gets the properties of the job that fills the client cache.
+     *
+     * @return the collector properties
+     */
+    public @NonNull FederationCollectorProperties getCollector() {
+      return this.collector;
     }
 
 
@@ -1405,11 +1419,6 @@ public class OidcConfigurationProperties {
     private Duration notFoundTimeToLive;
 
     /**
-     * The background job that refreshes the entries of frequently used clients before they expire.
-     */
-    private final FederationCacheRefreshProperties refresh = new FederationCacheRefreshProperties();
-
-    /**
      * Gets the maximum age.
      *
      * @return the maximum age, or {@code null} if not assigned
@@ -1445,57 +1454,34 @@ public class OidcConfigurationProperties {
       this.notFoundTimeToLive = notFoundTimeToLive;
     }
 
-    /**
-     * Gets the refresh properties.
-     *
-     * @return the refresh properties
-     */
-    public @NonNull FederationCacheRefreshProperties getRefresh() {
-      return this.refresh;
-    }
-
 
   }
 
   /**
-   * The background job that refreshes the entries of frequently used clients before they expire.
+   * The background job that fills the federation client cache with the clients of the federation.
    */
-  public static class FederationCacheRefreshProperties {
+  public static class FederationCollectorProperties {
 
     /**
-     * Whether the job runs. Defaults to false.
+     * Whether the job runs. Defaults to true.
      */
-    private boolean enabled = false;
+    private boolean enabled = true;
 
     /**
-     * How often the job runs. Defaults to 1 minute.
+     * How often the job runs. Defaults to 30 minutes.
      */
     private Duration interval;
 
     /**
-     * How long before an entry expires that it is refreshed. Defaults to 5 minutes.
+     * The entity identifiers of the intermediates that the job starts from, instead of the trust anchor.
      */
-    private Duration refreshAhead;
+    private List<String> intermediates;
 
     /**
-     * How many times a client must have been looked up within lookup-period to be refreshed. Defaults to 10.
+     * Whether a cached client that the resolver no longer knows is kept until its cache entry expires. If false, it
+     * is dropped at once. Defaults to true.
      */
-    private Integer minimumLookups;
-
-    /**
-     * The period that lookups are counted within. Defaults to 10 minutes.
-     */
-    private Duration lookupPeriod;
-
-    /**
-     * The largest number of clients that one run refreshes. Defaults to 100.
-     */
-    private Integer maximumClients;
-
-    /**
-     * The largest number of clients that lookups are counted for. Defaults to 1000.
-     */
-    private Integer maximumTrackedClients;
+    private boolean keepUntilExpiry = true;
 
     /**
      * Gets whether the job runs.
@@ -1534,95 +1520,40 @@ public class OidcConfigurationProperties {
     }
 
     /**
-     * Gets how long ahead an entry is refreshed.
+     * Gets the intermediates to start from.
      *
-     * @return how long ahead an entry is refreshed, or {@code null} if not assigned
+     * @return the entity identifiers of the intermediates, or {@code null} if not assigned
      */
-    public @Nullable Duration getRefreshAhead() {
-      return this.refreshAhead;
+    public @Nullable List<String> getIntermediates() {
+      return this.intermediates;
     }
 
     /**
-     * Assigns how long ahead an entry is refreshed.
+     * Assigns the intermediates to start from.
      *
-     * @param refreshAhead how long ahead an entry is refreshed
+     * @param intermediates the entity identifiers of the intermediates
      */
-    public void setRefreshAhead(final @Nullable Duration refreshAhead) {
-      this.refreshAhead = refreshAhead;
+    public void setIntermediates(final @Nullable List<String> intermediates) {
+      this.intermediates = intermediates;
     }
 
     /**
-     * Gets the minimum number of lookups.
+     * Gets whether a client that the resolver no longer knows is kept until its cache entry expires.
      *
-     * @return the minimum number of lookups, or {@code null} if not assigned
+     * @return whether such a client is kept
      */
-    public @Nullable Integer getMinimumLookups() {
-      return this.minimumLookups;
+    public boolean isKeepUntilExpiry() {
+      return this.keepUntilExpiry;
     }
 
     /**
-     * Assigns the minimum number of lookups.
+     * Assigns whether a client that the resolver no longer knows is kept until its cache entry expires.
      *
-     * @param minimumLookups the minimum number of lookups
+     * @param keepUntilExpiry whether such a client is kept
      */
-    public void setMinimumLookups(final @Nullable Integer minimumLookups) {
-      this.minimumLookups = minimumLookups;
+    public void setKeepUntilExpiry(final boolean keepUntilExpiry) {
+      this.keepUntilExpiry = keepUntilExpiry;
     }
-
-    /**
-     * Gets the lookup period.
-     *
-     * @return the lookup period, or {@code null} if not assigned
-     */
-    public @Nullable Duration getLookupPeriod() {
-      return this.lookupPeriod;
-    }
-
-    /**
-     * Assigns the lookup period.
-     *
-     * @param lookupPeriod the lookup period
-     */
-    public void setLookupPeriod(final @Nullable Duration lookupPeriod) {
-      this.lookupPeriod = lookupPeriod;
-    }
-
-    /**
-     * Gets the maximum number of clients per run.
-     *
-     * @return the maximum number of clients per run, or {@code null} if not assigned
-     */
-    public @Nullable Integer getMaximumClients() {
-      return this.maximumClients;
-    }
-
-    /**
-     * Assigns the maximum number of clients per run.
-     *
-     * @param maximumClients the maximum number of clients per run
-     */
-    public void setMaximumClients(final @Nullable Integer maximumClients) {
-      this.maximumClients = maximumClients;
-    }
-
-    /**
-     * Gets the maximum number of tracked clients.
-     *
-     * @return the maximum number of tracked clients, or {@code null} if not assigned
-     */
-    public @Nullable Integer getMaximumTrackedClients() {
-      return this.maximumTrackedClients;
-    }
-
-    /**
-     * Assigns the maximum number of tracked clients.
-     *
-     * @param maximumTrackedClients the maximum number of tracked clients
-     */
-    public void setMaximumTrackedClients(final @Nullable Integer maximumTrackedClients) {
-      this.maximumTrackedClients = maximumTrackedClients;
-    }
-
 
   }
 

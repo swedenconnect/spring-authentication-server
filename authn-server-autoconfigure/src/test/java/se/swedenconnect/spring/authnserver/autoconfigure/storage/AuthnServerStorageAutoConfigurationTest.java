@@ -55,8 +55,11 @@ import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.CachedClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarks;
@@ -136,6 +139,7 @@ class AuthnServerStorageAutoConfigurationTest {
           assertThat(context).doesNotHaveBean(ClientAssertionReplayCache.class);
           assertThat(context).doesNotHaveBean(ProviderTrustMarkStore.class);
           assertThat(context).getBean(FederationCache.class).isInstanceOf(InMemoryFederationCache.class);
+          assertThat(context).getBean(FederationEntityStore.class).isInstanceOf(InMemoryFederationEntityStore.class);
           assertThat(oidc().getAccessTokenStore().getClass().getSimpleName()).isEqualTo("InMemoryAccessTokenStore");
         });
   }
@@ -152,6 +156,7 @@ class AuthnServerStorageAutoConfigurationTest {
           assertThat(context).getBean(ClientAssertionReplayCache.class)
               .isInstanceOf(RedisClientAssertionReplayCache.class);
           assertThat(context).getBean(FederationCache.class).isInstanceOf(RedisFederationCache.class);
+          assertThat(context).getBean(FederationEntityStore.class).isInstanceOf(RedisFederationEntityStore.class);
           assertThat(context).getBean(ProviderTrustMarkStore.class).isInstanceOf(RedisProviderTrustMarkStore.class);
           assertThat(context).getBean(SessionRepository.class).isInstanceOf(RedisSessionRepository.class);
           assertThat(oidc().getAccessTokenStore()).isSameAs(context.getBean(AccessTokenStore.class));
@@ -224,6 +229,7 @@ class AuthnServerStorageAutoConfigurationTest {
           assertThat(context).doesNotHaveBean(AuthorizationCodeStore.class);
           assertThat(context).doesNotHaveBean(ReplayCache.class);
           assertThat(context).getBean(FederationCache.class).isInstanceOf(InMemoryFederationCache.class);
+          assertThat(context).getBean(FederationEntityStore.class).isInstanceOf(InMemoryFederationEntityStore.class);
           assertThat(context).doesNotHaveBean(SessionRepository.class);
         });
   }
@@ -239,6 +245,7 @@ class AuthnServerStorageAutoConfigurationTest {
           assertThat(context).doesNotHaveBean(AuthorizationCodeStore.class);
           assertThat(context).doesNotHaveBean(ProviderTrustMarkStore.class);
           assertThat(context).getBean(FederationCache.class).isInstanceOf(InMemoryFederationCache.class);
+          assertThat(context).getBean(FederationEntityStore.class).isInstanceOf(InMemoryFederationEntityStore.class);
           assertThat(context).getBean(AccessTokenStore.class).isInstanceOf(RedisAccessTokenStore.class);
           assertThat(context).getBean(SessionRepository.class).isInstanceOf(RedisSessionRepository.class);
         });

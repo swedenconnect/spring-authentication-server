@@ -37,7 +37,7 @@ Source links in this guide point to the `main` branch of the
 
     6.1. [The cache](#the-cache)
 
-    6.2. [Keeping frequently used clients fresh](#keeping-frequently-used-clients-fresh)
+    6.2. [Filling the cache from the federation](#filling-the-cache)
 
     6.3. [Trust marks on demand](#trust-marks-on-demand)
 
@@ -306,32 +306,72 @@ Resolved clients are cached, because reaching the resolver on every request is n
   repeated requests with the same unknown `client_id` do not each reach the resolver. A resolver that fails is never
   cached.
 
-<a name="keeping-frequently-used-clients-fresh"></a>
-### 6.2. Keeping frequently used clients fresh
+<a name="filling-the-cache"></a>
+### 6.2. Filling the cache from the federation
 
-[`FederationCacheRefresher`][FederationCacheRefresher] is a background job that resolves a cached client again
-shortly before its entry expires, so that a request from a client that is used often never waits for the resolver.
-The job is off by default.
+[`FederationClientCollector`][FederationClientCollector] is a background job that walks the federation and puts every
+client it finds in the cache, so that an authorization request does not have to wait for the resolver. With Spring
+Boot it runs whenever the federation source is set up from the properties: on by default, every 30 minutes, with the
+first run shortly after startup. It is turned off, or given another interval, under
+`authn-server.oidc.federation.clients.collector`, see [Section 6.11, "Clients from OpenID Federation"](configuration.html#oidc-federation-clients) of [Configuration](configuration.html).
 
-Only clients that are worth it are refreshed. A client qualifies once it has been looked up a configured number of
-times within a configured period, and one run never refreshes more clients than a configured maximum. Clients that are
-used rarely are left alone; they are resolved again the next time they are asked for after their entry has expired.
-The count of lookups is bounded too: at most a configured number of clients are counted, and the client that has not
-been asked for in the longest time is dropped when a new one arrives.
+A client that the job has not found yet, for example one that joined the federation after the latest run, is still
+resolved at its first request, as before.
+
+**The walk.** A run starts at the trust anchor. Each entity is resolved through the resolver, asking for both its
+relying party and its federation entity metadata, so the answers are signed and verified in the same way as for
+clients, and no other keys are needed. An entity that publishes a `federation_list_endpoint` is asked for its
+subordinates (OpenID Federation 1.0, Section 8.2), and each of them is resolved in the same way:
+
+- an entity with relying party metadata is a client, and is put in the cache,
+- an entity with a `federation_list_endpoint` is walked into, and an entity can be both,
+- an entity with neither, such as an OpenID Provider or a trust mark issuer, is only remembered.
+
+The listings are not filtered, so that any federation entity answers them. Each entity is visited once per run, so a
+loop in the listings does no harm. What the resolver answers about each entity is kept in a
+[`FederationEntityStore`][FederationEntityStore], separate from the cache, and is not asked for again until the
+resolve response expires, or the maximum age of the cache has passed. An answer that the resolver does not know an
+entity is kept as long as for a client. A failure is never kept.
+
+**Where to start.** In a large federation, a walk from the trust anchor resolves every entity of the federation, which
+costs one resolve request per entity after each start and memory for every answer. When the clients that matter are
+below one or a few intermediates, give them as `authn-server.oidc.federation.clients.collector.intermediates`, and
+the walk starts there instead of at the trust anchor. A client below another intermediate is resolved at its first
+request, as before.
+
+**Renewing.** A run resolves again every cached client whose entry expires before the next run, whether the job found
+it or a request did, and keeps the trust marks that have been [asked for on demand](#trust-marks-on-demand). A client
+whose resolve response lives shorter than the interval of the job can still expire between two runs, and is then
+resolved at its next request.
+
+**Clients that are no longer listed.** A listing is not signed, and a call can fail, so a run only counts as evidence
+that a client is gone when every listing call and every resolution of the walk succeeded. A cached client that such a
+run did not find is resolved again; a client that still resolves stays, also one that was found through a request
+outside the configured intermediates. When the resolver answers that it does not know the client, at this point or
+when the client is renewed:
+
+- by default, the client is kept until its cache entry expires, never longer, which is what OpenID Federation 1.0,
+  Section 12.3, allows. A client that dropped out of the resolver by mistake then has time to fix it without its users
+  noticing. Each such client is logged at `WARN` and shown in the
+  [health of the federation services](management.html#oidc-federation-health). Once the entry has expired, the next
+  answer that the client is not known reports it as [removed](management.html#clients-added-and-removed).
+- with `keep-until-expiry` set to `false`, the client is dropped and reported as removed at once.
+
+The job cannot tell a client that the federation has removed from one that has a broken configuration. With the
+default, **a removed client therefore keeps working until its cache entry expires**. Turn the setting off when a
+removal must take effect at once, and the resolver is reliable enough that a client is never missing by mistake.
+
+A resolver or listing endpoint that fails never removes anything. The failure is logged, shows in the
+[health of the federation services](management.html#oidc-federation-health), and the entity is tried again at the
+next run. The rest of the run goes on.
+
+An application that builds the backend in code starts the job itself:
 
 ```java
-FederationCacheSettings settings = new FederationCacheSettings(
-    Duration.ofHours(12),
-    Duration.ofMinutes(1),
-    FederationCacheSettings.RefreshSettings.enabled(true));
-
-FederationCacheRefresher refresher = new FederationCacheRefresher(backend);
-refresher.start();
+FederationClientCollector collector = new FederationClientCollector(backend, new InMemoryFederationEntityStore(),
+    httpFederationClient, federation, FederationCollectorSettings.defaults());
+collector.start();
 ```
-
-Built from the backend, the refresher uses the cache, the resolver and the settings of the backend, and a client that
-the resolver no longer knows is reported as [removed](management.html#clients-added-and-removed). The constructor that
-takes the parts one by one is still there, but a refresher built that way reports nothing.
 
 <a name="trust-marks-on-demand"></a>
 ### 6.3. Trust marks on demand
@@ -353,7 +393,7 @@ if (record != null && record.hasMark(trustMarkType)) {
   client, that it is of the type that was asked for, and that it has not expired.
 - A trust mark obtained this way is added to the client's cached record and kept until the earlier of the trust
   mark's expiry and the record's expiry. Later requests from the same client need no call to the issuer, and a
-  refresh of the record carries the trust mark over while it is still valid.
+  renewal of the record carries the trust mark over while it is still valid.
 - A trust mark without `exp`, or with a long one, stays trusted after the issuer has withdrawn it, unless its status is
   checked, see [Section 6.4, "Checking the status of trust marks"](#trust-mark-status-checks).
 
@@ -399,17 +439,16 @@ no longer than the resolve response is valid.
 <a name="several-nodes"></a>
 ### 6.5. Several nodes
 
-The cache is also where the background jobs keep their shared state. The backend asks the cache for the object that
-counts lookups, and the jobs ask it for the lock that decides which node runs a round. With a
-`RedisFederationCache`:
+The background jobs ask the cache for the lock that decides which node runs a round. With a `RedisFederationCache`,
+each run of the [job that fills the cache](#filling-the-cache) and each round of the
+[trust mark status checks](#trust-mark-status-checks) takes place on one node. A node that stops while it holds the
+lock of a job blocks the job for at most one round. [`RedisFederationEntityStore`][RedisFederationEntityStore] keeps
+the answers about the federation entities in Redis too, so that all nodes share them.
 
-- the lookup counts are kept in Redis, so that the threshold of the refresh applies to the traffic of all nodes, and
-- each round of the refresh and of the [trust mark status checks](#trust-mark-status-checks) runs on one node. A node
-  that stops while it holds the lock of a job blocks the job for at most one round.
-
-With Spring Boot, a `FederationCache` bean is declared according to `authn-server.storage.type`, or
-`authn-server.oidc.storage.federation-cache`, see [Section 7, "Running several nodes"](configuration.html#running-several-nodes) of [Configuration](configuration.html).
-The source set up from the properties uses it, together with the jobs. An application that builds the backend in code
+With Spring Boot, a `FederationCache` bean and a `FederationEntityStore` bean are declared according to
+`authn-server.storage.type`, or `authn-server.oidc.storage.federation-cache`, see
+[Section 7, "Running several nodes"](configuration.html#running-several-nodes) of [Configuration](configuration.html). The source set up from the properties uses them,
+together with the jobs. An application that builds the backend in code
 builds it and the jobs from the same bean, and from the [`HttpFederationClient`][HttpFederationClient] bean that the
 auto-configuration declares. That client publishes the outcome of every call it makes, which is what the
 [health of the federation services](management.html#oidc-federation-health) is built from:
@@ -494,7 +533,8 @@ To replace the check altogether, assign another implementation with `configurer.
 [DefaultClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/DefaultClientRegistry.java
 [EntityConfigurationEndpoints]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/EntityConfigurationEndpoints.java
 [FederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCache.java
-[FederationCacheRefresher]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCacheRefresher.java
+[FederationClientCollector]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientCollector.java
+[FederationEntityStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationEntityStore.java
 [FederationCacheSettings]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCacheSettings.java
 [FederationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientBackend.java
 [FederationResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationResolver.java
@@ -512,6 +552,7 @@ To replace the check altogether, assign another implementation with `configurer.
 [RequiredMarksRequesterPredicate]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/RequiredMarksRequesterPredicate.java
 [RequesterRecord]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/RequesterRecord.java
 [RedisFederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/RedisFederationCache.java
+[RedisFederationEntityStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/RedisFederationEntityStore.java
 [RepositoryClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/RepositoryClientBackend.java
 [SamlMetadataBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/metadata/SamlMetadataBackend.java
 [TrustMarkRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/TrustMarkRequester.java
