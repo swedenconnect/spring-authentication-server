@@ -19,6 +19,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,7 @@ import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import com.nimbusds.jose.util.JSONArrayUtils;
 import com.nimbusds.jwt.SignedJWT;
 
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.EntityConfigurationRequest;
@@ -49,22 +51,27 @@ import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMar
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
- * A {@link FederationClient} that makes the federation calls that the OpenID Provider needs over HTTP: the resolve
- * request of
- * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.3">OpenID Federation 1.0, Section 8.3</a>,
- * the trust mark status request of Section 8.4, the trust mark request of Section 8.6, and the request for an entity
- * configuration of Section 9.
+ * A {@link FederationClient} that makes the federation calls that the OpenID Provider needs over HTTP: the subordinate
+ * listing request of
+ * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.2">OpenID Federation 1.0, Section 8.2</a>,
+ * the resolve request of Section 8.3, the trust mark status request of Section 8.4, the trust marked entities listing
+ * request of Section 8.5, the trust mark request of Section 8.6, and the request for an entity configuration of
+ * Section 9.
  * <p>
  * The endpoint of a call is taken from the federation entity metadata of the request, under
- * {@value #FEDERATION_RESOLVE_ENDPOINT}, {@value #FEDERATION_TRUST_MARK_STATUS_ENDPOINT} and
+ * {@value #FEDERATION_LIST_ENDPOINT}, {@value #FEDERATION_RESOLVE_ENDPOINT},
+ * {@value #FEDERATION_TRUST_MARK_STATUS_ENDPOINT}, {@value #FEDERATION_TRUST_MARK_LIST_ENDPOINT} and
  * {@value #FEDERATION_TRUST_MARK_ENDPOINT}.
  * </p>
  * <p>
- * The other calls of the interface are not made by the client registry and are not implemented.
+ * The fetch request of Section 8.1 is not made by the server and is not implemented.
  * </p>
  * <p>
  * Every call is published as a {@link FederationCallEvent}, telling whether the service answered, answered with an
- * error or could not be reached, when the client has an event publisher. As a Spring bean it gets one.
+ * error or could not be reached, when the client has an event publisher. As a Spring bean it gets one. A listing
+ * request does not name the entity that is called, so the caller tells the client by putting the entity identifier in
+ * the federation entity metadata of the request, under {@value #LISTING_ENTITY_ID}. Without it, the endpoint
+ * identifies the service.
  * </p>
  *
  * @author Martin Lindström
@@ -82,6 +89,18 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
 
   /** The federation entity metadata parameter holding the trust mark status endpoint. */
   public static final String FEDERATION_TRUST_MARK_STATUS_ENDPOINT = "federation_trust_mark_status_endpoint";
+
+  /** The federation entity metadata parameter holding the subordinate listing endpoint. */
+  public static final String FEDERATION_LIST_ENDPOINT = "federation_list_endpoint";
+
+  /** The federation entity metadata parameter holding the trust marked entities listing endpoint. */
+  public static final String FEDERATION_TRUST_MARK_LIST_ENDPOINT = "federation_trust_mark_list_endpoint";
+
+  /**
+   * The key, in the federation entity metadata of a listing request, under which the caller gives the entity
+   * identifier of the entity that is called. It is used for the health of the federation services and is never sent.
+   */
+  public static final String LISTING_ENTITY_ID = "authn_server_listing_entity_id";
 
   /** The HTTP client. */
   private final RestClient restClient;
@@ -119,7 +138,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
     }
     final String endpoint = endpoint(request, FEDERATION_RESOLVE_ENDPOINT);
     return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,
-        FederationCallEvent.Call.RESOLVE, null);
+        FederationCallEvent.Call.RESOLVE, null, SignedJWT::parse);
   }
 
   /** {@inheritDoc} */
@@ -131,7 +150,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
     appendParameter(query, "sub", parameters.subject().getValue());
     final String endpoint = endpoint(request, FEDERATION_TRUST_MARK_ENDPOINT);
     return this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,
-        FederationCallEvent.Call.TRUST_MARK, parameters.trustMarkIssuer().getValue());
+        FederationCallEvent.Call.TRUST_MARK, parameters.trustMarkIssuer().getValue(), SignedJWT::parse);
   }
 
   /**
@@ -152,7 +171,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
         .uri(URI.create(endpoint))
         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
         .body(body.toString()), endpoint, FederationCallEvent.Call.TRUST_MARK_STATUS,
-        request.parameters().trustMarkIssuer());
+        request.parameters().trustMarkIssuer(), SignedJWT::parse);
     if (response == null) {
       throw new ClientRegistryException("The trust mark status endpoint %s did not answer".formatted(endpoint));
     }
@@ -160,26 +179,28 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
   }
 
   /**
-   * Makes the call, parses the response as a signed JWT and publishes how the call went. A 404 answer to a resolve or
-   * trust mark request means that the service has nothing for the subject, which is a successful call; a 404 answer to
-   * a trust mark status request or an entity configuration request is an error.
+   * Makes the call, parses the response and publishes how the call went. A 404 answer to a resolve or trust mark request
+   * means that the service has nothing for the subject, which is a successful call; a 404 answer to any other request
+   * is an error.
    *
+   * @param <T> the type of the parsed response
    * @param spec the prepared request
    * @param endpoint the endpoint that is called
    * @param call the call that is made
-   * @param issuer the trust mark issuer or the entity whose entity configuration is fetched, or {@code null} for a
-   *     resolve request
-   * @return a {@link SignedJWT}, or {@code null} if the endpoint answered that it has nothing
+   * @param issuer the trust mark issuer, the entity whose entity configuration is fetched, or the entity that is
+   *     asked for a listing, or {@code null}
+   * @param parser parses the non-empty body of a successful answer
+   * @return the parsed response, or {@code null} if the endpoint answered that it has nothing
    * @throws ClientRegistryException if the call fails
    */
-  private @Nullable SignedJWT call(final RestClient.@NonNull RequestHeadersSpec<?> spec,
-      final @NonNull String endpoint, final FederationCallEvent.@NonNull Call call, final @Nullable String issuer)
-      throws ClientRegistryException {
+  private <T> @Nullable T call(final RestClient.@NonNull RequestHeadersSpec<?> spec,
+      final @NonNull String endpoint, final FederationCallEvent.@NonNull Call call, final @Nullable String issuer,
+      final @NonNull BodyParser<T> parser) throws ClientRegistryException {
 
     final String what = describe(call);
     log.trace("Making {} request to {}", what, endpoint);
     try {
-      final SignedJWT response = spec
+      final T response = spec
           .exchange((clientRequest, clientResponse) -> {
             final HttpStatusCode status = clientResponse.getStatusCode();
             if (status.value() == 404
@@ -197,11 +218,14 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
                   "The %s endpoint %s answered with an empty body".formatted(what, endpoint));
             }
             try {
-              return SignedJWT.parse(body);
+              return parser.parse(body);
             }
             catch (final ParseException e) {
-              throw new ClientRegistryException(
-                  "The %s endpoint %s did not answer with a signed JWT".formatted(what, endpoint), e);
+              throw new ClientRegistryException("The %s endpoint %s did not answer with %s".formatted(what, endpoint,
+                  call == FederationCallEvent.Call.SUBORDINATE_LISTING
+                      || call == FederationCallEvent.Call.TRUST_MARKED_LISTING
+                      ? "a JSON array of strings"
+                      : "a signed JWT"), e);
             }
           });
       this.publish(call, endpoint, issuer, FederationCallEvent.Outcome.SUCCESS, null);
@@ -254,7 +278,46 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
       case TRUST_MARK -> "trust mark";
       case TRUST_MARK_STATUS -> "trust mark status";
       case ENTITY_CONFIGURATION -> "entity configuration";
+      case SUBORDINATE_LISTING -> "subordinate listing";
+      case TRUST_MARKED_LISTING -> "trust marked entities listing";
     };
+  }
+
+  /**
+   * Parses a body as a JSON array of strings, keeping the order.
+   *
+   * @param body the body
+   * @return the strings
+   * @throws ParseException if the body is not a JSON array of strings
+   */
+  private static @NonNull List<String> parseStringArray(final @NonNull String body) throws ParseException {
+    final List<Object> values = JSONArrayUtils.parse(body);
+    final List<String> strings = new ArrayList<>(values.size());
+    for (final Object value : values) {
+      if (!(value instanceof final String string)) {
+        throw new ParseException("The array holds a value that is not a string", 0);
+      }
+      strings.add(string);
+    }
+    return strings;
+  }
+
+  /**
+   * Parses the body of a successful answer.
+   *
+   * @param <T> the type of the parsed body
+   */
+  @FunctionalInterface
+  private interface BodyParser<T> {
+
+    /**
+     * Parses a body.
+     *
+     * @param body the body, not empty
+     * @return the parsed body
+     * @throws ParseException if the body cannot be parsed
+     */
+    @NonNull T parse(final @NonNull String body) throws ParseException;
   }
 
   /**
@@ -271,10 +334,13 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
    * Creates the URI of a GET request.
    *
    * @param endpoint the endpoint
-   * @param query the query string, without the leading question mark
+   * @param query the query string, without the leading question mark, possibly empty
    * @return the URI
    */
   private static @NonNull URI toUri(final @NonNull String endpoint, final @NonNull String query) {
+    if (query.isEmpty()) {
+      return URI.create(endpoint);
+    }
     return URI.create("%s%c%s".formatted(endpoint, endpoint.indexOf('?') >= 0 ? '&' : '?', query));
   }
 
@@ -328,7 +394,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
         ? parameters.ecLocation()
         : EntityConfigurationEndpoints.location(entityId);
     final SignedJWT response = this.call(this.restClient.get().uri(URI.create(location)), location,
-        FederationCallEvent.Call.ENTITY_CONFIGURATION, entityId);
+        FederationCallEvent.Call.ENTITY_CONFIGURATION, entityId, SignedJWT::parse);
     return Objects.requireNonNull(response, "a 404 answer to an entity configuration request is an error");
   }
 
@@ -338,16 +404,77 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
     throw new UnsupportedOperationException("The fetch call is not implemented");
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Makes the subordinate listing request of OpenID Federation 1.0, Section 8.2: an HTTP GET of the listing endpoint
+   * with every parameter that the request holds. {@code trust_marked} and {@code intermediate} are only sent when
+   * {@code true}. Any error answer, including 404 and {@code unsupported_parameter}, is an error.
+   *
+   * @param request the request
+   * @return the entity identifiers, in the order received
+   * @throws ClientRegistryException if the call fails, or the endpoint does not answer with a JSON array of strings
+   */
   @Override
-  public @NonNull List<String> subordinateListing(final FederationRequest<SubordinateListingRequest> request) {
-    throw new UnsupportedOperationException("The subordinate listing call is not implemented");
+  public @NonNull List<String> subordinateListing(
+      final @NonNull FederationRequest<SubordinateListingRequest> request) {
+    final SubordinateListingRequest parameters = request.parameters();
+    final StringBuilder query = new StringBuilder();
+    if (parameters.entityType() != null) {
+      parameters.entityType().stream()
+          .filter(StringUtils::hasText)
+          .forEach(type -> appendParameter(query, "entity_type", type));
+    }
+    if (Boolean.TRUE.equals(parameters.trustMarked())) {
+      appendParameter(query, "trust_marked", "true");
+    }
+    if (StringUtils.hasText(parameters.trustMarkType())) {
+      appendParameter(query, "trust_mark_type", parameters.trustMarkType());
+    }
+    if (Boolean.TRUE.equals(parameters.intermediate())) {
+      appendParameter(query, "intermediate", "true");
+    }
+    final String endpoint = endpoint(request, FEDERATION_LIST_ENDPOINT);
+    return Objects.requireNonNull(this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,
+        FederationCallEvent.Call.SUBORDINATE_LISTING, listingEntityId(request),
+        HttpFederationClient::parseStringArray), "a 404 answer to a listing request is an error");
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Makes the trust marked entities listing request of OpenID Federation 1.0, Section 8.5: an HTTP GET of the listing
+   * endpoint with {@code trust_mark_type} and, if given, {@code sub}. Any error answer, including 404, is an error.
+   *
+   * @param request the request
+   * @return the entity identifiers, in the order received
+   * @throws ClientRegistryException if the request has no trust mark type, the call fails, or the endpoint does not
+   *     answer with a JSON array of strings
+   */
   @Override
-  public @NonNull List<String> trustMarkedListing(final FederationRequest<TrustMarkListingRequest> request) {
-    throw new UnsupportedOperationException("The trust marked listing call is not implemented");
+  public @NonNull List<String> trustMarkedListing(final @NonNull FederationRequest<TrustMarkListingRequest> request) {
+    final TrustMarkListingRequest parameters = request.parameters();
+    if (!StringUtils.hasText(parameters.trustMarkType())) {
+      throw new ClientRegistryException("No trust_mark_type given for the trust marked entities listing request");
+    }
+    final StringBuilder query = new StringBuilder();
+    appendParameter(query, "trust_mark_type", parameters.trustMarkType());
+    if (StringUtils.hasText(parameters.subject())) {
+      appendParameter(query, "sub", parameters.subject());
+    }
+    final String endpoint = endpoint(request, FEDERATION_TRUST_MARK_LIST_ENDPOINT);
+    return Objects.requireNonNull(this.call(this.restClient.get().uri(toUri(endpoint, query.toString())), endpoint,
+        FederationCallEvent.Call.TRUST_MARKED_LISTING, listingEntityId(request),
+        HttpFederationClient::parseStringArray), "a 404 answer to a listing request is an error");
+  }
+
+  /**
+   * Gets the entity identifier of the entity that is asked for a listing, given by the caller under
+   * {@value #LISTING_ENTITY_ID}.
+   *
+   * @param request the request
+   * @return the entity identifier, or {@code null} if not given
+   */
+  private static @Nullable String listingEntityId(final @NonNull FederationRequest<?> request) {
+    final Map<String, Object> metadata = request.federationEntityMetadata();
+    final Object entityId = metadata != null ? metadata.get(LISTING_ENTITY_ID) : null;
+    return entityId instanceof final String value && StringUtils.hasText(value) ? value : null;
   }
 
 }

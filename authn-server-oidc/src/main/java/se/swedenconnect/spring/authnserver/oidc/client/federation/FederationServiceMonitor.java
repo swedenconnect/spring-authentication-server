@@ -23,8 +23,8 @@ import org.springframework.context.ApplicationListener;
 
 /**
  * Keeps track of how the calls to each federation service go, from the {@link FederationCallEvent}s that the
- * {@link HttpFederationClient} publishes: the resolver, and every trust mark issuer that the server calls. It never
- * calls a service itself.
+ * {@link HttpFederationClient} publishes: the resolver, every trust mark issuer, every entity whose entity
+ * configuration is fetched, and every entity that is asked for its subordinates. It never calls a service itself.
  *
  * @author Martin Lindström
  */

@@ -94,6 +94,20 @@ class HealthIndicatorsTest {
     assertThat(health.getStatus()).isEqualTo(AuthnServerHealthStatus.WARNING);
   }
 
+  @SuppressWarnings("unchecked")
+  @Test
+  void anEntityThatListsItsSubordinatesIsShown() {
+    final FederationServiceMonitor monitor = new FederationServiceMonitor(new InMemoryFederationServiceStateStore());
+    monitor.onApplicationEvent(new FederationCallEvent(FederationCallEvent.Call.SUBORDINATE_LISTING,
+        "https://ta.example.com/list", "https://ta.example.com", FederationCallEvent.Outcome.SUCCESS, null));
+
+    final Health health = new OidcFederationHealthIndicator(monitor).health();
+    assertThat(health.getStatus()).isEqualTo(Status.UP);
+    assertThat((List<Map<String, Object>>) health.getDetails().get("services")).singleElement()
+        .satisfies(s -> assertThat(s).containsEntry("type", "subordinate-listing")
+            .containsEntry("id", "https://ta.example.com"));
+  }
+
   @Test
   void theDefaultStatusOrderPutsWarningBetweenUpAndTheFailingStatuses() {
     final StandardEnvironment environment = new StandardEnvironment();

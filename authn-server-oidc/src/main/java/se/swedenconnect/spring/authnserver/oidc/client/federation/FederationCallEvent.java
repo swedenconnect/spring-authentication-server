@@ -43,8 +43,8 @@ public class FederationCallEvent extends ApplicationEvent {
   private final String endpoint;
 
   /**
-   * The entity identifier of the trust mark issuer, or of the entity whose entity configuration is fetched, or
-   * {@code null} for a resolve call.
+   * The entity identifier of the trust mark issuer, of the entity whose entity configuration is fetched, or of the
+   * entity that is asked for a listing, or {@code null} for a resolve call or a listing call that does not name it.
    */
   private final String issuer;
 
@@ -59,8 +59,9 @@ public class FederationCallEvent extends ApplicationEvent {
    *
    * @param call the call that was made
    * @param endpoint the endpoint that was called
-   * @param issuer the entity identifier of the trust mark issuer, or of the entity whose entity configuration is
-   *     fetched, or {@code null} for a resolve call
+   * @param issuer the entity identifier of the trust mark issuer, of the entity whose entity configuration is
+   *     fetched, or of the entity that is asked for a listing, or {@code null} for a resolve call or a listing call
+   *     that does not name it
    * @param outcome how the call went
    * @param error what went wrong, or {@code null} if the call succeeded
    */
@@ -93,9 +94,10 @@ public class FederationCallEvent extends ApplicationEvent {
   }
 
   /**
-   * Gets the entity identifier of the trust mark issuer, or of the entity whose entity configuration is fetched.
+   * Gets the entity identifier of the trust mark issuer, of the entity whose entity configuration is fetched, or of
+   * the entity that is asked for a listing.
    *
-   * @return the entity identifier, or {@code null} for a resolve call
+   * @return the entity identifier, or {@code null} for a resolve call or a listing call that does not name it
    */
   public @Nullable String getIssuer() {
     return this.issuer;
@@ -137,14 +139,16 @@ public class FederationCallEvent extends ApplicationEvent {
     return switch (this.call) {
       case RESOLVE -> ServiceType.RESOLVER;
       case ENTITY_CONFIGURATION -> ServiceType.ENTITY_CONFIGURATION;
-      case TRUST_MARK, TRUST_MARK_STATUS -> ServiceType.TRUST_MARK_ISSUER;
+      case TRUST_MARK, TRUST_MARK_STATUS, TRUST_MARKED_LISTING -> ServiceType.TRUST_MARK_ISSUER;
+      case SUBORDINATE_LISTING -> ServiceType.SUBORDINATE_LISTING;
     };
   }
 
   /**
    * Gets the identity of the service that was called: the endpoint of a resolver, the entity identifier of a trust
-   * mark issuer, so that the trust mark endpoint and the status endpoint of an issuer count as one service, and the
-   * entity identifier of an entity whose entity configuration is fetched.
+   * mark issuer, so that the trust mark, status and listing endpoints of an issuer count as one service, the entity
+   * identifier of an entity whose entity configuration is fetched, and the entity identifier of an entity that is asked
+   * for its subordinates. A call that does not name the entity is identified by its endpoint.
    *
    * @return the identity of the service
    */
@@ -170,7 +174,13 @@ public class FederationCallEvent extends ApplicationEvent {
      * A request for the entity configuration of an entity, OpenID Federation 1.0, Section 9, made to find an endpoint
      * that the entity publishes.
      */
-    ENTITY_CONFIGURATION
+    ENTITY_CONFIGURATION,
+
+    /** A subordinate listing request, OpenID Federation 1.0, Section 8.2. */
+    SUBORDINATE_LISTING,
+
+    /** A trust marked entities listing request, OpenID Federation 1.0, Section 8.5. */
+    TRUST_MARKED_LISTING
 
   }
 
@@ -186,7 +196,10 @@ public class FederationCallEvent extends ApplicationEvent {
     TRUST_MARK_ISSUER,
 
     /** An entity whose entity configuration is fetched to find its endpoints. */
-    ENTITY_CONFIGURATION
+    ENTITY_CONFIGURATION,
+
+    /** An entity that lists its subordinates, a trust anchor or an intermediate. */
+    SUBORDINATE_LISTING
 
   }
 
