@@ -53,6 +53,8 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.EntityC
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationTrustMarkStatusRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.ResolveRequest;
+import se.swedenconnect.oidf.common.entity.entity.integration.federation.SubordinateListingRequest;
+import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkListingRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMarkStatusResponse;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
@@ -339,11 +341,322 @@ class HttpFederationClientTest extends FederationTestSupport {
   }
 
   @Test
-  void theCallsThatTheClientRegistryDoesNotMakeAreNotImplemented() {
+  void theFetchCallIsNotImplemented() {
+    assertThatThrownBy(() -> new HttpFederationClient().fetch(null))
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  void theSubordinateListingRequestCarriesEveryParameter() throws Exception {
+    this.body = "[\"https://a.example.com\", \"https://b.example.com\"]";
+    final int port = this.startServer();
+
+    final List<String> answer = new HttpFederationClient().subordinateListing(this.subordinateListingRequest(port,
+        new SubordinateListingRequest(List.of("openid_relying_party", "federation_entity"), Boolean.TRUE,
+            "https://example.com/mark one?x=1&y", Boolean.TRUE)));
+
+    assertThat(answer).containsExactly("https://a.example.com", "https://b.example.com");
+    assertThat(this.requests).containsExactly("GET ");
+    assertThat(this.paths).containsExactly("/list");
+    assertThat(this.queries).containsExactly("entity_type=openid_relying_party&entity_type=federation_entity"
+        + "&trust_marked=true&trust_mark_type=https%3A%2F%2Fexample.com%2Fmark+one%3Fx%3D1%26y&intermediate=true");
+  }
+
+  @Test
+  void aSubordinateListingRequestLeavesOutParametersThatAreNotSetOrFalse() throws Exception {
+    this.body = "[]";
+    final int port = this.startServer();
     final HttpFederationClient client = new HttpFederationClient();
-    assertThatThrownBy(() -> client.fetch(null)).isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> client.subordinateListing(null)).isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> client.trustMarkedListing(null)).isInstanceOf(UnsupportedOperationException.class);
+
+    client.subordinateListing(this.subordinateListingRequest(port,
+        new SubordinateListingRequest(List.of(" ", "federation_entity"), Boolean.FALSE, " ", Boolean.FALSE)));
+    client.subordinateListing(this.subordinateListingRequest(port,
+        new SubordinateListingRequest(null, null, "https://example.com/mark", null)));
+
+    assertThat(this.queries).containsExactly("entity_type=federation_entity",
+        "trust_mark_type=https%3A%2F%2Fexample.com%2Fmark");
+  }
+
+  @Test
+  void aSubordinateListingRequestWithoutParametersCallsTheEndpointAsPublished() throws Exception {
+    this.body = "[]";
+    final int port = this.startServer();
+    final HttpFederationClient client = new HttpFederationClient();
+
+    assertThat(client.subordinateListing(this.subordinateListingRequest(port,
+        SubordinateListingRequest.requestAll()))).isEmpty();
+    assertThat(client.subordinateListing(new FederationRequest<>(SubordinateListingRequest.requestAll(),
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT,
+            "http://localhost:%d/list?tenant=a".formatted(port))))).isEmpty();
+    assertThat(client.subordinateListing(new FederationRequest<>(
+        new SubordinateListingRequest(null, Boolean.TRUE, null, null),
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT,
+            "http://localhost:%d/list?tenant=a".formatted(port))))).isEmpty();
+
+    assertThat(this.queries).containsExactly(null, "tenant=a", "tenant=a&trust_marked=true");
+    assertThat(this.paths).containsOnly("/list");
+  }
+
+  @Test
+  void theTrustMarkedListingRequestCarriesTheTypeAndTheSubject() throws Exception {
+    this.body = "[\"https://b.example.com\",\"https://a.example.com\"]";
+    final int port = this.startServer();
+
+    final List<String> answer = new HttpFederationClient().trustMarkedListing(this.trustMarkedListingRequest(port,
+        new TrustMarkListingRequest(MARK_ONE, "https://client.example.com/a b")));
+
+    assertThat(answer).containsExactly("https://b.example.com", "https://a.example.com");
+    assertThat(this.requests).containsExactly("GET ");
+    assertThat(this.paths).containsExactly("/trust_mark_list");
+    assertThat(this.queries).containsExactly(
+        "trust_mark_type=https%3A%2F%2Fexample.com%2Fmark-one&sub=https%3A%2F%2Fclient.example.com%2Fa+b");
+  }
+
+  @Test
+  void aTrustMarkedListingRequestWithoutASubjectLeavesItOut() throws Exception {
+    this.body = "[]";
+    final int port = this.startServer();
+    final HttpFederationClient client = new HttpFederationClient();
+
+    assertThat(client.trustMarkedListing(this.trustMarkedListingRequest(port,
+        new TrustMarkListingRequest(MARK_ONE, null)))).isEmpty();
+    assertThat(client.trustMarkedListing(this.trustMarkedListingRequest(port,
+        new TrustMarkListingRequest(MARK_ONE, "")))).isEmpty();
+
+    assertThat(this.queries).containsExactly("trust_mark_type=https%3A%2F%2Fexample.com%2Fmark-one",
+        "trust_mark_type=https%3A%2F%2Fexample.com%2Fmark-one");
+  }
+
+  @Test
+  void aTrustMarkedListingRequestWithoutATrustMarkTypeIsAnErrorAndNoCallIsMade() throws Exception {
+    final int port = this.startServer();
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+
+    assertThatThrownBy(() -> client.trustMarkedListing(this.trustMarkedListingRequest(port,
+        new TrustMarkListingRequest(null, CLIENT_ID))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("trust_mark_type");
+    assertThatThrownBy(() -> client.trustMarkedListing(this.trustMarkedListingRequest(port,
+        new TrustMarkListingRequest(" ", CLIENT_ID))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("trust_mark_type");
+    assertThat(this.requests).isEmpty();
+    assertThat(events).isEmpty();
+  }
+
+  @Test
+  void aListingRequestWithoutAnEndpointIsAnError() {
+    final HttpFederationClient client = new HttpFederationClient();
+    assertThatThrownBy(() -> client.subordinateListing(new FederationRequest<>(
+        SubordinateListingRequest.requestAll(), Map.of())))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining(HttpFederationClient.FEDERATION_LIST_ENDPOINT);
+    assertThatThrownBy(() -> client.subordinateListing(new FederationRequest<>(
+        SubordinateListingRequest.requestAll(), Map.of(HttpFederationClient.LISTING_ENTITY_ID, TRUST_ANCHOR))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining(HttpFederationClient.FEDERATION_LIST_ENDPOINT);
+    assertThatThrownBy(() -> client.trustMarkedListing(new FederationRequest<>(
+        new TrustMarkListingRequest(MARK_ONE, null))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining(HttpFederationClient.FEDERATION_TRUST_MARK_LIST_ENDPOINT);
+  }
+
+  @Test
+  void aListingEndpointThatAnswersNotFoundIsAnError() throws Exception {
+    this.status = 404;
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().subordinateListing(
+        this.subordinateListingRequest(port, SubordinateListingRequest.requestAll())))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("404");
+    assertThatThrownBy(() -> this.recordingClient().trustMarkedListing(
+        this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("404");
+    this.assertEveryResponseClosed(2);
+  }
+
+  @Test
+  void aListingEndpointThatDoesNotSupportAParameterIsAnErrorAndIsNotRetried() throws Exception {
+    this.status = 400;
+    this.body = "{\"error\":\"unsupported_parameter\",\"error_description\":\"intermediate\"}";
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().subordinateListing(this.subordinateListingRequest(port,
+        new SubordinateListingRequest(null, null, null, Boolean.TRUE))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("400");
+    assertThat(this.queries).containsExactly("intermediate=true");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void aListingEndpointThatFailsIsAnError() throws Exception {
+    this.status = 500;
+    this.body = "server error";
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().trustMarkedListing(
+        this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("500");
+    this.assertEveryResponseClosed(1);
+  }
+
+  @Test
+  void aListingEndpointThatDoesNotAnswerWithAnArrayOfStringsIsAnError() throws Exception {
+    final int port = this.startServer();
+    for (final String answer : List.of("not json", "{\"a\":\"b\"}", "\"https://a.example.com\"",
+        "[\"https://a.example.com\", 1]", "[\"https://a.example.com\", null]", "[[\"https://a.example.com\"]]",
+        "[\"https://a.example.com\"")) {
+      this.body = answer;
+      assertThatThrownBy(() -> this.recordingClient().subordinateListing(
+          this.subordinateListingRequest(port, SubordinateListingRequest.requestAll())))
+          .as(answer)
+          .isInstanceOf(ClientRegistryException.class)
+          .hasMessageContaining("JSON array of strings");
+      assertThatThrownBy(() -> this.recordingClient().trustMarkedListing(
+          this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null))))
+          .as(answer)
+          .isInstanceOf(ClientRegistryException.class)
+          .hasMessageContaining("JSON array of strings");
+    }
+    this.assertEveryResponseClosed(14);
+  }
+
+  @Test
+  void aListingEndpointThatAnswersWithAnEmptyBodyIsAnError() throws Exception {
+    final int port = this.startServer();
+
+    assertThatThrownBy(() -> this.recordingClient().subordinateListing(
+        this.subordinateListingRequest(port, SubordinateListingRequest.requestAll())))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("empty body");
+    this.body = " \n";
+    assertThatThrownBy(() -> this.recordingClient().trustMarkedListing(
+        this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null))))
+        .isInstanceOf(ClientRegistryException.class)
+        .hasMessageContaining("empty body");
+    this.assertEveryResponseClosed(2);
+  }
+
+  @Test
+  void theResponseIsClosedAfterASuccessfulListingRequest() throws Exception {
+    this.body = "[\"https://a.example.com\"]";
+    final int port = this.startServer();
+
+    assertThat(this.recordingClient().subordinateListing(
+        this.subordinateListingRequest(port, SubordinateListingRequest.requestAll())))
+        .containsExactly("https://a.example.com");
+    assertThat(this.recordingClient().trustMarkedListing(
+        this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null))))
+        .containsExactly("https://a.example.com");
+    this.assertEveryResponseClosed(2);
+  }
+
+  @Test
+  void aListingEndpointThatCannotBeReachedIsAnError() {
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = this.recordingClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+
+    assertThatThrownBy(() -> client.subordinateListing(new FederationRequest<>(
+        SubordinateListingRequest.requestAll(),
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT, "http://localhost:1/list"))))
+        .isInstanceOf(ClientRegistryException.class);
+    assertThatThrownBy(() -> client.trustMarkedListing(new FederationRequest<>(
+        new TrustMarkListingRequest(MARK_ONE, null),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_LIST_ENDPOINT, "http://localhost:1/trust_mark_list"))))
+        .isInstanceOf(ClientRegistryException.class);
+
+    assertThat(this.responses).isEmpty();
+    assertThat(events).extracting(FederationCallEvent::getCall, FederationCallEvent::getOutcome).containsExactly(
+        tuple(FederationCallEvent.Call.SUBORDINATE_LISTING, FederationCallEvent.Outcome.UNREACHABLE),
+        tuple(FederationCallEvent.Call.TRUST_MARKED_LISTING, FederationCallEvent.Outcome.UNREACHABLE));
+  }
+
+  @Test
+  void everyListingCallIsPublishedWithItsOutcome() throws Exception {
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+    final int port = this.startServer();
+
+    this.body = "[]";
+    client.subordinateListing(this.subordinateListingRequest(port, SubordinateListingRequest.requestAll()));
+    client.trustMarkedListing(this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null)));
+    this.status = 404;
+    this.body = "";
+    assertThatThrownBy(() -> client.subordinateListing(
+        this.subordinateListingRequest(port, SubordinateListingRequest.requestAll())))
+        .isInstanceOf(ClientRegistryException.class);
+    assertThatThrownBy(() -> client.trustMarkedListing(
+        this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null))))
+        .isInstanceOf(ClientRegistryException.class);
+
+    assertThat(events).extracting(FederationCallEvent::getCall, FederationCallEvent::getOutcome).containsExactly(
+        tuple(FederationCallEvent.Call.SUBORDINATE_LISTING, FederationCallEvent.Outcome.SUCCESS),
+        tuple(FederationCallEvent.Call.TRUST_MARKED_LISTING, FederationCallEvent.Outcome.SUCCESS),
+        tuple(FederationCallEvent.Call.SUBORDINATE_LISTING, FederationCallEvent.Outcome.ERROR_RESPONSE),
+        tuple(FederationCallEvent.Call.TRUST_MARKED_LISTING, FederationCallEvent.Outcome.ERROR_RESPONSE));
+    assertThat(events.get(0).getError()).isNull();
+    assertThat(events.get(2).getError()).contains("404");
+    assertThat(events.get(3).getError()).contains("404");
+  }
+
+  @Test
+  void aListingCallThatNamesTheEntityIsReportedUnderTheEntity() throws Exception {
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+    this.body = "[]";
+    final int port = this.startServer();
+    final String listEndpoint = "http://localhost:%d/list".formatted(port);
+    final String trustMarkListEndpoint = "http://localhost:%d/trust_mark_list".formatted(port);
+
+    client.subordinateListing(new FederationRequest<>(SubordinateListingRequest.requestAll(),
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT, listEndpoint,
+            HttpFederationClient.LISTING_ENTITY_ID, TRUST_ANCHOR)));
+    client.trustMarkedListing(new FederationRequest<>(new TrustMarkListingRequest(MARK_ONE, null),
+        Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_LIST_ENDPOINT, trustMarkListEndpoint,
+            HttpFederationClient.LISTING_ENTITY_ID, TRUST_MARK_ISSUER)));
+
+    assertThat(this.queries).containsExactly(null, "trust_mark_type=https%3A%2F%2Fexample.com%2Fmark-one");
+    assertThat(events).extracting(FederationCallEvent::getServiceType, FederationCallEvent::getServiceId,
+        FederationCallEvent::getEndpoint, FederationCallEvent::getIssuer).containsExactly(
+        tuple(FederationCallEvent.ServiceType.SUBORDINATE_LISTING, TRUST_ANCHOR, listEndpoint, TRUST_ANCHOR),
+        tuple(FederationCallEvent.ServiceType.TRUST_MARK_ISSUER, TRUST_MARK_ISSUER, trustMarkListEndpoint,
+            TRUST_MARK_ISSUER));
+  }
+
+  @Test
+  void aListingCallThatDoesNotNameTheEntityIsReportedUnderTheEndpoint() throws Exception {
+    final List<FederationCallEvent> events = new ArrayList<>();
+    final HttpFederationClient client = new HttpFederationClient();
+    client.setApplicationEventPublisher(e -> events.add((FederationCallEvent) e));
+    this.body = "[]";
+    final int port = this.startServer();
+    final String listEndpoint = "http://localhost:%d/list".formatted(port);
+    final String trustMarkListEndpoint = "http://localhost:%d/trust_mark_list".formatted(port);
+
+    client.subordinateListing(this.subordinateListingRequest(port, SubordinateListingRequest.requestAll()));
+    client.subordinateListing(new FederationRequest<>(SubordinateListingRequest.requestAll(),
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT, listEndpoint,
+            HttpFederationClient.LISTING_ENTITY_ID, " ")));
+    client.subordinateListing(new FederationRequest<>(SubordinateListingRequest.requestAll(),
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT, listEndpoint,
+            HttpFederationClient.LISTING_ENTITY_ID, URI.create(TRUST_ANCHOR))));
+    client.trustMarkedListing(this.trustMarkedListingRequest(port, new TrustMarkListingRequest(MARK_ONE, null)));
+
+    assertThat(events).extracting(FederationCallEvent::getServiceType, FederationCallEvent::getServiceId,
+        FederationCallEvent::getIssuer).containsExactly(
+        tuple(FederationCallEvent.ServiceType.SUBORDINATE_LISTING, listEndpoint, null),
+        tuple(FederationCallEvent.ServiceType.SUBORDINATE_LISTING, listEndpoint, null),
+        tuple(FederationCallEvent.ServiceType.SUBORDINATE_LISTING, listEndpoint, null),
+        tuple(FederationCallEvent.ServiceType.TRUST_MARK_ISSUER, trustMarkListEndpoint, null));
   }
 
   @Test
@@ -530,6 +843,18 @@ class HttpFederationClientTest extends FederationTestSupport {
     return new FederationRequest<>(new FederationTrustMarkStatusRequest(trustMark, TRUST_MARK_ISSUER),
         Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_STATUS_ENDPOINT,
             "http://localhost:%d/trust_mark_status".formatted(port)));
+  }
+
+  private FederationRequest<SubordinateListingRequest> subordinateListingRequest(
+      final int port, final SubordinateListingRequest request) {
+    return new FederationRequest<>(request,
+        Map.of(HttpFederationClient.FEDERATION_LIST_ENDPOINT, "http://localhost:%d/list".formatted(port)));
+  }
+
+  private FederationRequest<TrustMarkListingRequest> trustMarkedListingRequest(
+      final int port, final TrustMarkListingRequest request) {
+    return new FederationRequest<>(request, Map.of(HttpFederationClient.FEDERATION_TRUST_MARK_LIST_ENDPOINT,
+        "http://localhost:%d/trust_mark_list".formatted(port)));
   }
 
   private FederationRequest<EntityConfigurationRequest> entityConfigurationRequest(final String entityId) {

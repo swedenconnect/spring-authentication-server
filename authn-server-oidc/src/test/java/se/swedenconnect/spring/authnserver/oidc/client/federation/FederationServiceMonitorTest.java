@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.util.List;
 
@@ -110,6 +111,46 @@ class FederationServiceMonitorTest {
     new StringRedisTemplate(nodeA).opsForSet().add("test:oidc:federation-services", "test:oidc:gone", "test:bad");
     new StringRedisTemplate(nodeA).opsForHash().put("test:bad", "type", "NOT_A_TYPE");
     assertThat(a.getStates()).hasSize(2);
+  }
+
+  @Test
+  void anEntityThatListsItsSubordinatesIsReported() {
+    this.anEntityThatListsItsSubordinatesIsReported(new InMemoryFederationServiceStateStore());
+  }
+
+  @Test
+  void anEntityThatListsItsSubordinatesIsReportedWithRedis() {
+    this.anEntityThatListsItsSubordinatesIsReported(
+        new RedisFederationServiceStateStore(new StringRedisTemplate(nodeA), "test"));
+  }
+
+  private void anEntityThatListsItsSubordinatesIsReported(final FederationServiceStateStore store) {
+    final FederationServiceMonitor monitor = new FederationServiceMonitor(store);
+    final String trustAnchor = "https://ta.example.com";
+
+    monitor.onApplicationEvent(new FederationCallEvent(FederationCallEvent.Call.SUBORDINATE_LISTING,
+        trustAnchor + "/list", trustAnchor, FederationCallEvent.Outcome.ERROR_RESPONSE, "answered 404"));
+    monitor.onApplicationEvent(new FederationCallEvent(FederationCallEvent.Call.SUBORDINATE_LISTING,
+        trustAnchor + "/list", trustAnchor, FederationCallEvent.Outcome.SUCCESS, null));
+    monitor.onApplicationEvent(new FederationCallEvent(FederationCallEvent.Call.SUBORDINATE_LISTING,
+        "https://im.example.com/list", null, FederationCallEvent.Outcome.UNREACHABLE, "connection refused"));
+    monitor.onApplicationEvent(new FederationCallEvent(FederationCallEvent.Call.TRUST_MARK,
+        "https://tmi.example.com/trust_mark", ISSUER, FederationCallEvent.Outcome.SUCCESS, null));
+    monitor.onApplicationEvent(new FederationCallEvent(FederationCallEvent.Call.TRUST_MARKED_LISTING,
+        "https://tmi.example.com/trust_mark_list", ISSUER, FederationCallEvent.Outcome.ERROR_RESPONSE, "answered 500"));
+
+    assertThat(monitor.getStates()).hasSize(3);
+    assertThat(monitor.getStates()).filteredOn(s -> s.type() == FederationCallEvent.ServiceType.SUBORDINATE_LISTING)
+        .extracting(FederationServiceState::id, FederationServiceState::isFailing,
+            FederationServiceState::lastFailureError)
+        .containsExactlyInAnyOrder(
+            tuple(trustAnchor, false, "answered 404"),
+            tuple("https://im.example.com/list", true, "connection refused"));
+    assertThat(monitor.getStates()).filteredOn(s -> s.type() == FederationCallEvent.ServiceType.TRUST_MARK_ISSUER)
+        .singleElement()
+        .satisfies(s -> assertThat(s.id()).isEqualTo(ISSUER))
+        .satisfies(s -> assertThat(s.isFailing()).isTrue())
+        .satisfies(s -> assertThat(s.lastFailureError()).isEqualTo("answered 500"));
   }
 
   private void aFailureFollowedByASuccessIsStillShown(final FederationServiceStateStore store) {
