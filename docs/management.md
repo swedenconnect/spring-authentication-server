@@ -15,20 +15,32 @@ disappears.
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
-- [Setting up the Actuator](#setting-up-the-actuator)
-- [The clients endpoint](#the-clients-endpoint)
-    - [Allowing the update operations](#allowing-the-update-operations)
-- [The info endpoint](#the-info-endpoint)
-- [The health endpoint](#the-health-endpoint)
-    - [The WARNING status](#the-warning-status)
-    - [SAML metadata](#saml-metadata-health)
-    - [The trust marks of the OpenID Provider](#oidc-trust-marks-health)
-    - [Federation services](#oidc-federation-health)
-- [State that survives a restart](#state-that-survives-a-restart)
-- [Clients added and removed](#clients-added-and-removed)
+## Table of Contents
+
+1. [**Setting up the Actuator**](#setting-up-the-actuator)
+
+2. [**The clients endpoint**](#the-clients-endpoint)
+
+    2.1. [Allowing the update operations](#allowing-the-update-operations)
+
+3. [**The info endpoint**](#the-info-endpoint)
+
+4. [**The health endpoint**](#the-health-endpoint)
+
+    4.1. [The WARNING status](#the-warning-status)
+
+    4.2. [SAML metadata](#saml-metadata-health)
+
+    4.3. [The trust marks of the OpenID Provider](#oidc-trust-marks-health)
+
+    4.4. [Federation services](#oidc-federation-health)
+
+5. [**State that survives a restart**](#state-that-survives-a-restart)
+
+6. [**Clients added and removed**](#clients-added-and-removed)
 
 <a name="setting-up-the-actuator"></a>
-## Setting up the Actuator
+## 1. Setting up the Actuator
 
 The Actuator support is active when Spring Boot Actuator is on the classpath. The starters do not bring it, so add it
 to the application:
@@ -63,7 +75,7 @@ management:
 The examples on this page assume that the endpoints are found under `/actuator`.
 
 <a name="the-clients-endpoint"></a>
-## The clients endpoint
+## 2. The clients endpoint
 
 **Path:** `/actuator/clients`
 
@@ -145,7 +157,7 @@ A SAML metadata source is updated in the same way as when the scheduled download
 it adds or removes are reported as [added and removed](#clients-added-and-removed).
 
 <a name="allowing-the-update-operations"></a>
-### Allowing the update operations
+### 2.1. Allowing the update operations
 
 The update operations change what the server holds and make calls to other services, so the default access of the
 endpoint is read-only. Until the deployment grants more, a `POST` is refused. Grant it with:
@@ -165,7 +177,7 @@ curl -X POST -H 'Content-Type: application/json' \
 ```
 
 <a name="the-info-endpoint"></a>
-## The info endpoint
+## 3. The info endpoint
 
 **Path:** `/actuator/info`
 
@@ -226,7 +238,7 @@ A source that cannot tell how many clients it has, such as an MDQ source, gives 
 ```
 
 <a name="the-health-endpoint"></a>
-## The health endpoint
+## 4. The health endpoint
 
 **Path:** `/actuator/health`
 
@@ -238,7 +250,7 @@ one for Redis, and the indicator of credentials-support for monitored credential
 are not duplicated. An indicator is turned off with `management.health.<key>.enabled: false`.
 
 <a name="the-warning-status"></a>
-### The WARNING status
+### 4.1. The WARNING status
 
 The server adds the status `WARNING` for a failure where the server still works, for example a metadata download that
 failed while the metadata already held is used.
@@ -264,7 +276,7 @@ Boot's default mappings, so it gives the codes for `DOWN` and `OUT_OF_SERVICE` t
 those statuses would give HTTP 200.
 
 <a name="saml-metadata-health"></a>
-### SAML metadata
+### 4.2. SAML metadata
 
 **Key:** `saml-metadata`
 
@@ -299,7 +311,7 @@ source cannot tell how many Service Providers it has, and does not count as empt
 `loaded-at` is when the metadata was last downloaded or read successfully, and `age` is the time since then.
 
 <a name="oidc-trust-marks-health"></a>
-### The trust marks of the OpenID Provider
+### 4.3. The trust marks of the OpenID Provider
 
 **Key:** `oidc-trust-marks`
 
@@ -316,7 +328,7 @@ number of failed attempts and the latest error.
 When the trust marks are kept in Redis, every server instance reports the same.
 
 <a name="oidc-federation-health"></a>
-### Federation services
+### 4.4. Federation services
 
 **Key:** `oidc-federation`
 
@@ -367,7 +379,7 @@ sets up the federation backend of the client registry builds it with that bean, 
 creates itself are not seen.
 
 <a name="state-that-survives-a-restart"></a>
-## State that survives a restart
+## 5. State that survives a restart
 
 When the server keeps its state in memory, some of it is worth keeping when the server restarts. Give a cache
 directory:
@@ -399,7 +411,7 @@ restart there and the cache directory is not used for it. The record of known cl
 `authn-server.oidc.storage.trust-marks`.
 
 <a name="clients-added-and-removed"></a>
-## Clients added and removed
+## 6. Clients added and removed
 
 The server publishes an audit event when a client appears in or disappears from the client registry:
 [`client_added`](audit.html#client_added) and [`client_removed`](audit.html#client_removed). There is one event per

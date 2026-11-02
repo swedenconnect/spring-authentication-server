@@ -17,7 +17,38 @@ answers. The SAML and OpenID Connect layers reach for the protocol metadata insi
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
-## Looking up a requester
+## Table of Contents
+
+1. [**Looking up a requester**](#looking-up-a-requester)
+
+2. [**The record**](#the-record)
+
+    2.1. [Marks](#marks)
+
+    2.2. [The organisation number](#the-organisation-number)
+
+3. [**Backends**](#backends)
+
+4. [**SAML: metadata sources**](#saml-metadata-sources)
+
+5. [**OpenID Connect: three backends**](#openid-connect-three-backends)
+
+6. [**The federation backend**](#the-federation-backend)
+
+    6.1. [The cache](#the-cache)
+
+    6.2. [Keeping frequently used clients fresh](#keeping-frequently-used-clients-fresh)
+
+    6.3. [Trust marks on demand](#trust-marks-on-demand)
+
+    6.4. [Checking the status of trust marks](#trust-mark-status-checks)
+
+    6.5. [Several nodes](#several-nodes)
+
+7. [**Deciding which requesters may use the server**](#requester-acceptance)
+
+<a name="looking-up-a-requester"></a>
+## 1. Looking up a requester
 
 [`ClientRegistry`][ClientRegistry] has one lookup, by protocol and requester identity:
 
@@ -33,7 +64,8 @@ backend that fails. A metadata source that cannot be read, or a resolver service
 [`ClientRegistryException`][ClientRegistryException]. A failure is never reported as an unknown requester, so a
 temporary problem behind the registry never turns into "no such client".
 
-## The record
+<a name="the-record"></a>
+## 2. The record
 
 A [`RequesterRecord`][RequesterRecord] holds a protocol-neutral part and the protocol metadata.
 
@@ -64,7 +96,8 @@ EntityDescriptor spMetadata = record.getProtocolMetadata(EntityDescriptor.class)
 OIDCClientMetadata clientMetadata = record.getProtocolMetadata(OIDCClientMetadata.class);
 ```
 
-### Marks
+<a name="marks"></a>
+### 2.1. Marks
 
 Marks are one set of identifiers for both protocols:
 
@@ -84,7 +117,7 @@ A mark that the operator has set on a configured client, or on a client held in 
 operator vouches for it. Those are not verified.
 
 <a name="the-organisation-number"></a>
-### The organisation number
+### 2.2. The organisation number
 
 `record.organizationNumber()` tells which organisation the requester belongs to, so that code such as login page
 support, audit and checks for accepting a requester does not have to read SAML or OpenID Connect metadata:
@@ -103,14 +136,16 @@ protocols handles both forms itself.
 
 The organisation number is optional. A requester whose metadata gives none has `null` in its record.
 
-## Backends
+<a name="backends"></a>
+## 3. Backends
 
 The registry itself holds no data. It asks its backends, and each backend answers for one protocol. Several backends
 may serve the same protocol, in which case they are asked in the order they were given and the first one that knows
 the requester wins. [`ClientRegistryBackend`][ClientRegistryBackend] is the interface, and
 [`DefaultClientRegistry`][DefaultClientRegistry] is the registry that asks them.
 
-## SAML: metadata sources
+<a name="saml-metadata-sources"></a>
+## 4. SAML: metadata sources
 
 Service Provider metadata is read through one or more [`MetadataSource`][MetadataSource] objects, and
 [`MetadataProviderFactory`][MetadataProviderFactory] turns them into the OpenSAML provider that
@@ -157,7 +192,8 @@ Provider declares. The organisation number comes from the `mdorgext:Organization
 The SAML configurer creates this backend from the metadata sources it is given, and with Spring Boot the sources are
 set with the `authn-server.saml.metadata-providers` properties, see [Configuration](configuration.html#sp-metadata).
 
-## OpenID Connect: three backends
+<a name="openid-connect-three-backends"></a>
+## 5. OpenID Connect: three backends
 
 The OpenID Connect side has three backends. They are asked in a configured order, and the default order is
 configuration, repository, federation.
@@ -208,7 +244,7 @@ the secret in the `client_secret` field of its metadata, see
 [Client authentication](openid-provider.html#client-authentication).
 
 <a name="the-federation-backend"></a>
-## The federation backend
+## 6. The federation backend
 
 The federation backend resolves a client through OpenID Federation, where the `client_id` of the client is its entity
 identifier.
@@ -256,7 +292,8 @@ types of the response.
 Resolving inside the OpenID Provider itself is a later addition. It arrives as another implementation of
 `FederationResolver`, and nothing else changes.
 
-### The cache
+<a name="the-cache"></a>
+### 6.1. The cache
 
 Resolved clients are cached, because reaching the resolver on every request is not an option.
 
@@ -269,7 +306,8 @@ Resolved clients are cached, because reaching the resolver on every request is n
   repeated requests with the same unknown `client_id` do not each reach the resolver. A resolver that fails is never
   cached.
 
-### Keeping frequently used clients fresh
+<a name="keeping-frequently-used-clients-fresh"></a>
+### 6.2. Keeping frequently used clients fresh
 
 [`FederationCacheRefresher`][FederationCacheRefresher] is a background job that resolves a cached client again
 shortly before its entry expires, so that a request from a client that is used often never waits for the resolver.
@@ -295,7 +333,8 @@ Built from the backend, the refresher uses the cache, the resolver and the setti
 the resolver no longer knows is reported as [removed](management.html#clients-added-and-removed). The constructor that
 takes the parts one by one is still there, but a refresher built that way reports nothing.
 
-### Trust marks on demand
+<a name="trust-marks-on-demand"></a>
+### 6.3. Trust marks on demand
 
 A resolve response carries the trust marks that the resolver knows about. A trust mark that it does not carry can be
 asked for from its issuer:
@@ -321,7 +360,7 @@ if (record != null && record.hasMark(trustMarkType)) {
 For SAML, asking for a mark never finds anything. It gives the requester's record unchanged.
 
 <a name="trust-mark-status-checks"></a>
-### Checking the status of trust marks
+### 6.4. Checking the status of trust marks
 
 [`TrustMarkStatusChecker`][TrustMarkStatusChecker] is a background job that asks the issuer whether the trust marks
 obtained on demand are still valid, at the issuer's trust mark status endpoint (OpenID Federation 1.0, Section 8.4).
@@ -357,7 +396,8 @@ status checks count toward the [health of the trust mark issuers](management.htm
 The trust marks of the resolve response are not checked by the job. The resolver has checked them, and they are held
 no longer than the resolve response is valid.
 
-### Several nodes
+<a name="several-nodes"></a>
+### 6.5. Several nodes
 
 The cache is also where the background jobs keep their shared state. The backend asks the cache for the object that
 counts lookups, and the jobs ask it for the lock that decides which node runs a round. With a
@@ -388,7 +428,7 @@ The backend is added to the client registry with an `AuthnServerConfigurerAdapte
 updated through the [clients endpoint](management.html#the-clients-endpoint).
 
 <a name="requester-acceptance"></a>
-## Deciding which requesters may use the server
+## 7. Deciding which requesters may use the server
 
 Knowing a requester is not the same as accepting it. Once the requester has been found in the registry and its
 request has been verified, a [`RequesterAcceptance`][RequesterAcceptance] check decides whether it may use the server.
