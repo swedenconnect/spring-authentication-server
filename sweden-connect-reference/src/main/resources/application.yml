@@ -293,6 +293,11 @@ authn-server:
       - https://id.oidc.se/scope/naturalPersonNumber
       - https://id.oidc.se/scope/signApproval
 
+    # The page for Relying Party developers that describes the service. A deployment may override it.
+    discovery:
+      additional-parameters:
+        service_documentation: https://docs.swedenconnect.se/spring-authentication-server/service_documentation.html
+
     # DEPLOYMENT MUST ADD: the OpenID Connect clients. Each entry is either a location, a file holding one client or
     # an array of clients as JSON, or one client given inline. For example:
     #

@@ -267,6 +267,19 @@ Service", is shared. See
 simulated authentication cannot sign, and a signature request that uses it is rejected. See
 [Section 6.7, "Scopes and claims"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-scopes-and-claims) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 
+**Service documentation.** The discovery document holds `service_documentation`, the URL of a
+[page for Relying Party developers](https://docs.swedenconnect.se/spring-authentication-server/service_documentation.html)
+that describes the service. It is set under `authn-server.oidc.discovery.additional-parameters`, and a deployment
+overrides it with a URL of its own:
+
+```yaml
+authn-server:
+  oidc:
+    discovery:
+      additional-parameters:
+        service_documentation: https://op.example.com/docs
+```
+
 **AJP.** The Tomcat AJP connector is off. A deployment behind a web server that speaks AJP turns it on:
 
 | Setting | Description | Default value |
