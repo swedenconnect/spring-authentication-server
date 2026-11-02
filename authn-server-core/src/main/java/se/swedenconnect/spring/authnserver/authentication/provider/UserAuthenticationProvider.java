@@ -81,7 +81,8 @@ public interface UserAuthenticationProvider extends AuthenticationProvider {
   /**
    * Gets the OpenID Connect scopes that the provider offers. When the provider declares scopes, the OpenID Provider
    * offers exactly those for it. When it declares none, the scopes are derived from the claims of
-   * {@link #getSupportedAttributes()}. Other protocols do not use them. The default is none.
+   * {@link #getSupportedAttributes()}. The sign and sign approval scopes are never derived, so a provider that offers
+   * them must declare them. Other protocols do not use them. The default is none.
    *
    * @return scope values
    */

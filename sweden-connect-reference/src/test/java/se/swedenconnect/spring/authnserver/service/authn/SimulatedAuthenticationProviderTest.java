@@ -58,8 +58,7 @@ class SimulatedAuthenticationProviderTest {
     assertThat(this.provider.getEntityCategories()).containsExactly("http://id.elegnamnden.se/ec/1.0/loa3-pnr");
     assertThat(this.provider.getSupportedAttributes()).contains(AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER,
         AttributeIdentifiers.COORDINATION_NUMBER, AttributeIdentifiers.DATE_OF_BIRTH);
-    assertThat(this.provider.getSupportedScopes()).contains("openid", "https://id.oidc.se/scope/sign",
-        "https://id.oidc.se/scope/signApproval", "https://id.oidc.se/scope/naturalPersonNumber");
+    assertThat(this.provider.getSupportedScopes()).isEmpty();
     assertThat(this.provider.supportsUserAuthenticationToken(token(user(), null))).isTrue();
     assertThat(this.provider.supportsUserAuthenticationToken(new TestingAuthenticationToken("a", "b"))).isFalse();
   }

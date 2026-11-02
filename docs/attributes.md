@@ -217,6 +217,10 @@ built-in ones:
 The `openid` scope asks for `sub`, and `signApproval` asks for no claims at all, so neither of them gives a requested
 attribute. A scope that is not registered asks for nothing, which is not an error.
 
+The OpenID Provider never derives `sign` and `signApproval` from the claims of the providers. They are only offered
+when a provider declares them or they are configured, see
+[The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+
 #### Adding a scope
 
 A scope is an `OidcScopeValue`, which states its claims and, for each of them, whether it is essential and where it is

@@ -818,9 +818,13 @@ By default, the offered scopes and the supported claims are worked out from the 
 authentication providers declare, see
 [The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
 
-- `scopes` replaces the derived scopes. Each scope must be in the scope registry, and `openid` is always offered.
+- `scopes` replaces the derived scopes. Each scope must be in the scope registry, and `openid` is always offered. The
+  sign scopes, `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval`, are never derived, so they
+  are only offered when they are set here or declared by a provider. A warning is logged at startup for a scope whose
+  claims cannot be delivered.
 - `claims` is added to the claims of the providers. The claims count when scopes are derived and are published as
-  `claims_supported`. The claims of the offered scopes are not added automatically.
+  `claims_supported`, together with `sub`, `auth_time` and `acr`, which are always published. The claims of the
+  offered scopes are not added automatically.
 
 ```yaml
 authn-server:
