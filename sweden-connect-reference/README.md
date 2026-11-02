@@ -93,13 +93,13 @@ required when the protocol is enabled; both are enabled by default.
 
 | Setting | Description |
 | :--- | :--- |
-| `authn-server.base-url` | The base URL of the server: protocol, host, port and context path, for example `https://idp.example.com`. Every URL of the server is built from it, see [URL layout](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#url-layout). |
+| `authn-server.base-url` | The base URL of the server: protocol, host, port and context path, for example `https://idp.example.com`. Every URL of the server is built from it, see [Section 3, "URL layout"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#url-layout) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
 | `spring.ssl.bundle.*.tls` | The TLS key store of the server, as a Spring Boot [SSL bundle](https://docs.spring.io/spring-boot/reference/features/ssl.html) named `tls`, the bundle that `server.ssl.bundle` names. A JKS or PKCS#12 key store under `spring.ssl.bundle.jks.tls`, or PEM files under `spring.ssl.bundle.pem.tls`. |
 | `authn-server.saml.entity-id` | The SAML entity ID of the Identity Provider. |
-| `authn-server.saml.credentials.*` | The SAML signing key (`sign`) and encryption key (`encrypt`), or one key for both (`default-credential`). A metadata signing key (`metadata-sign`) is recommended. See [Credentials](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#credentials). |
-| `authn-server.saml.metadata-providers[]` | The sources of the SAML Service Provider metadata, for example the metadata of the Sweden Connect federation. See [Service Provider metadata](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#sp-metadata). |
+| `authn-server.saml.credentials.*` | The SAML signing key (`sign`) and encryption key (`encrypt`), or one key for both (`default-credential`). A metadata signing key (`metadata-sign`) is recommended. See [Section 5.1, "Credentials"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#credentials) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
+| `authn-server.saml.metadata-providers[]` | The sources of the SAML Service Provider metadata, for example the metadata of the Sweden Connect federation. See [Section 5.4, "Service Provider metadata"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#sp-metadata) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
 | `authn-server.oidc.issuer` | The issuer identifier of the OpenID Provider. It is also its OpenID Federation entity identifier. It must be the base URL, or begin with it. |
-| `authn-server.oidc.keys.signing[]` | The signing keys of the OpenID Provider. See [Keys](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-keys). |
+| `authn-server.oidc.keys.signing[]` | The signing keys of the OpenID Provider. See [Section 6.1, "Keys"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-keys) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). |
 | `authn-server.oidc.clients[]` | The OpenID Connect clients, in JSON files or inline, unless every client is resolved through an OpenID Federation, see [OpenID Connect clients](#openid-connect-clients). |
 
 The keys are configured through [credentials-support](https://docs.swedenconnect.se/credentials-support/), preferably as
@@ -172,7 +172,7 @@ authn-server:
 ### OpenID Connect clients
 
 The OpenID Connect clients are given with `authn-server.oidc.clients`, see
-[Clients](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-clients). Each entry is
+[Section 6.2, "Clients"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-clients) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html). Each entry is
 either the `location` of a JSON file, holding one client object or an array of them, or one client given inline with
 `client-id`, `metadata` as a JSON string, and optionally `client-secret` and `trust-mark-types`. A client object in a
 file has `client_id`, `metadata` as a nested object, and optionally `client_secret` and `trust_mark_types`. The
@@ -218,12 +218,12 @@ The clients are read at startup only, so a changed file takes effect when the se
 
 A deployment that joins an OpenID Federation also, or instead, accepts clients resolved through the federation, with
 `authn-server.oidc.federation.clients` and the trust anchor, see
-[Clients from OpenID Federation](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-federation-clients).
+[Section 6.11, "Clients from OpenID Federation"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-federation-clients) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 The configured clients are asked first, so a configured client wins over what the federation says about the same
 `client_id`.
 The `client_name` and `logo_uri` of a client are shown on the pages, in the language of the page where the metadata
 gives one. Only `private_key_jwt` is enabled at the token endpoint by default, see
-[The token endpoint and tokens](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-token-endpoint)
+[Section 6.6, "The token endpoint and tokens"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-token-endpoint) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html)
 for how to enable the others.
 
 <a name="optional-settings"></a>
@@ -235,7 +235,7 @@ settings that a deployment of the reference is most likely to change.
 
 **The subject identifier secret.** The SAML `NameID` and the OpenID Connect `sub` are computed with a secret. Setting
 `authn-server.subject-identifier.secret` is strongly recommended, see
-[Subject identifiers](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#subject-identifiers).
+[Section 4.2, "Subject identifiers"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#subject-identifiers) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 
 **Context path.** The service has no context path. A deployment may add one with `server.servlet.context-path`, for
 example `/idp`. The context path is then part of the base URL, and so of the OpenID Connect issuer and of every
@@ -259,13 +259,13 @@ OpenID Provider under `authn-server.oidc.entity-information.ui-info.display-name
 both protocols side by side. A normal deployment gives one shared display name under
 `authn-server.entity-information.ui-info.display-names`. The description, "Sweden Connect Reference Authentication
 Service", is shared. See
-[Entity information](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#entity-information).
+[Section 4.3, "Entity information"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#entity-information) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 
 **Scopes.** The OpenID Provider offers the scopes set in `authn-server.oidc.scopes`: `openid`, `profile`,
 `https://id.oidc.se/scope/naturalPersonInfo`, `https://id.oidc.se/scope/naturalPersonNumber` and
 `https://id.oidc.se/scope/signApproval`. The sign scope, `https://id.oidc.se/scope/sign`, is not offered, since the
 simulated authentication cannot sign, and a signature request that uses it is rejected. See
-[Scopes and claims](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-scopes-and-claims).
+[Section 6.7, "Scopes and claims"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#oidc-scopes-and-claims) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 
 **AJP.** The Tomcat AJP connector is off. A deployment behind a web server that speaks AJP turns it on:
 
@@ -281,7 +281,7 @@ A deployment that runs several instances keeps them in Redis instead, by setting
 `redis` and configuring the Redis connection under `spring.data.redis`. The Redis libraries are part of the service, so
 no other change is needed. The Redis health check of the Actuator is off by default, and is turned on with
 `management.health.redis.enabled`. See
-[Running several nodes](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#running-several-nodes).
+[Section 7, "Running several nodes"](https://docs.swedenconnect.se/spring-authentication-server/configuration.html#running-several-nodes) of [Configuration](https://docs.swedenconnect.se/spring-authentication-server/configuration.html).
 
 ```yaml
 authn-server:
@@ -365,7 +365,7 @@ levels of assurance, one of them.
   authenticating: `AUTHN_FAILED`, `CANCEL`, `FRAUD`, `POSSIBLE_FRAUD`, `UNKNOWN_PRINCIPAL`, `NO_AUTHN_CONTEXT`,
   `NOT_AUTHORIZED` or `SIGN_MESSAGE_NOT_DISPLAYED`, with a message of the tester's choice. Each is turned into the
   SAML status or OpenID Connect error of its protocol, see
-  [Errors](https://docs.swedenconnect.se/spring-authentication-server/authentication-module.html#errors).
+  [Section 5, "Errors"](https://docs.swedenconnect.se/spring-authentication-server/authentication-module.html#errors) of [Writing an authentication module](https://docs.swedenconnect.se/spring-authentication-server/authentication-module.html).
 
 The pages are in Swedish and English.
 

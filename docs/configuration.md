@@ -187,7 +187,7 @@ A protocol may also place some endpoints directly under the base URL. The OpenID
 document, which is published at the issuer followed by `/.well-known/openid-configuration`. The issuer defaults to the
 base URL, so the document is found at `https://idp.example.com/auth/.well-known/openid-configuration`. An issuer with a
 path, which must begin with the base URL, moves the document along with it, see
-[The OpenID Provider](openid-provider.html#where-things-are-published). The OpenID Federation entity configuration,
+[Section 1, "Where things are published"](openid-provider.html#where-things-are-published) of [The OpenID Provider](openid-provider.html). The OpenID Federation entity configuration,
 at the issuer followed by `/.well-known/openid-federation`, is placed in the same way.
 
 The SAML entity ID defaults to the base URL. In a server that offers both protocols, the SAML entity ID and the OpenID
@@ -207,21 +207,21 @@ wins over the shared one.
 
 | Property | Description | Default value | Per protocol |
 | :--- | :--- | :--- | :--- |
-| `authn-server.base-url` | The base URL of the server, see [URL layout](#url-layout). | Required | No |
-| `authn-server.sso.*` | The single sign-on policy, see [Single sign-on](#single-sign-on). | See below | Yes |
+| `authn-server.base-url` | The base URL of the server, see [Section 3, "URL layout"](#url-layout). | Required | No |
+| `authn-server.sso.*` | The single sign-on policy, see [Section 4.1, "Single sign-on"](#single-sign-on). | See below | Yes |
 | `authn-server.clock-skew` | The time that clocks of other parties may differ from the server clock. | 30 seconds | Yes |
 | `authn-server.supports-user-message` | Whether the server can display a user message sent by the requester. For SAML, see the [User Message Extension](https://docs.swedenconnect.se/technical-framework/updates/18_-_User_Message_Extension_in_SAML_Authentication_Requests.html). | `false` | Yes |
-| `authn-server.subject-identifier.*` | How subject identifiers are computed, see [Subject identifiers](#subject-identifiers). | See below | Yes |
-| `authn-server.entity-information.*` | The names, logos and contact persons that every protocol publishes, see [Entity information](#entity-information). | - | Yes |
+| `authn-server.subject-identifier.*` | How subject identifiers are computed, see [Section 4.2, "Subject identifiers"](#subject-identifiers). | See below | Yes |
+| `authn-server.entity-information.*` | The names, logos and contact persons that every protocol publishes, see [Section 4.3, "Entity information"](#entity-information). | - | Yes |
 | `authn-server.authn-flow-max-age` | How long the server waits for the user to come back from an authentication module that has pages of its own. Applied to the session-based storage of every redirect provider. | 30 minutes | No |
-| `authn-server.storage.type` | Where the HTTP session and the stores are kept, `memory` or `redis`, see [Running several nodes](#running-several-nodes). | `memory` | Per store |
-| `authn-server.cache-directory` | A directory where the server keeps state that should survive a restart when it keeps its state in memory: the OpenID Provider's own trust marks, the OpenID Federation client cache and the record of known clients, see [State that survives a restart](management.html#state-that-survives-a-restart). | Nothing is kept | No |
+| `authn-server.storage.type` | Where the HTTP session and the stores are kept, `memory` or `redis`, see [Section 7, "Running several nodes"](#running-several-nodes). | `memory` | Per store |
+| `authn-server.cache-directory` | A directory where the server keeps state that should survive a restart when it keeps its state in memory: the OpenID Provider's own trust marks, the OpenID Federation client cache and the record of known clients, see [Section 5, "State that survives a restart"](management.html#state-that-survives-a-restart) of [Monitoring and managing the server](management.html). | Nothing is kept | No |
 
 <a name="single-sign-on"></a>
 ### 4.1. Single sign-on
 
 The properties give the [`SsoPolicy`][SsoPolicy] of the server, described in
-[Writing an authentication module](authentication-module.html#the-policy).
+[Section 4.2, "The policy"](authentication-module.html#the-policy) of [Writing an authentication module](authentication-module.html).
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -306,15 +306,15 @@ authn-server:
 ```
 
 A protocol may override any part of it, in the same way as the [single sign-on settings](#single-sign-on): the SAML
-values are given under `authn-server.saml.metadata`, see [The IdP metadata](#the-idp-metadata), and the OpenID Connect
+values are given under `authn-server.saml.metadata`, see [Section 5.3, "The IdP metadata"](#the-idp-metadata), and the OpenID Connect
 values under `authn-server.oidc.entity-information`, see
-[Entity information for OpenID Connect](#oidc-entity-information). A protocol value replaces the shared value it
+[Section 6.9, "Entity information for OpenID Connect"](#oidc-entity-information). A protocol value replaces the shared value it
 corresponds to: each of the display names, the descriptions, the logos, the organization names, display names, URLs
 and number is replaced as a whole, and a contact person replaces the shared contact person of the same type while the
 other shared contact persons are kept.
 
-How the information is published is described in [The IdP metadata](#the-idp-metadata) for SAML, and in
-[Descriptive metadata](openid-provider.html#descriptive-metadata) for OpenID Connect.
+How the information is published is described in [Section 5.3, "The IdP metadata"](#the-idp-metadata) for SAML, and in
+[Section 8.4, "Descriptive metadata"](openid-provider.html#descriptive-metadata) of [The OpenID Provider](openid-provider.html) for OpenID Connect.
 
 <a name="the-saml-identity-provider"></a>
 ## 5. The SAML Identity Provider
@@ -324,25 +324,25 @@ The SAML properties are placed under `authn-server.saml`.
 | Property | Description | Default value |
 | :--- | :--- | :--- |
 | `enabled` | Whether the SAML Identity Provider is enabled. | `false` |
-| `path` | The SAML path, see [URL layout](#url-layout). | `/saml2` |
+| `path` | The SAML path, see [Section 3, "URL layout"](#url-layout). | `/saml2` |
 | `entity-id` | The SAML entity ID of the Identity Provider. | The base URL |
 | `hok-base-url` | The base URL for the Holder-of-key endpoints, when they need another host or port than the base URL. Must not end with a `/`. | The base URL |
 | `requires-signed-requests` | Whether the Identity Provider requires signed authentication requests. Published in the metadata as `WantAuthnRequestsSigned`. | `true` |
-| `sso.*` | The single sign-on policy for SAML, see [Single sign-on](#single-sign-on). | `authn-server.sso.*` |
+| `sso.*` | The single sign-on policy for SAML, see [Section 4.1, "Single sign-on"](#single-sign-on). | `authn-server.sso.*` |
 | `clock-skew` | The clock skew for SAML. | `authn-server.clock-skew` |
 | `supports-user-message` | Whether user messages are supported for SAML. | `authn-server.supports-user-message` |
 | `subject-identifier.*` | The subject identifier settings for SAML. | `authn-server.subject-identifier.*` |
-| `credentials.*` | The credentials, see [Credentials](#credentials). | Required |
-| `endpoints.*` | The endpoints, see [Endpoints](#endpoints). | See below |
-| `metadata.*` | The IdP metadata, see [The IdP metadata](#the-idp-metadata). | See below |
-| `metadata-providers[].*` | The sources of Service Provider metadata, see [Service Provider metadata](#sp-metadata). | Required |
+| `credentials.*` | The credentials, see [Section 5.1, "Credentials"](#credentials). | Required |
+| `endpoints.*` | The endpoints, see [Section 5.2, "Endpoints"](#endpoints). | See below |
+| `metadata.*` | The IdP metadata, see [Section 5.3, "The IdP metadata"](#the-idp-metadata). | See below |
+| `metadata-providers[].*` | The sources of Service Provider metadata, see [Section 5.4, "Service Provider metadata"](#sp-metadata). | Required |
 | `max-message-age` | The maximum age of a received authentication request. | 3 minutes |
-| `assertions.encrypt` | Whether assertions are encrypted, see [Request processing](#request-processing). | `true` |
+| `assertions.encrypt` | Whether assertions are encrypted, see [Section 5.5, "Request processing"](#request-processing). | `true` |
 | `assertions.not-after` | How long an assertion is valid after it was issued. Gives `NotOnOrAfter` of the conditions and of the subject confirmation. Must be positive. | 5 minutes |
 | `assertions.not-before` | How long before it was issued an assertion is valid. Gives `NotBefore` of the conditions. | 10 seconds |
-| `authn-context.*` | How requested authentication contexts are resolved, see [Request processing](#request-processing). | Exact comparison only |
-| `replay.*` | The protection against replayed requests, see [Replay protection](#replay-protection). | See below |
-| `requester-acceptance.*` | Which Service Providers may use the Identity Provider, see [Requester acceptance](#requester-acceptance). | Every Service Provider |
+| `authn-context.*` | How requested authentication contexts are resolved, see [Section 5.5, "Request processing"](#request-processing). | Exact comparison only |
+| `replay.*` | The protection against replayed requests, see [Section 5.6, "Replay protection"](#replay-protection). | See below |
+| `requester-acceptance.*` | Which Service Providers may use the Identity Provider, see [Section 5.7, "Requester acceptance"](#requester-acceptance). | Every Service Provider |
 
 The values are checked when the filter chain is built, and the application does not start if a required value is
 missing or a value is invalid.
@@ -414,7 +414,7 @@ authn-server:
 <a name="endpoints"></a>
 ### 5.2. Endpoints
 
-The endpoints are given relative to the SAML path, see [URL layout](#url-layout). They are placed under
+The endpoints are given relative to the SAML path, see [Section 3, "URL layout"](#url-layout). They are placed under
 `authn-server.saml.endpoints`.
 
 | Property | Description | Default value |
@@ -509,7 +509,7 @@ configurer.protocol(Saml2IdpConfigurer.class, saml -> saml.idpMetadataEndpoint(
 ### 5.4. Service Provider metadata
 
 The Identity Provider finds the Service Providers in the [client registry](client-registry.html). The metadata sources
-given here become the SAML backend of the registry, see [SAML: metadata sources](client-registry.html#saml-metadata-sources) for how each
+given here become the SAML backend of the registry, see [Section 4, "SAML: metadata sources"](client-registry.html#saml-metadata-sources) of [The client registry](client-registry.html) for how each
 kind of source is read. A SAML Identity Provider needs at least one source, unless the application assigns a client
 registry or a SAML backend of its own in an [adapter](#adjusting-the-configuration-in-code).
 
@@ -572,7 +572,7 @@ The ID of every received request is kept for a while, and a request with an ID t
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
-| `replay.type` | Where the IDs are kept, `memory` or `redis`, overriding `authn-server.storage.type`, see [Running several nodes](#running-several-nodes). | `authn-server.storage.type` |
+| `replay.type` | Where the IDs are kept, `memory` or `redis`, overriding `authn-server.storage.type`, see [Section 7, "Running several nodes"](#running-several-nodes). | `authn-server.storage.type` |
 | `replay.expiration` | For how long the IDs are kept. | 5 minutes |
 | `replay.context` | The context under which the IDs are stored. | `idp-replay-checker` |
 
@@ -585,7 +585,7 @@ OpenSAML `ReplayCache` bean, or a whole `MessageReplayChecker` bean, which repla
 
 By default, every Service Provider that is found in the metadata may use the Identity Provider. The rules under
 `authn-server.saml.requester-acceptance` restrict that. How the rules work, and how to add a rule of your own, is
-described in [The client registry](client-registry.html#requester-acceptance).
+described in [Section 7, "Deciding which requesters may use the server"](client-registry.html#requester-acceptance) of [The client registry](client-registry.html).
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -614,27 +614,27 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | Property | Description | Default value |
 | :--- | :--- | :--- |
 | `enabled` | Whether the OpenID Provider is enabled. | `false` |
-| `path` | The OIDC path, see [URL layout](#url-layout). | `/oidc` |
+| `path` | The OIDC path, see [Section 3, "URL layout"](#url-layout). | `/oidc` |
 | `issuer` | The issuer identifier. It must be the base URL, or begin with the base URL followed by a path. The discovery document is published at the issuer followed by `/.well-known/openid-configuration`. | The base URL |
-| `sso.*` | The single sign-on policy for OpenID Connect, see [Single sign-on](#single-sign-on). | `authn-server.sso.*` |
+| `sso.*` | The single sign-on policy for OpenID Connect, see [Section 4.1, "Single sign-on"](#single-sign-on). | `authn-server.sso.*` |
 | `clock-skew` | The clock skew for OpenID Connect. | `authn-server.clock-skew` |
 | `max-jwt-age` | The maximum age of a JWT that a client signs, measured from its `iat`: signed request objects, signature request JWTs and client assertions. The clock skew is added to it. A JWT without `iat` is accepted. The check cannot be turned off, and the value must be positive. A deployment whose clients reuse a signed request object through `request_uri` sets a value long enough for that. | 10 minutes |
 | `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the `https://id.oidc.se/param/userMessage` parameter is read, and the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. When they are not, the parameter is ignored. | `authn-server.supports-user-message` |
 | `subject-identifier.*` | The subject identifier settings for OpenID Connect. | `authn-server.subject-identifier.*` |
-| `keys.*` | The signing and decryption keys, see [Keys](#oidc-keys). | Required |
-| `clients[]` | The OpenID Connect clients, given in files or inline, see [Clients](#oidc-clients). | - |
-| `endpoints.*` | The endpoints, see [OIDC endpoints](#oidc-endpoints). | See below |
-| `authorization-request.*` | The processing of authentication requests, see [Authorization requests](#oidc-authorization-requests). | See below |
-| `requester-acceptance.*` | Which clients are accepted, see [Requester acceptance](#oidc-requester-acceptance). | Every known client |
-| `tokens.*` | The lifetimes of codes and tokens, see [The token endpoint and tokens](#oidc-token-endpoint). | See below |
-| `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint, see [The token endpoint and tokens](#oidc-token-endpoint). | `private_key_jwt` |
-| `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. When they are not, only a client that has registered it gets a signed response, see [The UserInfo endpoint](openid-provider.html#the-userinfo-endpoint). | `true` |
-| `scopes[]` | The offered scopes, see [Scopes and claims](#oidc-scopes-and-claims). | Derived from the authentication providers |
-| `claims[]` | Claims supported on top of those of the authentication providers, see [Scopes and claims](#oidc-scopes-and-claims). | - |
+| `keys.*` | The signing and decryption keys, see [Section 6.1, "Keys"](#oidc-keys). | Required |
+| `clients[]` | The OpenID Connect clients, given in files or inline, see [Section 6.2, "Clients"](#oidc-clients). | - |
+| `endpoints.*` | The endpoints, see [Section 6.3, "OIDC endpoints"](#oidc-endpoints). | See below |
+| `authorization-request.*` | The processing of authentication requests, see [Section 6.4, "Authorization requests"](#oidc-authorization-requests). | See below |
+| `requester-acceptance.*` | Which clients are accepted, see [Section 6.5, "Requester acceptance"](#oidc-requester-acceptance). | Every known client |
+| `tokens.*` | The lifetimes of codes and tokens, see [Section 6.6, "The token endpoint and tokens"](#oidc-token-endpoint). | See below |
+| `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint, see [Section 6.6, "The token endpoint and tokens"](#oidc-token-endpoint). | `private_key_jwt` |
+| `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. When they are not, only a client that has registered it gets a signed response, see [Section 6.6, "The UserInfo endpoint"](openid-provider.html#the-userinfo-endpoint) of [The OpenID Provider](openid-provider.html). | `true` |
+| `scopes[]` | The offered scopes, see [Section 6.7, "Scopes and claims"](#oidc-scopes-and-claims). | Derived from the authentication providers |
+| `claims[]` | Claims supported on top of those of the authentication providers, see [Section 6.7, "Scopes and claims"](#oidc-scopes-and-claims). | - |
 | `ui-locales[]` | The languages of the user interface, as language tags, published as `ui_locales_supported`. The Sweden Connect federation requires `sv` and `en`. | - |
-| `discovery.*` | The discovery document, see [The discovery document](#oidc-discovery). | - |
-| `entity-information.*` | The entity information for OpenID Connect, see [Entity information for OpenID Connect](#oidc-entity-information). | `authn-server.entity-information.*` |
-| `federation.*` | The OpenID Provider as a member of an OpenID Federation, see [OpenID Federation](#oidc-federation). | Not enabled |
+| `discovery.*` | The discovery document, see [Section 6.8, "The discovery document"](#oidc-discovery). | - |
+| `entity-information.*` | The entity information for OpenID Connect, see [Section 6.9, "Entity information for OpenID Connect"](#oidc-entity-information). | `authn-server.entity-information.*` |
+| `federation.*` | The OpenID Provider as a member of an OpenID Federation, see [Section 6.10, "OpenID Federation"](#oidc-federation). | Not enabled |
 
 The values are checked when the filter chain is built, and the application does not start if a required value is
 missing or a value is invalid.
@@ -656,7 +656,7 @@ the same as for the [SAML credentials](#credentials).
 
 At least one active signing key is required. An RSA key must be at least 2048 bits, and an EC key must be on P-256,
 P-384 or P-521. The rules, the key IDs and how to roll over a key are described in
-[The OpenID Provider](openid-provider.html#keys).
+[Section 2, "Keys"](openid-provider.html#keys) of [The OpenID Provider](openid-provider.html).
 
 ```yaml
 authn-server:
@@ -678,10 +678,10 @@ authn-server:
 
 The OpenID Provider takes its clients from two sources that are set up with properties: the configured clients of
 `authn-server.oidc.clients`, described here, and the clients resolved through OpenID Federation, see
-[Clients from OpenID Federation](#oidc-federation-clients). An OpenID Provider may use either of them, or both, in which
+[Section 6.11, "Clients from OpenID Federation"](#oidc-federation-clients). An OpenID Provider may use either of them, or both, in which
 case the configured clients are asked first. A client repository, or a client source of the application's own, is
 added in an [adapter](#adjusting-the-configuration-in-code), see
-[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends). An OpenID Provider without any
+[Section 5, "OpenID Connect: three backends"](client-registry.html#openid-connect-three-backends) of [The client registry](client-registry.html). An OpenID Provider without any
 client source does not start.
 
 `authn-server.oidc.clients` is a list where each entry is either a file or one client given inline.
@@ -691,7 +691,7 @@ client source does not start.
 | `clients[].location` | A resource, file or classpath, holding one client as a JSON object, or a JSON array of such objects. |
 | `clients[].client-id` | The `client_id` of an inline client. |
 | `clients[].metadata` | The client metadata of an inline client, as a JSON object in a string. |
-| `clients[].client-secret` | The client secret of an inline client that authenticates with one, see [Client authentication](openid-provider.html#client-authentication). |
+| `clients[].client-secret` | The client secret of an inline client that authenticates with one, see [Section 6.3, "Client authentication"](openid-provider.html#client-authentication) of [The OpenID Provider](openid-provider.html). |
 | `clients[].trust-mark-types[]` | Trust mark types that the operator assigns to an inline client, see below. |
 
 An entry has either a `location` or the inline fields, never both. An inline client needs `client-id` and `metadata`.
@@ -747,7 +747,7 @@ that names the client and where it was given:
 **Operator-assigned trust mark types.** The trust mark types of a client are not trust marks. Nothing is verified, and
 the operator vouches for them. They let the operator give a locally configured client the same treatment as a
 federation client that holds a real trust mark of that type, for example under
-`authn-server.oidc.requester-acceptance.required-marks`, see [Requester acceptance](#oidc-requester-acceptance). This
+`authn-server.oidc.requester-acceptance.required-marks`, see [Section 6.5, "Requester acceptance"](#oidc-requester-acceptance). This
 is useful for testing, and for using the meaning of trust mark assignments outside a federation.
 
 The clients of the property are served by a client source named `properties`. That is the name shown by the
@@ -760,7 +760,7 @@ The clients are read once, at startup. A changed file has no effect until the se
 <a name="oidc-endpoints"></a>
 ### 6.3. OIDC endpoints
 
-The endpoints are given relative to the OIDC path, see [URL layout](#url-layout). They are placed under
+The endpoints are given relative to the OIDC path, see [Section 3, "URL layout"](#url-layout). They are placed under
 `authn-server.oidc.endpoints`.
 
 | Property | Description | Default value |
@@ -778,7 +778,7 @@ The discovery document is not an endpoint under the OIDC path; it follows the is
 ### 6.4. Authorization requests
 
 How the OpenID Provider processes an authentication request, and which failures are sent to the client, is described
-in [The OpenID Provider](openid-provider.html#authentication-requests). These properties, under
+in [Section 5, "Authentication requests"](openid-provider.html#authentication-requests) of [The OpenID Provider](openid-provider.html). These properties, under
 `authn-server.oidc.authorization-request`, affect it:
 
 | Property | Description | Default value |
@@ -804,7 +804,7 @@ to the maximum age, `authn-server.oidc.max-jwt-age`, of signed request objects.
 
 By default, every client that the client registry knows may use the OpenID Provider. The rules under
 `authn-server.oidc.requester-acceptance` restrict that, in the same way as for SAML. How the rules work is described in
-[The client registry](client-registry.html#requester-acceptance).
+[Section 7, "Deciding which requesters may use the server"](client-registry.html#requester-acceptance) of [The client registry](client-registry.html).
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -826,7 +826,7 @@ A client that is not accepted gets the error `unauthorized_client`.
 ### 6.6. The token endpoint and tokens
 
 How the code flow, the token endpoint and the tokens work is described in
-[The OpenID Provider](openid-provider.html#the-code-flow).
+[Section 6, "The code flow"](openid-provider.html#the-code-flow) of [The OpenID Provider](openid-provider.html).
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -849,14 +849,14 @@ authn-server:
 
 ✋ Codes, access tokens and used client assertions are kept in memory by default, which only serves the
 node they run on. A deployment with several nodes keeps them in Redis, see
-[Running several nodes](#running-several-nodes), or needs sticky sessions.
+[Section 7, "Running several nodes"](#running-several-nodes), or needs sticky sessions.
 
 <a name="oidc-scopes-and-claims"></a>
 ### 6.7. Scopes and claims
 
 By default, the offered scopes and the supported claims are worked out from the attributes and scopes that the
 authentication providers declare, see
-[The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+[Section 4, "Scopes, claims and authentication contexts"](openid-provider.html#scopes-claims-and-authentication-contexts) of [The OpenID Provider](openid-provider.html).
 
 - `scopes` replaces the derived scopes. Each scope must be in the scope registry, and `openid` is always offered. The
   sign scopes, `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval`, are never derived, so they
@@ -885,7 +885,7 @@ factory, whose subject types are published as `subject_types_supported`.
 ### 6.8. The discovery document
 
 Most of the discovery document is worked out from the rest of the configuration, see
-[The OpenID Provider](openid-provider.html#the-discovery-document). Other parameters are added under
+[Section 7, "The discovery document"](openid-provider.html#the-discovery-document) of [The OpenID Provider](openid-provider.html). Other parameters are added under
 `authn-server.oidc.discovery`:
 
 | Property | Description | Default value |
@@ -902,7 +902,7 @@ authn-server:
 ```
 
 A customizer set in an [adapter](#adjusting-the-configuration-in-code) changes the built document, see
-[Extending the document](openid-provider.html#extending-the-document).
+[Section 7.1, "Extending the document"](openid-provider.html#extending-the-document) of [The OpenID Provider](openid-provider.html).
 
 <a name="oidc-entity-information"></a>
 ### 6.9. Entity information for OpenID Connect
@@ -910,7 +910,7 @@ A customizer set in an [adapter](#adjusting-the-configuration-in-code) changes t
 The [shared entity information](#entity-information) is overridden for OpenID Connect under
 `authn-server.oidc.entity-information`, with `ui-info`, `organization` and `contact-persons` in the same shape. The
 descriptive parameters of the OpenID Provider metadata are worked out from the result, see
-[Descriptive metadata](openid-provider.html#descriptive-metadata), and each of them may also be given directly:
+[Section 8.4, "Descriptive metadata"](openid-provider.html#descriptive-metadata) of [The OpenID Provider](openid-provider.html), and each of them may also be given directly:
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -935,7 +935,7 @@ authn-server:
 ### 6.10. OpenID Federation
 
 The OpenID Provider as a member of an OpenID Federation is configured under `authn-server.oidc.federation`, see
-[OpenID Federation](openid-provider.html#openid-federation).
+[Section 8, "OpenID Federation"](openid-provider.html#openid-federation) of [The OpenID Provider](openid-provider.html).
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -945,8 +945,8 @@ The OpenID Provider as a member of an OpenID Federation is configured under `aut
 | `entity-configuration-lifetime` | The lifetime of the entity configuration. | 1 day |
 | `additional-parameters.*` | Parameters applied to the entity configuration only, as a map of name to value, for example `trust_anchor_hints`. A `metadata` entry is merged into the metadata per entity type and parameter. | - |
 | `trust-marks[]` | The trust marks of the OpenID Provider, each with `type`, `issuer` (the entity identifier of the issuer), `jwks` (the location of a JWK Set document with the federation keys of the issuer) and, optionally, `endpoint` (its trust mark endpoint). Without `endpoint`, the `federation_trust_mark_endpoint` that the issuer publishes in its entity configuration is used. | - |
-| `trust-anchor.*` | The trust anchor, see [Clients from OpenID Federation](#oidc-federation-clients). | - |
-| `clients.*` | The client source that resolves clients through the federation, see [Clients from OpenID Federation](#oidc-federation-clients). | Enabled |
+| `trust-anchor.*` | The trust anchor, see [Section 6.11, "Clients from OpenID Federation"](#oidc-federation-clients). | - |
+| `clients.*` | The client source that resolves clients through the federation, see [Section 6.11, "Clients from OpenID Federation"](#oidc-federation-clients). | Enabled |
 | `trust-mark-cache-directory` | A directory where fetched trust marks are stored, so that they are available after a restart. Overrides the directory `oidc/trust-marks` of `authn-server.cache-directory`. Not used when the trust marks are kept in Redis. | Nothing is stored |
 | `trust-mark-retry-interval` | How long to wait before a failed attempt to fetch a trust mark is made again. | 5 minutes |
 
@@ -980,7 +980,7 @@ When federation is enabled, the application does not start without federation ke
 A member of a federation also accepts clients, relying parties, that are resolved through the federation. The client
 source is configured under `authn-server.oidc.federation.clients`, and the trust anchor that clients are resolved
 against under `authn-server.oidc.federation.trust-anchor`. How the source works is described in
-[The federation backend](client-registry.html#the-federation-backend).
+[Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html).
 
 The source is only used when federation is enabled, and it is then on by default. An OpenID Provider that is a member
 but takes no clients from the federation turns it off with `clients.enabled: false`. When the source is on, the trust
@@ -1035,7 +1035,7 @@ entry overrides what the federation says about the same `client_id`. Client sour
 `FederationClientBackend` added in an adapter replaces the federation source of the properties.
 
 The federation cache is kept where `authn-server.storage.type`, or `authn-server.oidc.storage.federation-cache`, says,
-see [Where state is kept](#where-state-is-kept).
+see [Section 7.2, "Where state is kept"](#where-state-is-kept).
 
 ```yaml
 authn-server:
@@ -1079,7 +1079,7 @@ that must be taken from a trusted copy of that document.
 
 The authority hint, `authn-server.oidc.federation.authority-hints`, is the intermediate that the OpenID Provider is
 registered under, and the OpenID Provider's own trust marks, `authn-server.oidc.federation.trust-marks`, are those that
-it has been granted, see [OpenID Federation](openid-provider.html#openid-federation).
+it has been granted, see [Section 8, "OpenID Federation"](openid-provider.html#openid-federation) of [The OpenID Provider](openid-provider.html).
 
 <a name="running-several-nodes"></a>
 ## 7. Running several nodes
@@ -1141,11 +1141,11 @@ setting.
 
 | Property | The store |
 | :--- | :--- |
-| `authn-server.saml.replay.type` | The IDs of received SAML requests, see [Replay protection](#replay-protection). |
+| `authn-server.saml.replay.type` | The IDs of received SAML requests, see [Section 5.6, "Replay protection"](#replay-protection). |
 | `authn-server.oidc.storage.authorization-codes` | Authorization codes. |
 | `authn-server.oidc.storage.access-tokens` | Access tokens. |
 | `authn-server.oidc.storage.client-assertions` | The `jti` values of used client assertions, `private_key_jwt` and `client_secret_jwt`. |
-| `authn-server.oidc.storage.federation-cache` | The cache of clients resolved through OpenID Federation, with its lookup counts and the lock of its background jobs, see [Background jobs and trust marks](#background-jobs-in-a-cluster). |
+| `authn-server.oidc.storage.federation-cache` | The cache of clients resolved through OpenID Federation, with its lookup counts and the lock of its background jobs, see [Section 7.7, "Background jobs and trust marks"](#background-jobs-in-a-cluster). |
 | `authn-server.oidc.storage.trust-marks` | The OpenID Provider's own trust marks and their state. |
 
 The record of known clients, which tells which clients have been [added and removed](management.html#clients-added-and-removed)
@@ -1285,7 +1285,7 @@ have it yet.
 Some work runs in the background on every node. When its state is kept in Redis, one node at a time does it.
 
 **The federation cache.** The refresh of the federation cache and the status checks of the trust marks of clients,
-see [The client registry](client-registry.html#the-federation-backend), work on the federation cache. When the cache
+see [Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html), work on the federation cache. When the cache
 is kept in Redis:
 
 - Each round of a job runs on one node. The node that starts a round takes a lock in Redis, held for the interval of
@@ -1295,7 +1295,7 @@ is kept in Redis:
   the traffic of all nodes.
 
 The application sets up the federation backend and its jobs, see
-[The client registry](client-registry.html#the-federation-backend). With Spring Boot, a `FederationCache` bean is
+[Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html). With Spring Boot, a `FederationCache` bean is
 declared according to `authn-server.oidc.storage.federation-cache`, and the backend and the jobs are built from it.
 Kept in memory, the cache is written to `authn-server.cache-directory`, when given, so that it survives a restart.
 
@@ -1338,7 +1338,7 @@ The values are checked when the filter chain is built, after all adapters have b
 The attribute producers, the attribute release voters, the single sign-on voters and the post-authentication
 processors are also adjusted in an adapter, in the shared lists of the `AuthnServerConfigurer` or in the lists of a
 protocol configurer. How the lists work is described in
-[The SAML Identity Provider](saml-identity-provider.html#producers-voters-and-processors).
+[Section 5, "Producers, voters and processors"](saml-identity-provider.html#producers-voters-and-processors) of [The SAML Identity Provider](saml-identity-provider.html).
 
 <a name="using-the-configurers-without-spring-boot"></a>
 ## 9. Using the configurers without Spring Boot
@@ -1411,12 +1411,12 @@ to `true`.
 | `saml.idp.assertions.encrypt` | `authn-server.saml.assertions.encrypt` | |
 | `saml.idp.assertions.not-after` | `authn-server.saml.assertions.not-after` | |
 | `saml.idp.assertions.not-before` | `authn-server.saml.assertions.not-before` | |
-| `saml.idp.replay.*` | `authn-server.saml.replay.*` | `type` now follows `authn-server.storage.type` when it is not set, instead of choosing Redis when Redis is available, see [Replay protection](#replay-protection). |
-| `saml.idp.session.module` | `authn-server.storage.type` | Shared by the HTTP session and all stores, see [Running several nodes](#running-several-nodes). |
-| `spring.data.redis.ssl-ext.enable-hostname-verification` | `authn-server.redis.ssl.skip-hostname-verification` | Inverted: set to `true` to skip the check. The server certificate is still checked against the trust store, see [The TLS host name check](#redis-host-name-check). |
-| `spring.data.redis.ssl-ext.credential.*`, `spring.data.redis.ssl-ext.trust.*` | `spring.ssl.bundle.*` and `spring.data.redis.ssl.bundle` | Key and trust stores are configured with a Spring Boot SSL bundle, see [The Redis connection](#the-redis-connection). |
+| `saml.idp.replay.*` | `authn-server.saml.replay.*` | `type` now follows `authn-server.storage.type` when it is not set, instead of choosing Redis when Redis is available, see [Section 5.6, "Replay protection"](#replay-protection). |
+| `saml.idp.session.module` | `authn-server.storage.type` | Shared by the HTTP session and all stores, see [Section 7, "Running several nodes"](#running-several-nodes). |
+| `spring.data.redis.ssl-ext.enable-hostname-verification` | `authn-server.redis.ssl.skip-hostname-verification` | Inverted: set to `true` to skip the check. The server certificate is still checked against the trust store, see [Section 7.5, "The TLS host name check"](#redis-host-name-check). |
+| `spring.data.redis.ssl-ext.credential.*`, `spring.data.redis.ssl-ext.trust.*` | `spring.ssl.bundle.*` and `spring.data.redis.ssl.bundle` | Key and trust stores are configured with a Spring Boot SSL bundle, see [Section 7.3, "The Redis connection"](#the-redis-connection). |
 | `spring.data.redis.cluster-ext.nat-translation[]` | `authn-server.redis.cluster.nat-translation[]` | The same `from` and `to`. Now for Lettuce, which Spring Data Redis uses by default; not supported with Jedis. |
-| `spring.data.redis.cluster-ext.read-mode` | `spring.data.redis.lettuce.read-from` | Spring Boot's own setting, see [Redis Cluster](#redis-cluster). `MASTER` is `upstream`, `SLAVE` is `replica-preferred` and `MASTER_SLAVE` is `any`. |
+| `spring.data.redis.cluster-ext.read-mode` | `spring.data.redis.lettuce.read-from` | Spring Boot's own setting, see [Section 7.6, "Redis Cluster"](#redis-cluster). `MASTER` is `upstream`, `SLAVE` is `replica-preferred` and `MASTER_SLAVE` is `any`. |
 
 Endpoints that were moved away from `/saml2` are set up by changing `authn-server.saml.path`, if they share a prefix,
 or by giving each endpoint relative to an empty SAML path.
@@ -1426,7 +1426,7 @@ configured with its `audit.*` properties. The audit event types and their data h
 [Auditing](audit.html).
 
 Redisson is not supported. A deployment that used the Redisson starter configures the connection with Spring Boot's
-`spring.data.redis.*` settings instead, see [The Redis connection](#the-redis-connection).
+`spring.data.redis.*` settings instead, see [Section 7.3, "The Redis connection"](#the-redis-connection).
 
 `Saml2ServiceProviderFilter` is replaced by [requester acceptance](#requester-acceptance), which works for both
 protocols. A filter bean becomes a `RequesterPredicate` for SAML, added in an adapter; a predicate reads the Service
@@ -1445,7 +1445,7 @@ The lists of `Saml2UserAuthenticationConfigurer` move to the configurers. `attri
 apply to all protocols, and on the `Saml2IdpConfigurer`, for SAML only. Single sign-on voters, which could only be
 added to a provider before, have the same two lists. `assertionCustomizer` moves to `Saml2IdpConfigurer.authnRequestProcessor(...)`, and
 the resume paths of the redirect providers no longer need to be registered, see
-[The SAML Identity Provider](saml-identity-provider.html#modules-with-pages-of-their-own).
+[Section 4.3, "Modules with pages of their own"](saml-identity-provider.html#modules-with-pages-of-their-own) of [The SAML Identity Provider](saml-identity-provider.html).
 
 [AuthnServerConfigurer]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/config/AuthnServerConfigurer.java
 [AuthnServerConfigurerAdapter]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/config/AuthnServerConfigurerAdapter.java

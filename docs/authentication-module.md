@@ -166,18 +166,18 @@ A provider that declares its attributes normally does not need to declare scopes
 them from the claims. Declare scopes when the derived set is wrong for the provider, for example a scope whose
 essential claims the provider delivers only some of. A provider that declares scopes offers exactly those, so the
 derived ones are replaced, not added to. How scopes and claims are worked out is described in
-[The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+[Section 4, "Scopes, claims and authentication contexts"](openid-provider.html#scopes-claims-and-authentication-contexts) of [The OpenID Provider](openid-provider.html).
 
 ✋ The sign scopes, `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval`, are never
 derived. A provider that signs declares `attribute.user-signature` among its attributes and the sign scope among its
 scopes, together with the other scopes it offers.
 
 The declarations only tell what the server offers. They do not limit what the provider releases: a provider still
-returns everything it knows about the user, see [The authenticated user](#the-authenticated-user). See
-[Configuration](configuration.html#the-idp-metadata) for the SAML metadata.
+returns everything it knows about the user, see [Section 3.1, "The authenticated user"](#the-authenticated-user). See
+[Section 5.3, "The IdP metadata"](configuration.html#the-idp-metadata) of [Configuration](configuration.html) for the SAML metadata.
 
 A module that cannot authenticate the user inside this call, because it needs pages of its own, is written slightly
-differently, see [Modules with pages of their own](#modules-with-pages-of-their-own).
+differently, see [Section 6, "Modules with pages of their own"](#modules-with-pages-of-their-own).
 
 <a name="what-the-module-receives"></a>
 ## 2. What the module receives
@@ -256,11 +256,11 @@ value equals any of the user's values for it.
 
 A missing attribute never fails the request, following OpenID Connect Core, Section 5.5.1. The logs name the attribute,
 never the requested or the actual values. A reused authentication is not checked here; the rule for single sign-on is
-described under [The rules that always apply](#the-rules-that-always-apply).
+described in [Section 4.1, "The rules that always apply"](#the-rules-that-always-apply).
 
 Whether the values are essential is `isRequestedValuesEssential()` of the requested attribute. It is decided by the
 request entry that carries the values, not by other requests for the same attribute, see
-[Generic requested attribute](attributes.html#generic-requested-attribute). A `PrincipalSelection` value is therefore
+[Section 1.2, "Generic requested attribute"](attributes.html#generic-requested-attribute) of [Attributes](attributes.html). A `PrincipalSelection` value is therefore
 voluntary even when the metadata of the Service Provider requires the attribute.
 
 A module returns the attributes it actually established. It is not obliged to return everything that was asked for, and
@@ -441,7 +441,7 @@ user who signed in at a SAML Service Provider can be let straight through at an 
 These are checked before any policy or voter, and no configuration turns them off:
 
 - The requester asked for a new authentication, with `ForceAuthn` or `prompt=login`. An OpenID Connect request without
-  `prompt` asks for it too, unless that is turned off, see [The OpenID Provider](openid-provider.html#what-the-request-is-turned-into).
+  `prompt` asks for it too, unless that is turned off, see [Section 5.6, "What the request is turned into"](openid-provider.html#what-the-request-is-turned-into) of [The OpenID Provider](openid-provider.html).
 - The previous authentication is older than the maximum authentication age the requester accepts.
 - The previous authentication may not be reused, which is the case when a sign message was displayed for it.
 - The request carries a sign message. A signature is approved by the user every time, see the Deployment Profile,
@@ -479,7 +479,7 @@ provider.setSsoPolicy(myOwnPolicy);                                             
 ```
 
 The server default and the protocol policies are set from the `authn-server.sso.*` and `authn-server.saml.sso.*`
-properties, see [Configuration](configuration.html#single-sign-on).
+properties, see [Section 4.1, "Single sign-on"](configuration.html#single-sign-on) of [Configuration](configuration.html).
 
 <a name="voters"></a>
 ### 4.3. Voters
@@ -500,7 +500,7 @@ provider.getSsoVoters().add((previous, requirements, requester, contexts) ->
 
 Voters that apply to every provider are better added to the server configuration, either to the shared list, for all
 protocols, or to the list of one protocol. They are asked after the provider's own voters, see
-[Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
+[Section 5, "Producers, voters and processors"](saml-identity-provider.html#producers-voters-and-processors) of [The SAML Identity Provider](saml-identity-provider.html).
 
 A refusal always states its reason, an [`SsoDenialReason`][SsoDenialReason]. That matters for a passive request, see
 below.
@@ -603,7 +603,7 @@ The error page is the application's own, chosen through Spring Boot's error hand
 dispatch that finds the `UnrecoverableErrorException` in the `jakarta.servlet.error.exception` request attribute and
 shows the message that its message code resolves to. An error may give the HTTP status of the page,
 `getHttpStatus()`, which the OpenID Provider uses for the errors of the authorization endpoint, see
-[Failures](openid-provider.html#failures); the default is 500. The Sweden Connect reference shows how, with
+[Section 5.8, "Failures"](openid-provider.html#failures) of [The OpenID Provider](openid-provider.html); the default is 500. The Sweden Connect reference shows how, with
 [`UnrecoverableErrorViewResolver`](https://github.com/swedenconnect/spring-authentication-server/blob/main/sweden-connect-reference/src/main/java/se/swedenconnect/spring/authnserver/service/config/UnrecoverableErrorViewResolver.java),
 and with a filter that makes the page the answer also when the request does not accept HTML, since Spring Boot answers
 such a request with JSON.
@@ -650,7 +650,7 @@ answered fails. Only when the user really has to authenticate is a
 [`RedirectForAuthenticationToken`][RedirectForAuthenticationToken] returned instead of a result. The server's filter
 chain serves the two paths: the authentication path is open to everyone, and the resume path is where the flow
 continues, in the protocol that the requester used. See
-[The SAML Identity Provider](saml-identity-provider.html#modules-with-pages-of-their-own).
+[Section 4.3, "Modules with pages of their own"](saml-identity-provider.html#modules-with-pages-of-their-own) of [The SAML Identity Provider](saml-identity-provider.html).
 
 ✋ Only these two exact paths are covered by the server's filter chain. Any other page of the module, such as
 the one a login form posts to, is not, and the application must secure it in its own security configuration. For
@@ -771,7 +771,7 @@ the audit log publishes Spring application events and registers a spring-audit-s
 that the module publishes while the flow is in progress, from the provider or from its controller on the
 authentication path, are audited under the correlation ID of the flow without the module doing anything. A request to
 the controller must carry the `authnId` parameter for this, as it already must for the controller to find the
-authentication, see [The identifier of the authentication](#the-identifier-of-the-authentication).
+authentication, see [Section 6.2, "The identifier of the authentication"](#the-identifier-of-the-authentication).
 
 <a name="post-authentication-processing"></a>
 ## 8. Post-authentication processing
@@ -782,7 +782,7 @@ set of tokens, and asserts that the authentication delivered what the request ne
 The processors of the server configuration run on every result. By default the shared list holds
 `SwedenConnectPostAuthenticationProcessor`, which fails a result where a sign message had to be shown but was not. How
 to add processors for all protocols or for one of them is described in
-[Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
+[Section 5, "Producers, voters and processors"](saml-identity-provider.html#producers-voters-and-processors) of [The SAML Identity Provider](saml-identity-provider.html).
 
 A provider may also have processors of its own, which run before those of the server configuration:
 

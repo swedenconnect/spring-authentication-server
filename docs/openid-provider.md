@@ -11,7 +11,7 @@ configured and rolled over, how the key that a message to a client is signed wit
 the supported claims and the authentication contexts are worked out from the authentication providers, how
 authentication requests are processed, how the code flow completes with the authorization code, the token endpoint,
 the ID token and the UserInfo endpoint, how to extend the discovery document, and how the OpenID Provider joins an
-OpenID Federation. The properties are described in [Configuration](configuration.html#the-openid-provider).
+OpenID Federation. The properties are described in [Section 6, "The OpenID Provider"](configuration.html#the-openid-provider) of [Configuration](configuration.html).
 
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
@@ -90,7 +90,7 @@ Source links in this guide point to the `main` branch of the
 ## 1. Where things are published
 
 The OpenID Provider is identified by its issuer, which defaults to the base URL. Its endpoints are placed under the
-OIDC path, `/oidc` by default, see [URL layout](configuration.html#url-layout). With the base URL
+OIDC path, `/oidc` by default, see [Section 3, "URL layout"](configuration.html#url-layout) of [Configuration](configuration.html). With the base URL
 `https://op.example.com`:
 
 | What | URL |
@@ -233,13 +233,13 @@ Section 4.1, leaves the choice to the OpenID Provider, so the default key decide
 If no active key can produce an algorithm that the client accepts, the message is not sent: this is an error, not a
 fallback to another algorithm. Future keys are never used.
 
-UserInfo responses are signed by default, see [The UserInfo endpoint](#the-userinfo-endpoint).
+UserInfo responses are signed by default, see [Section 6.6, "The UserInfo endpoint"](#the-userinfo-endpoint).
 
 <a name="scopes-claims-and-authentication-contexts"></a>
 ## 4. Scopes, claims and authentication contexts
 
 What the OpenID Provider offers is worked out from what the authentication providers declare, see
-[What the provider declares](authentication-module.html#what-the-provider-declares). The result is computed at startup
+[Section 1.1, "What the provider declares"](authentication-module.html#what-the-provider-declares) of [Writing an authentication module](authentication-module.html). The result is computed at startup
 by [`SupportedScopesAndClaims`][SupportedScopesAndClaims].
 
 **Claims.** The claims of a provider are its attributes, `getSupportedAttributes()`, mapped to claims through the
@@ -300,7 +300,7 @@ OpenID Connect Core, Section 3.1.2, and the
 authorization code flow is supported, so `response_type` must be `code`.
 
 This section covers the processing of the request, up to the protocol-neutral authentication requirements. What
-happens next is described in [The code flow](#the-code-flow).
+happens next is described in [Section 6, "The code flow"](#the-code-flow).
 
 <a name="how-a-request-is-processed"></a>
 ### 5.1. How a request is processed
@@ -312,9 +312,9 @@ The request is processed in two parts, by
 The first part finds out where a response can be sent:
 
 1. The client is looked up by `client_id` in the [client registry](client-registry.html). A client registered with
-   the token endpoint authentication method `none` is not accepted, see [Clients](#clients).
+   the token endpoint authentication method `none` is not accepted, see [Section 5.2, "Clients"](#clients).
 2. A request object, if the request has one, is fetched and decoded, and its parameters replace those of the request,
-   see [Request objects](#request-objects).
+   see [Section 5.3, "Request objects"](#request-objects).
 3. `redirect_uri` must be present and be one of the client's registered redirect URIs, compared as strings.
 4. `response_mode` must be `query`, `form_post` or absent.
 
@@ -324,7 +324,7 @@ the `state` of the request. The second part checks the request and builds the re
 1. The parameters are parsed, and `response_type` must be `code`.
 2. `state` must be present, unless that check is turned off.
 3. A request object must be signed if that is required.
-4. The client must be accepted, see [Which clients are accepted](#which-clients-are-accepted).
+4. The client must be accepted, see [Section 5.5, "Which clients are accepted"](#which-clients-are-accepted).
 5. PKCE is checked.
 6. The authentication requirements are built from the rest of the request.
 
@@ -332,11 +332,11 @@ the `state` of the request. The second part checks the request and builds the re
 ### 5.2. Clients
 
 The clients are found in the client registry, through its OpenID Connect backends and in their configured order, see
-[OpenID Connect: three backends](client-registry.html#openid-connect-three-backends).
+[Section 5, "OpenID Connect: three backends"](client-registry.html#openid-connect-three-backends) of [The client registry](client-registry.html).
 
 Clients that the deployment configures itself are given with `authn-server.oidc.clients`, in JSON files or inline, see
-[Clients](configuration.html#oidc-clients), and clients resolved through OpenID Federation with
-`authn-server.oidc.federation.clients`, see [Clients from OpenID Federation](configuration.html#oidc-federation-clients).
+[Section 6.2, "Clients"](configuration.html#oidc-clients) of [Configuration](configuration.html), and clients resolved through OpenID Federation with
+`authn-server.oidc.federation.clients`, see [Section 6.11, "Clients from OpenID Federation"](configuration.html#oidc-federation-clients) of [Configuration](configuration.html).
 An OpenID Provider may use either, or both, in which case the configured clients are asked first. An OpenID Provider
 without any client source does not start. A client repository, or a client source of the application's own, is added
 in an [adapter](configuration.html#adjusting-the-configuration-in-code):
@@ -356,13 +356,13 @@ What the OpenID Provider reads from the client metadata when it processes a requ
 | `request_uris` | The only values of `request_uri` that are fetched. |
 | `jwks` or `jwks_uri` | Verifying signed request objects and signature requests. |
 | `request_object_signing_alg` | When set, request objects must be signed with this algorithm. |
-| `token_endpoint_auth_method` | The method the client must authenticate with at the token endpoint, see [Client authentication](#client-authentication). Public clients, with `none`, are not supported. |
+| `token_endpoint_auth_method` | The method the client must authenticate with at the token endpoint, see [Section 6.3, "Client authentication"](#client-authentication). Public clients, with `none`, are not supported. |
 | `token_endpoint_auth_signing_alg` | When set, the algorithm that client assertions must be signed with. |
 | `client_secret` | The client secret, for the secret-based client authentication methods. |
 | `default_acr_values` | The authentication contexts, as voluntary values, when the request asks for none. |
-| `subject_type` and `sector_identifier_uri` | How the `sub` is computed, see [Identifying the user](attributes.html#identifying-the-user). |
-| `id_token_signed_response_alg` | The algorithm the ID token is signed with, see [Choosing the signing key for a client](#choosing-the-signing-key-for-a-client). |
-| `id_token_encrypted_response_alg` and `id_token_encrypted_response_enc` | Whether and how the ID token is encrypted, see [The ID token](#the-id-token). |
+| `subject_type` and `sector_identifier_uri` | How the `sub` is computed, see [Section 5, "Identifying the user"](attributes.html#identifying-the-user) of [Attributes](attributes.html). |
+| `id_token_signed_response_alg` | The algorithm the ID token is signed with, see [Section 3, "Choosing the signing key for a client"](#choosing-the-signing-key-for-a-client). |
+| `id_token_encrypted_response_alg` and `id_token_encrypted_response_enc` | Whether and how the ID token is encrypted, see [Section 6.5, "The ID token"](#the-id-token). |
 
 An unknown client and a client registry that fails end at the OpenID Provider, and are logged differently: the first
 at `INFO`, since it is a normal outcome, and the second at `ERROR`, since a dependency is not working.
@@ -431,9 +431,9 @@ Once the redirect URI is established and the request has been parsed, the
 [requester acceptance](client-registry.html#requester-acceptance) decides whether the client may use the OpenID
 Provider. By default every known client is accepted. The rules for OpenID Connect are set under
 `authn-server.oidc.requester-acceptance`: a whitelist of `client_id`s, and groups of required trust mark types, see
-[Configuration](configuration.html#oidc-requester-acceptance). A trust mark type that the client does not hold is asked
+[Section 6.5, "Requester acceptance"](configuration.html#oidc-requester-acceptance) of [Configuration](configuration.html). A trust mark type that the client does not hold is asked
 for through the client registry before the client is rejected, see
-[Trust marks on demand](client-registry.html#trust-marks-on-demand).
+[Section 6.3, "Trust marks on demand"](client-registry.html#trust-marks-on-demand) of [The client registry](client-registry.html).
 
 A client that is not accepted gets the error `unauthorized_client`.
 
@@ -451,14 +451,14 @@ The result is the protocol-neutral authentication requirements, as an
 | No `prompt` | Force authentication, as the OpenID Connect Profile for Sweden Connect, Section 2.2.1, requires. Single sign-on is then only used when the request holds `prompt` without `login`. With `authn-server.oidc.authorization-request.login-without-prompt` set to `false`, a request without `prompt` may be answered with single sign-on. |
 | `max_age` | The maximum authentication age. `max_age=0` is the same as `prompt=login`. |
 | `scope` | The requested scopes that the OpenID Provider offers. Other scopes are ignored, as OpenID Connect Core says for scopes that are not understood. |
-| `scope` and `claims` | The requested attributes. The offered scopes are expanded into their claims, the `claims` parameter is merged in, and the claims are mapped to generic attributes, see [What a request asks for](attributes.html#what-a-request-asks-for). |
+| `scope` and `claims` | The requested attributes. The offered scopes are expanded into their claims, the `claims` parameter is merged in, and the claims are mapped to generic attributes, see [Section 3, "What a request asks for"](attributes.html#what-a-request-asks-for) of [Attributes](attributes.html). |
 | `acr_values`, `acr` in `claims`, or the client's `default_acr_values` | The authentication contexts, in the client's order of preference, and whether they are voluntary or required. |
 | `login_hint` | The login hint. |
 | `ui_locales` | The preferred languages of the user interface. |
 | `id_token_hint` | The subject of the ID token. |
 
 **Authentication contexts.** The requirements tell voluntary authentication contexts from required ones, see
-[Which authentication contexts are acceptable](authentication-module.html#which-authentication-contexts-are-acceptable).
+[Section 2.2, "Which authentication contexts are acceptable"](authentication-module.html#which-authentication-contexts-are-acceptable) of [Writing an authentication module](authentication-module.html).
 
 - `acr_values` requests the `acr` claim as a voluntary claim (OpenID Connect Core, Sections 3.1.2.1 and 5.5.1.1).
   The supported values are used in the client's order of preference, and if none is supported, the user is
@@ -541,7 +541,7 @@ an `error_description` meant for the client's logs.
 | A signature request JWT lacks `iss` or `aud`, has the wrong `iss` or `aud`, has an `iat` in the future, or is older than `authn-server.oidc.max-jwt-age` | `invalid_request` |
 
 The errors that the authentication step reports are mapped as described in
-[Errors](authentication-module.html#errors).
+[Section 5, "Errors"](authentication-module.html#errors) of [Writing an authentication module](authentication-module.html).
 
 <a name="the-code-flow"></a>
 ## 6. The code flow
@@ -566,13 +566,13 @@ When the user has been authenticated, and before the code is issued:
 
 - After a new authentication, the `value` and `values` of the `claims` parameter are compared with the user. Essential
   values that do not match give `access_denied`, see
-  [When the user does not match the requested values](authentication-module.html#when-the-user-does-not-match-the-requested-values).
+  [Section 2.3.1, "When the user does not match the requested values"](authentication-module.html#when-the-user-does-not-match-the-requested-values) of [Writing an authentication module](authentication-module.html).
 - The `sub` of the user for the client is computed, public or pairwise, see
-  [Identifying the user](attributes.html#identifying-the-user). If the client asked for a `sub` with a value in the
+  [Section 5, "Identifying the user"](attributes.html#identifying-the-user) of [Attributes](attributes.html). If the client asked for a `sub` with a value in the
   `claims` parameter, or with `id_token_hint`, it must be the same. Otherwise the client gets `access_denied` and no
   code.
 - The attributes are released, by the OpenID Connect producers and voters followed by the shared ones, see
-  [Releasing attributes](attributes.html#releasing-attributes), and turned into claims.
+  [Section 4, "Releasing attributes"](attributes.html#releasing-attributes) of [Attributes](attributes.html), and turned into claims.
 
 The code is a random value that may only be used once. It is bound to the client, the redirect URI, the PKCE code
 challenge, the nonce, the requirements of the request, the authenticated user and the released claims. It is valid
@@ -581,7 +581,7 @@ maximum that RFC 6749, Section 4.1.2, recommends, is logged as a warning at star
 
 Every error after the request was accepted, such as a failed or cancelled authentication or a failed attribute
 release, is sent to the redirect URI as an error response, in the response mode of the request and with `state`. The
-errors are mapped as described in [Errors](authentication-module.html#errors). A failed authentication removes the
+errors are mapped as described in [Section 5, "Errors"](authentication-module.html#errors) of [Writing an authentication module](authentication-module.html). A failed authentication removes the
 authentication from the session, as for SAML.
 
 <a name="the-token-endpoint"></a>
@@ -591,7 +591,7 @@ The token endpoint accepts POST requests with the `authorization_code` grant, as
 and RFC 6749, Section 4.1.3, describe. No refresh tokens are issued, and `offline_access` is not offered. A request is
 checked in this order:
 
-1. The client is authenticated, see [Client authentication](#client-authentication).
+1. The client is authenticated, see [Section 6.3, "Client authentication"](#client-authentication).
 2. `grant_type` must be `authorization_code`.
 3. The code must be known, not expired, not used before, and issued to the client.
 4. `redirect_uri` must be identical to the one of the authentication request.
@@ -629,7 +629,7 @@ supported, so there are no public clients.
 | `client_secret_jwt` | No | The client assertion is verified with the client secret, with `HS256`, `HS384` or `HS512`. |
 
 The methods are enabled with `authn-server.oidc.client-authentication-methods`, see
-[Configuration](configuration.html#oidc-token-endpoint):
+[Section 6.6, "The token endpoint and tokens"](configuration.html#oidc-token-endpoint) of [Configuration](configuration.html):
 
 ```yaml
 authn-server:
@@ -656,7 +656,7 @@ key and an EC key, or an old and a new key during a rollover; the `kid` of the a
 algorithm.
 
 With `authn-server.oidc.clients`, the client secret is given next to the client metadata, never in it, see
-[Clients](configuration.html#oidc-clients). In an [`OidcClientRecord`][OidcClientRecord], the secret is kept as the
+[Section 6.2, "Clients"](configuration.html#oidc-clients) of [Configuration](configuration.html). In an [`OidcClientRecord`][OidcClientRecord], the secret is kept as the
 `client_secret` field of the client metadata, the name that OpenID Connect Dynamic Client Registration uses. A client
 resolved through OpenID Federation never has a secret:
 
@@ -697,7 +697,7 @@ The ID token follows the Swedish OpenID Connect Profile, Section 3.2.1:
 
 - A claim of the `claims` parameter goes where the parameter says, in the ID token or from the UserInfo endpoint.
 - A claim of a requested scope goes where the scope definition says, see
-  [The built-in scopes](attributes.html#the-built-in-scopes).
+  [Section 3.2.2, "The built-in scopes"](attributes.html#the-built-in-scopes) of [Attributes](attributes.html).
 - A claim asked for in the ID token by the `claims` parameter, which is also covered by a requested scope delivered
   from the UserInfo endpoint, is delivered in both places.
 
@@ -707,7 +707,7 @@ A request with only the `openid` scope and no `claims` parameter gets no identit
 5 minutes, so a longer lifetime is logged as a warning at startup, and the application still starts.
 
 **Signing.** The ID token is always signed, with the key chosen for the client, see
-[Choosing the signing key for a client](#choosing-the-signing-key-for-a-client).
+[Section 3, "Choosing the signing key for a client"](#choosing-the-signing-key-for-a-client).
 
 **Encryption.** When the client has registered `id_token_encrypted_response_alg`, the signed ID token is encrypted
 for the client (nested JWT). The key is taken from the client's `jwks` or `jwks_uri`: an encryption key of the type
@@ -737,7 +737,7 @@ way is rejected.
 
 **Single use.** By default an access token may only be used once: the first successful call uses it up, and a second
 call with the same token gets `invalid_token`. A call that fails does not use up the token. See
-[The access token](#the-access-token) for how to turn this off.
+[Section 6.4, "The access token"](#the-access-token) for how to turn this off.
 
 **What the response holds.** The response holds `sub`, the same value as in the ID token, and the claims whose
 delivery target includes UserInfo, following Section 4.2 of the profile:
@@ -751,7 +751,7 @@ A request with only the `openid` scope gets a response with only `sub`. The clai
 authentication completed, and kept with the access token. The release is not run again when the endpoint is called.
 
 **Signing.** Responses are signed by default, `authn-server.oidc.sign-user-info`. A signed response is a JWT, signed
-with the key chosen for the client, see [Choosing the signing key for a client](#choosing-the-signing-key-for-a-client),
+with the key chosen for the client, see [Section 3, "Choosing the signing key for a client"](#choosing-the-signing-key-for-a-client),
 and it also holds `iss` and `aud`. The content type is then `application/jwt`.
 
 | `sign-user-info` | The client has registered `userinfo_signed_response_alg` | Response |
@@ -761,7 +761,7 @@ and it also holds `iss` and `aud`. The content type is then `application/jwt`.
 | `false` | Yes | Signed JWT |
 
 **Encryption.** When the client has registered `userinfo_encrypted_response_alg`, the response is encrypted for the
-client, with the same algorithms and key rules as the ID token, see [The ID token](#the-id-token). The content
+client, with the same algorithms and key rules as the ID token, see [Section 6.5, "The ID token"](#the-id-token). The content
 encryption is given by `userinfo_encrypted_response_enc`, `A128CBC-HS256` by default. A signed response is signed and
 then encrypted. When signing is off and the client has not asked for it, the response is encrypted only, as OpenID
 Connect Core, Section 5.3.2, allows: the encrypted payload is the JSON claims set.
@@ -788,7 +788,7 @@ Authorization codes, access tokens and the `jti` values of used client assertion
 [`AuthorizationCodeStore`][AuthorizationCodeStore], [`AccessTokenStore`][AccessTokenStore] and
 [`ClientAssertionReplayCache`][ClientAssertionReplayCache]. The defaults keep them in memory, which only serves the
 node they run on. A deployment with several nodes keeps them in Redis, by setting `authn-server.storage.type`, or the
-setting of each store, to `redis`, see [Running several nodes](configuration.html#running-several-nodes). Otherwise it
+setting of each store, to `redis`, see [Section 7, "Running several nodes"](configuration.html#running-several-nodes) of [Configuration](configuration.html). Otherwise it
 needs sticky sessions, so that the authentication request, the token request and the UserInfo request of a client
 reach the same node.
 
@@ -881,7 +881,7 @@ AuthnServerConfigurerAdapter discoveryAdjustments() {
 
 A change that should appear in the discovery document belongs here, also when the OpenID Provider is a member of an
 OpenID Federation: the entity configuration is built from the discovery document, so both documents get the change.
-See [Changing the entity configuration](#changing-the-entity-configuration).
+See [Section 8.6, "Changing the entity configuration"](#changing-the-entity-configuration).
 
 <a name="openid-federation"></a>
 ## 8. OpenID Federation
@@ -889,7 +889,7 @@ See [Changing the entity configuration](#changing-the-entity-configuration).
 The OpenID Provider can be a member of an [OpenID Federation](https://openid.net/specs/openid-federation-1_0.html),
 such as the Sweden Connect federation, where an OpenID Provider is registered from its published entity
 configuration. This section is about the OpenID Provider's own membership. Clients resolved through a federation are
-described in [The federation backend](client-registry.html#the-federation-backend).
+described in [Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html).
 
 <a name="joining-a-federation"></a>
 ### 8.1. Joining a federation
@@ -912,13 +912,13 @@ authn-server:
 - The **authority hints** are the entity identifiers of the immediate superiors of the OpenID Provider in the
   federation, the intermediate entities or trust anchors it is registered with. At least one is required, since the
   OpenID Provider is a leaf entity (OpenID Federation 1.0, Section 3.1.2).
-- The **federation keys** sign the entity configuration, see [Federation keys](#federation-keys).
+- The **federation keys** sign the entity configuration, see [Section 8.2, "Federation keys"](#federation-keys).
 
 The application does not start when federation is enabled and the keys or the authority hints are missing. It does
 not start either when the [descriptive metadata](#descriptive-metadata) lacks what the Sweden Connect federation
 requires: at least one e-mail address in `contacts`, and a `logo_uri` that is an HTTPS URL.
 
-All properties are listed in [Configuration](configuration.html#oidc-federation). In code, the same settings are made
+All properties are listed in [Section 6.10, "OpenID Federation"](configuration.html#oidc-federation) of [Configuration](configuration.html). In code, the same settings are made
 with `OidcProviderConfigurer.federation(...)`, see [`OidcFederationConfigurer`][OidcFederationConfigurer].
 
 <a name="federation-keys"></a>
@@ -931,7 +931,7 @@ recommends. They are configured as a list, like the [signing keys](#signing-keys
 - **future**: published but never used.
 
 The first active key signs the entity configuration. The key requirements and the key IDs follow the same rules as for
-the OpenID Connect keys, see [Key requirements and key IDs](#key-requirements-and-key-ids). The signing algorithm is
+the OpenID Connect keys, see [Section 2.3, "Key requirements and key IDs"](#key-requirements-and-key-ids). The signing algorithm is
 `RS256` for an RSA key and the `ES` algorithm of the curve for an EC key, which is what both the Swedish OpenID
 Federation profile, Section 6, and Sweden Connect Security Requirements, Section 3, allow.
 
@@ -966,7 +966,7 @@ The entity configuration is a signed JWT with the type `entity-statement+jwt`, s
 | `iat` and `exp` | When it was signed, and when it expires. The lifetime is 1 day by default, `authn-server.oidc.federation.entity-configuration-lifetime`. |
 | `jwks` | The federation keys, active and future. |
 | `authority_hints` | The configured authority hints. |
-| `trust_marks` | The trust marks of the OpenID Provider, when it has any, see [The trust marks of the OpenID Provider](#the-trust-marks-of-the-openid-provider). |
+| `trust_marks` | The trust marks of the OpenID Provider, when it has any, see [Section 8.5, "The trust marks of the OpenID Provider"](#the-trust-marks-of-the-openid-provider). |
 | `metadata` | The `openid_provider` metadata only. The OpenID Provider is a leaf entity, and never publishes `federation_entity` metadata (Swedish OpenID Federation profile, Section 2.2). |
 
 The `openid_provider` metadata is the [discovery document](#the-discovery-document), as it is after the additional
@@ -993,7 +993,7 @@ change of key state takes effect when the application is restarted, and the enti
 ### 8.4. Descriptive metadata
 
 The descriptive information about the service and its organization is given once for all protocols, under
-`authn-server.entity-information`, see [Entity information](configuration.html#entity-information). The same values
+`authn-server.entity-information`, see [Section 4.3, "Entity information"](configuration.html#entity-information) of [Configuration](configuration.html). The same values
 are then published in the SAML metadata and in the OpenID Provider metadata, and a protocol may override any of them.
 
 The information is mapped to the parameters of
@@ -1011,7 +1011,7 @@ Section 3:
 | `contacts` | The e-mail addresses of the technical and support contact persons, without duplicates. A `mailto:` prefix is removed. |
 
 Each parameter may also be given directly under `authn-server.oidc.entity-information`, which wins over the mapped
-value, see [Entity information for OpenID Connect](configuration.html#oidc-entity-information). In code, the overrides
+value, see [Section 6.9, "Entity information for OpenID Connect"](configuration.html#oidc-entity-information) of [Configuration](configuration.html). In code, the overrides
 are `OidcProviderConfigurer.entityInformation(...)` and `OidcProviderConfigurer.entityMetadata(...)`, and the resulting
 values are given by `OidcProviderConfigurer.getEntityMetadata()`, see [`OidcEntityMetadata`][OidcEntityMetadata].
 
@@ -1053,27 +1053,27 @@ or later:
 
 - The failure is logged as an error, and a new attempt is made after the retry interval, 5 minutes by default,
   `authn-server.oidc.federation.trust-mark-retry-interval`.
-- The failure is published as a system alert for the audit log, see [Auditing](audit.html#trust-mark-alerts).
+- The failure is published as a system alert for the audit log, see [Section 5.4, "Trust mark alerts"](audit.html#trust-mark-alerts) of [Auditing](audit.html).
 - The current trust mark, if there is one, is still published until it expires.
 - At startup without a trust mark, the entity configuration is published without it, and gets it once it has been
   fetched.
 
 The state of each trust mark type, whether a valid trust mark is published and whether the latest attempt failed, is
 recorded in [`ProviderTrustMarks`][ProviderTrustMarks]. With Spring Boot it is a bean, and the `oidc-trust-marks`
-health indicator reads it with `getStates()`, see [Monitoring and managing the server](management.html#oidc-trust-marks-health).
+health indicator reads it with `getStates()`, see [Section 4.3, "The trust marks of the OpenID Provider"](management.html#oidc-trust-marks-health) of [Monitoring and managing the server](management.html).
 
 **The cache directory.** When a cache directory is given, every accepted trust mark is written there, and the stored
 trust marks are read at startup. This means that the OpenID Provider publishes its trust marks at once after a
 restart, also when an issuer cannot be reached. A stored trust mark that has expired, or that fails the check, is not
 used. With Spring Boot the directory is `oidc/trust-marks` in `authn-server.cache-directory`, see
-[State that survives a restart](management.html#state-that-survives-a-restart), or
+[Section 5, "State that survives a restart"](management.html#state-that-survives-a-restart) of [Monitoring and managing the server](management.html), or
 `trust-mark-cache-directory` when that is set. Without either, nothing is stored.
 
 **Several nodes.** The trust marks and their state are kept in a [`ProviderTrustMarkStore`][ProviderTrustMarkStore],
 in memory by default. When they are kept in Redis, by `authn-server.storage.type` or
 `authn-server.oidc.storage.trust-marks`, one node at a time fetches and renews them, every node publishes them, and
 `getStates()` gives the same answer on every node. The cache directory is then not used. See
-[Background jobs and trust marks](configuration.html#background-jobs-in-a-cluster).
+[Section 7.7, "Background jobs and trust marks"](configuration.html#background-jobs-in-a-cluster) of [Configuration](configuration.html).
 
 <a name="changing-the-entity-configuration"></a>
 ### 8.6. Changing the entity configuration
@@ -1081,7 +1081,7 @@ in memory by default. When they are kept in Redis, by `authn-server.storage.type
 There are two ways to change what the OpenID Provider publishes, and they differ in which documents they reach:
 
 - **The discovery document**, `authn-server.oidc.discovery.additional-parameters` and the discovery customizer, see
-  [Extending the document](#extending-the-document). The entity configuration is built from the discovery document, so
+  [Section 7.1, "Extending the document"](#extending-the-document). The entity configuration is built from the discovery document, so
   a change made here reaches **both** documents. A change that only concerns the OpenID Provider metadata belongs
   here.
 - **The entity configuration**, `authn-server.oidc.federation.additional-parameters` and the entity configuration
