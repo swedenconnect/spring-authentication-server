@@ -76,7 +76,7 @@ The protocol-neutral part is:
 - The logotypes, with a language where the metadata gives one, and a size where the metadata gives one.
 - The marks that the requester holds.
 - The organisation number of the requester, when its metadata gives one, see
-  [The organisation number](#the-organisation-number).
+  [Section 2.2, "The organisation number"](#the-organisation-number).
 
 Picking a name or a logotype for the user's language is done by the record:
 
@@ -190,7 +190,7 @@ Provider declares. The organisation number comes from the `mdorgext:Organization
 `md:Organization`; a Service Provider without `md:Organization`, or without the extension, has none.
 
 The SAML configurer creates this backend from the metadata sources it is given, and with Spring Boot the sources are
-set with the `authn-server.saml.metadata-providers` properties, see [Configuration](configuration.html#sp-metadata).
+set with the `authn-server.saml.metadata-providers` properties, see [Section 5.4, "Service Provider metadata"](configuration.html#sp-metadata) of [Configuration](configuration.html).
 
 <a name="openid-connect-three-backends"></a>
 ## 5. OpenID Connect: three backends
@@ -200,14 +200,14 @@ configuration, repository, federation.
 
 - **Configuration** ([`ConfigurationClientBackend`][ConfigurationClientBackend]): the clients that the deployment
   gives the server directly. With Spring Boot, they are given with `authn-server.oidc.clients`, in JSON files or
-  inline, see [Clients](configuration.html#oidc-clients), and that source is named `properties`. Configured clients
+  inline, see [Section 6.2, "Clients"](configuration.html#oidc-clients) of [Configuration](configuration.html), and that source is named `properties`. Configured clients
   added in code get the name `configuration`. The clients are read with
   [`OidcClientReader`][OidcClientReader], which may also be used without Spring Boot.
 - **Repository** ([`RepositoryClientBackend`][RepositoryClientBackend]): the clients of a
   [`ClientRepository`][ClientRepository]. The library ships [`InMemoryClientRepository`][InMemoryClientRepository];
   implementations backed by a database are added later. A repository that can list its clients implements
   `findAll()`, so that its clients can be listed and compared with those known before a restart, see
-  [Monitoring and managing the server](management.html#clients-added-and-removed).
+  [Section 6, "Clients added and removed"](management.html#clients-added-and-removed) of [Monitoring and managing the server](management.html).
 - **Federation** ([`FederationClientBackend`][FederationClientBackend]): clients resolved through OpenID Federation.
 
 Every client source has a name, which the [Actuator](management.html) and the [audit events](audit.html) use to tell
@@ -241,7 +241,7 @@ metadata.setCustomField("organization_identifier", "urn:glue:iso6523:0007:556677
 
 A configured client, or a client in a repository, that authenticates with a client secret at the token endpoint has
 the secret in the `client_secret` field of its metadata, see
-[Client authentication](openid-provider.html#client-authentication).
+[Section 6.3, "Client authentication"](openid-provider.html#client-authentication) of [The OpenID Provider](openid-provider.html).
 
 <a name="the-federation-backend"></a>
 ## 6. The federation backend
@@ -251,7 +251,7 @@ identifier.
 
 With Spring Boot, it is set up from properties: the trust anchor under `authn-server.oidc.federation.trust-anchor` and
 the source under `authn-server.oidc.federation.clients`, with the resolver, the trust mark issuers and the cache, see
-[Clients from OpenID Federation](configuration.html#oidc-federation-clients). The source is named `federation`, and it
+[Section 6.11, "Clients from OpenID Federation"](configuration.html#oidc-federation-clients) of [Configuration](configuration.html). The source is named `federation`, and it
 is on whenever the OpenID Provider is a member of a federation, unless it is turned off. Endpoints that are not
 configured are found in the entity configurations of the resolver and the issuers, by
 [`EntityConfigurationEndpoints`][EntityConfigurationEndpoints].
@@ -355,7 +355,7 @@ if (record != null && record.hasMark(trustMarkType)) {
   mark's expiry and the record's expiry. Later requests from the same client need no call to the issuer, and a
   refresh of the record carries the trust mark over while it is still valid.
 - A trust mark without `exp`, or with a long one, stays trusted after the issuer has withdrawn it, unless its status is
-  checked, see [Checking the status of trust marks](#trust-mark-status-checks).
+  checked, see [Section 6.4, "Checking the status of trust marks"](#trust-mark-status-checks).
 
 For SAML, asking for a mark never finds anything. It gives the requester's record unchanged.
 
@@ -389,7 +389,7 @@ status checks count toward the [health of the trust mark issuers](management.htm
   holding it on its next request: the trust mark is asked for again, and when the issuer no longer issues it, the
   client is rejected with the same error response as any client that lacks a required mark. The removal is also
   published as a system alert for the audit log, when the checker has been given an event publisher, see
-  [Auditing](audit.html#trust-mark-alerts).
+  [Section 5.4, "Trust mark alerts"](audit.html#trust-mark-alerts) of [Auditing](audit.html).
 - A status endpoint that cannot be reached, or a response that does not verify, leaves the trust mark in place. It is
   logged at `WARN`, and the trust mark is checked again at the next run.
 
@@ -408,7 +408,7 @@ counts lookups, and the jobs ask it for the lock that decides which node runs a 
   that stops while it holds the lock of a job blocks the job for at most one round.
 
 With Spring Boot, a `FederationCache` bean is declared according to `authn-server.storage.type`, or
-`authn-server.oidc.storage.federation-cache`, see [Running several nodes](configuration.html#running-several-nodes).
+`authn-server.oidc.storage.federation-cache`, see [Section 7, "Running several nodes"](configuration.html#running-several-nodes) of [Configuration](configuration.html).
 The source set up from the properties uses it, together with the jobs. An application that builds the backend in code
 builds it and the jobs from the same bean, and from the [`HttpFederationClient`][HttpFederationClient] bean that the
 auto-configuration declares. That client publishes the outcome of every call it makes, which is what the
@@ -424,7 +424,7 @@ FederationClientBackend federationBackend(final FederationCache cache, final Htt
 
 The backend is added to the client registry with an `AuthnServerConfigurerAdapter`, which calls
 `configurer.clientRegistryBackend(backend)`. The clients that the backend adds and removes are then reported, see
-[Clients added and removed](management.html#clients-added-and-removed), and the clients it holds can be listed and
+[Section 6, "Clients added and removed"](management.html#clients-added-and-removed) of [Monitoring and managing the server](management.html), and the clients it holds can be listed and
 updated through the [clients endpoint](management.html#the-clients-endpoint).
 
 <a name="requester-acceptance"></a>
@@ -454,13 +454,13 @@ Two predicates are built in:
 - [`RequiredMarksRequesterPredicate`][RequiredMarksRequesterPredicate] requires marks, given as groups. Every group must
   be satisfied, and a group is satisfied by any one of its marks, so `[[A, B], [C]]` means "A or B, and C". When a
   group is not satisfied by the record, the predicate asks the registry for the missing marks, see
-  [Trust marks on demand](#trust-marks-on-demand), and evaluates the updated record before rejecting. For SAML nothing
+  [Section 6.3, "Trust marks on demand"](#trust-marks-on-demand), and evaluates the updated record before rejecting. For SAML nothing
   is obtained this way, so the Service Provider metadata decides.
 
 With Spring Boot, the configurable check is set up from properties under each protocol's prefix, for SAML
-`authn-server.saml.requester-acceptance.*`, see [Configuration](configuration.html#requester-acceptance), and for
+`authn-server.saml.requester-acceptance.*`, see [Section 5.7, "Requester acceptance"](configuration.html#requester-acceptance) of [Configuration](configuration.html), and for
 OpenID Connect `authn-server.oidc.requester-acceptance.*`, see
-[Configuration](configuration.html#oidc-requester-acceptance).
+[Section 6.5, "Requester acceptance"](configuration.html#oidc-requester-acceptance) of [Configuration](configuration.html).
 
 A predicate of your own is added with an adapter. A predicate that reads protocol metadata gets it from the record in
 its own type:

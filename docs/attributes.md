@@ -129,7 +129,7 @@ Whether the requested values are essential, `isRequestedValuesEssential()`, is k
 is essential. It is decided by the request entry that carries the values, not by other requests for the same attribute.
 When essential values do not match the authenticated user the request fails with `UNKNOWN_PRINCIPAL`, while voluntary
 values that do not match are only logged, see
-[When the user does not match the requested values](authentication-module.html#when-the-user-does-not-match-the-requested-values).
+[Section 2.3.1, "When the user does not match the requested values"](authentication-module.html#when-the-user-does-not-match-the-requested-values) of [Writing an authentication module](authentication-module.html).
 
 The same attribute may be asked for in more than one place. Merging two requested attributes gives an attribute that
 is essential if either of them was, the values of the first one that has values, with whether they are essential, and
@@ -167,7 +167,7 @@ An attribute that no mapper handles is left out of the result. That is not an er
 
 The SAML mappers are in `authn-server-saml` and work on the OpenSAML types. The OpenID Connect mappers are in
 `authn-server-oidc` and work on the Nimbus types. The eIDAS attributes have a mapping of their own, see
-[eIDAS attributes](#eidas-attributes) below.
+[Section 10, "eIDAS attributes"](#eidas-attributes).
 
 ```java
 // SAML
@@ -308,7 +308,7 @@ attribute. A scope that is not registered asks for nothing, which is not an erro
 
 The OpenID Provider never derives `sign` and `signApproval` from the claims of the providers. They are only offered
 when a provider declares them or they are configured, see
-[The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+[Section 4, "Scopes, claims and authentication contexts"](openid-provider.html#scopes-claims-and-authentication-contexts) of [The OpenID Provider](openid-provider.html).
 
 <a name="adding-a-scope"></a>
 #### 3.2.3. Adding a scope
@@ -365,7 +365,7 @@ The server creates the manager for each protocol from the producers and voters o
 own followed by the shared ones. The shared defaults are `DefaultAttributeProducer` and
 `IncludeAllAttributeReleaseVoter`. For SAML, `SwedenConnectAttributeProducer` and `SwedenConnectAttributeReleaseVoter`
 come before them, see
-[Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
+[Section 5, "Producers, voters and processors"](saml-identity-provider.html#producers-voters-and-processors) of [The SAML Identity Provider](saml-identity-provider.html).
 
 <a name="the-built-in-producers"></a>
 ### 4.1. The built-in producers
@@ -625,8 +625,8 @@ eID Framework below it. The friendly name is what the text below uses. A dash me
 in that protocol.
 
 Several generic attributes may map to the same SAML attribute or claim, and the cell then says how. "Joined with the
-other name parts" means that this attribute is one of the parts that together make up the value, and the rules under
-[Mapping rules](#mapping-rules) below say in what order. "The key `PoBox`" means that this attribute is one key of the
+other name parts" means that this attribute is one of the parts that together make up the value, and the rules in
+[Section 9, "Mapping rules"](#mapping-rules) say in what order. "The key `PoBox`" means that this attribute is one key of the
 key-value list that the SAML attribute holds.
 
 | Generic attribute | Type | SAML attribute | OpenID Connect claim |

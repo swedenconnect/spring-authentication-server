@@ -10,7 +10,7 @@ This page describes how the SAML Identity Provider handles an authentication req
 request is received and turned into the protocol-neutral authentication requirements, how the user is authenticated,
 how single sign-on is decided, how the released attributes are chosen, what the response holds, which failures are
 answered to the Service Provider, and how to replace the parts of the processing. The properties are described in
-[Configuration](configuration.html#the-saml-identity-provider).
+[Section 5, "The SAML Identity Provider"](configuration.html#the-saml-identity-provider) of [Configuration](configuration.html).
 
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
@@ -43,30 +43,30 @@ Source links in this guide point to the `main` branch of the
 ## 1. How a request flows
 
 1. The Service Provider sends an `AuthnRequest` to one of the authentication endpoints. The request is decoded,
-   validated and turned into authentication requirements, see [Receiving a request](#receiving-a-request).
+   validated and turned into authentication requirements, see [Section 2, "Receiving a request"](#receiving-a-request).
 
 2. The requirements are handed to the authentication providers, together with the authentication in the session that
    may be reused. The first provider that can serve the request handles it, see
-   [Authenticating the user](#authenticating-the-user).
+   [Section 4, "Authenticating the user"](#authenticating-the-user).
 
 3. Either the provider answers at once, from single sign-on or with a new authentication, or it sends the user to the
    pages of its module. In the second case, the flow continues when the user comes back to the resume path, see
-   [Modules with pages of their own](#modules-with-pages-of-their-own).
+   [Section 4.3, "Modules with pages of their own"](#modules-with-pages-of-their-own).
 
 4. The post-authentication processors run on the result, the released attributes are chosen, and the assertion and the
-   response are built, see [The response](#the-response).
+   response are built, see [Section 6, "The response"](#the-response).
 
 5. The authentication is kept in the session for single sign-on, and the response is posted to the assertion consumer
    service of the Service Provider.
 
 A failure after the assertion consumer service has been established is answered to the Service Provider with an error
-response, see [Failures](#failures).
+response, see [Section 7, "Failures"](#failures).
 
 <a name="receiving-a-request"></a>
 ## 2. Receiving a request
 
 Authentication requests are received on the authentication endpoints under the SAML path, see
-[URL layout](configuration.html#url-layout):
+[Section 3, "URL layout"](configuration.html#url-layout) of [Configuration](configuration.html):
 
 - `/saml2/redirect/authn` for the HTTP redirect binding.
 - `/saml2/post/authn` for the HTTP POST binding.
@@ -96,12 +96,12 @@ authentication requirements. In this order:
 ## 3. What the requirements hold
 
 The result is a [`SamlAuthenticationRequirements`][SamlAuthenticationRequirements], described in
-[Writing an authentication module](authentication-module.html#what-the-module-receives):
+[Section 2, "What the module receives"](authentication-module.html#what-the-module-receives) of [Writing an authentication module](authentication-module.html):
 
 - `ForceAuthn` and `IsPassive`. A request with both is invalid.
 - The requested authentication contexts, from `RequestedAuthnContext`. The `exact` comparison gives the requested
   URIs. The other comparisons are resolved through configured mappings, see
-  [Request processing](configuration.html#request-processing).
+  [Section 5.5, "Request processing"](configuration.html#request-processing) of [Configuration](configuration.html).
 - The requested attributes, worked out from the metadata, the request and the entity categories, see
   [Attributes](attributes.html).
 - The requested authentication providers, from the `IDPList` of `Scoping`, and the original requesters, from its
@@ -140,7 +140,7 @@ providers in the order they should be preferred.
 The session holds one authentication for the whole server, whichever protocol it was made for, since single sign-on
 is shared between SAML and OpenID Connect. It is kept in the Spring Security `SecurityContext` of the session. When a
 request comes in, that authentication is given to the provider, and the provider decides whether it may be reused, as
-described in [Writing an authentication module](authentication-module.html#single-sign-on).
+described in [Section 4, "Single sign-on"](authentication-module.html#single-sign-on) of [Writing an authentication module](authentication-module.html).
 
 The single sign-on policy of a provider, when it has one, wins over the SAML policy under `authn-server.saml.sso`,
 which wins over the shared policy under `authn-server.sso`. With the default policy, an authentication is reused for
@@ -152,13 +152,13 @@ released are therefore what the new request asks for, not what the original requ
 After a successful response, the authentication is saved in the session. An authentication that may not be reused,
 such as one where a sign message was displayed, is not saved, and it also removes any earlier authentication from the
 session. What happens to the session authentication otherwise is described in
-[Writing an authentication module](authentication-module.html#what-happens-to-the-session-authentication).
+[Section 4.4, "What happens to the session authentication"](authentication-module.html#what-happens-to-the-session-authentication) of [Writing an authentication module](authentication-module.html).
 
 <a name="modules-with-pages-of-their-own"></a>
 ### 4.3. Modules with pages of their own
 
 A provider that authenticates the user on pages of its own, see
-[Writing an authentication module](authentication-module.html#modules-with-pages-of-their-own), sends the user to its
+[Section 6, "Modules with pages of their own"](authentication-module.html#modules-with-pages-of-their-own) of [Writing an authentication module](authentication-module.html), sends the user to its
 authentication path. The server's filter chain serves both paths of every such provider:
 
 - The authentication path is open to everyone, since the user is not authenticated yet. Only this exact path is
@@ -178,7 +178,7 @@ shown an error page. An error that the module reports, including a cancel, is an
 Four kinds of components take part in the authentication and the response:
 
 - The attribute producers decide which attributes may be released. The first producer to release an attribute wins.
-- The attribute release voters decide which of those are kept, see [Attributes](attributes.html#releasing-attributes).
+- The attribute release voters decide which of those are kept, see [Section 4, "Releasing attributes"](attributes.html#releasing-attributes) of [Attributes](attributes.html).
 - The single sign-on voters decide whether an authentication may be reused.
 - The post-authentication processors check, and may change, the result before it is answered.
 
@@ -229,7 +229,7 @@ A successful authentication is answered with a signed `Response` holding one ass
 [`Saml2AssertionBuilder`][Saml2AssertionBuilder]:
 
 - The `Subject` holds the `NameID` from the generator that was set up when the request was processed, see
-  [Attributes](attributes.html#identifying-the-user), and one `SubjectConfirmation`.
+  [Section 5, "Identifying the user"](attributes.html#identifying-the-user) of [Attributes](attributes.html), and one `SubjectConfirmation`.
 - The subject confirmation is `bearer`, with the assertion consumer service as `Recipient`, the ID of the request as
   `InResponseTo`, and the address the user was authenticated from. For a request received on a Holder-of-key
   endpoint, it is `holder-of-key` instead, with the certificate that the client presented in the TLS handshake in a
@@ -242,7 +242,7 @@ A successful authentication is answered with a signed `Response` holding one ass
   authentication, becomes `AuthenticatingAuthority`.
 - The `AttributeStatement` holds the released attributes, mapped to SAML attributes by the
   [`SamlAttributeMapping`][SamlAttributeMapping]. Assign a mapping of your own with
-  `Saml2IdpConfigurer.attributeMapping(...)`, see [Attributes](attributes.html#mapping).
+  `Saml2IdpConfigurer.attributeMapping(...)`, see [Section 2, "Mapping"](attributes.html#mapping) of [Attributes](attributes.html).
 
 The assertion is signed when the Service Provider metadata states `WantAssertionsSigned`, and always for
 Holder-of-key. It is encrypted for the Service Provider when `authn-server.saml.assertions.encrypt` is `true`, which is
@@ -280,7 +280,7 @@ state.
 | The `SADRequest` is invalid | `Requester` / `RequestUnsupported` |
 | A request on a Holder-of-key endpoint has no client certificate | `Responder` / `AuthnFailed` |
 | No provider can deliver a requested authentication context | `Requester` / `NoAuthnContext` |
-| The authentication fails, or the module reports an error | The status of the error, see [Errors](authentication-module.html#errors) |
+| The authentication fails, or the module reports an error | The status of the error, see [Section 5, "Errors"](authentication-module.html#errors) of [Writing an authentication module](authentication-module.html) |
 | A sign message had to be displayed, but was not | `Responder` / `AuthnFailed` |
 | The resume path is reached without a matching authentication in progress | Unrecoverable (`INVALID_SESSION`) |
 

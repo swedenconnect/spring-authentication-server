@@ -97,7 +97,7 @@ The server has no audit settings of its own.
 
 Without Spring Boot, the [`AuthnServerConfigurer`][AuthnServerConfigurer] publishes the events to the application
 context of the `HttpSecurity` object, or to the publisher given with `eventPublisher(...)`. The transformers listed
-under [Changing what an event holds](#replacing-a-transformer) are then registered with spring-audit-support's
+in [Section 6, "Changing what an event holds"](#replacing-a-transformer) are then registered with spring-audit-support's
 `AuditApplicationListener` by the application.
 
 <a name="common-structure"></a>
@@ -165,7 +165,7 @@ follows the flow like this:
 
 Since the correlation ID is kept with the data of the flow, the session, the authorization codes and the access
 tokens, it is the same whichever server instance handles a request, also when that data is kept in Redis, see
-[Running several nodes](configuration.html#running-several-nodes).
+[Section 7, "Running several nodes"](configuration.html#running-several-nodes) of [Configuration](configuration.html).
 
 A request that cannot be tied to a flow gets a correlation ID of its own, for example a token request with an unknown
 code, or a request on the resume path without an authentication in progress.
@@ -200,7 +200,7 @@ For SAML, the event is written once the message has been decoded; a message that
 [Unrecoverable Error](#authn_unrecoverable_error). For OpenID Connect, the request object of a request that has one
 has not yet been read.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
 **Audit data:** `authn_request`, SAML
 
@@ -243,10 +243,10 @@ Every member except `request_object` is absent when the request does not have it
 **Description:** The request has passed all checks, the requester is verified, and the user authentication starts.
 Any error from here on is answered to the requester.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
 **Audit data:** `authn_request`, with the members of
-[Authentication Request Received](#authn_request_received), with these differences:
+[Section 4.1, "Authentication Request Received"](#authn_request_received), with these differences:
 
 - SAML: `assertion_consumer_service_url` is the assertion consumer service that the response is sent to.
 - OpenID Connect: the values include those of the request object, and `response_mode` is the response mode that is
@@ -262,9 +262,9 @@ sign-on. The event holds every attribute the authentication module delivered, wh
 requester. Which attributes were released is found in the [Success Response](#authn_success_response) and
 [UserInfo Delivered](#authn_userinfo_delivered) events.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
-**Audit data:** `authn_request`, as in [Authentication Request Accepted](#authn_request_accepted).
+**Audit data:** `authn_request`, as in [Section 4.2, "Authentication Request Accepted"](#authn_request_accepted).
 
 **Audit data:** `user_authentication`
 
@@ -299,7 +299,7 @@ A list of the attributes that the authentication module delivered, by their prot
 **Description:** OpenID Connect only. The authorization code has been issued, and the authorization response holding
 it is sent to the client. The code itself is not recorded.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
 **Audit data:** `authorization_response`
 
@@ -318,7 +318,7 @@ it is sent to the client. The code itself is not recorded.
 OpenID Connect, the client has redeemed the authorization code at the token endpoint and the ID token has been issued.
 There is no separate event for the tokens. The event holds the attributes that were released, by their protocol names.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
 **Audit data:** `response`, SAML
 
@@ -355,7 +355,7 @@ There is no separate event for the tokens. The event holds the attributes that w
 
 A list of the released attributes, by their protocol names: the SAML attribute names of the assertion, or the claims of
 the ID token. Each element has `name` and `values`, as the `attributes` of
-[User Authenticated](#authn_user_authenticated). The list is empty if nothing was released.
+[Section 4.3, "User Authenticated"](#authn_user_authenticated). The list is empty if nothing was released.
 
 <a name="authn_userinfo_delivered"></a>
 ### 4.6. UserInfo Delivered
@@ -365,7 +365,7 @@ the ID token. Each element has `name` and `values`, as the `attributes` of
 **Description:** OpenID Connect only. A UserInfo response holding the claims has been produced and is sent to the
 client.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
 **Audit data:** `response`
 
@@ -376,7 +376,7 @@ client.
 | `encrypted` | Whether the response is encrypted. | Boolean |
 
 **Audit data:** `released_attributes`, the claims of the response other than `sub`, as in
-[Success Response](#authn_success_response).
+[Section 4.5, "Success Response"](#authn_success_response).
 
 <a name="authn_error_response"></a>
 ### 4.7. Error Response
@@ -387,7 +387,7 @@ client.
 to the redirect URI, an error from the token endpoint or an error from the UserInfo endpoint. This includes a user who
 cancels the authentication. The event is written just before the response is sent.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
 **Audit data:** `stage`, a string telling where the error came from:
 
@@ -410,7 +410,7 @@ cancels the authentication. The event is written just before the response is sen
 
 | Parameter | Description | Type |
 | :--- | :--- | :--- |
-| `id`, `in_response_to`, `destination`, `issued_at`, `signed`, `relay_state` | As in [Success Response](#authn_success_response). | |
+| `id`, `in_response_to`, `destination`, `issued_at`, `signed`, `relay_state` | As in [Section 4.5, "Success Response"](#authn_success_response). | |
 | `status_code` | The status code. | String |
 | `subordinate_status_code` | The subordinate status code. | String |
 | `status_message` | The status message. Absent if there is none. | String |
@@ -438,11 +438,11 @@ cancels the authentication. The event is written just before the response is sen
 is or where to send a response. The error is shown to the user instead. Examples are a SAML message that cannot be
 decoded, an unknown Service Provider or client, a `redirect_uri` that the client has not registered, and a return to
 the resume path without an authentication in progress. The principal and `verified` follow
-[The principal](#the-principal), so an unknown requester is recorded as the requester the request names.
+[Section 2.2, "The principal"](#the-principal), so an unknown requester is recorded as the requester the request names.
 
-**Audit data:** `requester`, see [The requester](#the-requester).
+**Audit data:** `requester`, see [Section 2.1, "The requester"](#the-requester).
 
-**Audit data:** `stage`, as in [Error Response](#authn_error_response). Absent when the stage is not known, such as
+**Audit data:** `stage`, as in [Section 4.7, "Error Response"](#authn_error_response). Absent when the stage is not known, such as
 for an error on the pages of an authentication module that do not belong to an authentication in progress.
 
 **Audit data:** `error`
@@ -496,7 +496,7 @@ These events are not tied to an authentication flow. Their principal is the syst
 **Description:** A monitored credential that failed its test could not be reloaded, and cannot be used. Written for
 credentials-support's `FailedCredentialReloadEvent`.
 
-**Audit data:** as [Credential Test Error](#authn_credential_test_error), with the error of the reload.
+**Audit data:** as [Section 5.1, "Credential Test Error"](#authn_credential_test_error), with the error of the reload.
 
 <a name="trust-mark-alerts"></a>
 ### 5.4. Trust mark alerts
@@ -505,9 +505,9 @@ Two conditions of OpenID Federation are published as spring-audit-support's `Sys
 [System Alert][audit-system-alert] events:
 
 - The OpenID Provider fails to fetch or renew one of its own trust marks, see
-  [The trust marks of the OpenID Provider](openid-provider.html#the-trust-marks-of-the-openid-provider).
+  [Section 8.5, "The trust marks of the OpenID Provider"](openid-provider.html#the-trust-marks-of-the-openid-provider) of [The OpenID Provider](openid-provider.html).
 - A trust mark of a client is reported withdrawn, or anything but active, at a trust mark status check, see
-  [Trust mark status checks](client-registry.html#trust-mark-status-checks).
+  [Section 6.4, "Checking the status of trust marks"](client-registry.html#trust-mark-status-checks) of [The client registry](client-registry.html).
 
 The trust marks of the OpenID Provider are wired to publish the alerts. A
 [`TrustMarkStatusChecker`][TrustMarkStatusChecker] is created by the application, which gives it the application
@@ -522,7 +522,7 @@ context with `setEventPublisher(...)`.
 holds a new Service Provider, an OpenID Federation client was resolved and was not known before, or a client that the
 server loads at startup was not known before the restart. There is one event per client. The type has no `authn_`
 prefix since it is a system operation. When the event occurs, and how the server knows which clients it had before a
-restart, is described under [Clients added and removed](management.html#clients-added-and-removed).
+restart, is described in [Section 6, "Clients added and removed"](management.html#clients-added-and-removed) of [Monitoring and managing the server](management.html).
 
 **Audit data:**
 
@@ -530,7 +530,7 @@ restart, is described under [Clients added and removed](management.html#clients-
 | :--- | :--- | :--- |
 | `client.protocol` | `saml` or `oidc`. | String |
 | `client.id` | The SAML entityID or the OpenID Connect `client_id`. | String |
-| `client.organization_number` | The organisation number of the client exactly as the client registry holds it, see [The requester](#the-requester). Absent if the client has none. | String |
+| `client.organization_number` | The organisation number of the client exactly as the client registry holds it, see [Section 2.1, "The requester"](#the-requester). Absent if the client has none. | String |
 | `client.source` | Where the client came from: the SAML metadata source, or the OpenID Connect backend, `properties`, `configuration`, `repository` or `federation`. | String |
 
 <a name="client_removed"></a>
@@ -547,7 +547,7 @@ client. A federation client whose cache entry expires and is resolved again is n
 
 | Parameter | Description | Type |
 | :--- | :--- | :--- |
-| `client` | The client as it was known, with the members of [Client Added](#client_added). | Object |
+| `client` | The client as it was known, with the members of [Section 5.5, "Client Added"](#client_added). | Object |
 | `reason` | Why the client was removed, for example `no longer held by the source 'https://md.example.com/sp.xml'` or `the resolver reports the client as not found`. | String |
 
 The events are written once for the whole deployment when the nodes share their state in Redis. A deployment that does

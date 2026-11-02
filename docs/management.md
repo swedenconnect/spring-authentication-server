@@ -140,7 +140,7 @@ The answer of an update tells what happened in `outcome`, with a description in 
 | Outcome | Description |
 | :--- | :--- |
 | `updated` | The data was fetched again. |
-| `removed` | The OpenID Federation resolver reports the client as not found. It is removed, see [Clients added and removed](#clients-added-and-removed). |
+| `removed` | The OpenID Federation resolver reports the client as not found. It is removed, see [Section 6, "Clients added and removed"](#clients-added-and-removed). |
 | `nothing-to-update` | The data does not come from a source that can be updated: a configured OpenID Connect client, a client in a repository, or SAML metadata that is read once from a resource. |
 | `failed` | The update failed, and the answer has HTTP status 502. The data held before is kept. |
 
@@ -316,7 +316,7 @@ source cannot tell how many Service Providers it has, and does not count as empt
 **Key:** `oidc-trust-marks`
 
 Present when OpenID Federation is enabled. Each of the OpenID Provider's own trust mark types, see
-[The trust marks of the OpenID Provider](openid-provider.html#the-trust-marks-of-the-openid-provider), reports
+[Section 8.5, "The trust marks of the OpenID Provider"](openid-provider.html#the-trust-marks-of-the-openid-provider) of [The OpenID Provider](openid-provider.html), reports
 whether a valid trust mark is published, when it expires, when it was last fetched, and, while fetching fails, the
 number of failed attempts and the latest error.
 
@@ -335,7 +335,7 @@ When the trust marks are kept in Redis, every server instance reports the same.
 The OpenID Federation services that the server calls: the resolver, each trust mark issuer, whether it is called
 for the OpenID Provider's own trust marks, for a trust mark that a client is asked to hold, or for a trust mark status
 check, and each entity whose entity configuration is fetched to find an endpoint that is not configured, see
-[Clients from OpenID Federation](configuration.html#oidc-federation-clients). An entity configuration that cannot be
+[Section 6.11, "Clients from OpenID Federation"](configuration.html#oidc-federation-clients) of [Configuration](configuration.html). An entity configuration that cannot be
 fetched or verified, or that does not publish a needed endpoint, counts as a failure.
 
 The health is built from the calls that the server makes, never from calls made by the health check. A resolver
@@ -375,7 +375,7 @@ is kept in Redis, so is this state, and every server instance reports the same.
 
 The calls are recorded by the `HttpFederationClient` bean that the auto-configuration declares. An application that
 sets up the federation backend of the client registry builds it with that bean, see
-[The client registry](client-registry.html#the-federation-backend); calls made through a client that the application
+[Section 6, "The federation backend"](client-registry.html#the-federation-backend) of [The client registry](client-registry.html); calls made through a client that the application
 creates itself are not seen.
 
 <a name="state-that-survives-a-restart"></a>
@@ -398,14 +398,14 @@ directory is organized:
 
 | Path | What it holds |
 | :--- | :--- |
-| `known-clients.json` | The record of the clients that the server knows, which the server compares with at startup, see [Clients added and removed](#clients-added-and-removed). Written when a client is added or removed. |
+| `known-clients.json` | The record of the clients that the server knows, which the server compares with at startup, see [Section 6, "Clients added and removed"](#clients-added-and-removed). Written when a client is added or removed. |
 | `oidc/federation-cache.json` | The cache of clients resolved through OpenID Federation. Written a few seconds after a change, and when the server stops. At startup, entries that have expired are dropped. |
 | `oidc/trust-marks/` | The OpenID Provider's own trust marks, one file per trust mark type. A stored trust mark is used at startup if it is still valid. |
 
 `authn-server.oidc.federation.trust-mark-cache-directory`, when set, overrides where the trust marks of the OpenID
 Provider are kept.
 
-When state is kept in Redis, see [Running several nodes](configuration.html#running-several-nodes), it survives a
+When state is kept in Redis, see [Section 7, "Running several nodes"](configuration.html#running-several-nodes) of [Configuration](configuration.html), it survives a
 restart there and the cache directory is not used for it. The record of known clients follows
 `authn-server.storage.type`, the federation cache `authn-server.oidc.storage.federation-cache` and the trust marks
 `authn-server.oidc.storage.trust-marks`.
