@@ -26,9 +26,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;
 
-import com.nimbusds.openid.connect.sdk.OIDCScopeValue;
-
-import se.oidc.nimbus.claims.ScopeConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.attributes.GenericAttribute;
 import se.swedenconnect.spring.authnserver.attributes.SwedishIdentityNumbers;
@@ -57,18 +54,6 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
       AttributeIdentifiers.SURNAME,
       AttributeIdentifiers.DISPLAY_NAME,
       AttributeIdentifiers.DATE_OF_BIRTH);
-
-  /**
-   * The OpenID Connect scopes that the provider offers. The scopes of signature services are scopes without claims,
-   * and are therefore only offered when they are declared.
-   */
-  private static final List<String> SUPPORTED_SCOPES = List.of(
-      OIDCScopeValue.OPENID.getValue(),
-      OIDCScopeValue.PROFILE.getValue(),
-      ScopeConstants.NATURAL_PERSON_INFO.getValue(),
-      ScopeConstants.NATURAL_PERSON_PERSONAL_NUMBER.getValue(),
-      ScopeConstants.SIGN.getValue(),
-      ScopeConstants.SIGN_APPROVAL.getValue());
 
   /** The name of the provider. */
   private final String name;
@@ -125,12 +110,6 @@ public class SimulatedAuthenticationProvider extends AbstractUserRedirectAuthent
   @Override
   public @NonNull List<String> getSupportedAttributes() {
     return SUPPORTED_ATTRIBUTES;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public @NonNull List<String> getSupportedScopes() {
-    return SUPPORTED_SCOPES;
   }
 
   /** {@inheritDoc} */

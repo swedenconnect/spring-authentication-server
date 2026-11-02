@@ -98,8 +98,13 @@ public @NonNull List<String> getSupportedAttributes() {
 
 A provider that declares its attributes normally does not need to declare scopes, since the OpenID Provider derives
 them from the claims. Declare scopes when the derived set is wrong for the provider, for example a scope whose
-essential claims the provider delivers only some of. How scopes and claims are worked out is described in
+essential claims the provider delivers only some of. A provider that declares scopes offers exactly those, so the
+derived ones are replaced, not added to. How scopes and claims are worked out is described in
 [The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
+
+:raised_hand: The sign scopes, `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval`, are never
+derived. A provider that signs declares `attribute.user-signature` among its attributes and the sign scope among its
+scopes, together with the other scopes it offers.
 
 The declarations only tell what the server offers. They do not limit what the provider releases: a provider still
 returns everything it knows about the user, see [The authenticated user](#the-authenticated-user). See

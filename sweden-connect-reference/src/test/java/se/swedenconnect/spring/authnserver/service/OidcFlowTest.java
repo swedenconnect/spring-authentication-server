@@ -164,12 +164,12 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
   }
 
   @Test
-  void signatureRequestShowsTheSignMessage() throws Exception {
+  void signatureApprovalRequestShowsTheSignMessage() throws Exception {
     final TestBrowser browser = new TestBrowser();
     final Map<String, String> request =
-        authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
+        authorizationRequest("openid https://id.oidc.se/scope/signApproval " + NATURAL_PERSON_NUMBER);
     request.put("prompt", "login consent");
-    request.put("https://id.oidc.se/param/signRequest", this.signRequest("I sign the *contract*"));
+    request.put("https://id.oidc.se/param/signRequest", this.signRequest("I sign the *contract*", false));
 
     final String html = browser.follow(browser.get(authorizeUrl(request)), BASE_URL).body();
     assertThat(html).contains("requests your signature").contains("sign-message").contains("<em>contract</em>");
@@ -185,6 +185,23 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
     assertThat(idClaims.getStringClaim("acr")).isEqualTo(LOA3);
     assertThat(this.userInfo(tokens.getOIDCTokens().getBearerAccessToken())
         .getStringClaim(ClaimConstants.PERSONAL_IDENTITY_NUMBER_CLAIM_NAME)).isEqualTo(USER);
+  }
+
+  @Test
+  void theSignScopeIsNotOfferedSoASignatureRequestWithItIsRejected() throws Exception {
+    final Map<String, String> request =
+        authorizationRequest("openid https://id.oidc.se/scope/sign " + NATURAL_PERSON_NUMBER);
+    request.put("prompt", "login consent");
+    request.put("https://id.oidc.se/param/signRequest", this.signRequest("I sign the *contract*", true));
+
+    final HttpResponse<String> response = new TestBrowser().get(authorizeUrl(request));
+    assertThat(TestBrowser.isRedirect(response)).isTrue();
+    final String location = TestBrowser.location(response);
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(TestBrowser.queryParameters(location))
+        .containsEntry("error", "invalid_request")
+        .containsEntry("error_description", "A signature request requires the sign or the sign approval scope")
+        .containsEntry("state", request.get("state"));
   }
 
   @Test
@@ -321,18 +338,20 @@ class OidcFlowTest extends AbstractCompleteProfileTest {
     return ((RSAKey) jwks.getKeyByKeyId(keyId)).toRSAPublicKey();
   }
 
-  private String signRequest(final String markdown) throws Exception {
+  private String signRequest(final String markdown, final boolean withDataToBeSigned) throws Exception {
     final JSONObject signMessage = new JSONObject();
     signMessage.put("message#en", encode(markdown));
     signMessage.put("mime_type", "text/markdown");
-    final JWTClaimsSet claims = new JWTClaimsSet.Builder()
+    final JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
         .issuer(CLIENT_ID)
         .audience(BASE_URL)
         .issueTime(new Date())
-        .claim("tbs_data", encode("data to be signed"))
-        .claim("sign_message", signMessage)
-        .build();
-    final SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("rp-key").build(), claims);
+        .claim("sign_message", signMessage);
+    if (withDataToBeSigned) {
+      claims.claim("tbs_data", encode("data to be signed"));
+    }
+    final SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("rp-key").build(),
+        claims.build());
     jwt.sign(new RSASSASigner(CLIENT_KEY));
     return jwt.serialize();
   }

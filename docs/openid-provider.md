@@ -214,10 +214,16 @@ OpenID Connect [attribute mapping](attributes.html#mapping). For example, `attri
 
 **Scopes.** A provider that declares scopes, `getSupportedScopes()`, offers exactly those. A provider that declares
 none offers the scopes derived from its claims. A scope of the [scope registry](attributes.html#the-built-in-scopes)
-is derived when all its essential claims are among the claims of the provider. In this check, the claims `sub` and
-`auth_time` always count, since the OpenID Provider puts them in every ID token. A scope without essential claims, such
-as `profile`, is derived when at least one of its claims is among them, and a scope without claims, such as
-`https://id.oidc.se/scope/signApproval`, is only offered when it is declared.
+is derived when all its essential claims are among the claims of the provider. In this check, the claims `sub`,
+`auth_time` and `acr` always count, since the OpenID Provider puts them in every ID token. A scope without essential
+claims, such as `profile`, is derived when at least one of its claims is among them, and a scope without claims is only
+offered when it is declared.
+
+**The sign scopes.** `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval` are never derived,
+not even for a provider that delivers the user signature. They are only offered when a provider declares them with
+`getSupportedScopes()`, or when they are set in `authn-server.oidc.scopes`. A provider that signs delivers the
+attribute `attribute.user-signature`, which gives the claim `https://id.oidc.se/claim/userSignature`, and declares
+the sign scope.
 
 :raised_hand: The scope `https://id.oidc.se/scope/naturalPersonNumber` has two essential claims, the personal identity
 number and the coordination number. A provider that delivers only one of them does not get the scope derived. Declare
@@ -231,11 +237,21 @@ The settings of the OpenID Provider change this:
 - `authn-server.oidc.claims` is added to the claims of the providers. The claims also count when scopes are derived,
   and they are published in `claims_supported`.
 
-**The supported claims** are `sub`, the claims of the providers and the configured claims. The claims of the offered
-scopes are not added, so `claims_supported` lists only the claims that the OpenID Provider can deliver. An OpenID
-Provider that offers `profile` but only delivers names and date of birth publishes those claims, and not `nickname`,
-`picture` or `zoneinfo`. A claim that should be published even though no provider delivers it is added with
-`authn-server.oidc.claims`.
+**The supported claims** are `sub`, `auth_time` and `acr`, which are always published, the claims of the providers and
+the configured claims. The other claims of the ID token, such as `iss`, `aud` and `nonce`, are not published, since a
+relying party cannot usefully request them. The claims of the offered scopes are not added, so `claims_supported`
+lists only the claims that the OpenID Provider can deliver. An OpenID Provider that offers `profile` but only delivers
+names and date of birth publishes those claims, and not `nickname`, `picture` or `zoneinfo`. A claim that should be
+published even though no provider delivers it is added with `authn-server.oidc.claims`.
+
+**Scopes that cannot be delivered.** A declared or configured scope is published even when the OpenID Provider cannot
+deliver its claims, but a warning is logged at startup:
+
+- when the scope has claims and none of them is in `claims_supported`, and
+- when `https://id.oidc.se/scope/sign` is offered and `https://id.oidc.se/claim/userSignature` is not in
+  `claims_supported`.
+
+A scope with some of its claims supported, and a scope without claims, gives no warning.
 
 **Authentication contexts.** `acr_values_supported` is the union of the authentication context URIs of the providers,
 `getSupportedAuthnContextUris()`. It is not configurable.
@@ -765,7 +781,7 @@ The discovery document holds:
 | `id_token_signing_alg_values_supported` | The algorithms the active signing keys can produce, those of the default key first. |
 | `request_object_encryption_alg_values_supported` | The algorithms of the active decryption keys. Left out without decryption keys. |
 | `scopes_supported` | The offered scopes. |
-| `claims_supported` | The supported claims. |
+| `claims_supported` | The supported claims: `sub`, `auth_time`, `acr`, the claims of the providers and the configured claims. |
 | `acr_values_supported` | The authentication context URIs of the providers. |
 | `subject_types_supported` | The subject types of the subject generator factory, by default `public` and `pairwise`. |
 | `ui_locales_supported` | The configured UI locales. Left out when none are configured. |
