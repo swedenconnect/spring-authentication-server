@@ -11,11 +11,91 @@ sees requested attributes, and produces user attributes, in a form that does not
 describes that form, the mapping to and from SAML attributes and OpenID Connect claims, how the identifier of the
 user is produced, and how an application adds attributes and mappings of its own.
 
-## The generic attribute model
+## Table of Contents
+
+1. [**The generic attribute model**](#the-generic-attribute-model)
+
+    1.1. [Generic attribute](#generic-attribute)
+
+    1.2. [Generic requested attribute](#generic-requested-attribute)
+
+    1.3. [Attribute definitions](#attribute-definitions)
+
+2. [**Mapping**](#mapping)
+
+3. [**What a request asks for**](#what-a-request-asks-for)
+
+    3.1. [SAML](#saml)
+
+    3.1.1. [Entity categories](#entity-categories)
+
+    3.2. [OpenID Connect](#openid-connect)
+
+    3.2.1. [Where a claim is delivered](#where-a-claim-is-delivered)
+
+    3.2.2. [The built-in scopes](#the-built-in-scopes)
+
+    3.2.3. [Adding a scope](#adding-a-scope)
+
+4. [**Releasing attributes**](#releasing-attributes)
+
+    4.1. [The built-in producers](#the-built-in-producers)
+
+    4.2. [Deciding what a requester may receive](#deciding-what-a-requester-may-receive)
+
+    4.3. [The Sweden Connect rules for SAML](#the-sweden-connect-rules-for-saml)
+
+5. [**Identifying the user**](#identifying-the-user)
+
+    5.1. [The server secret](#the-server-secret)
+
+    5.2. [SAML](#saml-1)
+
+    5.3. [OpenID Connect](#openid-connect-1)
+
+    5.4. [Supplying a generator of your own](#supplying-a-generator-of-your-own)
+
+6. [**Adding an attribute**](#adding-an-attribute)
+
+7. [**Replacing a built-in mapper**](#replacing-a-built-in-mapper)
+
+8. [**The built-in attributes**](#the-built-in-attributes)
+
+9. [**Mapping rules**](#mapping-rules)
+
+    9.1. [Personal identity numbers and coordination numbers](#personal-identity-numbers-and-coordination-numbers)
+
+    9.2. [Birth name](#birth-name)
+
+    9.3. [Place of birth](#place-of-birth)
+
+    9.4. [Telephone numbers and e-mail](#telephone-numbers-and-e-mail)
+
+    9.5. [Gender](#gender)
+
+    9.6. [Country](#country)
+
+    9.7. [The eIDAS address](#the-eidas-address)
+
+    9.8. [Transliteration](#transliteration)
+
+    9.9. [The OpenID Connect address](#the-openid-connect-address)
+
+10. [**eIDAS attributes**](#eidas-attributes)
+
+11. [**Attributes that exist in only one protocol**](#attributes-that-exist-in-only-one-protocol)
+
+    11.1. [SAML only](#saml-only)
+
+    11.2. [OpenID Connect only](#openid-connect-only)
+
+<a name="the-generic-attribute-model"></a>
+## 1. The generic attribute model
 
 The model lives in `authn-server-core` and knows nothing about either protocol.
 
-### Generic attribute
+<a name="generic-attribute"></a>
+### 1.1. Generic attribute
 
 A `GenericAttribute` is an identifier and one or more values of the same Java type. Values are serializable, since the
 authentication result is kept in the user session.
@@ -30,7 +110,8 @@ An identifier is the prefix `attribute.` followed by a kebab-case name, for exam
 `attribute.personal-identity-number`. The identifiers of the built-in attributes are constants in
 `AttributeIdentifiers`.
 
-### Generic requested attribute
+<a name="generic-requested-attribute"></a>
+### 1.2. Generic requested attribute
 
 A `GenericRequestedAttribute` is what a requester asked for. It holds the identifier, whether the attribute is
 essential ("required" in SAML, "essential" in OpenID Connect), the values that the requester will accept, and
@@ -55,7 +136,8 @@ is essential if either of them was, the values of the first one that has values,
 the protocol data of the second one replacing the data of the first, key by key. Data that implements `MergeableProtocolData` decides the result for its key itself, which is how a claim asked
 for in the ID token by one source and from the UserInfo endpoint by another ends up delivered in both places.
 
-### Attribute definitions
+<a name="attribute-definitions"></a>
+### 1.3. Attribute definitions
 
 An `AttributeDefinition` describes a generic attribute: its identifier, the Java type of its values, whether it may
 hold more than one value, and a short description. The definitions of the built-in attributes are in
@@ -65,7 +147,8 @@ Values are typed where the specifications define a type. Dates, such as the date
 defined as seconds since epoch, such as the validity of a credential, are `Instant`. Values defined as booleans are
 `Boolean`. Everything else is a `String`.
 
-## Mapping
+<a name="mapping"></a>
+## 2. Mapping
 
 Mapping runs in both directions and is not one to one. One input may become several outputs, several inputs may
 become one output, and the values may decide the result.
@@ -98,14 +181,16 @@ List<GenericRequestedAttribute> requested = oidc.toGenericFromClaimsRequest(clai
 List<UserClaim> claims = oidc.toClaims(userAttributes, requested);
 ```
 
-## What a request asks for
+<a name="what-a-request-asks-for"></a>
+## 3. What a request asks for
 
 The mapping above turns one requested attribute, or one claims request entry, into the generic form. Working out what
 a whole request asks for is a step above that, and it has a resolver per protocol. The request processing calls the
 resolver and puts the result in the authentication requirements, see
 [Writing an authentication module](authentication-module.html).
 
-### SAML
+<a name="saml"></a>
+### 3.1. SAML
 
 A Service Provider states what it needs in more than one place, and `SamlRequestedAttributeResolver` collects them
 all:
@@ -142,7 +227,8 @@ SamlRequestedAttributeResolver resolver = new SamlRequestedAttributeResolver(
 
 Pass a list of processors of your own to the same constructor to add a source, or to leave one out.
 
-#### Entity categories
+<a name="entity-categories"></a>
+#### 3.1.1. Entity categories
 
 Only the categories that the Identity Provider itself declares are used, and every category brings the attributes of
 its attribute set. The required attributes of the set are essential and the recommended ones are not.
@@ -167,7 +253,8 @@ processor.setEntityCategoryRegistry(new EntityCategoryRegistryImpl(categories));
 
 An entity category that is not in the registry, and one that is not a service entity category, asks for nothing.
 
-### OpenID Connect
+<a name="openid-connect"></a>
+### 3.2. OpenID Connect
 
 A client asks for claims by the scopes it requests and by the `claims` request parameter.
 `OidcRequestedAttributeResolver` expands the scopes into the claims they stand for, merges the `claims` parameter in
@@ -185,7 +272,8 @@ the personal identity number as essential, a voluntary `value` for that claim is
 attributes, such as `sub`, `auth_time` and
 `acr`, have no mapping and are left out, like any other claim that no mapper handles.
 
-#### Where a claim is delivered
+<a name="where-a-claim-is-delivered"></a>
+#### 3.2.1. Where a claim is delivered
 
 Section 4.2 of the Swedish OpenID Connect Profile decides this, and the answer is carried as the protocol data
 `ClaimDeliveryTarget`:
@@ -198,7 +286,8 @@ When more than one source asks for the same claim the targets are combined. A cl
 `claims` parameter is therefore also delivered from the UserInfo endpoint when a requested scope covers it, which is
 what the profile requires.
 
-#### The built-in scopes
+<a name="the-built-in-scopes"></a>
+#### 3.2.2. The built-in scopes
 
 `ScopeRegistry` holds the scopes that the OpenID Provider knows about, and `DefaultScopeRegistry` starts with the
 built-in ones:
@@ -221,7 +310,8 @@ The OpenID Provider never derives `sign` and `signApproval` from the claims of t
 when a provider declares them or they are configured, see
 [The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
 
-#### Adding a scope
+<a name="adding-a-scope"></a>
+#### 3.2.3. Adding a scope
 
 A scope is an `OidcScopeValue`, which states its claims and, for each of them, whether it is essential and where it is
 delivered by default. Register it, and a mapper for the claim if it is one of your own:
@@ -239,7 +329,8 @@ ID token and whether it is delivered from the UserInfo endpoint. At least one of
 Registering a scope whose value is already registered replaces it, which is how a built-in scope is given a definition
 of your own.
 
-## Releasing attributes
+<a name="releasing-attributes"></a>
+## 4. Releasing attributes
 
 Working out what a request asks for is one side. The other is deciding what goes back once the user has been
 authenticated. That is the release step, and it works on generic attributes: mapping them to SAML attributes or
@@ -276,7 +367,8 @@ own followed by the shared ones. The shared defaults are `DefaultAttributeProduc
 come before them, see
 [Producers, voters and processors](saml-identity-provider.html#producers-voters-and-processors).
 
-### The built-in producers
+<a name="the-built-in-producers"></a>
+### 4.1. The built-in producers
 
 `DefaultAttributeProducer` releases the user attributes that are among the requested attributes of the authentication
 requirements. That covers both what the request stated and what it asked for implicitly, through SAML entity
@@ -288,7 +380,8 @@ filtering to the voters.
 The requirements are those of the request being answered. When a previous authentication is reused for single
 sign-on, what is released is therefore what the new request asked for, not what the original request asked for.
 
-### Deciding what a requester may receive
+<a name="deciding-what-a-requester-may-receive"></a>
+### 4.2. Deciding what a requester may receive
 
 The library ships no list of the attributes a given Service Provider or OpenID Connect client is allowed to receive.
 An integrator who needs one writes a voter:
@@ -327,7 +420,8 @@ public class MyOwnAttributeProducer implements AttributeProducer {
 }
 ```
 
-### The Sweden Connect rules for SAML
+<a name="the-sweden-connect-rules-for-saml"></a>
+### 4.3. The Sweden Connect rules for SAML
 
 `SwedenConnectAttributeProducer` in `authn-server-saml` builds on the default producer and adds the two attributes
 that the Swedish eID Framework asks an Identity Provider for. Both are about the authentication event rather than
@@ -358,7 +452,8 @@ Categories for the Swedish eID Framework. The rule covers `attribute.coordinatio
 
 The voter votes `DONT_KNOW` for everything else, so it is combined with the other voters rather than used alone.
 
-## Identifying the user
+<a name="identifying-the-user"></a>
+## 5. Identifying the user
 
 Every response carries an identifier of the user: the `NameID` of a SAML assertion and the `sub` claim of an OpenID
 Connect ID token. It is not one of the released attributes, but it is computed from one of them.
@@ -379,7 +474,8 @@ forbids using a value that reveals personal information, such as a personal iden
 
 A generator is kept in the user session until the response has been sent, so it survives Java serialization.
 
-### The server secret
+<a name="the-server-secret"></a>
+### 5.1. The server secret
 
 Assign a server secret. Without one, the identifier is a plain hash of values that anyone may know, and since the number
 of possible Swedish personal identity numbers is small enough to try them all, the identifier can be traced back to the
@@ -398,7 +494,8 @@ that is set once and kept, and back it up together with the server keys.
 When no secret has been assigned, a warning is logged the first time an identifier is computed, saying that the
 identifiers can be traced back to the users they were issued for.
 
-### SAML
+<a name="saml-1"></a>
+### 5.2. SAML
 
 [DefaultNameIDGeneratorFactory] follows the requirements of the Swedish eID Framework. It works out the `Format` from
 the request and the Service Provider metadata:
@@ -425,7 +522,8 @@ A deployment moving from an Identity Provider built on
 secret gives the Service Providers new `NameID`s for their users, so it is a decision to take when the Identity Provider
 is set up rather than later.
 
-### OpenID Connect
+<a name="openid-connect-1"></a>
+### 5.3. OpenID Connect
 
 [DefaultSubjectGeneratorFactory] supports both subject identifier types of OpenID Connect Core, Section 8. The type
 comes from the `subject_type` of the client, and a client that has not registered one gets `public`, as the Swedish
@@ -450,7 +548,8 @@ registers the URI it should have registered from the start.
 Fetching the `sector_identifier_uri` and checking that the redirect URIs of the client are among the ones it lists, as
 OpenID Connect Dynamic Client Registration, Section 5, requires, belongs to client registration.
 
-### Supplying a generator of your own
+<a name="supplying-a-generator-of-your-own"></a>
+### 5.4. Supplying a generator of your own
 
 Implement [SubjectIdentifierGenerator], or extend one of the classes above, when the identifiers are to come from
 somewhere else, for example a table that records which identifier a user was given for a requester:
@@ -473,7 +572,8 @@ out the generator from a [NameIDGeneratorFactory] of your own. For OpenID Connec
 [SubjectGeneratorFactory]. Extending `AbstractNameIDGenerator`, or the two OpenID Connect generators, is enough when
 only the computation of the value is to change.
 
-## Adding an attribute
+<a name="adding-an-attribute"></a>
+## 6. Adding an attribute
 
 Register a definition for it, and a mapper for each protocol it is to be released in.
 
@@ -497,7 +597,8 @@ oidc.getFromProtocolMapping().register(
 straightforward cases. Implement `ToProtocolAttributeMapper` or `FromProtocolAttributeMapper` directly when a
 mapping needs more than that.
 
-## Replacing a built-in mapper
+<a name="replacing-a-built-in-mapper"></a>
+## 7. Replacing a built-in mapper
 
 Registering a mapper takes over every protocol name, or generic identifier, that it declares. Registering a mapper
 for a name that a built-in mapper already held replaces it for that name.
@@ -513,7 +614,8 @@ Note that a built-in mapper handling several identifiers, such as the one buildi
 claim, is replaced for one identifier at a time. To take it over completely, register a mapper that declares every
 identifier it declares.
 
-## The built-in attributes
+<a name="the-built-in-attributes"></a>
+## 8. The built-in attributes
 
 `Date` is a `LocalDate`, written as `YYYY-MM-DD` in SAML and in claims. `Instant` is written as an ISO-8601
 timestamp in SAML and as seconds since epoch in claims, which is what the claim definitions call for.
@@ -603,11 +705,13 @@ key-value list that the SAML attribute holds.
 | `attribute.auth-context-params` | String | `urn:oid:1.2.752.201.3.3`<br />`authContextParams` | - |
 | `attribute.employee-hsa-id` | String | `urn:oid:1.2.752.29.6.2.1`<br />`employeeHsaId` | - |
 
-## Mapping rules
+<a name="mapping-rules"></a>
+## 9. Mapping rules
 
 Several mappings need more than a name on each side.
 
-### Personal identity numbers and coordination numbers
+<a name="personal-identity-numbers-and-coordination-numbers"></a>
+### 9.1. Personal identity numbers and coordination numbers
 
 SAML uses `personalIdentityNumber` for both a Swedish personal identity number ("personnummer") and a coordination
 number ("samordningsnummer"). OpenID Connect has a claim for each. The generic model follows OpenID Connect and has
@@ -624,7 +728,8 @@ The same holds for `previousPersonalIdentityNumber` and for `mappedPersonalIdent
 `previousPersonalIdentityNumber` reaches OpenID Connect only as `previousCoordinationNumber`, and so only when the
 previous number is a coordination number.
 
-### Birth name
+<a name="birth-name"></a>
+### 9.2. Birth name
 
 SAML has one `birthName` attribute holding the full name. OpenID Connect has a claim for each part.
 
@@ -632,7 +737,8 @@ SAML has one `birthName` attribute holding the full name. OpenID Connect has a c
   order given name, middle name and family name.
 - OpenID Connect gets the parts. A full birth name on its own is not split.
 
-### Place of birth
+<a name="place-of-birth"></a>
+### 9.3. Place of birth
 
 - SAML `placeOfBirth` gets the free text place of birth, or, when only the parts are known, the parts joined with a
   comma and a space in the order locality, region and country, giving for example `Stockholm, SE`. Parts that are
@@ -640,7 +746,8 @@ SAML has one `birthName` attribute holding the full name. OpenID Connect has a c
 - The `place_of_birth` claim gets the parts in its `country`, `region` and `locality` fields. When the free text is
   the only thing known it is sent as `place_of_birth.locality`.
 
-### Telephone numbers and e-mail
+<a name="telephone-numbers-and-e-mail"></a>
+### 9.4. Telephone numbers and e-mail
 
 The claims `phone_number` and `email` hold one value each, while the SAML attributes may hold several.
 
@@ -650,20 +757,23 @@ The claims `phone_number` and `email` hold one value each, while the SAML attrib
 
 More generally, a multi-valued attribute mapped to a claim that holds one value contributes its first value.
 
-### Gender
+<a name="gender"></a>
+### 9.5. Gender
 
 The generic attribute uses the OpenID Connect values, `female` and `male`. The SAML values `M` and `F`, in either
 case, are converted. The SAML value `U`, for an unspecified gender, is kept as the generic value `u` but has no claim
 value and is not released in OpenID Connect.
 
-### Country
+<a name="country"></a>
+### 9.6. Country
 
 The country and the eIDAS country are separate attributes.
 
 - SAML `c` is released from the country, and from the eIDAS country when no country is known.
 - `address.country` comes from the country, and the `eidasCountry` claim from the eIDAS country.
 
-### The eIDAS address
+<a name="the-eidas-address"></a>
+### 9.7. The eIDAS address
 
 The SAML attribute `eidasNaturalPersonAddress` holds the eIDAS `CurrentAddress` of a natural person as key-value
 pairs separated by semicolons, where the key and the value are URL-encoded. Each key is a generic attribute of its
@@ -672,14 +782,16 @@ own, and a request for the SAML attribute is a request for all of them.
 The attribute value is produced by OpenSAML, `CurrentAddressType.toSwedishEidString()`. Reading such a value back is
 not supported there, so `EidasNaturalPersonAddress.parse()` does that.
 
-### Transliteration
+<a name="transliteration"></a>
+### 9.8. Transliteration
 
 An eIDAS attribute value may be given twice, once in Latin script and once in the script of the member state, which
 Section 2.4 of the eIDAS attribute specification calls transliteration. Section 3.3.3 of the Attribute Specification
 for the Swedish eID Framework says that a value stating `LatinScript="false"` is not part of the converted attribute,
 so such values are dropped when an attribute is read.
 
-### The OpenID Connect address
+<a name="the-openid-connect-address"></a>
+### 9.9. The OpenID Connect address
 
 Each part of the `address` claim is a generic attribute of its own, and a request for the claim is a request for all
 of them, the parts of the eIDAS address included. The street address and the post office box both go into
@@ -703,7 +815,8 @@ When a generic address attribute and an eIDAS part would fill the same field of 
 The two sets are never mixed within one field: a known generic street address or post office box means that
 `street_address` holds those and none of the eIDAS lines.
 
-## eIDAS attributes
+<a name="eidas-attributes"></a>
+## 10. eIDAS attributes
 
 eIDAS attributes are a third naming of the same information, used between the nodes of the eIDAS network. They are
 mapped separately, by `EidasAttributeMapping` in `authn-server-saml`, and that is what an eIDAS Proxy Service uses:
@@ -753,12 +866,14 @@ address is the same `CurrentAddress` that the Swedish eID Framework carries as `
 nine parts are the same generic attributes in both mappings, and only the wrapping differs: a typed `CurrentAddress`
 in eIDAS, the key-value string in the Swedish eID Framework.
 
-## Attributes that exist in only one protocol
+<a name="attributes-that-exist-in-only-one-protocol"></a>
+## 11. Attributes that exist in only one protocol
 
 Not every attribute has a meaning in both protocols. An attribute with a mapping for only one of them is still a
 generic attribute, and it is simply left out when the other protocol is used.
 
-### SAML only
+<a name="saml-only"></a>
+### 11.1. SAML only
 
 - `attribute.birth-name`
 - `attribute.previous-personal-identity-number`
@@ -768,7 +883,8 @@ generic attribute, and it is simply left out when the other protocol is used.
 - `attribute.auth-context-params`
 - `attribute.employee-hsa-id`
 
-### OpenID Connect only
+<a name="openid-connect-only"></a>
+### 11.2. OpenID Connect only
 
 - `attribute.middle-name`
 - `attribute.nickname`

@@ -15,7 +15,32 @@ answered to the Service Provider, and how to replace the parts of the processing
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
-## How a request flows
+## Table of Contents
+
+1. [**How a request flows**](#how-a-request-flows)
+
+2. [**Receiving a request**](#receiving-a-request)
+
+3. [**What the requirements hold**](#what-the-requirements-hold)
+
+4. [**Authenticating the user**](#authenticating-the-user)
+
+    4.1. [Choosing the provider](#choosing-the-provider)
+
+    4.2. [Single sign-on](#single-sign-on)
+
+    4.3. [Modules with pages of their own](#modules-with-pages-of-their-own)
+
+5. [**Producers, voters and processors**](#producers-voters-and-processors)
+
+6. [**The response**](#the-response)
+
+7. [**Failures**](#failures)
+
+8. [**Replacing parts of the processing**](#replacing-parts-of-the-processing)
+
+<a name="how-a-request-flows"></a>
+## 1. How a request flows
 
 1. The Service Provider sends an `AuthnRequest` to one of the authentication endpoints. The request is decoded,
    validated and turned into authentication requirements, see [Receiving a request](#receiving-a-request).
@@ -37,7 +62,8 @@ Source links in this guide point to the `main` branch of the
 A failure after the assertion consumer service has been established is answered to the Service Provider with an error
 response, see [Failures](#failures).
 
-## Receiving a request
+<a name="receiving-a-request"></a>
+## 2. Receiving a request
 
 Authentication requests are received on the authentication endpoints under the SAML path, see
 [URL layout](configuration.html#url-layout):
@@ -66,7 +92,8 @@ authentication requirements. In this order:
 10. The `NameIDPolicy` is checked by the `NameID` generator factory, see [Attributes](attributes.html).
 11. The authentication requirements are built.
 
-## What the requirements hold
+<a name="what-the-requirements-hold"></a>
+## 3. What the requirements hold
 
 The result is a [`SamlAuthenticationRequirements`][SamlAuthenticationRequirements], described in
 [Writing an authentication module](authentication-module.html#what-the-module-receives):
@@ -92,12 +119,13 @@ The requirements are handed on together with the SAML data that the response is 
 came on a Holder-of-key endpoint, and the `NameID` generator.
 
 <a name="authenticating-the-user"></a>
-## Authenticating the user
+## 4. Authenticating the user
 
 The processed request is handed to the installed [authentication providers](authentication-module.html), in the order
 they were installed. With Spring Boot, every `UserAuthenticationProvider` bean is installed, in Spring's order.
 
-### Choosing the provider
+<a name="choosing-the-provider"></a>
+### 4.1. Choosing the provider
 
 A provider that cannot deliver any of the requested authentication contexts returns `null`, and the next one is
 asked. The first provider that returns something handles the request. When no provider handles it, the Service
@@ -106,7 +134,8 @@ Provider gets `Requester` / `NoAuthnContext`.
 A request without a `RequestedAuthnContext` can be served by any provider, so the first one handles it. Install the
 providers in the order they should be preferred.
 
-### Single sign-on
+<a name="single-sign-on"></a>
+### 4.2. Single sign-on
 
 The session holds one authentication for the whole server, whichever protocol it was made for, since single sign-on
 is shared between SAML and OpenID Connect. It is kept in the Spring Security `SecurityContext` of the session. When a
@@ -126,7 +155,7 @@ session. What happens to the session authentication otherwise is described in
 [Writing an authentication module](authentication-module.html#what-happens-to-the-session-authentication).
 
 <a name="modules-with-pages-of-their-own"></a>
-### Modules with pages of their own
+### 4.3. Modules with pages of their own
 
 A provider that authenticates the user on pages of its own, see
 [Writing an authentication module](authentication-module.html#modules-with-pages-of-their-own), sends the user to its
@@ -144,7 +173,7 @@ been resumed, and one for a protocol that is not enabled, is the unrecoverable i
 shown an error page. An error that the module reports, including a cancel, is answered to the Service Provider.
 
 <a name="producers-voters-and-processors"></a>
-## Producers, voters and processors
+## 5. Producers, voters and processors
 
 Four kinds of components take part in the authentication and the response:
 
@@ -194,7 +223,7 @@ The lists are read when the filter chain is built, so changes after that have no
 and post-authentication processors of the lists reach the providers that extend `AbstractUserAuthenticationProvider`.
 
 <a name="the-response"></a>
-## The response
+## 6. The response
 
 A successful authentication is answered with a signed `Response` holding one assertion, built by
 [`Saml2AssertionBuilder`][Saml2AssertionBuilder]:
@@ -223,7 +252,7 @@ The response is posted to the assertion consumer service by the response page, t
 default page is a form that the browser submits by itself.
 
 <a name="failures"></a>
-## Failures
+## 7. Failures
 
 Until the Service Provider is known and the assertion consumer service has been established, there is nowhere to send
 a response. Failures up to that point end at the Identity Provider as an `UnrecoverableErrorException`, with one of
@@ -261,7 +290,8 @@ normal outcome, and the second at `ERROR`, since a dependency is not working.
 The status message of an error response is resolved from the message code of the error against a `MessageSource`, when
 one is given, and is otherwise the description of the error.
 
-## Replacing parts of the processing
+<a name="replacing-parts-of-the-processing"></a>
+## 8. Replacing parts of the processing
 
 The components have defaults built from the configuration. Replace them in an
 [adapter](configuration.html#adjusting-the-configuration-in-code) through the

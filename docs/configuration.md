@@ -10,48 +10,88 @@ This page describes how the Spring Authentication Server is configured: the prop
 auto-configuration, how the URLs of the server are laid out, how to run several nodes that share their state through
 Redis, how an application adjusts the configuration in code, and how the server is set up without Spring Boot.
 
-- [Getting started](#getting-started)
-- [Enabling protocols](#enabling-protocols)
-- [URL layout](#url-layout)
-- [Shared settings](#shared-settings)
-    - [Single sign-on](#single-sign-on)
-    - [Subject identifiers](#subject-identifiers)
-    - [Entity information](#entity-information)
-- [The SAML Identity Provider](#the-saml-identity-provider)
-    - [Credentials](#credentials)
-    - [Endpoints](#endpoints)
-    - [The IdP metadata](#the-idp-metadata)
-    - [Service Provider metadata](#sp-metadata)
-    - [Request processing](#request-processing)
-    - [Replay protection](#replay-protection)
-    - [Requester acceptance](#requester-acceptance)
-- [The OpenID Provider](#the-openid-provider)
-    - [Keys](#oidc-keys)
-    - [Clients](#oidc-clients)
-    - [OIDC endpoints](#oidc-endpoints)
-    - [Authorization requests](#oidc-authorization-requests)
-    - [Requester acceptance](#oidc-requester-acceptance)
-    - [The token endpoint and tokens](#oidc-token-endpoint)
-    - [Scopes and claims](#oidc-scopes-and-claims)
-    - [The discovery document](#oidc-discovery)
-    - [Entity information for OpenID Connect](#oidc-entity-information)
-    - [OpenID Federation](#oidc-federation)
-    - [Clients from OpenID Federation](#oidc-federation-clients)
-    - [Joining Sweden Connect](#joining-sweden-connect)
-- [Running several nodes](#running-several-nodes)
-    - [Dependencies](#redis-dependencies)
-    - [Where state is kept](#where-state-is-kept)
-    - [The Redis connection](#the-redis-connection)
-    - [Key names](#redis-key-names)
-    - [The TLS host name check](#redis-host-name-check)
-    - [Redis Cluster](#redis-cluster)
-    - [Background jobs and trust marks](#background-jobs-in-a-cluster)
-- [Adjusting the configuration in code](#adjusting-the-configuration-in-code)
-- [Using the configurers without Spring Boot](#using-the-configurers-without-spring-boot)
-- [Migrating from saml-identity-provider](#migrating-from-saml-identity-provider)
+## Table of Contents
+
+1. [**Getting started**](#getting-started)
+
+2. [**Enabling protocols**](#enabling-protocols)
+
+3. [**URL layout**](#url-layout)
+
+4. [**Shared settings**](#shared-settings)
+
+    4.1. [Single sign-on](#single-sign-on)
+
+    4.2. [Subject identifiers](#subject-identifiers)
+
+    4.3. [Entity information](#entity-information)
+
+5. [**The SAML Identity Provider**](#the-saml-identity-provider)
+
+    5.1. [Credentials](#credentials)
+
+    5.2. [Endpoints](#endpoints)
+
+    5.3. [The IdP metadata](#the-idp-metadata)
+
+    5.4. [Service Provider metadata](#sp-metadata)
+
+    5.5. [Request processing](#request-processing)
+
+    5.6. [Replay protection](#replay-protection)
+
+    5.7. [Requester acceptance](#requester-acceptance)
+
+6. [**The OpenID Provider**](#the-openid-provider)
+
+    6.1. [Keys](#oidc-keys)
+
+    6.2. [Clients](#oidc-clients)
+
+    6.3. [OIDC endpoints](#oidc-endpoints)
+
+    6.4. [Authorization requests](#oidc-authorization-requests)
+
+    6.5. [Requester acceptance](#oidc-requester-acceptance)
+
+    6.6. [The token endpoint and tokens](#oidc-token-endpoint)
+
+    6.7. [Scopes and claims](#oidc-scopes-and-claims)
+
+    6.8. [The discovery document](#oidc-discovery)
+
+    6.9. [Entity information for OpenID Connect](#oidc-entity-information)
+
+    6.10. [OpenID Federation](#oidc-federation)
+
+    6.11. [Clients from OpenID Federation](#oidc-federation-clients)
+
+    6.12. [Joining Sweden Connect](#joining-sweden-connect)
+
+7. [**Running several nodes**](#running-several-nodes)
+
+    7.1. [Dependencies](#redis-dependencies)
+
+    7.2. [Where state is kept](#where-state-is-kept)
+
+    7.3. [The Redis connection](#the-redis-connection)
+
+    7.4. [Key names](#redis-key-names)
+
+    7.5. [The TLS host name check](#redis-host-name-check)
+
+    7.6. [Redis Cluster](#redis-cluster)
+
+    7.7. [Background jobs and trust marks](#background-jobs-in-a-cluster)
+
+8. [**Adjusting the configuration in code**](#adjusting-the-configuration-in-code)
+
+9. [**Using the configurers without Spring Boot**](#using-the-configurers-without-spring-boot)
+
+10. [**Migrating from saml-identity-provider**](#migrating-from-saml-identity-provider)
 
 <a name="getting-started"></a>
-## Getting started
+## 1. Getting started
 
 Include the starter for each protocol the server offers:
 
@@ -114,7 +154,7 @@ The server audits its authentication flows with spring-audit-support, which refu
 `audit.*` properties. See [Auditing](audit.html).
 
 <a name="enabling-protocols"></a>
-## Enabling protocols
+## 2. Enabling protocols
 
 A protocol is offered when its module is on the classpath and it has been enabled:
 
@@ -127,7 +167,7 @@ The application does not start if no protocol is enabled, or if a protocol is en
 classpath.
 
 <a name="url-layout"></a>
-## URL layout
+## 3. URL layout
 
 Every URL of the server is built from three parts:
 
@@ -159,7 +199,7 @@ SAML Holder-of-key needs client TLS, which normally means another host or port. 
 base URL, the SAML path and the endpoint.
 
 <a name="shared-settings"></a>
-## Shared settings
+## 4. Shared settings
 
 The settings that are common to all protocols are placed directly under `authn-server`. Some of them may be overridden
 per protocol, under the protocol's prefix, for example `authn-server.saml.clock-skew`. A protocol value, when set,
@@ -178,7 +218,7 @@ wins over the shared one.
 | `authn-server.cache-directory` | A directory where the server keeps state that should survive a restart when it keeps its state in memory: the OpenID Provider's own trust marks, the OpenID Federation client cache and the record of known clients, see [State that survives a restart](management.html#state-that-survives-a-restart). | Nothing is kept | No |
 
 <a name="single-sign-on"></a>
-### Single sign-on
+### 4.1. Single sign-on
 
 The properties give the [`SsoPolicy`][SsoPolicy] of the server, described in
 [Writing an authentication module](authentication-module.html#the-policy).
@@ -210,7 +250,7 @@ properties. Assign `SsoPolicy.forSessionLifetime()`, or a policy with no time li
 [adapter](#adjusting-the-configuration-in-code).
 
 <a name="subject-identifiers"></a>
-### Subject identifiers
+### 4.2. Subject identifiers
 
 The SAML `NameID` and the OpenID Connect `sub` are computed from the user identity and a server secret, see
 [Attributes](attributes.html).
@@ -221,7 +261,7 @@ The SAML `NameID` and the OpenID Connect `sub` are computed from the user identi
 | `hash-algorithm` | The JCE name of the hash algorithm. | `SHA-256` |
 
 <a name="entity-information"></a>
-### Entity information
+### 4.3. Entity information
 
 The descriptive information about the service and its organization is given once, under
 `authn-server.entity-information`, and published by every protocol: in the SAML metadata, and in the `openid_provider`
@@ -277,7 +317,7 @@ How the information is published is described in [The IdP metadata](#the-idp-met
 [Descriptive metadata](openid-provider.html#descriptive-metadata) for OpenID Connect.
 
 <a name="the-saml-identity-provider"></a>
-## The SAML Identity Provider
+## 5. The SAML Identity Provider
 
 The SAML properties are placed under `authn-server.saml`.
 
@@ -308,7 +348,7 @@ The values are checked when the filter chain is built, and the application does 
 missing or a value is invalid.
 
 <a name="credentials"></a>
-### Credentials
+### 5.1. Credentials
 
 The credentials are configured through the [credentials-support](https://docs.swedenconnect.se/credentials-support/)
 library. Each credential is a
@@ -336,7 +376,7 @@ Each credential may instead be declared as a bean of the type
 (`X509Certificate` for the future signing certificate) with the bean name in the table. The bean then replaces the
 property.
 
-:raised_hand: Configuring the credentials as credential bundles, and referring to them, is recommended:
+✋ Configuring the credentials as credential bundles, and referring to them, is recommended:
 
 ```yaml
 credential:
@@ -372,7 +412,7 @@ authn-server:
 ```
 
 <a name="endpoints"></a>
-### Endpoints
+### 5.2. Endpoints
 
 The endpoints are given relative to the SAML path, see [URL layout](#url-layout). They are placed under
 `authn-server.saml.endpoints`.
@@ -388,7 +428,7 @@ The endpoints are given relative to the SAML path, see [URL layout](#url-layout)
 With the default SAML path, the endpoints are `/saml2/redirect/authn`, `/saml2/post/authn` and `/saml2/metadata`.
 
 <a name="the-idp-metadata"></a>
-### The IdP metadata
+### 5.3. The IdP metadata
 
 The Identity Provider publishes its SAML metadata at the metadata endpoint. The response has the content type
 `application/samlmetadata+xml` when the request accepts it, and `application/xml` otherwise.
@@ -466,7 +506,7 @@ configurer.protocol(Saml2IdpConfigurer.class, saml -> saml.idpMetadataEndpoint(
 ```
 
 <a name="sp-metadata"></a>
-### Service Provider metadata
+### 5.4. Service Provider metadata
 
 The Identity Provider finds the Service Providers in the [client registry](client-registry.html). The metadata sources
 given here become the SAML backend of the registry, see [SAML: metadata sources](client-registry.html#saml-metadata-sources) for how each
@@ -488,7 +528,7 @@ Each entry of `authn-server.saml.metadata-providers[]` has:
 Several sources are combined into one, searched in the order they are given.
 
 <a name="request-processing"></a>
-### Request processing
+### 5.5. Request processing
 
 How the Identity Provider processes an authentication request, and which failures are answered to the Service
 Provider, is described in [The SAML Identity Provider](saml-identity-provider.html). These properties affect it:
@@ -526,7 +566,7 @@ A request with a comparison that has no mapping, or a URI that has none, is answ
 `RequestUnsupported`.
 
 <a name="replay-protection"></a>
-### Replay protection
+### 5.6. Replay protection
 
 The ID of every received request is kept for a while, and a request with an ID that has already been seen is rejected.
 
@@ -536,12 +576,12 @@ The ID of every received request is kept for a while, and a request with an ID t
 | `replay.expiration` | For how long the IDs are kept. | 5 minutes |
 | `replay.context` | The context under which the IDs are stored. | `idp-replay-checker` |
 
-:raised_hand: The in-memory store only protects the node it runs on. A deployment with several nodes keeps the IDs in
+✋ The in-memory store only protects the node it runs on. A deployment with several nodes keeps the IDs in
 Redis, so that a request replayed to another node is also rejected. A store of your own is added by declaring an
 OpenSAML `ReplayCache` bean, or a whole `MessageReplayChecker` bean, which replace the store chosen by the setting.
 
 <a name="requester-acceptance"></a>
-### Requester acceptance
+### 5.7. Requester acceptance
 
 By default, every Service Provider that is found in the metadata may use the Identity Provider. The rules under
 `authn-server.saml.requester-acceptance` restrict that. How the rules work, and how to add a rule of your own, is
@@ -566,7 +606,7 @@ authn-server:
 A Service Provider that is not accepted gets an error response with the status `Responder` / `RequestDenied`.
 
 <a name="the-openid-provider"></a>
-## The OpenID Provider
+## 6. The OpenID Provider
 
 The OpenID Connect properties are placed under `authn-server.oidc`. How the OpenID Provider uses them is described in
 [The OpenID Provider](openid-provider.html).
@@ -600,7 +640,7 @@ The values are checked when the filter chain is built, and the application does 
 missing or a value is invalid.
 
 <a name="oidc-keys"></a>
-### Keys
+### 6.1. Keys
 
 The keys are given as two lists under `authn-server.oidc.keys`. Each entry has a credential, a
 [PkiCredentialConfigurationProperties](https://github.com/swedenconnect/credentials-support/blob/main/credentials-support/src/main/java/se/swedenconnect/security/credential/config/properties/PkiCredentialConfigurationProperties.java),
@@ -634,7 +674,7 @@ authn-server:
 ```
 
 <a name="oidc-clients"></a>
-### Clients
+### 6.2. Clients
 
 The OpenID Provider takes its clients from two sources that are set up with properties: the configured clients of
 `authn-server.oidc.clients`, described here, and the clients resolved through OpenID Federation, see
@@ -718,7 +758,7 @@ have the same name, so a source added in code may not be named `properties`.
 The clients are read once, at startup. A changed file has no effect until the server is restarted.
 
 <a name="oidc-endpoints"></a>
-### OIDC endpoints
+### 6.3. OIDC endpoints
 
 The endpoints are given relative to the OIDC path, see [URL layout](#url-layout). They are placed under
 `authn-server.oidc.endpoints`.
@@ -735,7 +775,7 @@ the token endpoint is `/oidc/token` and the UserInfo endpoint is `/oidc/userinfo
 The discovery document is not an endpoint under the OIDC path; it follows the issuer.
 
 <a name="oidc-authorization-requests"></a>
-### Authorization requests
+### 6.4. Authorization requests
 
 How the OpenID Provider processes an authentication request, and which failures are sent to the client, is described
 in [The OpenID Provider](openid-provider.html#authentication-requests). These properties, under
@@ -760,7 +800,7 @@ The clock skew, `authn-server.oidc.clock-skew`, applies to the `exp`, `nbf` and 
 to the maximum age, `authn-server.oidc.max-jwt-age`, of signed request objects.
 
 <a name="oidc-requester-acceptance"></a>
-### Requester acceptance
+### 6.5. Requester acceptance
 
 By default, every client that the client registry knows may use the OpenID Provider. The rules under
 `authn-server.oidc.requester-acceptance` restrict that, in the same way as for SAML. How the rules work is described in
@@ -783,7 +823,7 @@ authn-server:
 A client that is not accepted gets the error `unauthorized_client`.
 
 <a name="oidc-token-endpoint"></a>
-### The token endpoint and tokens
+### 6.6. The token endpoint and tokens
 
 How the code flow, the token endpoint and the tokens work is described in
 [The OpenID Provider](openid-provider.html#the-code-flow).
@@ -807,12 +847,12 @@ authn-server:
       - client_secret_basic
 ```
 
-:raised_hand: Codes, access tokens and used client assertions are kept in memory by default, which only serves the
+✋ Codes, access tokens and used client assertions are kept in memory by default, which only serves the
 node they run on. A deployment with several nodes keeps them in Redis, see
 [Running several nodes](#running-several-nodes), or needs sticky sessions.
 
 <a name="oidc-scopes-and-claims"></a>
-### Scopes and claims
+### 6.7. Scopes and claims
 
 By default, the offered scopes and the supported claims are worked out from the attributes and scopes that the
 authentication providers declare, see
@@ -842,7 +882,7 @@ bean replaces the default attribute mapping. A `SubjectGeneratorFactory` bean re
 factory, whose subject types are published as `subject_types_supported`.
 
 <a name="oidc-discovery"></a>
-### The discovery document
+### 6.8. The discovery document
 
 Most of the discovery document is worked out from the rest of the configuration, see
 [The OpenID Provider](openid-provider.html#the-discovery-document). Other parameters are added under
@@ -865,7 +905,7 @@ A customizer set in an [adapter](#adjusting-the-configuration-in-code) changes t
 [Extending the document](openid-provider.html#extending-the-document).
 
 <a name="oidc-entity-information"></a>
-### Entity information for OpenID Connect
+### 6.9. Entity information for OpenID Connect
 
 The [shared entity information](#entity-information) is overridden for OpenID Connect under
 `authn-server.oidc.entity-information`, with `ui-info`, `organization` and `contact-persons` in the same shape. The
@@ -892,7 +932,7 @@ authn-server:
 ```
 
 <a name="oidc-federation"></a>
-### OpenID Federation
+### 6.10. OpenID Federation
 
 The OpenID Provider as a member of an OpenID Federation is configured under `authn-server.oidc.federation`, see
 [OpenID Federation](openid-provider.html#openid-federation).
@@ -935,7 +975,7 @@ When federation is enabled, the application does not start without federation ke
 `logo_uri`.
 
 <a name="oidc-federation-clients"></a>
-### Clients from OpenID Federation
+### 6.11. Clients from OpenID Federation
 
 A member of a federation also accepts clients, relying parties, that are resolved through the federation. The client
 source is configured under `authn-server.oidc.federation.clients`, and the trust anchor that clients are resolved
@@ -1028,7 +1068,7 @@ authn-server:
 ```
 
 <a name="joining-sweden-connect"></a>
-### Joining Sweden Connect
+### 6.12. Joining Sweden Connect
 
 An OpenID Provider that joins the Sweden Connect federation takes the trust anchor's entity identifier and its
 federation keys from [Sweden Connect - OpenID Federation Structure](https://docs.swedenconnect.se/federation/oidf-structure.html),
@@ -1042,7 +1082,7 @@ registered under, and the OpenID Provider's own trust marks, `authn-server.oidc.
 it has been granted, see [OpenID Federation](openid-provider.html#openid-federation).
 
 <a name="running-several-nodes"></a>
-## Running several nodes
+## 7. Running several nodes
 
 By default the server keeps what it needs between requests in the memory of the node: the HTTP session, which holds
 single sign-on and the authentication in progress, and the stores of the protocols, such as the IDs of received SAML
@@ -1052,7 +1092,7 @@ sticky load balancing, and a node that restarts loses what it held.
 With Redis, the nodes share all of it. Any node can serve any request, and a node that restarts loses nothing.
 
 <a name="redis-dependencies"></a>
-### Dependencies
+### 7.1. Dependencies
 
 Redis support is optional, and the starters do not bring it. Add Spring Data Redis, and Spring Session for Redis when
 the HTTP session is kept in Redis:
@@ -1073,7 +1113,7 @@ Spring Data Redis uses the Lettuce client. To use Jedis instead, add `redis.clie
 `spring.data.redis.client-type` to `jedis`. Redisson is not supported.
 
 <a name="where-state-is-kept"></a>
-### Where state is kept
+### 7.2. Where state is kept
 
 One setting decides where the HTTP session and all stores are kept:
 
@@ -1135,7 +1175,7 @@ The application does not start, and the message names what is missing, when some
   Spring Session.
 
 <a name="the-redis-connection"></a>
-### The Redis connection
+### 7.3. The Redis connection
 
 The connection is configured with Spring Boot's own settings, `spring.data.redis.*`, for a single Redis, Redis Sentinel
 or Redis Cluster, see
@@ -1169,7 +1209,7 @@ The key store is only needed when Redis requires client certificates. At startup
 the server checks that the connection works.
 
 <a name="redis-key-names"></a>
-### Key names
+### 7.4. Key names
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -1185,7 +1225,7 @@ cache entry with the cache entry. The state of a trust mark of the OpenID Provid
 expires, so that its failures are still reported.
 
 <a name="redis-host-name-check"></a>
-### The TLS host name check
+### 7.5. The TLS host name check
 
 | Property | Description | Default value |
 | :--- | :--- | :--- |
@@ -1200,7 +1240,7 @@ The setting means the same for both clients. For Lettuce, the certificate is ver
 host name is checked unless the check is skipped, which Spring Boot by itself does not do for Jedis.
 
 <a name="redis-cluster"></a>
-### Redis Cluster
+### 7.6. Redis Cluster
 
 **NAT translation.** The nodes of a Redis Cluster tell the client their addresses. When the cluster is behind NAT, the
 addresses that the nodes report are not the ones the server can reach. Each entry translates one address:
@@ -1240,7 +1280,7 @@ the server often reads what it has just written, such as a session or an authori
 have it yet.
 
 <a name="background-jobs-in-a-cluster"></a>
-### Background jobs and trust marks
+### 7.7. Background jobs and trust marks
 
 Some work runs in the background on every node. When its state is kept in Redis, one node at a time does it.
 
@@ -1271,7 +1311,7 @@ Kept in memory, the cache is written to `authn-server.cache-directory`, when giv
 With `memory`, every node runs the jobs and fetches the trust marks itself, as with a single node.
 
 <a name="adjusting-the-configuration-in-code"></a>
-## Adjusting the configuration in code
+## 8. Adjusting the configuration in code
 
 The properties are applied to configurers: [`AuthnServerConfigurer`][AuthnServerConfigurer] for the shared values,
 and one configurer per protocol, [`Saml2IdpConfigurer`][Saml2IdpConfigurer] and
@@ -1301,7 +1341,7 @@ protocol configurer. How the lists work is described in
 [The SAML Identity Provider](saml-identity-provider.html#producers-voters-and-processors).
 
 <a name="using-the-configurers-without-spring-boot"></a>
-## Using the configurers without Spring Boot
+## 9. Using the configurers without Spring Boot
 
 The configurers do not depend on Spring Boot or on the properties. An application without Spring Boot creates the
 configurers itself and applies them to its filter chain. For SAML, it must also initialize OpenSAML before the chain
@@ -1339,7 +1379,7 @@ configurer.protocol(new OidcProviderConfigurer()
 Values may still be changed after the call, since they are read when the chain is built.
 
 <a name="migrating-from-saml-identity-provider"></a>
-## Migrating from saml-identity-provider
+## 10. Migrating from saml-identity-provider
 
 For an Identity Provider built on [saml-identity-provider](https://github.com/swedenconnect/saml-identity-provider),
 most properties move from `saml.idp` to `authn-server.saml`. The base URL and the settings that are common to all
@@ -1392,7 +1432,7 @@ Redisson is not supported. A deployment that used the Redisson starter configure
 protocols. A filter bean becomes a `RequesterPredicate` for SAML, added in an adapter; a predicate reads the Service
 Provider metadata with `record.getProtocolMetadata(EntityDescriptor.class)`.
 
-:raised_hand: A Service Provider that is not accepted now gets the status `Responder` / `RequestDenied`. The
+✋ A Service Provider that is not accepted now gets the status `Responder` / `RequestDenied`. The
 saml-identity-provider library answered with `Responder` / `AuthnFailed`.
 
 `Saml2IdpConfigurerAdapter` is replaced by [`AuthnServerConfigurerAdapter`][AuthnServerConfigurerAdapter], which gets

@@ -16,43 +16,78 @@ OpenID Federation. The properties are described in [Configuration](configuration
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
-- [Where things are published](#where-things-are-published)
-- [Keys](#keys)
-    - [Signing keys](#signing-keys)
-    - [Decryption keys](#decryption-keys)
-    - [Key requirements and key IDs](#key-requirements-and-key-ids)
-    - [Rolling over a key](#rolling-over-a-key)
-- [Choosing the signing key for a client](#choosing-the-signing-key-for-a-client)
-- [Scopes, claims and authentication contexts](#scopes-claims-and-authentication-contexts)
-- [Authentication requests](#authentication-requests)
-    - [How a request is processed](#how-a-request-is-processed)
-    - [Clients](#clients)
-    - [Request objects](#request-objects)
-    - [PKCE, state and response modes](#pkce-state-and-response-modes)
-    - [Which clients are accepted](#which-clients-are-accepted)
-    - [What the request is turned into](#what-the-request-is-turned-into)
-    - [Swedish extensions](#swedish-extensions)
-    - [Failures](#failures)
-- [The code flow](#the-code-flow)
-    - [Authentication and the authorization code](#authentication-and-the-authorization-code)
-    - [The token endpoint](#the-token-endpoint)
-    - [Client authentication](#client-authentication)
-    - [The access token](#the-access-token)
-    - [The ID token](#the-id-token)
-    - [The UserInfo endpoint](#the-userinfo-endpoint)
-    - [Where codes and tokens are kept](#where-codes-and-tokens-are-kept)
-- [The discovery document](#the-discovery-document)
-    - [Extending the document](#extending-the-document)
-- [OpenID Federation](#openid-federation)
-    - [Joining a federation](#joining-a-federation)
-    - [Federation keys](#federation-keys)
-    - [The entity configuration](#the-entity-configuration)
-    - [Descriptive metadata](#descriptive-metadata)
-    - [The trust marks of the OpenID Provider](#the-trust-marks-of-the-openid-provider)
-    - [Changing the entity configuration](#changing-the-entity-configuration)
+## Table of Contents
+
+1. [**Where things are published**](#where-things-are-published)
+
+2. [**Keys**](#keys)
+
+    2.1. [Signing keys](#signing-keys)
+
+    2.2. [Decryption keys](#decryption-keys)
+
+    2.3. [Key requirements and key IDs](#key-requirements-and-key-ids)
+
+    2.4. [Rolling over a key](#rolling-over-a-key)
+
+3. [**Choosing the signing key for a client**](#choosing-the-signing-key-for-a-client)
+
+4. [**Scopes, claims and authentication contexts**](#scopes-claims-and-authentication-contexts)
+
+5. [**Authentication requests**](#authentication-requests)
+
+    5.1. [How a request is processed](#how-a-request-is-processed)
+
+    5.2. [Clients](#clients)
+
+    5.3. [Request objects](#request-objects)
+
+    5.4. [PKCE, state and response modes](#pkce-state-and-response-modes)
+
+    5.5. [Which clients are accepted](#which-clients-are-accepted)
+
+    5.6. [What the request is turned into](#what-the-request-is-turned-into)
+
+    5.7. [Swedish extensions](#swedish-extensions)
+
+    5.8. [Failures](#failures)
+
+6. [**The code flow**](#the-code-flow)
+
+    6.1. [Authentication and the authorization code](#authentication-and-the-authorization-code)
+
+    6.2. [The token endpoint](#the-token-endpoint)
+
+    6.3. [Client authentication](#client-authentication)
+
+    6.4. [The access token](#the-access-token)
+
+    6.5. [The ID token](#the-id-token)
+
+    6.6. [The UserInfo endpoint](#the-userinfo-endpoint)
+
+    6.7. [Where codes and tokens are kept](#where-codes-and-tokens-are-kept)
+
+7. [**The discovery document**](#the-discovery-document)
+
+    7.1. [Extending the document](#extending-the-document)
+
+8. [**OpenID Federation**](#openid-federation)
+
+    8.1. [Joining a federation](#joining-a-federation)
+
+    8.2. [Federation keys](#federation-keys)
+
+    8.3. [The entity configuration](#the-entity-configuration)
+
+    8.4. [Descriptive metadata](#descriptive-metadata)
+
+    8.5. [The trust marks of the OpenID Provider](#the-trust-marks-of-the-openid-provider)
+
+    8.6. [Changing the entity configuration](#changing-the-entity-configuration)
 
 <a name="where-things-are-published"></a>
-## Where things are published
+## 1. Where things are published
 
 The OpenID Provider is identified by its issuer, which defaults to the base URL. Its endpoints are placed under the
 OIDC path, `/oidc` by default, see [URL layout](configuration.html#url-layout). With the base URL
@@ -76,14 +111,14 @@ discovery document is published at `https://op.example.com/op1/.well-known/openi
 the base URL or begin with it, since the server can only serve paths under the base URL.
 
 <a name="keys"></a>
-## Keys
+## 2. Keys
 
 The OpenID Provider has two lists of keys: signing keys and decryption keys. Each key is a credential configured
 through the [credentials-support](https://docs.swedenconnect.se/credentials-support/) library, together with a state.
 The keys are checked at startup, and the application does not start if a rule below is broken.
 
 <a name="signing-keys"></a>
-### Signing keys
+### 2.1. Signing keys
 
 The OpenID Provider signs ID tokens, and UserInfo responses unless that is turned off. A signing key is:
 
@@ -108,7 +143,7 @@ The algorithms that a key can produce follow from the key:
 A key can be limited to one algorithm by assigning `jose-alg` in the credential metadata.
 
 <a name="decryption-keys"></a>
-### Decryption keys
+### 2.2. Decryption keys
 
 Clients may encrypt request objects to the OpenID Provider. A decryption key is:
 
@@ -120,7 +155,7 @@ An RSA key supports `RSA-OAEP-256` and `RSA-OAEP`, and an EC key supports `ECDH-
 `request_object_encryption_alg_values_supported`. Decryption keys are optional.
 
 <a name="key-requirements-and-key-ids"></a>
-### Key requirements and key IDs
+### 2.3. Key requirements and key IDs
 
 Following [Sweden Connect Security Requirements](https://docs.swedenconnect.se/federation/security-requirements.html),
 Section 3, an RSA key must be at least 2048 bits, and an EC key must be on the P-256, P-384 or P-521 curve. Other keys
@@ -135,7 +170,7 @@ The JWKS publishes the public keys only, with `use` set to `sig` or `enc`, and w
 credential has one.
 
 <a name="rolling-over-a-key"></a>
-### Rolling over a key
+### 2.4. Rolling over a key
 
 Section 4 of the security requirements says how a key is replaced without disrupting the clients.
 
@@ -177,7 +212,7 @@ authn-server:
 ```
 
 <a name="choosing-the-signing-key-for-a-client"></a>
-## Choosing the signing key for a client
+## 3. Choosing the signing key for a client
 
 The key is chosen per client that a message is sent to, by [`SigningKeySelector`][SigningKeySelector]. The ID token
 uses the client's ID token parameters, and the UserInfo response its UserInfo parameters.
@@ -201,7 +236,7 @@ fallback to another algorithm. Future keys are never used.
 UserInfo responses are signed by default, see [The UserInfo endpoint](#the-userinfo-endpoint).
 
 <a name="scopes-claims-and-authentication-contexts"></a>
-## Scopes, claims and authentication contexts
+## 4. Scopes, claims and authentication contexts
 
 What the OpenID Provider offers is worked out from what the authentication providers declare, see
 [What the provider declares](authentication-module.html#what-the-provider-declares). The result is computed at startup
@@ -225,7 +260,7 @@ not even for a provider that delivers the user signature. They are only offered 
 attribute `attribute.user-signature`, which gives the claim `https://id.oidc.se/claim/userSignature`, and declares
 the sign scope.
 
-:raised_hand: The scope `https://id.oidc.se/scope/naturalPersonNumber` has two essential claims, the personal identity
+✋ The scope `https://id.oidc.se/scope/naturalPersonNumber` has two essential claims, the personal identity
 number and the coordination number. A provider that delivers only one of them does not get the scope derived. Declare
 the scope, or configure the missing claim, if the provider should offer it.
 
@@ -257,7 +292,7 @@ A scope with some of its claims supported, and a scope without claims, gives no 
 `getSupportedAuthnContextUris()`. It is not configurable.
 
 <a name="authentication-requests"></a>
-## Authentication requests
+## 5. Authentication requests
 
 Authentication requests are received on the authorization endpoint, with GET or POST. The OpenID Provider follows
 OpenID Connect Core, Section 3.1.2, and the
@@ -268,7 +303,7 @@ This section covers the processing of the request, up to the protocol-neutral au
 happens next is described in [The code flow](#the-code-flow).
 
 <a name="how-a-request-is-processed"></a>
-### How a request is processed
+### 5.1. How a request is processed
 
 The request is processed in two parts, by
 [`OidcAuthnRequestAuthenticationConverter`][OidcAuthnRequestAuthenticationConverter] and
@@ -294,7 +329,7 @@ the `state` of the request. The second part checks the request and builds the re
 6. The authentication requirements are built from the rest of the request.
 
 <a name="clients"></a>
-### Clients
+### 5.2. Clients
 
 The clients are found in the client registry, through its OpenID Connect backends and in their configured order, see
 [OpenID Connect: three backends](client-registry.html#openid-connect-three-backends).
@@ -337,7 +372,7 @@ error. The request ends at the OpenID Provider, without a redirect, and the erro
 client registration needs to be corrected.
 
 <a name="request-objects"></a>
-### Request objects
+### 5.3. Request objects
 
 A request object may be passed by value, in `request`, or by reference, in `request_uri`. Its parameters replace
 those of the request with the same name, as OpenID Connect Core, Section 6.3.3, states. `client_id` must still be
@@ -373,7 +408,7 @@ may be what holds it. The error is sent to the client when the plain parameters 
 redirect URI and a supported response mode, and otherwise ends at the OpenID Provider.
 
 <a name="pkce-state-and-response-modes"></a>
-### PKCE, state and response modes
+### 5.4. PKCE, state and response modes
 
 **PKCE** (RFC 7636) is optional by default. With `authn-server.oidc.authorization-request.require-pkce` set to
 `true` it is required. The only supported method is `S256`. A request with the method `plain`, or with a
@@ -390,7 +425,7 @@ the page with `OidcProviderConfigurer.authnRequestProcessor(p -> p.responsePage(
 such as `fragment`, is answered with HTTP status 400 and no redirect, as OpenID Connect Core, Section 3.1.2.6, says.
 
 <a name="which-clients-are-accepted"></a>
-### Which clients are accepted
+### 5.5. Which clients are accepted
 
 Once the redirect URI is established and the request has been parsed, the
 [requester acceptance](client-registry.html#requester-acceptance) decides whether the client may use the OpenID
@@ -403,7 +438,7 @@ for through the client registry before the client is rejected, see
 A client that is not accepted gets the error `unauthorized_client`.
 
 <a name="what-the-request-is-turned-into"></a>
-### What the request is turned into
+### 5.6. What the request is turned into
 
 The result is the protocol-neutral authentication requirements, as an
 [`OidcAuthenticationRequirements`][OidcAuthenticationRequirements], which adds what only OpenID Connect has.
@@ -447,7 +482,7 @@ challenge, is kept as the protocol request data of the request, an
 [`OidcAuthnRequestData`][OidcAuthnRequestData].
 
 <a name="swedish-extensions"></a>
-### Swedish extensions
+### 5.7. Swedish extensions
 
 The parameters of
 [Authentication Request Parameter Extensions for the Swedish OpenID Connect Profile](https://www.oidc.se/specifications/request-parameter-extensions-1_1.html)
@@ -471,7 +506,7 @@ are read, as plain parameters or from a request object.
   to be signed. A signature request that breaks a rule is answered with `invalid_request`.
 
 <a name="failures"></a>
-### Failures
+### 5.8. Failures
 
 Until the client and the redirect URI are known, there is nowhere safe to send a response, and OAuth 2.0 (RFC 6749),
 Section 4.1.2.1, forbids redirecting the user to a redirect URI that is missing, invalid or not registered, or for a
@@ -509,7 +544,7 @@ The errors that the authentication step reports are mapped as described in
 [Errors](authentication-module.html#errors).
 
 <a name="the-code-flow"></a>
-## The code flow
+## 6. The code flow
 
 Once the authentication request has been processed, the code flow continues:
 
@@ -519,7 +554,7 @@ Once the authentication request has been processed, the code flow continues:
 4. The client calls the UserInfo endpoint with the access token.
 
 <a name="authentication-and-the-authorization-code"></a>
-### Authentication and the authorization code
+### 6.1. Authentication and the authorization code
 
 The processed request goes to the authentication providers in the same way as a SAML request: the provider is chosen
 from the requested authentication contexts, a previous authentication may be reused for single sign-on, and a
@@ -550,7 +585,7 @@ errors are mapped as described in [Errors](authentication-module.html#errors). A
 authentication from the session, as for SAML.
 
 <a name="the-token-endpoint"></a>
-### The token endpoint
+### 6.2. The token endpoint
 
 The token endpoint accepts POST requests with the `authorization_code` grant, as OpenID Connect Core, Section 3.1.3,
 and RFC 6749, Section 4.1.3, describe. No refresh tokens are issued, and `offline_access` is not offered. A request is
@@ -580,7 +615,7 @@ Section 4.1.2, says. Every response, also an error response, carries `Cache-Cont
 | The client registry fails | `server_error` (HTTP status 500) |
 
 <a name="client-authentication"></a>
-### Client authentication
+### 6.3. Client authentication
 
 A client must authenticate with the method it has registered as `token_endpoint_auth_method`. When it has registered
 none, the default of OpenID Connect Dynamic Client Registration, `client_secret_basic`, applies. `none` is not
@@ -630,7 +665,7 @@ metadata.setCustomField(OidcClientRecord.CLIENT_SECRET, secret);
 ```
 
 <a name="the-access-token"></a>
-### The access token
+### 6.4. The access token
 
 The access token is an opaque random value. It reveals nothing about the user, and the OpenID Provider keeps what the
 UserInfo endpoint needs together with it: the client, the `sub`, the scopes and the claims to deliver from the UserInfo
@@ -644,7 +679,7 @@ endpoint.
 With single use off, the token may be used at the UserInfo endpoint until it expires or is revoked.
 
 <a name="the-id-token"></a>
-### The ID token
+### 6.5. The ID token
 
 The ID token follows the Swedish OpenID Connect Profile, Section 3.2.1:
 
@@ -687,7 +722,7 @@ A client that asks for other algorithms, or has no usable key, is a client confi
 request ends at the OpenID Provider, and the error is logged at `WARN`.
 
 <a name="the-userinfo-endpoint"></a>
-### The UserInfo endpoint
+### 6.6. The UserInfo endpoint
 
 The UserInfo endpoint, `/oidc/userinfo` by default, gives the client the claims that belong in UserInfo, as the
 Swedish OpenID Connect Profile, Section 4.1, requires. It accepts GET and POST.
@@ -747,7 +782,7 @@ response, carries `Cache-Control: no-store`.
 The request processing is found in [`UserInfoRequestProcessor`][UserInfoRequestProcessor].
 
 <a name="where-codes-and-tokens-are-kept"></a>
-### Where codes and tokens are kept
+### 6.7. Where codes and tokens are kept
 
 Authorization codes, access tokens and the `jti` values of used client assertions are kept in stores:
 [`AuthorizationCodeStore`][AuthorizationCodeStore], [`AccessTokenStore`][AccessTokenStore] and
@@ -771,7 +806,7 @@ oidc.authnRequestProcessor(p -> p
 ```
 
 <a name="the-discovery-document"></a>
-## The discovery document
+## 7. The discovery document
 
 The discovery document holds:
 
@@ -810,7 +845,7 @@ The discovery document holds:
 | `userinfo_encryption_enc_values_supported` | `A128CBC-HS256`, `A256CBC-HS512`, `A128GCM` and `A256GCM`. |
 
 <a name="extending-the-document"></a>
-### Extending the document
+### 7.1. Extending the document
 
 Parameters are added through configuration, as a map of name to value. A value may be a string, a boolean, a list or
 a map:
@@ -849,7 +884,7 @@ OpenID Federation: the entity configuration is built from the discovery document
 See [Changing the entity configuration](#changing-the-entity-configuration).
 
 <a name="openid-federation"></a>
-## OpenID Federation
+## 8. OpenID Federation
 
 The OpenID Provider can be a member of an [OpenID Federation](https://openid.net/specs/openid-federation-1_0.html),
 such as the Sweden Connect federation, where an OpenID Provider is registered from its published entity
@@ -857,7 +892,7 @@ configuration. This section is about the OpenID Provider's own membership. Clien
 described in [The federation backend](client-registry.html#the-federation-backend).
 
 <a name="joining-a-federation"></a>
-### Joining a federation
+### 8.1. Joining a federation
 
 Federation is off by default. To join a federation, enable it, and give the federation keys and the authority hints:
 
@@ -887,7 +922,7 @@ All properties are listed in [Configuration](configuration.html#oidc-federation)
 with `OidcProviderConfigurer.federation(...)`, see [`OidcFederationConfigurer`][OidcFederationConfigurer].
 
 <a name="federation-keys"></a>
-### Federation keys
+### 8.2. Federation keys
 
 The federation keys are separate from the OpenID Connect signing keys, as OpenID Federation 1.0, Section 3.1.1,
 recommends. They are configured as a list, like the [signing keys](#signing-keys), and a key is:
@@ -920,7 +955,7 @@ authn-server:
 ```
 
 <a name="the-entity-configuration"></a>
-### The entity configuration
+### 8.3. The entity configuration
 
 The entity configuration is a signed JWT with the type `entity-statement+jwt`, served with the content type
 `application/entity-statement+jwt`. It holds, following OpenID Federation 1.0, Section 3:
@@ -955,7 +990,7 @@ The OpenID Connect keys are part of the discovery document. They, like the feder
 change of key state takes effect when the application is restarted, and the entity configuration is then built anew.
 
 <a name="descriptive-metadata"></a>
-### Descriptive metadata
+### 8.4. Descriptive metadata
 
 The descriptive information about the service and its organization is given once for all protocols, under
 `authn-server.entity-information`, see [Entity information](configuration.html#entity-information). The same values
@@ -985,7 +1020,7 @@ document holds one of them, for example set by its customizer, the value of the 
 documents, so that they never disagree.
 
 <a name="the-trust-marks-of-the-openid-provider"></a>
-### The trust marks of the OpenID Provider
+### 8.5. The trust marks of the OpenID Provider
 
 The trust marks that the OpenID Provider holds, such as the level of assurance trust marks of the Sweden Connect
 federation, are published in its entity configuration. They are configured per trust mark type, separately from the
@@ -1041,7 +1076,7 @@ in memory by default. When they are kept in Redis, by `authn-server.storage.type
 [Background jobs and trust marks](configuration.html#background-jobs-in-a-cluster).
 
 <a name="changing-the-entity-configuration"></a>
-### Changing the entity configuration
+### 8.6. Changing the entity configuration
 
 There are two ways to change what the OpenID Provider publishes, and they differ in which documents they reach:
 

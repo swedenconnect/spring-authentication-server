@@ -23,7 +23,72 @@ done.
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
-## Writing the provider
+## Table of Contents
+
+1. [**Writing the provider**](#writing-the-provider)
+
+    1.1. [What the provider declares](#what-the-provider-declares)
+
+2. [**What the module receives**](#what-the-module-receives)
+
+    2.1. [Whether to authenticate the user again](#whether-to-authenticate-the-user-again)
+
+    2.2. [Which authentication contexts are acceptable](#which-authentication-contexts-are-acceptable)
+
+    2.3. [Which attributes are requested](#which-attributes-are-requested)
+
+    2.3.1. [When the user does not match the requested values](#when-the-user-does-not-match-the-requested-values)
+
+    2.4. [Where to authenticate, and who is really asking](#where-to-authenticate-and-who-is-really-asking)
+
+    2.5. [The user message](#the-user-message)
+
+    2.6. [The sign message](#the-sign-message)
+
+    2.7. [What SAML adds](#what-saml-adds)
+
+3. [**What the module returns**](#what-the-module-returns)
+
+    3.1. [The authenticated user](#the-authenticated-user)
+
+    3.2. [The authentication result](#the-authentication-result)
+
+    3.3. [When a result must not be reused for single sign-on](#when-a-result-must-not-be-reused-for-single-sign-on)
+
+4. [**Single sign-on**](#single-sign-on)
+
+    4.1. [The rules that always apply](#the-rules-that-always-apply)
+
+    4.2. [The policy](#the-policy)
+
+    4.3. [Voters](#voters)
+
+    4.4. [What happens to the session authentication](#what-happens-to-the-session-authentication)
+
+    4.5. [How use of the result is tracked](#how-use-of-the-result-is-tracked)
+
+5. [**Errors**](#errors)
+
+    5.1. [The passive case](#the-passive-case)
+
+    5.2. [Errors that cannot be reported](#errors-that-cannot-be-reported)
+
+6. [**Modules with pages of their own**](#modules-with-pages-of-their-own)
+
+    6.1. [The provider](#the-provider)
+
+    6.2. [The identifier of the authentication](#the-identifier-of-the-authentication)
+
+    6.3. [The controller](#the-controller)
+
+    6.4. [Where the authentications are kept](#where-the-authentications-are-kept)
+
+7. [**Audit events**](#audit-events)
+
+8. [**Post-authentication processing**](#post-authentication-processing)
+
+<a name="writing-the-provider"></a>
+## 1. Writing the provider
 
 A module plugs into the server as a [`UserAuthenticationProvider`][UserAuthenticationProvider], which is a Spring
 Security `AuthenticationProvider`. Extend [`AbstractUserAuthenticationProvider`][AbstractUserAuthenticationProvider] and
@@ -75,7 +140,8 @@ and the protocol data of the request, records its use, and runs the
 Several providers may be installed, each supporting its own authentication contexts. A provider is asked only about
 requests it can serve, so a module never has to check whether it is the right one.
 
-### What the provider declares
+<a name="what-the-provider-declares"></a>
+### 1.1. What the provider declares
 
 Besides its authentication contexts, a provider may declare what it offers. The server publishes the declarations in
 the SAML metadata and in the OpenID Connect discovery document. Each has a default method on
@@ -102,7 +168,7 @@ essential claims the provider delivers only some of. A provider that declares sc
 derived ones are replaced, not added to. How scopes and claims are worked out is described in
 [The OpenID Provider](openid-provider.html#scopes-claims-and-authentication-contexts).
 
-:raised_hand: The sign scopes, `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval`, are never
+✋ The sign scopes, `https://id.oidc.se/scope/sign` and `https://id.oidc.se/scope/signApproval`, are never
 derived. A provider that signs declares `attribute.user-signature` among its attributes and the sign scope among its
 scopes, together with the other scopes it offers.
 
@@ -113,7 +179,8 @@ returns everything it knows about the user, see [The authenticated user](#the-au
 A module that cannot authenticate the user inside this call, because it needs pages of its own, is written slightly
 differently, see [Modules with pages of their own](#modules-with-pages-of-their-own).
 
-## What the module receives
+<a name="what-the-module-receives"></a>
+## 2. What the module receives
 
 [`AuthenticationRequirements`][AuthenticationRequirements] is what the requester asked for, with the differences
 between the two protocols already resolved. The module does not need to know which protocol was used. The
@@ -135,7 +202,8 @@ This is the mapping, in case you need to reason about a request you are looking 
 | `getUserMessage()` | the `UserMessage` extension | `userMessage` |
 | `getSignMessage()` | the `SignMessage` extension | `sign_message` in `signRequest` |
 
-### Whether to authenticate the user again
+<a name="whether-to-authenticate-the-user-again"></a>
+### 2.1. Whether to authenticate the user again
 
 `isForceAuthn()` means the user must be authenticated again even if an earlier authentication could have been reused. A
 maximum authentication age of zero means the same thing, since that is how OpenID Connect defines `max_age=0`, so the
@@ -145,7 +213,8 @@ module only has to look at `isForceAuthn()`.
 when single sign-on was refused, so `authenticate` is reached for a passive request only if the module can authenticate
 the user without asking anything, for instance from a client certificate.
 
-### Which authentication contexts are acceptable
+<a name="which-authentication-contexts-are-acceptable"></a>
+### 2.2. Which authentication contexts are acceptable
 
 `getAuthnContextRequirements()` holds the authentication context URIs the requester accepts, in its order of
 preference, because that is how `acr_values` is defined. Sweden Connect uses the same URIs in SAML and in OpenID
@@ -160,7 +229,8 @@ as if no context had been requested.
 A module does not read this list. It gets the contexts that are left after filtering, in the same order, as the second
 argument to `authenticate`. It picks the one it delivers and reports it as part of the authenticated user.
 
-### Which attributes are requested
+<a name="which-attributes-are-requested"></a>
+### 2.3. Which attributes are requested
 
 `getRequestedAttributes()` holds the requested attributes in the generic form described in
 [Attributes](attributes.html). A requested attribute may be essential, and it may carry the values the requester will
@@ -172,7 +242,7 @@ value. A hint that the user is `197705232382` therefore arrives as a requested `
 with that value, and a module that can prefill a field should look for exactly that.
 
 <a name="when-the-user-does-not-match-the-requested-values"></a>
-#### When the user does not match the requested values
+#### 2.3.1. When the user does not match the requested values
 
 A module does not have to check the requested values itself. After a new authentication, the library compares every
 requested attribute that carries values with the user the module returned. The attribute matches when any requested
@@ -196,7 +266,8 @@ voluntary even when the metadata of the Service Provider requires the attribute.
 A module returns the attributes it actually established. It is not obliged to return everything that was asked for, and
 it may return more.
 
-### Where to authenticate, and who is really asking
+<a name="where-to-authenticate-and-who-is-really-asking"></a>
+### 2.4. Where to authenticate, and who is really asking
 
 `getRequestedAuthnProviders()` is the requester asking for a particular authentication service or mechanism. A server
 that offers several should honour it when it can.
@@ -207,7 +278,8 @@ and carries no token; OpenID Connect allows one identifier and may add a token w
 Use it for what you display to the user, never for an access decision, since it is the proxy's claim about a third
 party.
 
-### The user message
+<a name="the-user-message"></a>
+### 2.5. The user message
 
 `getUserMessage()` is a message the requester wants shown together with the authentication, for example "You are about
 to sign in to the Tax Agency". If the module shows a screen, it should show this message.
@@ -231,7 +303,8 @@ according to `getMimeType()`, which is `text/plain`, `text/markdown` or `text/ht
 [`MessageMimeType`][MessageMimeType]. A module that cannot render Markdown or HTML should not fall back to showing the
 raw markup.
 
-### The sign message
+<a name="the-sign-message"></a>
+### 2.6. The sign message
 
 `getSignMessage()` is different in kind. It is not information, it is what the user is approving, and it belongs to a
 signature operation. A [`GenericSignMessage`][GenericSignMessage] holds the same messages and MIME type as a user
@@ -250,7 +323,8 @@ post-authentication processing checks that, and a result where the message was n
 An encrypted SAML sign message is decrypted before the module sees it, and the SAML `DisplayEntity` has already been
 checked against the server's own entityID. Neither reaches the module.
 
-### What SAML adds
+<a name="what-saml-adds"></a>
+### 2.7. What SAML adds
 
 A protocol may ask for more than the generic model holds, so `AuthenticationRequirements` can be subtyped. A module
 written against the generic type works everywhere; a module that only ever runs in an Identity Provider may look for
@@ -270,9 +344,11 @@ that needs the request itself asks for it and casts it to the type its protocol 
 Object requestData = token.getProtocolRequestData();
 ```
 
-## What the module returns
+<a name="what-the-module-returns"></a>
+## 3. What the module returns
 
-### The authenticated user
+<a name="the-authenticated-user"></a>
+### 3.1. The authenticated user
 
 [`AuthenticatedUser`][AuthenticatedUser] is what the module established about the user. It is a Spring Security
 `UserDetails`.
@@ -317,7 +393,8 @@ have been offered in several and only the one shown matters:
 user.setSignMessageDisplayed(true, "sv");
 ```
 
-### The authentication result
+<a name="the-authentication-result"></a>
+### 3.2. The authentication result
 
 [`UserAuthentication`][UserAuthentication] is a Spring Security `Authentication` wrapping the user. It is what the SAML
 layer turns into an assertion and the OpenID Connect layer into tokens, and it is what is kept in the session for
@@ -334,7 +411,8 @@ Because the object lives in the session, everything it holds must survive Java s
 attribute values a module puts on the user, so a module that invents its own attribute value type must make it
 `Serializable`.
 
-### When a result must not be reused for single sign-on
+<a name="when-a-result-must-not-be-reused-for-single-sign-on"></a>
+### 3.3. When a result must not be reused for single sign-on
 
 By default a result may be reused, and `isReuseForSso()` says so. A module turns that off when the authentication was
 tied to this one request:
@@ -351,12 +429,14 @@ sign-on, and the same holds for a SAML signature service. Recording the displaye
 Turning reuse off is a decision that the result must not be saved. Leaving it on is not a decision that it will be: the
 server may still choose not to save it.
 
-## Single sign-on
+<a name="single-sign-on"></a>
+## 4. Single sign-on
 
 Single sign-on is what makes a previous authentication answer a new request, and it works across the two protocols: a
 user who signed in at a SAML Service Provider can be let straight through at an OpenID Connect client.
 
-### The rules that always apply
+<a name="the-rules-that-always-apply"></a>
+### 4.1. The rules that always apply
 
 These are checked before any policy or voter, and no configuration turns them off:
 
@@ -369,7 +449,8 @@ These are checked before any policy or voter, and no configuration turns them of
 - An attribute value the requester asked for does not match the value the user has. A request that states that the user
   is `197705232382` is never answered with an authentication of somebody else.
 
-### The policy
+<a name="the-policy"></a>
+### 4.2. The policy
 
 Everything else is an [`SsoPolicy`][SsoPolicy]. The default policy allows single sign-on for 60 minutes, which is the
 Sweden Connect maximum, and only for the requester the authentication was made for. Two things are configurable:
@@ -400,7 +481,8 @@ provider.setSsoPolicy(myOwnPolicy);                                             
 The server default and the protocol policies are set from the `authn-server.sso.*` and `authn-server.saml.sso.*`
 properties, see [Configuration](configuration.html#single-sign-on).
 
-### Voters
+<a name="voters"></a>
+### 4.3. Voters
 
 The decision is made by an ordered list of [`SsoVoter`][SsoVoter]s. One denial ends it, and at least one voter has to
 allow it, so a request where every voter abstains gets no single sign-on. Three voters are installed: one applies the
@@ -424,7 +506,7 @@ A refusal always states its reason, an [`SsoDenialReason`][SsoDenialReason]. Tha
 below.
 
 <a name="what-happens-to-the-session-authentication"></a>
-### What happens to the session authentication
+### 4.4. What happens to the session authentication
 
 The session holds one authentication for the whole server, the one that a later request may reuse. What happens to it
 depends on how a request ends:
@@ -441,7 +523,8 @@ depends on how a request ends:
   the user. That is an invalid request, an unknown or rejected requester, `NO_AUTHN_CONTEXT` when no provider could
   take the request, and `PASSIVE_NOT_POSSIBLE` when the user was never asked.
 
-### How use of the result is tracked
+<a name="how-use-of-the-result-is-tracked"></a>
+### 4.5. How use of the result is tracked
 
 The library records every time a result is used, one record per use, in an
 [`AuthenticationUsageTrack`][AuthenticationUsageTrack]. A record holds the protocol, the requester, the request
@@ -455,7 +538,8 @@ the second time.
 The requirements and the protocol data of the request are cleared from the result before it is saved, so a module must
 not expect them to still be there when a result comes back from the session.
 
-## Errors
+<a name="errors"></a>
+## 5. Errors
 
 A module reports a failure by throwing an [`AuthenticationErrorException`][AuthenticationErrorException] carrying an
 [`AuthenticationError`][AuthenticationError]. The protocol module turns it into a SAML `Status` or an OpenID Connect
@@ -494,7 +578,8 @@ the user chose to stop, and the fraud codes when a security check alerted, not w
 The mappings live in the protocol modules, [`SamlErrorStatus`][SamlErrorStatus] and
 [`OidcErrorMapping`][OidcErrorMapping], and a module does not call them.
 
-### The passive case
+<a name="the-passive-case"></a>
+### 5.1. The passive case
 
 `PASSIVE_NOT_POSSIBLE` is the one error whose OpenID Connect code depends on why it happened, so the exception carries
 the `SsoDenialReason` that refused single sign-on. A request that could have been answered except that the requester
@@ -503,7 +588,8 @@ Section 2.2.1, requires. Every other reason gets `login_required`. SAML has one 
 
 The base class raises this error, so a module does not.
 
-### Errors that cannot be reported
+<a name="errors-that-cannot-be-reported"></a>
+### 5.2. Errors that cannot be reported
 
 Some failures make it impossible to send the user back to the requester at all, for instance when the request cannot be
 tied to a session. The user is shown an error page instead. Those are an
@@ -522,7 +608,8 @@ shows the message that its message code resolves to. An error may give the HTTP 
 and with a filter that makes the page the answer also when the request does not accept HTML, since Spring Boot answers
 such a request with JSON.
 
-## Modules with pages of their own
+<a name="modules-with-pages-of-their-own"></a>
+## 6. Modules with pages of their own
 
 Most modules cannot authenticate the user inside the call to `authenticate`. They need to show a login screen, poll a
 BankID server, or walk the user through a few steps. Such a module is sent the user instead: the server redirects to a
@@ -531,7 +618,8 @@ controller of the module's own, the controller authenticates the user, and the f
 The module writes two things, a provider and a controller, and neither of them has to know which protocol the requester
 used. A SAML login and an OpenID Connect login reach the same controller and return to the same resume path.
 
-### The provider
+<a name="the-provider"></a>
+### 6.1. The provider
 
 Extend [`AbstractUserRedirectAuthenticationProvider`][AbstractUserRedirectAuthenticationProvider] instead of
 `AbstractUserAuthenticationProvider`. It takes the two paths, the one the user is sent to and the one the user comes
@@ -564,7 +652,7 @@ chain serves the two paths: the authentication path is open to everyone, and the
 continues, in the protocol that the requester used. See
 [The SAML Identity Provider](saml-identity-provider.html#modules-with-pages-of-their-own).
 
-:raised_hand: Only these two exact paths are covered by the server's filter chain. Any other page of the module, such as
+✋ Only these two exact paths are covered by the server's filter chain. Any other page of the module, such as
 the one a login form posts to, is not, and the application must secure it in its own security configuration. For
 example, permit the module's paths in the application's filter chain:
 
@@ -588,7 +676,8 @@ authentication happened elsewhere.
 `supportsUserAuthenticationToken` says whether the provider can use what the controller delivered. It is how the right
 provider is found when several are installed.
 
-### The identifier of the authentication
+<a name="the-identifier-of-the-authentication"></a>
+### 6.2. The identifier of the authentication
 
 Each authentication gets an unguessable identifier when the redirect starts. It travels to the controller and back as
 the `authnId` request parameter, and it is what makes several authentications in the same session independent of each
@@ -599,7 +688,8 @@ An authentication is removed once it has been resumed, and one that is never res
 the maximum age, 30 minutes by default. A request to the resume path that carries no identifier, or an identifier that
 is unknown, expired or already resumed, is the invalid session error, and the user is shown an error page.
 
-### The controller
+<a name="the-controller"></a>
+### 6.3. The controller
 
 Extend [`AbstractAuthenticationController`][AbstractAuthenticationController], which gives the controller what it needs
 and takes care of getting the user back into the flow:
@@ -653,7 +743,8 @@ three redirect the user to the resume path:
 A controller that spreads the authentication over several pages must carry the identifier along, as a hidden field or
 in the link, so that every request lands on the right authentication. Losing it means the user cannot be brought back.
 
-### Where the authentications are kept
+<a name="where-the-authentications-are-kept"></a>
+### 6.4. Where the authentications are kept
 
 The storage has two sides: [`RedirectFlowRepository`][RedirectFlowRepository], which the protocol flow uses to start an
 authentication and pick up its outcome, and [`RedirectAuthenticatorRepository`][RedirectAuthenticatorRepository], which
@@ -672,7 +763,8 @@ provider.setRepository(repository);
 Whatever the storage, everything the module puts in it must survive Java serialization, including the token the
 controller delivers.
 
-## Audit events
+<a name="audit-events"></a>
+## 7. Audit events
 
 The server audits each authentication flow, see [Auditing](audit.html). A module that wants to add its own entries to
 the audit log publishes Spring application events and registers a spring-audit-support transformer for them. Events
@@ -681,7 +773,8 @@ authentication path, are audited under the correlation ID of the flow without th
 the controller must carry the `authnId` parameter for this, as it already must for the controller to find the
 authentication, see [The identifier of the authentication](#the-identifier-of-the-authentication).
 
-## Post-authentication processing
+<a name="post-authentication-processing"></a>
+## 8. Post-authentication processing
 
 A [`PostAuthenticationProcessor`][PostAuthenticationProcessor] runs on the result before it becomes an assertion or a
 set of tokens, and asserts that the authentication delivered what the request needed. It may also change the result.

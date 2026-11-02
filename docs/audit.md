@@ -18,31 +18,54 @@ configured, is described in its own documentation.
 Source links in this guide point to the `main` branch of the
 [spring-authentication-server](https://github.com/swedenconnect/spring-authentication-server) repository.
 
-- [Setting up auditing](#setting-up-auditing)
-- [The common structure](#common-structure)
-    - [The requester](#the-requester)
-    - [The principal](#the-principal)
-- [Following a flow: the correlation ID](#correlation-id)
-- [Authentication events](#authentication-events)
-    - [Authentication Request Received](#authn_request_received)
-    - [Authentication Request Accepted](#authn_request_accepted)
-    - [User Authenticated](#authn_user_authenticated)
-    - [Authorization Response](#authn_authorization_response)
-    - [Success Response](#authn_success_response)
-    - [UserInfo Delivered](#authn_userinfo_delivered)
-    - [Error Response](#authn_error_response)
-    - [Unrecoverable Error](#authn_unrecoverable_error)
-- [Operational events](#operational-events)
-    - [Credential Test Error](#authn_credential_test_error)
-    - [Credential Reload Success](#authn_credential_reload_success)
-    - [Credential Reload Error](#authn_credential_reload_error)
-    - [Trust mark alerts](#trust-mark-alerts)
-    - [Client Added](#client_added)
-    - [Client Removed](#client_removed)
-- [Changing what an event holds](#replacing-a-transformer)
+## Table of Contents
+
+1. [**Setting up auditing**](#setting-up-auditing)
+
+2. [**The common structure**](#common-structure)
+
+    2.1. [The requester](#the-requester)
+
+    2.2. [The principal](#the-principal)
+
+3. [**Following a flow: the correlation ID**](#correlation-id)
+
+4. [**Authentication events**](#authentication-events)
+
+    4.1. [Authentication Request Received](#authn_request_received)
+
+    4.2. [Authentication Request Accepted](#authn_request_accepted)
+
+    4.3. [User Authenticated](#authn_user_authenticated)
+
+    4.4. [Authorization Response](#authn_authorization_response)
+
+    4.5. [Success Response](#authn_success_response)
+
+    4.6. [UserInfo Delivered](#authn_userinfo_delivered)
+
+    4.7. [Error Response](#authn_error_response)
+
+    4.8. [Unrecoverable Error](#authn_unrecoverable_error)
+
+5. [**Operational events**](#operational-events)
+
+    5.1. [Credential Test Error](#authn_credential_test_error)
+
+    5.2. [Credential Reload Success](#authn_credential_reload_success)
+
+    5.3. [Credential Reload Error](#authn_credential_reload_error)
+
+    5.4. [Trust mark alerts](#trust-mark-alerts)
+
+    5.5. [Client Added](#client_added)
+
+    5.6. [Client Removed](#client_removed)
+
+6. [**Changing what an event holds**](#replacing-a-transformer)
 
 <a name="setting-up-auditing"></a>
-## Setting up auditing
+## 1. Setting up auditing
 
 The starters include spring-audit-support and its auto-configuration, so the server produces audit events without any
 code. Two things are left to the application:
@@ -78,7 +101,7 @@ under [Changing what an event holds](#replacing-a-transformer) are then register
 `AuditApplicationListener` by the application.
 
 <a name="common-structure"></a>
-## The common structure
+## 2. The common structure
 
 Every event has the common structure of spring-audit-support, see [The audit event][audit-event]: `type`,
 `timestamp`, `application`, `correlation_id`, `trace_id`, `principal` and `data`. The server does not assign a trace
@@ -90,7 +113,7 @@ the entry to the SAML or OpenID Connect messages. Its members depend on the prot
 are given per protocol.
 
 <a name="the-requester"></a>
-### The requester
+### 2.1. The requester
 
 **Audit data:** `requester`
 
@@ -114,7 +137,7 @@ The [Authentication Request Received](#authn_request_received) event is always w
 requester is never verified.
 
 <a name="the-principal"></a>
-### The principal
+### 2.2. The principal
 
 The principal of an authentication event is always the requester: the `id` above. When the request names no
 requester, such as a SAML request without an `Issuer` that could be read, the principal is `unknown`.
@@ -122,7 +145,7 @@ requester, such as a SAML request without an `Issuer` that could be read, the pr
 The operational events have spring-audit-support's system principal, `system`.
 
 <a name="correlation-id"></a>
-## Following a flow: the correlation ID
+## 3. Following a flow: the correlation ID
 
 All events of one authentication flow have the same `correlation_id`. The server generates it when an authentication
 request arrives, for both protocols. The ID of the SAML `AuthnRequest` is not used; it is found in the
@@ -155,7 +178,7 @@ cleared when the request ends, whatever the outcome. See [Correlation ID and Tra
 > flow without the module doing anything. spring-audit-support picks the ID up when the event is transformed.
 
 <a name="authentication-events"></a>
-## Authentication events
+## 4. Authentication events
 
 The events are given in the order they occur in a flow. A SAML flow produces
 [Authentication Request Received](#authn_request_received), [Authentication Request Accepted](#authn_request_accepted),
@@ -168,7 +191,7 @@ An error ends the flow with an [Error Response](#authn_error_response) or an
 [Unrecoverable Error](#authn_unrecoverable_error).
 
 <a name="authn_request_received"></a>
-### Authentication Request Received
+### 4.1. Authentication Request Received
 
 **Type:** `authn_request_received`
 
@@ -213,7 +236,7 @@ has not yet been read.
 Every member except `request_object` is absent when the request does not have it.
 
 <a name="authn_request_accepted"></a>
-### Authentication Request Accepted
+### 4.2. Authentication Request Accepted
 
 **Type:** `authn_request_accepted`
 
@@ -230,7 +253,7 @@ Any error from here on is answered to the requester.
   used, `query` or `form_post`.
 
 <a name="authn_user_authenticated"></a>
-### User Authenticated
+### 4.3. User Authenticated
 
 **Type:** `authn_user_authenticated`
 
@@ -269,7 +292,7 @@ A list of the attributes that the authentication module delivered, by their prot
 | `values` | The values of the attribute, as strings. | List of strings |
 
 <a name="authn_authorization_response"></a>
-### Authorization Response
+### 4.4. Authorization Response
 
 **Type:** `authn_authorization_response`
 
@@ -287,7 +310,7 @@ it is sent to the client. The code itself is not recorded.
 | `state` | The `state` of the request. Absent if there is none. | String |
 
 <a name="authn_success_response"></a>
-### Success Response
+### 4.5. Success Response
 
 **Type:** `authn_success_response`
 
@@ -335,7 +358,7 @@ the ID token. Each element has `name` and `values`, as the `attributes` of
 [User Authenticated](#authn_user_authenticated). The list is empty if nothing was released.
 
 <a name="authn_userinfo_delivered"></a>
-### UserInfo Delivered
+### 4.6. UserInfo Delivered
 
 **Type:** `authn_userinfo_delivered`
 
@@ -356,7 +379,7 @@ client.
 [Success Response](#authn_success_response).
 
 <a name="authn_error_response"></a>
-### Error Response
+### 4.7. Error Response
 
 **Type:** `authn_error_response`
 
@@ -407,7 +430,7 @@ cancels the authentication. The event is written just before the response is sen
 | `http_status` | The HTTP status of the response. | Integer |
 
 <a name="authn_unrecoverable_error"></a>
-### Unrecoverable Error
+### 4.8. Unrecoverable Error
 
 **Type:** `authn_unrecoverable_error`
 
@@ -430,12 +453,12 @@ for an error on the pages of an authentication module that do not belong to an a
 | `message` | A description of what went wrong. | String |
 
 <a name="operational-events"></a>
-## Operational events
+## 5. Operational events
 
 These events are not tied to an authentication flow. Their principal is the system principal, `system`.
 
 <a name="authn_credential_test_error"></a>
-### Credential Test Error
+### 5.1. Credential Test Error
 
 **Type:** `authn_credential_test_error`
 
@@ -452,7 +475,7 @@ These events are not tied to an authentication flow. Their principal is the syst
 | `error.exception_class` | The class of the exception from the test. Absent if there was none. | String |
 
 <a name="authn_credential_reload_success"></a>
-### Credential Reload Success
+### 5.2. Credential Reload Success
 
 **Type:** `authn_credential_reload_success`
 
@@ -466,7 +489,7 @@ These events are not tied to an authentication flow. Their principal is the syst
 | `credential_name` | The name of the credential. | String |
 
 <a name="authn_credential_reload_error"></a>
-### Credential Reload Error
+### 5.3. Credential Reload Error
 
 **Type:** `authn_credential_reload_error`
 
@@ -476,7 +499,7 @@ credentials-support's `FailedCredentialReloadEvent`.
 **Audit data:** as [Credential Test Error](#authn_credential_test_error), with the error of the reload.
 
 <a name="trust-mark-alerts"></a>
-### Trust mark alerts
+### 5.4. Trust mark alerts
 
 Two conditions of OpenID Federation are published as spring-audit-support's `SystemAlertEvent`, and audited as
 [System Alert][audit-system-alert] events:
@@ -491,7 +514,7 @@ The trust marks of the OpenID Provider are wired to publish the alerts. A
 context with `setEventPublisher(...)`.
 
 <a name="client_added"></a>
-### Client Added
+### 5.5. Client Added
 
 **Type:** `client_added`
 
@@ -511,7 +534,7 @@ restart, is described under [Clients added and removed](management.html#clients-
 | `client.source` | Where the client came from: the SAML metadata source, or the OpenID Connect backend, `properties`, `configuration`, `repository` or `federation`. | String |
 
 <a name="client_removed"></a>
-### Client Removed
+### 5.6. Client Removed
 
 **Type:** `client_removed`
 
@@ -531,7 +554,7 @@ The events are written once for the whole deployment when the nodes share their 
 not want them leaves them out with `audit.repository.exclude-events`.
 
 <a name="replacing-a-transformer"></a>
-## Changing what an event holds
+## 6. Changing what an event holds
 
 Each event type has a transformer, registered as a bean by the auto-configuration:
 
