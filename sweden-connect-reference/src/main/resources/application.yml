@@ -278,6 +278,10 @@ authn-server:
     #     - credential:
     #         bundle: oidc-sign
 
+    # The maximum age, counted from iat, of a signed request object, signature request or client assertion. Older
+    # ones are rejected. A deployment may change it.
+    max-jwt-age: 10m
+
     entity-information:
       ui-info:
         display-names:
