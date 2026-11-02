@@ -345,14 +345,19 @@ reports the outcome of its latest call and when it was made, its most recent fai
 (`error-response` or `unreachable`) and the error, and the number of failed calls since the latest successful one. A
 failure is therefore still shown after a later call has succeeded.
 
+The cached clients that the resolver no longer knows, and that the
+[job that fills the cache](client-registry.html#filling-the-cache) keeps until their cache entries expire, are listed
+under `retained-clients`, with when the resolver first answered that it does not know the client and when its entry
+expires. The list is left out when it is empty.
+
 | Status | When |
 | :--- | :--- |
-| `UP` | The latest call to every service succeeded, or no call has been made. |
-| `WARNING` | The latest call to a service failed. |
+| `UP` | The latest call to every service succeeded, or no call has been made, and no client is retained. |
+| `WARNING` | The latest call to a service failed, or a client is retained. |
 
 ```json
 "oidc-federation" : {
-  "status" : "UP",
+  "status" : "WARNING",
   "details" : {
     "services" : [ {
       "type" : "resolver",
@@ -365,6 +370,11 @@ failure is therefore still shown after a later call has succeeded.
         "kind" : "unreachable",
         "error" : "Failed to make resolve request to https://fed.swedenconnect.se/resolve - Connection refused"
       }
+    } ],
+    "retained-clients" : [ {
+      "id" : "https://rp.example.com",
+      "not-found-since" : "2026-10-01T10:00:12Z",
+      "kept-until" : "2026-10-01T22:00:00Z"
     } ]
   }
 }
@@ -372,8 +382,8 @@ failure is therefore still shown after a later call has succeeded.
 
 A resolver is identified by its endpoint, and a trust mark issuer, an entity whose entity configuration is fetched
 (type `entity-configuration`) and an entity that lists its subordinates (type `subordinate-listing`) by their entity
-identifiers. A listing call made without the entity identifier of the called entity is identified by its endpoint. When the federation cache
-is kept in Redis, so is this state, and every server instance reports the same.
+identifiers. A listing call made without the entity identifier of the called entity is identified by its endpoint.
+When the federation cache is kept in Redis, so is this state, and every server instance reports the same.
 
 The calls are recorded by the `HttpFederationClient` bean that the auto-configuration declares. An application that
 sets up the federation backend of the client registry builds it with that bean, see
@@ -428,8 +438,10 @@ A client is removed when:
 
 - a SAML metadata source that is downloaded or read again no longer holds a Service Provider that it had, unless
   another metadata source holds it, or
-- the OpenID Federation resolver reports a client that was known as not found, at a request, at a refresh of the
-  cache, or at an update through the [clients endpoint](#the-clients-endpoint).
+- the OpenID Federation resolver reports a client that was known as not found, at a request, at a run of the
+  [job that fills the cache](client-registry.html#filling-the-cache), or at an update through the
+  [clients endpoint](#the-clients-endpoint). By default, the job keeps such a client until its cache entry expires,
+  and it is reported as removed at the first answer that it is not found after that.
 
 A federation client whose cache entry expires and that is resolved again is neither added nor removed.
 

@@ -59,8 +59,10 @@ import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBacken
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientReader;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationClient;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.federation.InMemoryProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
@@ -241,6 +243,8 @@ public class OidcAutoConfiguration {
    *
    * @param properties the OIDC properties
    * @param cache where resolved clients are kept, declared according to the storage settings
+   * @param entityStore where the resolve results of the federation entities are kept, declared according to the
+   *     storage settings
    * @param federationClient the client making the calls
    * @param eventPublisher the event publisher
    * @return an {@link OidcFederationClientSource}
@@ -249,9 +253,10 @@ public class OidcAutoConfiguration {
   @ConditionalOnProperty(prefix = OidcConfigurationProperties.PREFIX + ".federation", name = "enabled",
       havingValue = "true")
   OidcFederationClientSource oidcFederationClientSource(final OidcConfigurationProperties properties,
-      final ObjectProvider<FederationCache> cache, final ObjectProvider<FederationClient> federationClient,
-      final ApplicationEventPublisher eventPublisher) {
+      final ObjectProvider<FederationCache> cache, final ObjectProvider<FederationEntityStore> entityStore,
+      final ObjectProvider<FederationClient> federationClient, final ApplicationEventPublisher eventPublisher) {
     return new OidcFederationClientSource(properties.getFederation(), cache.getIfUnique(InMemoryFederationCache::new),
+        entityStore.getIfUnique(InMemoryFederationEntityStore::new),
         federationClient.getIfUnique(HttpFederationClient::new), eventPublisher);
   }
 

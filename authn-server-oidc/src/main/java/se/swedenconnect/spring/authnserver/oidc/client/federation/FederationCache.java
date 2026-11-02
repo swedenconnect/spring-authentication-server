@@ -15,8 +15,6 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
-import java.time.Clock;
-import java.time.Duration;
 import java.util.Collection;
 
 import org.jspecify.annotations.NonNull;
@@ -31,9 +29,9 @@ import se.swedenconnect.spring.authnserver.job.JobLock;
  * {@link InMemoryFederationCache} and a {@link RedisFederationCache}.
  * </p>
  * <p>
- * The cache is also where the shared state of the background jobs that work on it is kept: the lookup counts that the
- * {@link FederationCacheRefresher} works from, and the lock that makes the jobs run on one node at a time. A cache
- * kept in the memory of one node keeps them there too.
+ * The cache also gives the lock that makes the background jobs that work on it, the
+ * {@link FederationClientCollector} and the {@link TrustMarkStatusChecker}, run on one node at a time. A cache kept in
+ * the memory of one node uses a lock that is always granted.
  * </p>
  * <p>
  * An entry that has expired is never handed out. An implementation may drop it when it is asked for, or leave that to
@@ -73,20 +71,6 @@ public interface FederationCache {
    * @param clientId the {@code client_id} of the client
    */
   void remove(final @NonNull String clientId);
-
-  /**
-   * Creates the object that counts how often each client is looked up. The default keeps the counts in memory, in an
-   * {@link InMemoryLookupTracker}.
-   *
-   * @param maximumTrackedClients the largest number of clients that are counted
-   * @param period the period that lookups are counted within
-   * @param clock the clock to use
-   * @return a {@link LookupTracker}
-   */
-  default @NonNull LookupTracker createLookupTracker(final int maximumTrackedClients, final @NonNull Duration period,
-      final @NonNull Clock clock) {
-    return new InMemoryLookupTracker(maximumTrackedClients, period, clock);
-  }
 
   /**
    * Gets the lock that the background jobs working on the cache use, so that a round runs on one node at a time. The

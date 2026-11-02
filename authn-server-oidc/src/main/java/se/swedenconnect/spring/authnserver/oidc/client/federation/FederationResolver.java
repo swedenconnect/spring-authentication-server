@@ -40,4 +40,21 @@ public interface FederationResolver {
    */
   @Nullable ResolvedClient resolve(final @NonNull String clientId) throws ClientRegistryException;
 
+  /**
+   * Resolves any entity of the federation, asking for both its relying party and its federation entity metadata, so
+   * that the {@link FederationClientCollector} learns whether it is a client and whether it lists subordinates.
+   * <p>
+   * The default resolves the entity as a client, so the entity is never found to list subordinates.
+   * </p>
+   *
+   * @param entityId the entity identifier
+   * @return a {@link ResolvedEntity}, or {@code null} if the federation does not know the entity, or the entity is of
+   *     none of the asked for entity types
+   * @throws ClientRegistryException if the resolution fails
+   */
+  default @Nullable ResolvedEntity resolveEntity(final @NonNull String entityId) throws ClientRegistryException {
+    final ResolvedClient client = this.resolve(entityId);
+    return client != null ? ResolvedEntity.of(client) : null;
+  }
+
 }

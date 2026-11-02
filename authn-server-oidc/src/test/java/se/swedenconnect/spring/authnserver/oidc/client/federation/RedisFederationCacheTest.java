@@ -40,8 +40,8 @@ import se.swedenconnect.spring.authnserver.oidc.RedisTestNodes;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 
 /**
- * Tests for {@link RedisFederationCache}, {@link RedisLookupTracker} and the background jobs working on a shared cache,
- * against a Redis container. Two caches with connections of their own play two nodes.
+ * Tests for {@link RedisFederationCache} and the background jobs working on a shared cache, against a Redis container.
+ * Two caches with connections of their own play two nodes.
  *
  * @author Martin Lindström
  */
@@ -151,106 +151,92 @@ class RedisFederationCacheTest extends FederationTestSupport {
   }
 
   @Test
-  void lookupCountsAddUpAcrossNodes() {
-    final LookupTracker a = this.cacheA.createLookupTracker(100, Duration.ofMinutes(10), this.clock);
-    final LookupTracker b = this.cacheB.createLookupTracker(100, Duration.ofMinutes(10), this.clock);
-    a.record("frequent");
-    b.record("frequent");
-    a.record("frequent");
-    b.record("second");
-    a.record("second");
-    b.record("rare");
+  void theEntityStoreIsSharedByTheNodes() {
+    final RedisFederationEntityStore storeA = new RedisFederationEntityStore(this.template, "test", this.clock);
+    final RedisFederationEntityStore storeB =
+        new RedisFederationEntityStore(new StringRedisTemplate(nodeB), "test", this.clock);
+    final OIDCClientMetadata metadata = clientMetadata("The Client");
+    final ResolvedEntity entity = new ResolvedEntity(CLIENT_ID, metadata, "https://client.example.com/list",
+        Set.of(MARK_ONE), this.clock.instant().plus(Duration.ofHours(1)));
+    storeA.put(FederationEntityRecord.found(entity, this.clock.instant(), VALIDITY));
+    storeA.put(FederationEntityRecord.notFound("https://unknown.example.com", this.clock.instant(),
+        Duration.ofMinutes(1)));
+    storeA.put(FederationEntityRecord.found(new ResolvedEntity("https://op.example.com", null, null, Set.of(),
+        this.clock.instant().plus(VALIDITY)), this.clock.instant(), null));
 
-    assertThat(a.getFrequentClients(2, 10)).containsExactly("frequent", "second");
-    assertThat(b.getFrequentClients(3, 10)).containsExactly("frequent");
-    assertThat(b.getFrequentClients(1, 1)).containsExactly("frequent");
-    assertThat(this.template.getExpire("test:oidc:federation-lookups:frequent")).isBetween(595L, 600L);
-    assertThat(this.template.getExpire("test:oidc:federation-lookups")).isBetween(595L, 600L);
+    final FederationEntityRecord read = storeB.get(CLIENT_ID);
+    assertThat(read).isNotNull();
+    assertThat(read.expiresAt()).isEqualTo(this.clock.instant().plus(VALIDITY));
+    assertThat(read.listEndpoint()).isEqualTo("https://client.example.com/list");
+    assertThat(read.entity().expiresAt()).isEqualTo(entity.expiresAt());
+    assertThat(read.entity().trustMarkTypes()).containsExactly(MARK_ONE);
+    assertThat(read.toClient().metadata().toJSONObject()).isEqualTo(metadata.toJSONObject());
+    assertThat(read.toClient().expiresAt()).isEqualTo(read.expiresAt());
+    assertThat(storeB.get("https://unknown.example.com")).isNotNull()
+        .satisfies(r -> assertThat(r.isFound()).isFalse());
+    assertThat(storeB.get("https://op.example.com")).isNotNull()
+        .satisfies(r -> assertThat(r.isFound()).isTrue())
+        .satisfies(r -> assertThat(r.toClient()).isNull());
+    assertThat(storeB.get("https://never.example.com")).isNull();
+    assertThat(this.template.getExpire("test:oidc:federation-entity:" + CLIENT_ID)).isBetween(595L, 600L);
+
+    this.clock.advance(Duration.ofMinutes(2));
+    assertThat(storeB.get("https://unknown.example.com")).isNull();
+    assertThat(storeB.get(CLIENT_ID)).isNotNull();
+
+    this.template.opsForValue().set("test:oidc:federation-entity:bad", "{\"entityId\":\"bad\",\"found\":true,"
+        + "\"clientMetadata\":\"{x\",\"expiresAt\":\"" + this.clock.instant().plusSeconds(60) + "\"}");
+    assertThat(storeB.get("bad")).isNull();
   }
 
   @Test
-  void lookupCountsStartOverWhenThePeriodHasPassed() throws Exception {
-    final LookupTracker tracker = this.cacheA.createLookupTracker(100, Duration.ofMillis(300), this.clock);
-    tracker.record("client");
-    tracker.record("client");
-    assertThat(tracker.getFrequentClients(2, 10)).containsExactly("client");
-    Thread.sleep(400);
-    tracker.record("client");
-    assertThat(tracker.getFrequentClients(2, 10)).isEmpty();
+  void theRetainedClientsAreSharedByTheNodes() {
+    final RedisFederationEntityStore storeA = new RedisFederationEntityStore(this.template, "test", this.clock);
+    final RedisFederationEntityStore storeB =
+        new RedisFederationEntityStore(new StringRedisTemplate(nodeB), "test", this.clock);
+    final RetainedClient one = new RetainedClient("one", this.clock.instant(), this.clock.instant().plus(VALIDITY));
+    final RetainedClient two =
+        new RetainedClient("two", this.clock.instant(), this.clock.instant().plus(Duration.ofHours(1)));
+
+    storeA.putRetainedClient(one);
+    storeA.putRetainedClient(two);
+    assertThat(storeB.getRetainedClients()).containsExactlyInAnyOrder(one, two);
+    assertThat(this.template.getExpire("test:oidc:federation-retained"))
+        .isGreaterThan(Duration.ofDays(RedisFederationEntityStore.RETENTION_DAYS).toSeconds());
+
+    storeB.removeRetainedClient("one");
+    assertThat(storeA.getRetainedClients()).containsExactly(two);
   }
 
   @Test
-  void theClientNotAskedForInTheLongestTimeIsDroppedFirst() {
-    final LookupTracker tracker = this.cacheA.createLookupTracker(2, Duration.ofMinutes(10), this.clock);
-    tracker.record("one");
-    this.clock.advance(Duration.ofSeconds(1));
-    tracker.record("two");
-    this.clock.advance(Duration.ofSeconds(1));
-    tracker.record("one");
-    this.clock.advance(Duration.ofSeconds(1));
-    tracker.record("three");
-
-    assertThat(tracker.getFrequentClients(1, 10)).containsExactlyInAnyOrder("one", "three");
-  }
-
-  @Test
-  void theLookupTrackerChecksItsArguments() {
-    assertThatThrownBy(() -> this.cacheA.createLookupTracker(0, Duration.ofMinutes(1), this.clock))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> this.cacheA.createLookupTracker(1, Duration.ZERO, this.clock))
-        .isInstanceOf(IllegalArgumentException.class);
-  }
-
-  @Test
-  void theBackendCountsLookupsInRedis() throws Exception {
+  void aCollectorRunTakesPlaceOnOneNode() {
     final FederationClientBackendTest.StubResolver resolver = new FederationClientBackendTest.StubResolver();
     resolver.answerFor = clientId -> new ResolvedClient(clientId, clientMetadata("The Client"), Set.of(),
         this.clock.instant().plus(VALIDITY));
-    final FederationCacheSettings settings = FederationCacheSettings.defaults();
-    final FederationClientBackend backendA = new FederationClientBackend(resolver, (id, mark) -> null,
-        this.cacheA, settings, this.clock);
-    final FederationClientBackend backendB = new FederationClientBackend(resolver, (id, mark) -> null,
-        this.cacheB, settings, this.clock);
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(key("ta"))),
+        new FederationSettings.Resolver(TRUST_ANCHOR, null, null));
+    final StubFederationClient client = new StubFederationClient();
+    final FederationClientCollector collectorA = new FederationClientCollector(
+        new FederationClientBackend(resolver, (id, mark) -> null, this.cacheA, FederationCacheSettings.defaults(),
+            this.clock),
+        new RedisFederationEntityStore(this.template, "test", this.clock), client, settings,
+        FederationCollectorSettings.defaults());
+    final FederationClientCollector collectorB = new FederationClientCollector(
+        new FederationClientBackend(resolver, (id, mark) -> null, this.cacheB, FederationCacheSettings.defaults(),
+            this.clock),
+        new RedisFederationEntityStore(new StringRedisTemplate(nodeB), "test", this.clock), client, settings,
+        FederationCollectorSettings.defaults());
 
-    final RequesterRecord record = backendA.lookup(CLIENT_ID);
-    assertThat(record).isNotNull();
-    assertThat(backendB.lookup(CLIENT_ID)).isNotNull();
-    assertThat(resolver.calls).isEqualTo(1);
-    assertThat(backendA.getLookupTracker()).isInstanceOf(RedisLookupTracker.class);
-    assertThat(backendB.getLookupTracker().getFrequentClients(2, 10)).containsExactly(CLIENT_ID);
-  }
-
-  @Test
-  void aRefreshRoundRunsOnOneNode() {
-    final FederationCacheSettings settings = new FederationCacheSettings(null,
-        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE, new FederationCacheSettings.RefreshSettings(true,
-            Duration.ofMinutes(1), Duration.ofMinutes(5), 2, Duration.ofMinutes(10), 10, 100));
-    final FederationClientBackendTest.StubResolver resolver = new FederationClientBackendTest.StubResolver();
-    resolver.answerFor = clientId -> new ResolvedClient(clientId, clientMetadata("The Client"), Set.of(),
-        this.clock.instant().plus(VALIDITY));
-    final LookupTracker trackerA = this.cacheA.createLookupTracker(100, Duration.ofMinutes(10), this.clock);
-    final LookupTracker trackerB = this.cacheB.createLookupTracker(100, Duration.ofMinutes(10), this.clock);
-    final FederationCacheRefresher refresherA =
-        new FederationCacheRefresher(this.cacheA, resolver, trackerA, settings, this.clock);
-    final FederationCacheRefresher refresherB =
-        new FederationCacheRefresher(this.cacheB, resolver, trackerB, settings, this.clock);
-
-    this.cacheA.put(this.found("client", VALIDITY));
-    trackerA.record("client");
-    trackerB.record("client");
-    this.clock.advance(Duration.ofMinutes(6));
-
-    final int refreshed = refresherA.refresh() + refresherB.refresh();
-    assertThat(refreshed).isEqualTo(1);
-    assertThat(resolver.calls).isEqualTo(1);
-    assertThat(this.cacheB.get("client").expiresAt()).isEqualTo(this.clock.instant().plus(VALIDITY));
+    assertThat(collectorA.collect()).isNotNull();
+    assertThat(collectorB.collect()).isNull();
+    assertThat(resolver.asked).containsExactly(TRUST_ANCHOR);
+    assertThat(this.cacheB.get(TRUST_ANCHOR)).isNotNull();
 
     // Releasing the lock, as when the round has passed, lets the next round run
-    this.template.delete("test:lock:" + FederationCacheRefresher.JOB_NAME);
-    this.clock.advance(Duration.ofMinutes(6));
-    trackerB.record("client");
-    trackerA.record("client");
-    assertThat(refresherB.refresh() + refresherA.refresh()).isEqualTo(1);
+    this.template.delete("test:lock:" + FederationClientCollector.JOB_NAME);
+    assertThat(collectorB.collect()).isNotNull();
+    assertThat(collectorA.collect()).isNull();
   }
 
   @Test

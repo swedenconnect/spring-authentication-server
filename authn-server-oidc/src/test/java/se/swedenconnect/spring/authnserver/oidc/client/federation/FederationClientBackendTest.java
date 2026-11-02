@@ -73,7 +73,7 @@ class FederationClientBackendTest extends FederationTestSupport {
   @Test
   void theMaximumAgeCutsAnEntryShort() {
     final Fixture fixture = new Fixture(new FederationCacheSettings(Duration.ofMinutes(5),
-        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE, FederationCacheSettings.RefreshSettings.disabled()));
+        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE));
     fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
 
     fixture.backend.lookup(CLIENT_ID);
@@ -90,7 +90,7 @@ class FederationClientBackendTest extends FederationTestSupport {
   @Test
   void theMaximumAgeIsNotUsedWhenTheResponseExpiresFirst() {
     final Fixture fixture = new Fixture(new FederationCacheSettings(Duration.ofHours(2),
-        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE, FederationCacheSettings.RefreshSettings.disabled()));
+        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE));
     final Instant expiresAt = fixture.clock.instant().plus(Duration.ofMinutes(10));
     fixture.resolver.answer = new ResolvedClient(CLIENT_ID, clientMetadata("The Client"), Set.of(), expiresAt);
 
@@ -101,8 +101,7 @@ class FederationClientBackendTest extends FederationTestSupport {
 
   @Test
   void anUnknownClientIsCachedForTheConfiguredTime() {
-    final Fixture fixture = new Fixture(new FederationCacheSettings(null, Duration.ofSeconds(30),
-        FederationCacheSettings.RefreshSettings.disabled()));
+    final Fixture fixture = new Fixture(new FederationCacheSettings(null, Duration.ofSeconds(30)));
 
     assertThat(fixture.backend.lookup(CLIENT_ID)).isNull();
     assertThat(fixture.backend.lookup(CLIENT_ID)).isNull();
@@ -210,18 +209,13 @@ class FederationClientBackendTest extends FederationTestSupport {
   }
 
   @Test
-  void theBackendCountsLookupsAndCanBeNamed() {
+  void theBackendCanBeNamed() {
     final Fixture fixture = new Fixture(FederationCacheSettings.defaults());
     fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
 
     assertThat(fixture.backend.getName()).isEqualTo(FederationClientBackend.DEFAULT_NAME);
     fixture.backend.setName("my-federation");
     assertThat(fixture.backend.getName()).isEqualTo("my-federation");
-
-    fixture.backend.lookup(CLIENT_ID);
-    fixture.backend.lookup(CLIENT_ID);
-
-    assertThat(fixture.backend.getLookupTracker().getFrequentClients(2, 10)).containsExactly(CLIENT_ID);
   }
 
   /**

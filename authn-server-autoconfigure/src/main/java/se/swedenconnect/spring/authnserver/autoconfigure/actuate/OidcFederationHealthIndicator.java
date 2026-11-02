@@ -16,6 +16,7 @@
 package se.swedenconnect.spring.authnserver.autoconfigure.actuate;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,12 +24,16 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.health.contributor.AbstractHealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCollectorSettings;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceState;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.RetainedClient;
 
 /**
  * Health of the federation services that the OpenID Provider calls: the resolver, every trust mark issuer, every
@@ -40,6 +45,11 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServ
  * a failure is not hidden by a later success. A service whose latest call failed gives
  * {@link AuthnServerHealthStatus#WARNING}.
  * </p>
+ * <p>
+ * The cached clients that the resolver no longer knows, and that are kept until their cache entries expire, are shown
+ * too, see {@link FederationCollectorSettings#keepUntilExpiry()}. Such a client also gives
+ * {@link AuthnServerHealthStatus#WARNING}.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -48,14 +58,29 @@ public class OidcFederationHealthIndicator extends AbstractHealthIndicator {
   /** The monitor of the federation services. */
   private final FederationServiceMonitor monitor;
 
+  /** Where the retained clients are kept, or {@code null}. */
+  private final FederationEntityStore entityStore;
+
   /**
    * Constructor.
    *
    * @param monitor the monitor of the federation services
    */
   public OidcFederationHealthIndicator(final @NonNull FederationServiceMonitor monitor) {
+    this(monitor, null);
+  }
+
+  /**
+   * Constructor.
+   *
+   * @param monitor the monitor of the federation services
+   * @param entityStore where the retained clients are kept, or {@code null} to not show them
+   */
+  public OidcFederationHealthIndicator(final @NonNull FederationServiceMonitor monitor,
+      final @Nullable FederationEntityStore entityStore) {
     super("Federation health check failed");
     this.monitor = Objects.requireNonNull(monitor, "monitor must not be null");
+    this.entityStore = entityStore;
   }
 
   /** {@inheritDoc} */
@@ -85,6 +110,22 @@ public class OidcFederationHealthIndicator extends AbstractHealthIndicator {
       services.add(s);
     }
     builder.withDetail("services", services);
+    if (this.entityStore != null) {
+      final List<Map<String, Object>> retained = new ArrayList<>();
+      this.entityStore.getRetainedClients().stream()
+          .sorted(Comparator.comparing(RetainedClient::clientId))
+          .forEach(c -> {
+            final Map<String, Object> r = new LinkedHashMap<>();
+            r.put("id", c.clientId());
+            r.put("not-found-since", c.since().toString());
+            r.put("kept-until", c.expiresAt().toString());
+            retained.add(r);
+          });
+      if (!retained.isEmpty()) {
+        builder.withDetail("retained-clients", retained);
+        warning = true;
+      }
+    }
     builder.status(warning ? AuthnServerHealthStatus.WARNING : Status.UP);
   }
 

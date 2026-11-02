@@ -15,6 +15,7 @@
  */
 /**
  * Resolving OpenID Connect clients through OpenID Federation: the calls to the resolver service and to trust mark
- * issuers, the cache of resolved clients and the background job that keeps frequently used clients fresh.
+ * issuers, the cache of resolved clients and the background job that fills the cache with the clients of the
+ * federation.
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;

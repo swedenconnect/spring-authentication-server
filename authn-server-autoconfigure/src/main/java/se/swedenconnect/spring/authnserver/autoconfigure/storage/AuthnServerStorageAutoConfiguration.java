@@ -49,10 +49,13 @@ import org.springframework.util.ClassUtils;
 
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.RedisFederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.ProviderTrustMarkStore;
 import se.swedenconnect.spring.authnserver.oidc.federation.RedisProviderTrustMarkStore;
@@ -288,6 +291,18 @@ public class AuthnServerStorageAutoConfiguration {
     }
 
     /**
+     * Creates the store of the resolve results of the federation entities in memory. It follows the federation cache.
+     *
+     * @return an {@link InMemoryFederationEntityStore}
+     */
+    @Bean
+    @ConditionalOnMissingBean(FederationEntityStore.class)
+    @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.MEMORY)
+    FederationEntityStore authnServerFederationEntityStore() {
+      return new InMemoryFederationEntityStore();
+    }
+
+    /**
      * The OIDC stores in Redis.
      */
     @Configuration(proxyBeanMethods = false)
@@ -357,6 +372,19 @@ public class AuthnServerStorageAutoConfiguration {
       @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.REDIS)
       FederationServiceStateStore authnServerFederationServiceStateStore(final RedisStorage storage) {
         return new RedisFederationServiceStateStore(storage.getRedisTemplate(), storage.getKeyPrefix());
+      }
+
+      /**
+       * Creates the store of the resolve results of the federation entities. It follows the federation cache.
+       *
+       * @param storage the Redis storage
+       * @return a {@link RedisFederationEntityStore}
+       */
+      @Bean
+      @ConditionalOnMissingBean(FederationEntityStore.class)
+      @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.REDIS)
+      FederationEntityStore authnServerFederationEntityStore(final RedisStorage storage) {
+        return new RedisFederationEntityStore(storage.getRedisTemplate(), storage.getKeyPrefix());
       }
 
       /**

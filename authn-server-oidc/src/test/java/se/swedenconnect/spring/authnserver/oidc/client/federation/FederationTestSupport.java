@@ -271,6 +271,12 @@ abstract class FederationTestSupport {
     /** The entity identifiers whose entity configurations were asked for, in order. */
     final List<String> entityConfigurationRequests = new ArrayList<>();
 
+    /** The subordinates that each entity lists, by entity identifier. A listing of another entity fails. */
+    final Map<String, List<String>> listings = new HashMap<>();
+
+    /** The listing requests made, in order. */
+    final List<FederationRequest<SubordinateListingRequest>> listingRequests = new ArrayList<>();
+
     /** The endpoint of the last resolve request. */
     Object lastResolveEndpoint;
 
@@ -312,7 +318,13 @@ abstract class FederationTestSupport {
 
     @Override
     public List<String> subordinateListing(final FederationRequest<SubordinateListingRequest> request) {
-      throw new UnsupportedOperationException();
+      this.listingRequests.add(request);
+      final Object entityId = request.federationEntityMetadata().get(HttpFederationClient.LISTING_ENTITY_ID);
+      final List<String> subordinates = this.listings.get(entityId);
+      if (subordinates == null) {
+        throw new ClientRegistryException("The listing of %s failed".formatted(entityId));
+      }
+      return subordinates;
     }
 
     @Override

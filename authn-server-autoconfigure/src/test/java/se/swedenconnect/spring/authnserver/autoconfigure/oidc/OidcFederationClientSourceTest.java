@@ -22,12 +22,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -71,6 +74,8 @@ import se.swedenconnect.spring.authnserver.oidc.client.RepositoryClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCallEvent;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientCollector;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCollectorSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceState;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
@@ -152,7 +157,18 @@ class OidcFederationClientSourceTest {
     this.server.stop(0);
   }
 
+  /**
+   * Gets the context runner with the job that fills the cache turned off, so that it never makes calls that a test
+   * does not expect.
+   *
+   * @return the runner
+   * @throws IOException if the trust anchor keys cannot be written
+   */
   private WebApplicationContextRunner runner() throws IOException {
+    return this.baseRunner().withPropertyValues("authn-server.oidc.federation.clients.collector.enabled=false");
+  }
+
+  private WebApplicationContextRunner baseRunner() throws IOException {
     return new WebApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(SpringCredentialBundlesAutoConfiguration.class,
             ConvertersAutoConfiguration.class, AuthnServerStorageAutoConfiguration.class, OidcAutoConfiguration.class,
@@ -397,15 +413,129 @@ class OidcFederationClientSourceTest {
 
     properties.setMaximumAge(Duration.ofHours(12));
     properties.setNotFoundTimeToLive(Duration.ofMinutes(2));
-    properties.getRefresh().setEnabled(true);
-    properties.getRefresh().setMinimumLookups(3);
     final FederationCacheSettings settings = OidcFederationClientSource.createCacheSettings(properties);
     assertThat(settings.maximumAge()).isEqualTo(Duration.ofHours(12));
     assertThat(settings.notFoundTimeToLive()).isEqualTo(Duration.ofMinutes(2));
-    assertThat(settings.refresh().enabled()).isTrue();
-    assertThat(settings.refresh().minimumLookups()).isEqualTo(3);
-    assertThat(settings.refresh().interval())
-        .isEqualTo(FederationCacheSettings.RefreshSettings.DEFAULT_INTERVAL);
+  }
+
+  @Test
+  void theCollectorSettingsFollowThePropertiesWithTheDefaultsOfTheLibrary() {
+    final OidcConfigurationProperties.FederationCollectorProperties properties =
+        new OidcConfigurationProperties.FederationCollectorProperties();
+    assertThat(OidcFederationClientSource.createCollectorSettings(properties))
+        .isEqualTo(FederationCollectorSettings.defaults());
+
+    properties.setEnabled(false);
+    properties.setInterval(Duration.ofMinutes(10));
+    properties.setIntermediates(List.of(" https://im.example.com "));
+    properties.setKeepUntilExpiry(false);
+    assertThat(OidcFederationClientSource.createCollectorSettings(properties)).isEqualTo(
+        new FederationCollectorSettings(false, Duration.ofMinutes(10), List.of("https://im.example.com"), false));
+  }
+
+  @Test
+  void theRemovedRefreshSettingsAreGone() throws Exception {
+    assertThat(new BeanWrapperImpl(new OidcConfigurationProperties.FederationCacheProperties())
+        .isReadableProperty("refresh")).isFalse();
+    assertThat(Arrays.stream(OidcConfigurationProperties.class.getClasses()).map(Class::getSimpleName))
+        .doesNotContain("FederationCacheRefreshProperties");
+    for (final String removed : List.of("FederationCacheRefresher", "LookupTracker", "InMemoryLookupTracker",
+        "RedisLookupTracker")) {
+      assertThatThrownBy(() -> Class.forName(FederationClientBackend.class.getPackageName() + "." + removed))
+          .isInstanceOf(ClassNotFoundException.class);
+    }
+    assertThat(Arrays.stream(FederationCacheSettings.class.getRecordComponents()).map(c -> c.getName()))
+        .containsExactly("maximumAge", "notFoundTimeToLive");
+  }
+
+  @Test
+  void theCollectorRunsByDefault() throws Exception {
+    this.baseRunner().run(context -> {
+      assertThat(context).hasNotFailed();
+      final FederationClientCollector collector =
+          context.getBean(OidcFederationClientSource.class).getCollector();
+      assertThat(collector).isNotNull();
+      assertThat(collector.isStarted()).isTrue();
+    });
+  }
+
+  @Test
+  void theCollectorCanBeTurnedOff() throws Exception {
+    this.runner().run(context -> {
+      assertThat(context).hasNotFailed();
+      assertThat(context.getBean(OidcFederationClientSource.class).getCollector().isStarted()).isFalse();
+    });
+  }
+
+  @Test
+  void thereIsNoCollectorWithoutTheFederationClientSource() throws Exception {
+    this.baseRunner()
+        .withPropertyValues("authn-server.oidc.federation.clients.enabled=false",
+            "authn-server.oidc.clients[0].client-id=https://configured.example.com",
+            "authn-server.oidc.clients[0].metadata={}")
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context.getBean(OidcFederationClientSource.class).getCollector()).isNull();
+        });
+    this.baseRunner()
+        .withPropertyValues("authn-server.oidc.federation.trust-anchor.entity-id=")
+        .withUserConfiguration(CodeFederationConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context.getBean(OidcFederationClientSource.class).getCollector()).isNull();
+        });
+  }
+
+  @Test
+  void theCollectorCachesTheClientsOfTheFederationSoThatARequestIsNotResolved() throws Exception {
+    final String intermediate = this.base + "/im";
+    final String rpOne = "https://rp1.example.com";
+    final String rpTwo = "https://rp2.example.com";
+    final Map<String, Map<String, Object>> entities = Map.of(
+        this.trustAnchor, Map.of("federation_entity", Map.of("federation_list_endpoint", this.trustAnchor + "/list")),
+        intermediate, Map.of("federation_entity", Map.of("federation_list_endpoint", intermediate + "/list")),
+        rpOne, Map.of("openid_relying_party", Map.of("client_name", "RP one",
+            "redirect_uris", List.of("https://rp1.example.com/cb"))),
+        rpTwo, Map.of("openid_relying_party", Map.of("client_name", "RP two",
+            "redirect_uris", List.of("https://rp2.example.com/cb"))));
+    this.answers.put("/ta/resolve", query -> {
+      final String subject = URLDecoder.decode(query.replaceAll(".*(^|&)sub=([^&]*).*", "$2"), StandardCharsets.UTF_8);
+      final Map<String, Object> metadata = entities.get(subject);
+      return metadata == null ? new Answer(404, "{\"error\":\"not_found\"}")
+          : Answer.ok(this.resolveResponse(this.trustAnchorKey, this.trustAnchor, subject, metadata));
+    });
+    this.answers.put("/ta/list", query -> Answer.ok("[\"" + intermediate + "\"]"));
+    this.answers.put("/im/list", query -> Answer.ok("[\"" + rpOne + "\",\"" + rpTwo + "\"]"));
+
+    this.baseRunner().run(context -> {
+      assertThat(context).hasNotFailed();
+      final ConfiguredAuthnServer server = context.getBean(ConfiguredAuthnServer.class);
+      final FederationClientCollector collector =
+          context.getBean(OidcFederationClientSource.class).getCollector();
+
+      final FederationClientCollector.RunResult result = collector.collect();
+      assertThat(result).isNotNull();
+      assertThat(result.complete()).isTrue();
+      assertThat(result.entities()).isEqualTo(4);
+      assertThat(result.clients()).isEqualTo(2);
+      assertThat(this.paths).contains("/ta/list", "/im/list");
+      assertThat(server.getClientRegistryBackends(FederationClientBackend.class).getFirst().getClients())
+          .extracting(c -> c.requester().identifier())
+          .containsExactlyInAnyOrder(rpOne, rpTwo);
+
+      // The client is served from the cache, without a resolve request
+      this.paths.clear();
+      final RequesterRecord record = server.getClientRegistry().lookup(AuthenticationProtocol.OIDC, rpOne);
+      assertThat(record).isNotNull();
+      assertThat(record.getDisplayName("en")).isEqualTo("RP one");
+      assertThat(this.paths).isEmpty();
+
+      // The listing calls are reported under the entities that were asked
+      assertThat(context.getBean(FederationServiceMonitor.class).getStates())
+          .filteredOn(s -> s.type() == FederationCallEvent.ServiceType.SUBORDINATE_LISTING)
+          .extracting(FederationServiceState::id)
+          .containsExactlyInAnyOrder(this.trustAnchor, intermediate);
+    });
   }
 
   @Test
@@ -525,6 +655,17 @@ class OidcFederationClientSourceTest {
             .expirationTime(Date.from(Instant.now().plus(Duration.ofHours(1))))
             .claim("metadata", Map.of("federation_entity", federationEntity))
             .build())));
+  }
+
+  private String resolveResponse(final ECKey key, final String issuer, final String subject,
+      final Map<String, Object> metadata) {
+    return sign(key, "resolve-response+jwt", new JWTClaimsSet.Builder()
+        .issuer(issuer)
+        .subject(subject)
+        .issueTime(new Date())
+        .expirationTime(Date.from(Instant.now().plus(Duration.ofHours(1))))
+        .claim("metadata", metadata)
+        .build());
   }
 
   private String resolveResponse(final ECKey key, final String issuer, final String name) {

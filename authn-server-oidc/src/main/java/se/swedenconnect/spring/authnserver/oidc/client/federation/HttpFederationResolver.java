@@ -17,6 +17,7 @@ package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,10 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * The resolve response is a signed JWT. It is verified with the trust anchor's keys when the resolver runs at the
  * trust anchor, and with the resolver's own keys otherwise. When no resolve endpoint is configured, the
  * {@code federation_resolve_endpoint} that the resolver publishes in its entity configuration is used.
+ * </p>
+ * <p>
+ * A client is resolved asking for its relying party metadata only. An entity of the federation, see
+ * {@link #resolveEntity(String)}, is resolved asking for both its relying party and its federation entity metadata.
  * </p>
  *
  * @author Martin Lindström
@@ -106,22 +111,11 @@ public class HttpFederationResolver implements FederationResolver {
   public @Nullable ResolvedClient resolve(final @NonNull String clientId) throws ClientRegistryException {
     Objects.requireNonNull(clientId, "clientId must not be null");
 
-    final ResolveRequest request = new ResolveRequest(clientId, this.settings.trustAnchor().entityId(),
-        List.of(EntityType.OPENID_RELYING_PARTY.getValue()), Boolean.FALSE);
-    final URI endpoint = this.settings.resolver().endpoint() != null
-        ? this.settings.resolver().endpoint()
-        : this.endpoints.getEndpoint(this.settings.resolver().entityId(), this.settings.getResolverKeys(),
-            HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT);
-    final SignedJWT response = this.federationClient.resolve(new FederationRequest<>(request,
-        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, endpoint.toString())));
-
-    if (response == null) {
+    final JWTClaimsSet claims = this.resolveClaims(clientId, List.of(EntityType.OPENID_RELYING_PARTY.getValue()));
+    if (claims == null) {
       log.debug("The resolver does not know the client '{}'", clientId);
       return null;
     }
-    final JWTClaimsSet claims = FederationJwtVerifier.verify(response, RESOLVE_RESPONSE_TYPE,
-        this.settings.getResolverKeys(), this.settings.resolver().entityId(), clientId, Set.of("exp", "metadata"));
-
     final OIDCClientMetadata metadata = clientMetadata(claims, clientId);
     if (metadata == null) {
       return null;
@@ -129,6 +123,87 @@ public class HttpFederationResolver implements FederationResolver {
     final Instant expiresAt = claims.getExpirationTime().toInstant();
     log.debug("Resolved the client '{}', valid until {}", clientId, expiresAt);
     return new ResolvedClient(clientId, metadata, trustMarkTypes(claims), expiresAt);
+  }
+
+  /**
+   * Resolves an entity asking for its relying party and its federation entity metadata. The
+   * {@code federation_list_endpoint} is read from the federation entity metadata.
+   */
+  @Override
+  public @Nullable ResolvedEntity resolveEntity(final @NonNull String entityId) throws ClientRegistryException {
+    Objects.requireNonNull(entityId, "entityId must not be null");
+
+    final JWTClaimsSet claims = this.resolveClaims(entityId,
+        List.of(EntityType.OPENID_RELYING_PARTY.getValue(), EntityType.FEDERATION_ENTITY.getValue()));
+    if (claims == null) {
+      log.debug("The resolver does not know the entity '{}'", entityId);
+      return null;
+    }
+    final Map<String, Object> federationEntity = federationEntityMetadata(claims, entityId);
+    final OIDCClientMetadata metadata = clientMetadata(claims, entityId);
+    if (metadata == null && federationEntity == null) {
+      log.debug("The resolved entity '{}' has none of the asked for entity types", entityId);
+      return null;
+    }
+    final String listEndpoint = federationEntity != null
+        && federationEntity.get(HttpFederationClient.FEDERATION_LIST_ENDPOINT) instanceof final String value
+        && !value.isBlank()
+        ? value
+        : null;
+    final Instant expiresAt = claims.getExpirationTime().toInstant();
+    log.debug("Resolved the entity '{}', valid until {}", entityId, expiresAt);
+    return new ResolvedEntity(entityId, metadata, listEndpoint, trustMarkTypes(claims), expiresAt);
+  }
+
+  /**
+   * Makes a resolve request and verifies the response.
+   *
+   * @param entityId the entity identifier of the subject
+   * @param entityTypes the entity types to ask for
+   * @return the claims of the verified response, or {@code null} if the resolver does not know the entity
+   * @throws ClientRegistryException if the resolution fails or the response does not verify
+   */
+  private @Nullable JWTClaimsSet resolveClaims(final @NonNull String entityId, final @NonNull List<String> entityTypes)
+      throws ClientRegistryException {
+    final ResolveRequest request =
+        new ResolveRequest(entityId, this.settings.trustAnchor().entityId(), entityTypes, Boolean.FALSE);
+    final URI endpoint = this.settings.resolver().endpoint() != null
+        ? this.settings.resolver().endpoint()
+        : this.endpoints.getEndpoint(this.settings.resolver().entityId(), this.settings.getResolverKeys(),
+            HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT);
+    final SignedJWT response = this.federationClient.resolve(new FederationRequest<>(request,
+        Map.of(HttpFederationClient.FEDERATION_RESOLVE_ENDPOINT, endpoint.toString())));
+    if (response == null) {
+      return null;
+    }
+    return FederationJwtVerifier.verify(response, RESOLVE_RESPONSE_TYPE,
+        this.settings.getResolverKeys(), this.settings.resolver().entityId(), entityId, Set.of("exp", "metadata"));
+  }
+
+  /**
+   * Gets the federation entity metadata of the resolve response.
+   *
+   * @param claims the claims of the resolve response
+   * @param entityId the entity identifier
+   * @return the federation entity metadata, or {@code null} if the response has none
+   * @throws ClientRegistryException if the metadata cannot be read
+   */
+  private static @Nullable Map<String, Object> federationEntityMetadata(
+      final @NonNull JWTClaimsSet claims, final @NonNull String entityId) throws ClientRegistryException {
+    try {
+      final Map<String, Object> metadata = claims.getJSONObjectClaim("metadata");
+      final Object federationEntity = metadata != null ? metadata.get(EntityType.FEDERATION_ENTITY.getValue()) : null;
+      if (!(federationEntity instanceof final Map<?, ?> map)) {
+        return null;
+      }
+      final Map<String, Object> result = new LinkedHashMap<>();
+      map.forEach((key, value) -> result.put(String.valueOf(key), value));
+      return result;
+    }
+    catch (final java.text.ParseException e) {
+      throw new ClientRegistryException(
+          "Failed to read the metadata of the resolve response for '%s' - %s".formatted(entityId, e.getMessage()), e);
+    }
   }
 
   /**
