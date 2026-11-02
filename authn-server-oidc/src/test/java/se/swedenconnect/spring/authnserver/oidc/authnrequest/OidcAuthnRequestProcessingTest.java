@@ -1029,8 +1029,29 @@ class OidcAuthnRequestProcessingTest {
   }
 
   @Test
-  void anOldIatIsAcceptedWithoutMaximumJwtAge() throws Exception {
+  void theMaximumJwtAgeDefaultsToTenMinutes() throws Exception {
+    // The clock skew is the default, 30 seconds
     this.start(c -> {});
+    final Date tooOld = Date.from(Instant.now().minusSeconds(640));
+    final Date notTooOld = Date.from(Instant.now().minusSeconds(620));
+    Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().issueTime(tooOld).build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request_object", "state-1");
+    params.put("request", sign(requestObjectClaims().issueTime(notTooOld).build(), CLIENT_KEY));
+    this.process(post(params));
+
+    params = signParams();
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(tooOld).build(), CLIENT_KEY));
+    assertError(this.send(post(params)), "invalid_request", "state-1");
+    params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME,
+        sign(signRequestClaims(signRequest(true)).issueTime(notTooOld).build(), CLIENT_KEY));
+    this.process(post(params));
+  }
+
+  @Test
+  void aConfiguredMaximumJwtAgeReplacesTheDefault() throws Exception {
+    this.start(c -> oidc(c).maxJwtAge(Duration.ofDays(2)));
     final Date dayOld = Date.from(Instant.now().minus(Duration.ofDays(1)));
     Map<String, String> params = params();
     params.put("request", sign(requestObjectClaims().issueTime(dayOld).build(), CLIENT_KEY));

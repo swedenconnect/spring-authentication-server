@@ -186,8 +186,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /** The ID token lifetime. */
   private Duration idTokenLifetime = IdTokenBuilder.DEFAULT_LIFETIME;
 
-  /** The maximum age of a JWT signed by a client, or {@code null} for no limit. */
-  private Duration maxJwtAge;
+  /** The maximum age of a JWT signed by a client. */
+  private Duration maxJwtAge = RequestObjectDecoder.DEFAULT_MAX_JWT_AGE;
 
   /** The enabled client authentication methods. */
   private Set<ClientAuthenticationMethod> clientAuthenticationMethods =
@@ -570,23 +570,24 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   /**
    * Assigns the maximum age of a JWT that a client signs, measured from its {@code iat}. It applies to signed request
    * objects, signature request JWTs and client assertions, and the clock skew is added to it. A JWT without
-   * {@code iat} is accepted. Defaults to {@code null}, which means that the age is not checked. The value must be
-   * positive.
+   * {@code iat} is accepted. Defaults to 10 minutes, {@link RequestObjectDecoder#DEFAULT_MAX_JWT_AGE}. The check cannot
+   * be turned off, and the value must be positive. A deployment whose clients reuse a signed request object through
+   * {@code request_uri} assigns a value long enough for that.
    *
-   * @param maxJwtAge the maximum age, or {@code null} for no limit
+   * @param maxJwtAge the maximum age
    * @return this configurer
    */
-  public @NonNull OidcProviderConfigurer maxJwtAge(final @Nullable Duration maxJwtAge) {
-    this.maxJwtAge = maxJwtAge;
+  public @NonNull OidcProviderConfigurer maxJwtAge(final @NonNull Duration maxJwtAge) {
+    this.maxJwtAge = Objects.requireNonNull(maxJwtAge, "maxJwtAge must not be null");
     return this;
   }
 
   /**
    * Gets the maximum age of a JWT that a client signs.
    *
-   * @return the maximum age, or {@code null} if the age is not checked
+   * @return the maximum age
    */
-  public @Nullable Duration getMaxJwtAge() {
+  public @NonNull Duration getMaxJwtAge() {
     return this.maxJwtAge;
   }
 
@@ -1160,9 +1161,7 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     assertPositive(this.authorizationCodeLifetime, "authorization code lifetime");
     assertPositive(this.accessTokenLifetime, "access token lifetime");
     assertPositive(this.idTokenLifetime, "ID token lifetime");
-    if (this.maxJwtAge != null) {
-      assertPositive(this.maxJwtAge, "maximum JWT age");
-    }
+    assertPositive(this.maxJwtAge, "maximum JWT age");
     if (this.clientAuthenticationMethods.isEmpty()) {
       throw new IllegalArgumentException("At least one OIDC client authentication method must be enabled");
     }

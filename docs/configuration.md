@@ -578,7 +578,7 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `issuer` | The issuer identifier. It must be the base URL, or begin with the base URL followed by a path. The discovery document is published at the issuer followed by `/.well-known/openid-configuration`. | The base URL |
 | `sso.*` | The single sign-on policy for OpenID Connect, see [Single sign-on](#single-sign-on). | `authn-server.sso.*` |
 | `clock-skew` | The clock skew for OpenID Connect. | `authn-server.clock-skew` |
-| `max-jwt-age` | The maximum age of a JWT that a client signs, measured from its `iat`: signed request objects, signature request JWTs and client assertions. The clock skew is added to it. A JWT without `iat` is accepted. Must be positive when set. | No maximum age |
+| `max-jwt-age` | The maximum age of a JWT that a client signs, measured from its `iat`: signed request objects, signature request JWTs and client assertions. The clock skew is added to it. A JWT without `iat` is accepted. The check cannot be turned off, and the value must be positive. A deployment whose clients reuse a signed request object through `request_uri` sets a value long enough for that. | 10 minutes |
 | `supports-user-message` | Whether user messages are supported for OpenID Connect. When they are, the `https://id.oidc.se/param/userMessage` parameter is read, and the discovery document declares `https://id.oidc.se/disco/userMessageSupported`. When they are not, the parameter is ignored. | `authn-server.supports-user-message` |
 | `subject-identifier.*` | The subject identifier settings for OpenID Connect. | `authn-server.subject-identifier.*` |
 | `keys.*` | The signing and decryption keys, see [Keys](#oidc-keys). | Required |

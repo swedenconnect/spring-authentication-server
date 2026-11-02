@@ -48,12 +48,14 @@ import net.minidev.json.JSONObject;
 import se.oidc.nimbus.claims.ParameterConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
 import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientRepository;
 import se.swedenconnect.spring.authnserver.oidc.client.RepositoryClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKey;
 import se.swedenconnect.spring.authnserver.oidc.scope.TestAuthenticationProvider;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
 
 /**
@@ -167,8 +169,17 @@ class OidcProviderConfigurerTest {
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("maximum JWT age");
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.maxJwtAge(Duration.ofSeconds(-1))))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("maximum JWT age");
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.maxJwtAge(null)))
+        .isInstanceOf(NullPointerException.class).hasMessageContaining("maxJwtAge");
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.tokenEndpoint("token")))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("token endpoint");
+  }
+
+  @Test
+  void theMaximumJwtAgeDefaultsToTenMinutes() {
+    assertThat(new OidcProviderConfigurer().getMaxJwtAge()).isEqualTo(Duration.ofMinutes(10));
+    assertThat(RequestObjectDecoder.DEFAULT_MAX_JWT_AGE).isEqualTo(Duration.ofMinutes(10));
+    assertThat(ClientAuthenticator.DEFAULT_MAX_JWT_AGE).isEqualTo(Duration.ofMinutes(10));
   }
 
   @Test
