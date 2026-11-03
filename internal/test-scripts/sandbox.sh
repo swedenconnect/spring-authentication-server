@@ -54,7 +54,12 @@ new_sandbox() {
 #!/usr/bin/env bash
 # Stands in for Maven: records the call, prints the version of the root pom.xml for help:evaluate,
 # and for versions:set rewrites every pom.xml, the way versions:set -DprocessAllModules=true does.
+# If MVN_FAIL is set and the call holds that text, the call fails the way a failed build does.
 echo "$*" >> "${MVN_LOG}"
+if [ -n "${MVN_FAIL:-}" ] && [[ "$*" == *"${MVN_FAIL}"* ]]; then
+  echo "[ERROR] BUILD FAILURE"
+  exit 1
+fi
 for arg in "$@"; do
   case "$arg" in
     help:evaluate)

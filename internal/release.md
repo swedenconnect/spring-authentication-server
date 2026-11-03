@@ -24,8 +24,9 @@ the branch.
 - The working tree has no changes and no untracked files.
 - You can push to `origin`.
 - Maven works on your machine.
-- Docker is running if you want the Redis tests to run. Without Docker they are skipped locally.
-  They always run in the Maven Central workflow.
+- Docker is running, so that the Redis tests run. The release script is the only place the Redis
+  tests run in a release. Without Docker they are skipped, and the Maven Central workflow does not
+  run the tests.
 
 ## Run the release script
 
@@ -48,7 +49,11 @@ It does the release up to and including the tag, in one run:
    repository is exactly as it was.
 5. Creates the release branch, if it is making one.
 6. Sets the version in every `pom.xml`, with `mvn versions:set -DprocessAllModules=true`.
-7. Builds and tests with `mvn clean install`.
+7. Builds and tests with `mvn -Prelease -Dgpg.skip=true clean install`. This uses the `release`
+   profile, so it also builds the Javadoc and source files that are published, but it signs nothing
+   and uploads nothing. If the build, the tests or the Javadoc fail, the script stops here, before
+   anything is committed, pushed or tagged. These are the only tests run in a release, since the
+   Maven Central workflow does not run them again.
 8. Stops and asks you to write the release notes for this version in
    [`docs/release-notes.md`](../docs/release-notes.md), including the date. Do that now, then press
    Enter.
@@ -192,8 +197,11 @@ files as the `swedenconnect-bot` Central user. Nothing is published by hand.
 1. Checks out the tag and sets up Java 25 from Temurin.
 2. Checks the version, before anything is built, so that a mismatch publishes nothing. Every module
    that is published must be at the version the tag names, and that version must not be a snapshot.
-3. Builds the whole project with `mvn -Prelease clean deploy`, tests included. The Redis tests use
-   Testcontainers, and the runner has Docker, so they run too. A failing test stops the release.
+3. Builds the whole project with `mvn -Prelease clean deploy -DskipTests`. The tests are compiled
+   and the test source files are attached, but the tests are not run. They were run by the release
+   script, with the same profile, before the tag was pushed. A tag pushed without running the
+   release script is therefore published without any tests being run, unless you built it yourself
+   first. A failing build or Javadoc stops the release.
 4. Signs every file and uploads them to Central.
 
 The version check is [`internal/check-release-version.sh`](check-release-version.sh). You can run
@@ -265,14 +273,15 @@ token GitHub gives every workflow.
 
 ### Trying it out first
 
-A published version cannot be changed, so it is worth building everything before you tag:
+A published version cannot be changed, so everything is built before the tag is pushed. The
+release script does this for you. To do the same by hand:
 
 ```bash
-mvn -Prelease -Dgpg.skip=true clean verify
+mvn -Prelease -Dgpg.skip=true clean install
 ```
 
-This builds every file the release would upload, source and javadoc files included, but signs
-nothing and uploads nothing.
+This builds every file the release would upload, source and javadoc files included, and runs the
+tests, but signs nothing and uploads nothing.
 
 ### Publishing by hand
 
@@ -321,12 +330,16 @@ In all of these the repository is exactly as it was.
 
 ### The build failed
 
-Fix the problem on the release branch and commit it. Then set the version and build again by hand:
+Nothing has been committed, pushed or tagged. Fix the problem on the release branch and commit it.
+Then set the version and build again by hand, the same way as the script does:
 
 ```bash
 mvn versions:set -DnewVersion=X.Y.Z -DprocessAllModules=true -DgenerateBackupPoms=false
-mvn clean install
+mvn -Prelease -Dgpg.skip=true clean install
 ```
+
+A failure here can be in the tests or in the Javadoc. Docker should be running, so that the Redis
+tests run too.
 
 Then carry on from step 8 of the release script above, or start the script again on that branch,
 which uses it as it is.
@@ -334,8 +347,9 @@ which uses it as it is.
 ### The release script stopped after the branch was pushed but before the tag
 
 Either you answered no to the tag question, or you stopped the script. The branch is on `origin`
-and holds the release version. There is no tag and nothing is published. To finish, from the
-release commit:
+and holds the release version. There is no tag and nothing is published. The release commit was
+built and tested by the script, so it is safe to tag it by hand. To finish, from the release
+commit:
 
 ```bash
 git tag -a vX.Y.Z -m "Version X.Y.Z"
@@ -366,8 +380,10 @@ delete the bump branch with `git branch -D bump/X_Y_Z`, then run the script agai
   - **The version check failed.** Nothing was built and nothing was uploaded. The tag does not
     match the version in the POMs, or the version is still a snapshot. Fix the version and release a
     new version.
-  - **The build or the tests failed.** Nothing was uploaded. Fix the problem on `main` and release
-    a new version.
+  - **The build failed.** Nothing was uploaded. The workflow does not run the tests, and the
+    release script has already built the Javadoc and source files, so this points to something that
+    differs between your machine and the runner, such as the Java version. Fix the problem on `main`
+    and release a new version.
   - **The upload or Central's own checks failed.** An upload that fails those checks never goes
     live, so nothing was published. Look at the deployment in the Central portal, fix the cause,
     and release a new version. Running the workflow again on the same tag only works if the upload

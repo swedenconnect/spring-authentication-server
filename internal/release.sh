@@ -4,7 +4,10 @@
 #
 # The script works out the next version from the tags that exist, lets you confirm it or enter
 # another one, sets that version in every pom.xml, builds the project, commits, pushes the branch,
-# tags the release commit and pushes the tag. Merging the branch into main is left to you, and the
+# tags the release commit and pushes the tag. The build uses the release profile with signing
+# skipped, so the Javadoc and source files that are published are built and the tests are run here,
+# before anything is committed, pushed or tagged. The Maven Central workflow does not run the tests
+# again. Merging the branch into main is left to you, and the
 # next snapshot version is opened afterwards with internal/post-release-bump.sh, run on main.
 #
 # Run from main, the release is made on a new release/X_Y_Z branch. Run from any other branch, the
@@ -146,8 +149,10 @@ main() {
   echo "Setting the version to $version in every pom.xml ..."
   mvn versions:set -DnewVersion="$version" -DprocessAllModules=true -DgenerateBackupPoms=false
 
-  echo "Building the project ..."
-  mvn clean install
+  # The same files as the deploy, Javadoc and source files included, but nothing is signed or
+  # uploaded. A fault stops the script here, before anything is committed, pushed or tagged.
+  echo "Building the project, with the Javadoc and source files ..."
+  mvn -Prelease -Dgpg.skip=true clean install
 
   echo
   echo "== Release notes =="
