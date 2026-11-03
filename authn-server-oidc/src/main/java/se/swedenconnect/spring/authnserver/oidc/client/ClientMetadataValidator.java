@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.oidc.client.federation;
+package se.swedenconnect.spring.authnserver.oidc.client;
 
 import java.io.IOException;
 import java.io.Serial;
@@ -50,13 +50,19 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.CachedClientRecord;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationJwtVerifier;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.ResolvedClient;
 import se.swedenconnect.spring.authnserver.oidc.keys.SigningKeySelector;
+import se.swedenconnect.spring.authnserver.oidc.token.ClientAuthenticator;
 import se.swedenconnect.spring.authnserver.oidc.token.ClientEncryption;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
- * Checks the metadata of a federation client each time the client is resolved, so that a fault is found at once and
- * not when a request hits it. A client that fails is marked as invalid, see {@link Outcome}.
+ * Checks the metadata of an OpenID Connect client, so that a fault is found at once and not when a request hits it. A
+ * client that fails is marked as invalid, see {@link Outcome}. There is one set of rules for all clients: those
+ * resolved through OpenID Federation, which are checked each time they are resolved, and those from the configuration
+ * or a {@link ClientRepository}, which are checked by their backend, see {@link ClientValidation}.
  * <p>
  * Only what the OpenID Provider needs to serve the client is checked. A parameter that is absent has the default value
  * of <a href="https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata">OpenID Connect Dynamic
@@ -67,9 +73,9 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * <li>its metadata cannot be parsed, or it has no {@code redirect_uris};</li>
  * <li>its {@code response_types} do not include {@code code}, or its {@code grant_types} do not include
  * {@code authorization_code};</li>
- * <li>its {@code token_endpoint_auth_method} is {@code none}, needs a client secret, which a federation client never
- * has, or is not supported and enabled by the OpenID Provider. The default, {@code client_secret_basic}, needs a client
- * secret;</li>
+ * <li>its {@code token_endpoint_auth_method} is {@code none}, needs a client secret that the client does not have, or
+ * is not supported and enabled by the OpenID Provider. The default, {@code client_secret_basic}, needs a client
+ * secret. A federation client never has one;</li>
  * <li>a signing or encryption algorithm that it declares is not supported by the OpenID Provider;</li>
  * <li>{@code jwks_uri} or {@code signed_jwks_uri} does not use {@code https};</li>
  * <li>it needs keys, for {@code private_key_jwt}, a {@code request_object_signing_alg} or encryption of ID tokens or
@@ -80,30 +86,43 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * <li>its {@code subject_type} is {@code pairwise} and its registration fails the {@link PairwiseClientCheck}.</li>
  * </ul>
  * <p>
- * The keys are taken from {@code jwks}, {@code signed_jwks_uri} or {@code jwks_uri}, in that order. Keys at a URI are
- * fetched each time the client is resolved, and held with the client, see {@link HeldKeys}. When they cannot be
- * fetched or read, the mark is {@link Outcome#temporary() temporary}, unless the client already holds keys from the
- * same URI. Then it keeps them and stays valid. Every other fault lasts until the client is next resolved.
+ * The keys of a federation client are taken from {@code jwks}, {@code signed_jwks_uri} or {@code jwks_uri}, in that
+ * order. Keys at a URI are fetched each time the client is validated, and held with the client, see {@link HeldKeys}.
+ * When they cannot be fetched or read, the mark is {@link Outcome#temporary() temporary}, unless the client already
+ * holds keys from the same URI. Then it keeps them and stays valid. Every other fault lasts until the client is next
+ * validated.
  * </p>
+ * <p>
+ * A client from the configuration or a client repository differs from a federation client in that:
+ * </p>
+ * <ul>
+ * <li>a client authentication method that needs a client secret is accepted if the client has one;</li>
+ * <li>its keys are taken from {@code jwks} or {@code jwks_uri}, and {@code signed_jwks_uri} is ignored. A client with
+ * only a {@code signed_jwks_uri} has a fault, since there is no trust chain to give its Federation Entity Keys;</li>
+ * <li>the {@link PairwiseClientCheck} never fetches the document at its {@code sector_identifier_uri};</li>
+ * <li>a fault is logged at error level, since it is an error in the configuration of the OpenID Provider.</li>
+ * </ul>
  * <p>
  * The algorithms and client authentication methods that the OpenID Provider supports are taken from its discovery
  * document, see {@link #setProviderMetadata(OIDCProviderMetadata)}. Without one, the algorithms and methods that the
- * library supports are used, with {@code private_key_jwt} as the only method, and the ID token and UserInfo signing
- * algorithms are not checked.
+ * library supports are used, and the ID token and UserInfo signing algorithms are not checked.
  * </p>
  *
  * @author Martin Lindström
  */
-public class FederationClientValidator {
+public class ClientMetadataValidator {
 
   /** Logger. */
-  private static final Logger log = LoggerFactory.getLogger(FederationClientValidator.class);
+  private static final Logger log = LoggerFactory.getLogger(ClientMetadataValidator.class);
 
   /** The explicit type of a signed JWK Set. */
   public static final String SIGNED_JWKS_TYPE = "jwk-set+jwt";
 
   /** The {@code none} algorithm. */
   private static final String NONE = "none";
+
+  /** The check of pairwise clients from the configuration or a client repository, which never fetches a document. */
+  private static final PairwiseClientCheck NO_DOCUMENT_CHECK = new PairwiseClientCheck(null);
 
   /** Fetches the keys at a {@code jwks_uri} or {@code signed_jwks_uri}. */
   private final ClientKeysFetcher keysFetcher;
@@ -120,14 +139,15 @@ public class FederationClientValidator {
    * @param pairwiseClientCheck checks the registration of pairwise clients
    * @param keysFetcher fetches the keys at a {@code jwks_uri} or {@code signed_jwks_uri}
    */
-  public FederationClientValidator(final @NonNull PairwiseClientCheck pairwiseClientCheck,
+  public ClientMetadataValidator(final @NonNull PairwiseClientCheck pairwiseClientCheck,
       final @NonNull ClientKeysFetcher keysFetcher) {
     this.pairwiseClientCheck = Objects.requireNonNull(pairwiseClientCheck, "pairwiseClientCheck must not be null");
     this.keysFetcher = Objects.requireNonNull(keysFetcher, "keysFetcher must not be null");
   }
 
   /**
-   * Assigns the check of pairwise clients.
+   * Assigns the check of pairwise federation clients. Clients from the configuration or a client repository are
+   * always checked without fetching the document at the {@code sector_identifier_uri}.
    *
    * @param pairwiseClientCheck the check
    */
@@ -136,7 +156,7 @@ public class FederationClientValidator {
   }
 
   /**
-   * Gets the check of pairwise clients.
+   * Gets the check of pairwise federation clients.
    *
    * @return the check
    */
@@ -164,7 +184,7 @@ public class FederationClientValidator {
   }
 
   /**
-   * Validates a resolved client.
+   * Validates a client resolved through OpenID Federation.
    *
    * @param client the resolved client
    * @param earlier the earlier cache entry of the client, whose held keys and remembered check are used, or
@@ -175,20 +195,50 @@ public class FederationClientValidator {
     Objects.requireNonNull(client, "client must not be null");
     final String clientId = client.clientId();
     if (client.metadataError() != null) {
-      return invalid(clientId, "the metadata cannot be parsed - " + client.metadataError(), false, null);
+      return invalid(clientId, "the metadata cannot be parsed - " + client.metadataError(), false, true);
     }
     final OIDCClientMetadata metadata = client.metadata();
-    final String fault = this.checkMetadata(metadata);
+    final String fault = this.checkMetadata(metadata, true, false);
     if (fault != null) {
-      return invalid(clientId, fault, false, null);
+      return invalid(clientId, fault, false, true);
     }
-    final KeysOutcome keys = this.checkKeys(client, earlier != null ? earlier.heldKeys() : null);
+    final KeysOutcome keys = this.checkKeys(clientId, metadata, true, client.entityKeys(),
+        earlier != null ? earlier.heldKeys() : null);
     if (keys.fault() != null) {
-      return invalid(clientId, keys.fault(), keys.temporary(), null);
+      return invalid(clientId, keys.fault(), keys.temporary(), true);
     }
     final PairwiseClientCheck.Outcome pairwise = this.pairwiseClientCheck.check(clientId, metadata,
         earlier != null ? earlier.verifiedSector() : null);
+    if (!pairwise.isValid()) {
+      logInvalid(clientId, Objects.requireNonNull(pairwise.invalidReason()), pairwise.temporary(), true);
+    }
     return new Outcome(pairwise.invalidReason(), pairwise.temporary(), pairwise.verifiedSector(), keys.held());
+  }
+
+  /**
+   * Validates a client from the configuration or a client repository.
+   *
+   * @param client the client
+   * @param earlier the keys that the client held before, or {@code null}
+   * @return the outcome
+   */
+  public @NonNull Outcome validate(final @NonNull OidcClientRecord client, final @Nullable HeldKeys earlier) {
+    Objects.requireNonNull(client, "client must not be null");
+    final String clientId = client.clientId();
+    final OIDCClientMetadata metadata = client.metadata();
+    final String fault = this.checkMetadata(metadata, false, OidcClientRecord.getClientSecret(metadata) != null);
+    if (fault != null) {
+      return invalid(clientId, fault, false, false);
+    }
+    final KeysOutcome keys = this.checkKeys(clientId, metadata, false, null, earlier);
+    if (keys.fault() != null) {
+      return invalid(clientId, keys.fault(), keys.temporary(), false);
+    }
+    final PairwiseClientCheck.Outcome pairwise = NO_DOCUMENT_CHECK.check(clientId, metadata, null);
+    if (!pairwise.isValid()) {
+      logInvalid(clientId, Objects.requireNonNull(pairwise.invalidReason()), false, false);
+    }
+    return new Outcome(pairwise.invalidReason(), false, null, keys.held());
   }
 
   /**
@@ -227,7 +277,7 @@ public class FederationClientValidator {
   }
 
   /**
-   * Gets the URI that the keys of a client are fetched from: its {@code signed_jwks_uri}, or else its
+   * Gets the URI that the keys of a federation client are fetched from: its {@code signed_jwks_uri}, or else its
    * {@code jwks_uri}. A client with {@code jwks} has none, since {@code jwks} is used first.
    *
    * @param metadata the client metadata
@@ -245,9 +295,12 @@ public class FederationClientValidator {
    * Checks what can be checked without keys.
    *
    * @param metadata the client metadata
+   * @param federation whether the client is resolved through OpenID Federation
+   * @param hasSecret whether the client has a client secret
    * @return the fault, or {@code null} if there is none
    */
-  private @Nullable String checkMetadata(final @NonNull OIDCClientMetadata metadata) {
+  private @Nullable String checkMetadata(final @NonNull OIDCClientMetadata metadata, final boolean federation,
+      final boolean hasSecret) {
     if (metadata.getRedirectionURIs() == null || metadata.getRedirectionURIs().isEmpty()) {
       return "the metadata has no redirect_uris";
     }
@@ -264,13 +317,21 @@ public class FederationClientValidator {
     if (ClientAuthenticationMethod.NONE.equals(effective)) {
       return "the token_endpoint_auth_method is none, which is not supported";
     }
-    if (ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(effective)
+    final boolean needsSecret = ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(effective)
         || ClientAuthenticationMethod.CLIENT_SECRET_POST.equals(effective)
-        || ClientAuthenticationMethod.CLIENT_SECRET_JWT.equals(effective)) {
+        || ClientAuthenticationMethod.CLIENT_SECRET_JWT.equals(effective);
+    if (needsSecret && federation) {
       return method == null
           ? "there is no token_endpoint_auth_method, and the default client_secret_basic needs a client secret, "
               + "which a federation client never has"
           : "the token_endpoint_auth_method %s needs a client secret, which a federation client never has"
+              .formatted(effective);
+    }
+    if (needsSecret && !hasSecret) {
+      return method == null
+          ? "there is no token_endpoint_auth_method, and the default client_secret_basic needs a client secret, "
+              + "which the client does not have"
+          : "the token_endpoint_auth_method %s needs a client secret, which the client does not have"
               .formatted(effective);
     }
     if (!this.getAuthenticationMethods().contains(effective)) {
@@ -278,7 +339,7 @@ public class FederationClientValidator {
     }
 
     String fault = checkSupported("token_endpoint_auth_signing_alg", metadata.getTokenEndpointAuthJWSAlg(),
-        this.getTokenEndpointAlgorithms());
+        this.getTokenEndpointAlgorithms(!federation));
     if (fault == null) {
       fault = checkSupported("request_object_signing_alg", metadata.getRequestObjectJWSAlg(),
           this.getRequestObjectAlgorithms());
@@ -318,17 +379,25 @@ public class FederationClientValidator {
   /**
    * Checks the keys of the client, and fetches them when they are at a URI.
    *
-   * @param client the resolved client
+   * @param clientId the {@code client_id} of the client
+   * @param metadata the client metadata
+   * @param federation whether the client is resolved through OpenID Federation. Otherwise {@code signed_jwks_uri} is
+   *     ignored, unless it is the only key parameter
+   * @param federationEntityKeys the Federation Entity Keys of a federation client, or {@code null}
    * @param earlier the keys that the client held before, or {@code null}
    * @return the outcome
    */
-  private @NonNull KeysOutcome checkKeys(final @NonNull ResolvedClient client, final @Nullable HeldKeys earlier) {
-    final OIDCClientMetadata metadata = client.metadata();
+  private @NonNull KeysOutcome checkKeys(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
+      final boolean federation, final @Nullable JWKSet federationEntityKeys, final @Nullable HeldKeys earlier) {
     final URI jwksUri = metadata.getJWKSetURI();
+    if (!federation && metadata.getSignedJWKSetURI() != null && metadata.getJWKSet() == null && jwksUri == null) {
+      return KeysOutcome.fault("there is only a signed_jwks_uri, whose keys cannot be verified since the client is "
+          + "not resolved through OpenID Federation and has no trust chain", false);
+    }
     if (jwksUri != null && !"https".equalsIgnoreCase(jwksUri.getScheme())) {
       return KeysOutcome.fault("the jwks_uri does not use https", false);
     }
-    final URI signedJwksUri = metadata.getSignedJWKSetURI();
+    final URI signedJwksUri = federation ? metadata.getSignedJWKSetURI() : null;
     if (signedJwksUri != null && !"https".equalsIgnoreCase(signedJwksUri.getScheme())) {
       return KeysOutcome.fault("the signed_jwks_uri does not use https", false);
     }
@@ -343,11 +412,12 @@ public class FederationClientValidator {
       final List<String> needs = this.getNeeds(metadata).stream().map(Need::name).toList();
       return needs.isEmpty()
           ? KeysOutcome.valid(null)
-          : KeysOutcome.fault("there is no jwks, signed_jwks_uri or jwks_uri, and keys are needed for "
-              + String.join(", ", needs), false);
+          : KeysOutcome.fault("there is no %s, and keys are needed for %s".formatted(
+              federation ? "jwks, signed_jwks_uri or jwks_uri" : "jwks or jwks_uri", String.join(", ", needs)),
+              false);
     }
     final String parameter = signed ? "signed_jwks_uri" : "jwks_uri";
-    final JWKSet entityKeys = signed ? client.entityKeys() : null;
+    final JWKSet entityKeys = signed ? federationEntityKeys : null;
     if (signed && entityKeys == null) {
       return KeysOutcome.fault("the keys at the signed_jwks_uri cannot be verified, since the resolve response has no "
           + "usable trust_chain", false);
@@ -355,14 +425,14 @@ public class FederationClientValidator {
 
     final JWKSet keys;
     try {
-      keys = this.fetch(client.clientId(), uri, signed, entityKeys);
+      keys = this.fetch(clientId, uri, signed, entityKeys);
     }
     catch (final IOException e) {
       if (earlier != null && earlier.isFrom(uri.toString(), signed)) {
         final String unusable = this.checkUsable(metadata, earlier.keys(), parameter);
         if (unusable == null) {
           log.warn("The keys at the {} {} of the client '{}' cannot be fetched - the keys held before are kept: {}",
-              parameter, uri, client.clientId(), e.getMessage());
+              parameter, uri, clientId, e.getMessage());
           return KeysOutcome.valid(new HeldKeys(earlier.uri(), signed, earlier.keys(),
               signed ? entityKeys : null));
         }
@@ -447,10 +517,10 @@ public class FederationClientValidator {
     if (ClientAuthenticationMethod.PRIVATE_KEY_JWT.equals(metadata.getTokenEndpointAuthMethod())) {
       final List<JWSAlgorithm> algorithms = metadata.getTokenEndpointAuthJWSAlg() != null
           ? List.of(metadata.getTokenEndpointAuthJWSAlg())
-          : this.getTokenEndpointAlgorithms().stream()
+          : this.getTokenEndpointAlgorithms(false).stream()
               .filter(a -> !JWSAlgorithm.Family.HMAC_SHA.contains(a))
               .toList();
-      needs.add(new Need("private_key_jwt", algorithms.stream().map(FederationClientValidator::signing).toList()));
+      needs.add(new Need("private_key_jwt", algorithms.stream().map(ClientMetadataValidator::signing).toList()));
     }
     final JWSAlgorithm requestObject = metadata.getRequestObjectJWSAlg();
     if (requestObject != null && !NONE.equals(requestObject.getName())) {
@@ -475,7 +545,7 @@ public class FederationClientValidator {
   private @NonNull List<ClientAuthenticationMethod> getAuthenticationMethods() {
     final OIDCProviderMetadata provider = this.providerMetadata;
     if (provider == null) {
-      return List.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
+      return ClientAuthenticator.SUPPORTED_METHODS;
     }
     return Objects.requireNonNullElse(provider.getTokenEndpointAuthMethods(), List.of());
   }
@@ -483,12 +553,19 @@ public class FederationClientValidator {
   /**
    * Gets the algorithms that the OpenID Provider accepts for client assertions.
    *
+   * @param withSecret whether the algorithms of {@code client_secret_jwt} are included when there is no discovery
+   *     document
    * @return the algorithms
    */
-  private @NonNull List<JWSAlgorithm> getTokenEndpointAlgorithms() {
+  private @NonNull List<JWSAlgorithm> getTokenEndpointAlgorithms(final boolean withSecret) {
     final OIDCProviderMetadata provider = this.providerMetadata;
     if (provider == null) {
-      return RequestObjectDecoder.SUPPORTED_SIGNING_ALGORITHMS;
+      if (!withSecret) {
+        return RequestObjectDecoder.SUPPORTED_SIGNING_ALGORITHMS;
+      }
+      final List<JWSAlgorithm> algorithms = new ArrayList<>(RequestObjectDecoder.SUPPORTED_SIGNING_ALGORITHMS);
+      algorithms.addAll(ClientAuthenticator.CLIENT_SECRET_JWT_ALGORITHMS);
+      return algorithms;
     }
     return Objects.requireNonNullElse(provider.getTokenEndpointJWSAlgs(), List.of());
   }
@@ -612,14 +689,35 @@ public class FederationClientValidator {
    * @param clientId the {@code client_id} of the client
    * @param reason why the client is invalid
    * @param temporary whether the mark is temporary
-   * @param heldKeys the keys that the client holds, or {@code null}
+   * @param federation whether the client is resolved through OpenID Federation
    * @return the outcome
    */
   private static @NonNull Outcome invalid(final @NonNull String clientId, final @NonNull String reason,
-      final boolean temporary, final @Nullable HeldKeys heldKeys) {
-    log.warn("The federation client '{}' is marked as invalid{} - {}", clientId,
-        temporary ? " for a while" : " until it is resolved again", reason);
-    return new Outcome(reason, temporary, null, heldKeys);
+      final boolean temporary, final boolean federation) {
+    logInvalid(clientId, reason, temporary, federation);
+    return new Outcome(reason, temporary, null, null);
+  }
+
+  /**
+   * Logs a fault. A fault of a federation client is logged as a warning, since the client is registered by someone
+   * else. A fault of a client from the configuration or a client repository is an error in the setup of the OpenID
+   * Provider.
+   *
+   * @param clientId the {@code client_id} of the client
+   * @param reason why the client is invalid
+   * @param temporary whether the mark is temporary
+   * @param federation whether the client is resolved through OpenID Federation
+   */
+  private static void logInvalid(final @NonNull String clientId, final @NonNull String reason,
+      final boolean temporary, final boolean federation) {
+    if (federation) {
+      log.warn("The federation client '{}' is marked as invalid{} - {}", clientId,
+          temporary ? " for a while" : " until it is resolved again", reason);
+    }
+    else {
+      log.error("The client '{}' is marked as invalid{} - {}", clientId,
+          temporary ? " for a while" : " until its metadata changes", reason);
+    }
   }
 
   /**
@@ -628,7 +726,7 @@ public class FederationClientValidator {
    * @param invalidReason why the client is invalid, or {@code null} if it is valid
    * @param temporary whether the client is invalid only for a while, since its keys or the document at its
    *     {@code sector_identifier_uri} could not be fetched. Otherwise an invalid client stays invalid until it is
-   *     resolved again
+   *     validated again
    * @param verifiedSector the successful check of the {@code sector_identifier_uri} to remember for the client, or
    *     {@code null}
    * @param heldKeys the keys to hold for the client, or {@code null}

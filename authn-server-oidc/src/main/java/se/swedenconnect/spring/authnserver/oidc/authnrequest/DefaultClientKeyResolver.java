@@ -35,6 +35,11 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 /**
  * The default {@link ClientKeyResolver}. It uses the keys of the client metadata: {@code jwks} when present, and
  * otherwise the keys published at {@code jwks_uri}, which are fetched and cached.
+ * <p>
+ * It serves the clients of a client registry backend of the application's own. Clients from the configuration, from a
+ * client repository and from OpenID Federation hold their keys, see
+ * {@link se.swedenconnect.spring.authnserver.oidc.client.HeldKeysClientKeyResolver}.
+ * </p>
  *
  * @author Martin Lindström
  */

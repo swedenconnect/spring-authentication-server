@@ -135,11 +135,13 @@ and the path of its metadata:
 }
 ```
 
-An OpenID Federation client that is marked as invalid, since its registration has an error, also has `valid` set to
-`false` and the reason in `invalid-reason`, both in the list and when it is shown alone. Such a client is never
-authenticated, see [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of
-[The client registry](client-registry.html). Once the client has fixed its registration, `POST /actuator/clients/oidc`
-resolves and checks it again at once:
+An OpenID Connect client that is marked as invalid, since its registration has an error, also has `valid` set to
+`false` and the reason in `invalid-reason`, both in the list and when it is shown alone. This holds for clients from
+the configuration and from a client repository as well as for federation clients. Such a client is never
+authenticated, see [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) and
+[Section 5.1, "Validation of configured and repository clients"](client-registry.html#static-client-validation) of
+[The client registry](client-registry.html). Once a federation client has fixed its registration,
+`POST /actuator/clients/oidc` resolves and checks it again at once:
 
 ```json
 {

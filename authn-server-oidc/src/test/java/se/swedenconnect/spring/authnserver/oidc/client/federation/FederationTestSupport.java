@@ -56,6 +56,9 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Subordi
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkListingRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.TrustMarkRequest;
 import se.swedenconnect.oidf.common.entity.entity.integration.trustmark.TrustMarkStatusResponse;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.SectorIdentifierFetcher;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 
 /**
@@ -113,7 +116,7 @@ abstract class FederationTestSupport {
   }
 
   /**
-   * Creates client metadata with the supplied name, for a client that passes the {@link FederationClientValidator}:
+   * Creates client metadata with the supplied name, for a client that passes the {@link ClientMetadataValidator}:
    * it authenticates with {@code private_key_jwt} and gives its key as {@code jwks}.
    *
    * @param name the {@code client_name}
@@ -259,7 +262,7 @@ abstract class FederationTestSupport {
    * @return a {@link SignedJWT}
    */
   static SignedJWT signedJwks(final ECKey key, final String issuer, final JWKSet keys) {
-    return sign(key, FederationClientValidator.SIGNED_JWKS_TYPE, new JWTClaimsSet.Builder()
+    return sign(key, ClientMetadataValidator.SIGNED_JWKS_TYPE, new JWTClaimsSet.Builder()
         .issuer(issuer)
         .subject(issuer)
         .issueTime(new Date())

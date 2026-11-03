@@ -33,6 +33,8 @@ Source links in this guide point to the `main` branch of the
 
 5. [**OpenID Connect: three backends**](#openid-connect-three-backends)
 
+    5.1. [Validation of configured and repository clients](#static-client-validation)
+
 6. [**The federation backend**](#the-federation-backend)
 
     6.1. [The cache](#the-cache)
@@ -248,6 +250,80 @@ metadata.setCustomField("organization_identifier", "urn:glue:iso6523:0007:556677
 A configured client, or a client in a repository, that authenticates with a client secret at the token endpoint has
 the secret in the `client_secret` field of its metadata, see
 [Section 6.3, "Client authentication"](openid-provider.html#client-authentication) of [The OpenID Provider](openid-provider.html).
+
+<a name="static-client-validation"></a>
+### 5.1. Validation of configured and repository clients
+
+The clients of the configuration and of a client repository are checked with the same rules as federation clients,
+by the [`ClientMetadataValidator`][ClientMetadataValidator], so that a client with an error is found at once and not
+when a request hits it, which can be after the user has logged in. The rules are listed in
+[Section 6.6, "Invalid clients"](#invalid-clients).
+
+The OpenID Provider sets this up when it starts: it gives each `ConfigurationClientBackend` and
+`RepositoryClientBackend` added to the client registry a [`ClientValidation`][ClientValidation], which holds the
+validator and knows the algorithms and client authentication methods that the OpenID Provider supports. The
+application adds the backend as before and supplies nothing more, and the author of a `ClientRepository` does nothing
+for it. A backend that the OpenID Provider has not set up, for example one in a client registry that the application
+assigns itself, marks every client as invalid.
+
+A client is validated:
+
+- at startup, for every configured client, and for every client of a repository whose `findAll()` lists them,
+- at its first lookup, for a client of a repository that cannot list its clients,
+- when the metadata of a repository client differs from what was validated,
+- when a temporary mark has run out, see below.
+
+A lookup makes no network call unless the metadata has changed or a temporary mark has run out. A repository that
+cannot be read at startup does not stop the server. The failure is logged, and its clients are validated when they are
+looked up. An error in a client never stops the server from starting.
+
+A client with an error is blocked in the same way as a federation client. It stays in the client registry and in the
+[clients endpoint](management.html#the-clients-endpoint), shown as invalid with the reason, is never authenticated, and
+gets `invalid_client` at its redirect URI and at the token endpoint. A client without a registered redirect URI ends at
+the error page for a client that is not correctly registered. Every error is logged at error level, since it is an
+error in the setup of the server, and gives a [`client_invalid`](audit.html#client_invalid) audit event.
+
+The rules differ from those for federation clients in these ways:
+
+- **Client secrets.** A `token_endpoint_auth_method` that needs a client secret, including the default
+  `client_secret_basic`, is accepted if the client has a secret and is an error if it does not. The method must still
+  be enabled by the OpenID Provider.
+- **Pairwise clients.** A pairwise client with redirect URIs on more than one host and no `sector_identifier_uri` has an
+  error. The document at the `sector_identifier_uri` is never fetched, whatever
+  `authn-server.oidc.federation.clients.check-sector-identifier-uri` says. The operator is expected to give correct
+  values. A repository whose clients register themselves must check the document when a client registers, since the
+  server does not.
+- **`signed_jwks_uri`.** A client with only a `signed_jwks_uri` has an error, since there is no trust chain to give its
+  Federation Entity Keys. A client that also has `jwks` or `jwks_uri` uses those, and its `signed_jwks_uri` is
+  ignored.
+- **Metadata that cannot be parsed** is not a case, since these clients are parsed when they are created.
+
+**Keys.** The keys at the `jwks_uri` of a client are read when it is validated, and held together with the URI, as for a
+federation client, see [Section 6.8, "Keys of federation clients"](#client-keys). A request does not cause a fetch for a
+key that is held. A client with `jwks` uses those keys. The keys are read again:
+
+- when a JWT names a key that is not held, at most once a minute for each client,
+- by a background job, the [`ClientKeysRefresher`][ClientKeysRefresher], every
+  `authn-server.oidc.client-keys-refresh-interval`, 1 hour by default. It covers every configured client and every
+  client of a repository that can list them, and the repository clients that have been validated otherwise. Without
+  it, the OpenID Provider would keep encrypting to an old key, since encryption has no trigger like the unknown key.
+  The job also validates again a client whose temporary mark has run out.
+
+| Situation | Result |
+| :--- | :--- |
+| The keys at `jwks_uri` cannot be read at the first check | Invalid for `authn-server.oidc.federation.clients.cache.not-found-time-to-live`, then validated again at the next lookup or by the job |
+| A later read fails, or gives keys that cannot be used | The held keys are kept and the client stays valid. A failed read is logged and shows in the [health of the federation services](management.html#oidc-federation-health) |
+| The `jwks_uri` of a repository client has changed | The keys of the old URI are not kept |
+| Any other error | Invalid until the metadata changes, which for a configured client means until a restart |
+
+Reads have the same limits as for federation clients and use the same fetcher. With Spring Boot, the outcomes and the
+held keys are kept in memory or in Redis according to `authn-server.storage.type`. With Redis, all nodes share them,
+and the background job runs on one node at a time. In memory, each node holds its own. In code, the store is assigned
+with `authnRequestProcessor(c -> c.clientValidationStore(...))` on the `OidcProviderConfigurer`, and the job's interval
+and the time of a temporary mark with `clientKeysRefreshInterval(...)` and `clientKeysFailureTimeToLive(...)`.
+
+The keys of a client of a backend of the application's own, which holds no keys, are found by the configured
+`ClientKeyResolver`.
 
 <a name="the-federation-backend"></a>
 ## 6. The federation backend
@@ -476,11 +552,12 @@ updated through the [clients endpoint](management.html#the-clients-endpoint).
 ### 6.6. Invalid clients
 
 A client resolved through OpenID Federation is marked as invalid when it is resolved and its registration has an
-error. Its metadata is checked by the [`FederationClientValidator`][FederationClientValidator] each time it is
+error. Its metadata is checked by the [`ClientMetadataValidator`][ClientMetadataValidator] each time it is
 resolved: at a request, by the [job that fills the cache](#filling-the-cache) or through the operator's re-resolve.
 Only what the OpenID Provider needs to serve the client is checked. Stricter rules of a federation, such as a required
-`client_name` or `contacts`, are left to the Federation Operator's policy. Clients from the configuration and from a
-client repository are not checked; their metadata is expected to be correct.
+`client_name` or `contacts`, are left to the Federation Operator's policy. The same rules apply to clients from the
+configuration and from a client repository, with the differences listed in
+[Section 5.1, "Validation of configured and repository clients"](#static-client-validation).
 
 A parameter that is absent has the default value of OpenID Connect Dynamic Client Registration 1.0, Section 2. The
 exception is ID token signing, where no algorithm is assumed, as for any client. A client has an error when:
@@ -559,8 +636,9 @@ valid resolve result for it.
 
 The check of the document is turned off with `authn-server.oidc.federation.clients.check-sector-identifier-uri: false`,
 or by giving the backend a `PairwiseClientCheck` without a fetcher. Do this only where someone else has done the check,
-such as the Federation Operator in the Sweden Connect federation. Clients from the configuration and from a client
-repository are never checked; their metadata is expected to be correct, since the server does not check it.
+such as the Federation Operator in the Sweden Connect federation. For clients from the configuration and from a client
+repository, the first row applies, but the document is never fetched, see
+[Section 5.1, "Validation of configured and repository clients"](#static-client-validation).
 
 <a name="client-keys"></a>
 ### 6.8. Keys of federation clients
@@ -600,14 +678,15 @@ application that builds the backend in code does the same:
 ```java
 HttpClientKeysFetcher keysFetcher = new HttpClientKeysFetcher();
 keysFetcher.setApplicationEventPublisher(applicationContext);
-backend.setValidator(new FederationClientValidator(
+backend.setValidator(new ClientMetadataValidator(
     new PairwiseClientCheck(new HttpSectorIdentifierFetcher()), keysFetcher));
 ```
 
 The OpenID Provider gives the backends added to the client registry its discovery document, which the validator checks
 the algorithms and methods against, and takes the held keys through a
-[`FederationClientKeyResolver`][FederationClientKeyResolver]. Clients from the configuration and from a client
-repository get their keys as before, from the configured `ClientKeyResolver`.
+[`HeldKeysClientKeyResolver`][HeldKeysClientKeyResolver]. Clients from the configuration and from a client
+repository hold their keys in the same way, see
+[Section 5.1, "Validation of configured and repository clients"](#static-client-validation).
 
 <a name="requester-acceptance"></a>
 ## 7. Deciding which requesters may use the server
@@ -670,21 +749,23 @@ To replace the check altogether, assign another implementation with `configurer.
 [ClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistry.java
 [ClientRegistryBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistryBackend.java
 [ClientRegistryException]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/ClientRegistryException.java
-[PairwiseClientCheck]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/PairwiseClientCheck.java
+[PairwiseClientCheck]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/PairwiseClientCheck.java
+[ClientKeysRefresher]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ClientKeysRefresher.java
+[ClientValidation]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ClientValidation.java
 [ClientRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ClientRepository.java
 [ConfigurableRequesterAcceptance]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/acceptance/ConfigurableRequesterAcceptance.java
 [ConfigurationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ConfigurationClientBackend.java
 [DefaultClientRegistry]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/registry/DefaultClientRegistry.java
 [EntityConfigurationEndpoints]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/EntityConfigurationEndpoints.java
 [FederationCache]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCache.java
-[FederationClientKeyResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientKeyResolver.java
-[FederationClientValidator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientValidator.java
+[HeldKeysClientKeyResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/HeldKeysClientKeyResolver.java
+[ClientMetadataValidator]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/ClientMetadataValidator.java
 [FederationClientCollector]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientCollector.java
 [FederationEntityStore]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationEntityStore.java
 [FederationCacheSettings]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationCacheSettings.java
 [FederationClientBackend]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationClientBackend.java
 [FederationResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/FederationResolver.java
-[HttpClientKeysFetcher]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/HttpClientKeysFetcher.java
+[HttpClientKeysFetcher]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/HttpClientKeysFetcher.java
 [HttpFederationClient]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/HttpFederationClient.java
 [HttpFederationResolver]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/federation/HttpFederationResolver.java
 [InMemoryClientRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/client/InMemoryClientRepository.java

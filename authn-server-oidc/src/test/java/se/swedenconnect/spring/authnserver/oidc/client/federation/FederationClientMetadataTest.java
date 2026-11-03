@@ -43,6 +43,10 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.ClientKeyResolver;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.HeldKeys;
+import se.swedenconnect.spring.authnserver.oidc.client.HeldKeysClientKeyResolver;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.registry.ClientUpdateResult;
 import se.swedenconnect.spring.authnserver.registry.RegisteredClient;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
@@ -77,7 +81,7 @@ class FederationClientMetadataTest extends FederationTestSupport {
     this.events.clear();
     this.fetcher.calls.clear();
     this.fixture = new FederationClientBackendTest.Fixture(new FederationCacheSettings(null, TEMPORARY));
-    this.fixture.backend.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), this.fetcher));
+    this.fixture.backend.setValidator(new ClientMetadataValidator(new PairwiseClientCheck(null), this.fetcher));
     final ClientChangeTracker tracker = new ClientChangeTracker(new InMemoryKnownClientStore());
     tracker.setApplicationEventPublisher(e -> this.events.add((ApplicationEvent) e));
     tracker.start();
@@ -310,8 +314,8 @@ class FederationClientMetadataTest extends FederationTestSupport {
       delegated.add(clientId);
       return List.of();
     };
-    final FederationClientKeyResolver resolver =
-        new FederationClientKeyResolver(List.of(this.fixture.backend), delegate);
+    final HeldKeysClientKeyResolver resolver =
+        new HeldKeysClientKeyResolver(List.of(this.fixture.backend), delegate);
 
     final List<JWK> keys = resolver.resolve(CLIENT_ID, metadata,
         new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(CLIENT_KEY.getKeyID()).build());

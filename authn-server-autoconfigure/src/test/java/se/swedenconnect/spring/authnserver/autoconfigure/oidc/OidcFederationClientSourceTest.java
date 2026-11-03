@@ -69,6 +69,7 @@ import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerAutoConfigur
 import se.swedenconnect.spring.authnserver.autoconfigure.ConfiguredAuthnServer;
 import se.swedenconnect.spring.authnserver.autoconfigure.storage.AuthnServerStorageAutoConfiguration;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurerAdapter;
+import se.swedenconnect.spring.authnserver.oidc.client.HttpClientKeysFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientRepository;
 import se.swedenconnect.spring.authnserver.oidc.client.RepositoryClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
@@ -78,7 +79,6 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClie
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCollectorSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceState;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpClientKeysFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;

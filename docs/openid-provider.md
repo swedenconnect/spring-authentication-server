@@ -368,6 +368,11 @@ For a client resolved through OpenID Federation, the metadata is checked when th
 `jwks_uri`, or at `signed_jwks_uri`, which such a client may also use, are fetched then and held with it, see
 [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) and
 [Section 6.8, "Keys of federation clients"](client-registry.html#client-keys) of [The client registry](client-registry.html).
+A client from the configuration or from a client repository is checked with the same rules, at startup or when it is
+first looked up, and the keys at its `jwks_uri` are read then and held with it. A client that registers a method that
+needs a client secret must have one, and the method must be enabled. See
+[Section 5.1, "Validation of configured and repository clients"](client-registry.html#static-client-validation) of
+[The client registry](client-registry.html).
 
 An unknown client and a client registry that fails end at the OpenID Provider, and are logged differently: the first
 at `INFO`, since it is a normal outcome, and the second at `ERROR`, since a dependency is not working.

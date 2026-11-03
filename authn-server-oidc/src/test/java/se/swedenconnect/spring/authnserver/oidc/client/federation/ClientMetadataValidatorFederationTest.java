@@ -46,12 +46,16 @@ import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.HeldKeys;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
+
 /**
- * Tests for {@link FederationClientValidator}.
+ * Tests for {@link ClientMetadataValidator}.
  *
  * @author Martin Lindström
  */
-class FederationClientValidatorTest extends FederationTestSupport {
+class ClientMetadataValidatorFederationTest extends FederationTestSupport {
 
   private static final String JWKS_URI = "https://client.example.com/jwks";
 
@@ -67,14 +71,14 @@ class FederationClientValidatorTest extends FederationTestSupport {
 
   private final StubSectorIdentifierFetcher sectorFetcher = new StubSectorIdentifierFetcher();
 
-  private final FederationClientValidator validator =
-      new FederationClientValidator(new PairwiseClientCheck(this.sectorFetcher), this.fetcher);
+  private final ClientMetadataValidator validator =
+      new ClientMetadataValidator(new PairwiseClientCheck(this.sectorFetcher), this.fetcher);
 
   // What is checked without keys
 
   @Test
   void aClientWithKeysAsJwksIsValidWithoutAnyFetch() {
-    final FederationClientValidator.Outcome outcome = this.validate(clientMetadata("RP"));
+    final ClientMetadataValidator.Outcome outcome = this.validate(clientMetadata("RP"));
 
     assertThat(outcome.isValid()).isTrue();
     assertThat(outcome.heldKeys()).isNull();
@@ -83,7 +87,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
 
   @Test
   void metadataThatCannotBeParsedIsALastingFault() {
-    final FederationClientValidator.Outcome outcome = this.validator.validate(new ResolvedClient(CLIENT_ID,
+    final ClientMetadataValidator.Outcome outcome = this.validator.validate(new ResolvedClient(CLIENT_ID,
         new OIDCClientMetadata(), Set.of(), Instant.now().plusSeconds(3600), "Unexpected type of redirect_uris", null),
         null);
 
@@ -131,7 +135,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
     final OIDCClientMetadata metadata = clientMetadata("RP");
     metadata.setTokenEndpointAuthMethod(null);
 
-    final FederationClientValidator.Outcome outcome = this.validate(metadata);
+    final ClientMetadataValidator.Outcome outcome = this.validate(metadata);
 
     assertThat(outcome.invalidReason()).contains("no token_endpoint_auth_method", "client_secret_basic",
         "client secret");
@@ -251,7 +255,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
     final OIDCClientMetadata metadata = clientMetadata("RP");
     metadata.setJWKSet(null);
 
-    final FederationClientValidator.Outcome outcome = this.validate(metadata);
+    final ClientMetadataValidator.Outcome outcome = this.validate(metadata);
 
     assertThat(outcome.invalidReason())
         .isEqualTo("there is no jwks, signed_jwks_uri or jwks_uri, and keys are needed for private_key_jwt");
@@ -300,7 +304,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
   void theKeysAtTheJwksUriAreFetchedAndHeld() {
     this.fetcher.jwks.put(JWKS_URI, publicKeys(CLIENT_KEY));
 
-    final FederationClientValidator.Outcome outcome = this.validate(uriClient(JWKS_URI));
+    final ClientMetadataValidator.Outcome outcome = this.validate(uriClient(JWKS_URI));
 
     assertThat(outcome.isValid()).isTrue();
     assertThat(outcome.heldKeys()).isNotNull().satisfies(h -> {
@@ -324,7 +328,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
 
   @Test
   void keysThatCannotBeFetchedTheFirstTimeGiveATemporaryMark() {
-    final FederationClientValidator.Outcome outcome = this.validate(uriClient(JWKS_URI));
+    final ClientMetadataValidator.Outcome outcome = this.validate(uriClient(JWKS_URI));
 
     assertThat(outcome.invalidReason()).isEqualTo("the keys at the jwks_uri cannot be fetched - HTTP status 503");
     assertThat(outcome.temporary()).isTrue();
@@ -335,7 +339,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
   void heldKeysFromTheSameUriAreKeptWhenTheFetchFails() {
     final HeldKeys earlier = new HeldKeys(JWKS_URI, false, publicKeys(CLIENT_KEY), null);
 
-    final FederationClientValidator.Outcome outcome = this.validate(uriClient(JWKS_URI), earlier);
+    final ClientMetadataValidator.Outcome outcome = this.validate(uriClient(JWKS_URI), earlier);
 
     assertThat(outcome.isValid()).isTrue();
     assertThat(outcome.heldKeys()).isEqualTo(earlier);
@@ -346,7 +350,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
   void aNewUriThatCannotBeFetchedGivesATemporaryMark() {
     final HeldKeys earlier = new HeldKeys("https://client.example.com/old-jwks", false, publicKeys(CLIENT_KEY), null);
 
-    final FederationClientValidator.Outcome outcome = this.validate(uriClient(JWKS_URI), earlier);
+    final ClientMetadataValidator.Outcome outcome = this.validate(uriClient(JWKS_URI), earlier);
 
     assertThat(outcome.isValid()).isFalse();
     assertThat(outcome.temporary()).isTrue();
@@ -358,7 +362,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
     final OIDCClientMetadata metadata = uriClient(JWKS_URI);
     metadata.setTokenEndpointAuthJWSAlg(JWSAlgorithm.ES256);
 
-    final FederationClientValidator.Outcome outcome =
+    final ClientMetadataValidator.Outcome outcome =
         this.validate(metadata, new HeldKeys(JWKS_URI, false, publicKeys(CLIENT_KEY), null));
 
     assertThat(outcome.invalidReason()).isEqualTo("the keys of the jwks_uri hold no usable key for private_key_jwt");
@@ -376,16 +380,16 @@ class FederationClientValidatorTest extends FederationTestSupport {
     all.setJWKSet(publicKeys(CLIENT_KEY));
     assertThat(this.validateSigned(all).heldKeys()).isNull();
     assertThat(this.fetcher.calls).isEmpty();
-    assertThat(FederationClientValidator.getKeysUri(all)).isNull();
+    assertThat(ClientMetadataValidator.getKeysUri(all)).isNull();
 
     all.setJWKSet(null);
     assertThat(this.validateSigned(all).heldKeys()).isNotNull()
         .satisfies(h -> assertThat(h.uri()).isEqualTo(SIGNED_JWKS_URI));
     assertThat(this.fetcher.calls).containsExactly(SIGNED_JWKS_URI);
-    assertThat(FederationClientValidator.getKeysUri(all)).isEqualTo(URI.create(SIGNED_JWKS_URI));
+    assertThat(ClientMetadataValidator.getKeysUri(all)).isEqualTo(URI.create(SIGNED_JWKS_URI));
 
     all.setSignedJWKSetURI(null);
-    assertThat(FederationClientValidator.getKeysUri(all)).isEqualTo(URI.create(JWKS_URI));
+    assertThat(ClientMetadataValidator.getKeysUri(all)).isEqualTo(URI.create(JWKS_URI));
   }
 
   // signed_jwks_uri
@@ -394,7 +398,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
   void theKeysAtTheSignedJwksUriAreVerifiedWithTheFederationEntityKeys() {
     this.fetcher.signedJwks.put(SIGNED_JWKS_URI, signedJwks(ENTITY_KEY, CLIENT_ID, publicKeys(CLIENT_KEY)));
 
-    final FederationClientValidator.Outcome outcome = this.validateSigned(signedClient());
+    final ClientMetadataValidator.Outcome outcome = this.validateSigned(signedClient());
 
     assertThat(outcome.isValid()).isTrue();
     assertThat(outcome.heldKeys()).isNotNull().satisfies(h -> {
@@ -408,7 +412,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
   void aSignedJwkSetWithABadSignatureIsALastingFault() {
     this.fetcher.signedJwks.put(SIGNED_JWKS_URI, signedJwks(key("other"), CLIENT_ID, publicKeys(CLIENT_KEY)));
 
-    final FederationClientValidator.Outcome outcome = this.validateSigned(signedClient());
+    final ClientMetadataValidator.Outcome outcome = this.validateSigned(signedClient());
 
     assertThat(outcome.invalidReason()).startsWith("the signed JWK Set at the signed_jwks_uri does not verify");
     assertThat(outcome.temporary()).isFalse();
@@ -427,7 +431,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
     assertThat(this.validateSigned(signedClient()).invalidReason()).contains("does not verify");
 
     final SignedJWT noKid = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.ES256)
-        .type(new JOSEObjectType(FederationClientValidator.SIGNED_JWKS_TYPE)).build(), claims);
+        .type(new JOSEObjectType(ClientMetadataValidator.SIGNED_JWKS_TYPE)).build(), claims);
     noKid.sign(new ECDSASigner(ENTITY_KEY));
     this.fetcher.signedJwks.put(SIGNED_JWKS_URI, noKid);
     assertThat(this.validateSigned(signedClient()).invalidReason())
@@ -438,7 +442,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
   void aSignedJwksUriCannotBeVerifiedWithoutATrustChain() {
     this.fetcher.signedJwks.put(SIGNED_JWKS_URI, signedJwks(ENTITY_KEY, CLIENT_ID, publicKeys(CLIENT_KEY)));
 
-    final FederationClientValidator.Outcome outcome = this.validate(signedClient());
+    final ClientMetadataValidator.Outcome outcome = this.validate(signedClient());
 
     assertThat(outcome.invalidReason()).isEqualTo("the keys at the signed_jwks_uri cannot be verified, since the "
         + "resolve response has no usable trust_chain");
@@ -451,7 +455,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
     final ECKey newEntityKey = key("new-entity-key");
     final HeldKeys earlier = new HeldKeys(SIGNED_JWKS_URI, true, publicKeys(CLIENT_KEY), publicKeys(ENTITY_KEY));
 
-    final FederationClientValidator.Outcome outcome = this.validator.validate(new ResolvedClient(CLIENT_ID,
+    final ClientMetadataValidator.Outcome outcome = this.validator.validate(new ResolvedClient(CLIENT_ID,
         signedClient(), Set.of(), Instant.now().plusSeconds(3600), null, publicKeys(newEntityKey)),
         this.earlier(earlier));
 
@@ -509,7 +513,7 @@ class FederationClientValidatorTest extends FederationTestSupport {
     metadata.setJWKSet(null);
     metadata.setJWKSetURI(URI.create(JWKS_URI));
 
-    final FederationClientValidator.Outcome outcome = this.validate(metadata);
+    final ClientMetadataValidator.Outcome outcome = this.validate(metadata);
 
     assertThat(outcome.invalidReason()).contains("2 different hosts");
     assertThat(outcome.heldKeys()).isNotNull();
@@ -525,16 +529,16 @@ class FederationClientValidatorTest extends FederationTestSupport {
     assertThat(this.sectorFetcher.calls).isEmpty();
   }
 
-  private FederationClientValidator.Outcome validate(final OIDCClientMetadata metadata) {
+  private ClientMetadataValidator.Outcome validate(final OIDCClientMetadata metadata) {
     return this.validate(metadata, null);
   }
 
-  private FederationClientValidator.Outcome validate(final OIDCClientMetadata metadata, final HeldKeys earlier) {
+  private ClientMetadataValidator.Outcome validate(final OIDCClientMetadata metadata, final HeldKeys earlier) {
     return this.validator.validate(
         new ResolvedClient(CLIENT_ID, metadata, Set.of(), Instant.now().plusSeconds(3600)), this.earlier(earlier));
   }
 
-  private FederationClientValidator.Outcome validateSigned(final OIDCClientMetadata metadata) {
+  private ClientMetadataValidator.Outcome validateSigned(final OIDCClientMetadata metadata) {
     return this.validator.validate(new ResolvedClient(CLIENT_ID, metadata, Set.of(),
         Instant.now().plusSeconds(3600), null, publicKeys(ENTITY_KEY)), null);
   }

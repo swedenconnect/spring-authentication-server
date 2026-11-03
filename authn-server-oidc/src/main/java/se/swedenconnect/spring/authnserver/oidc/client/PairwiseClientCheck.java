@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.oidc.client.federation;
+package se.swedenconnect.spring.authnserver.oidc.client;
 
 import java.io.IOException;
 import java.net.URI;
@@ -32,8 +32,8 @@ import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 /**
- * Checks the registration of a federation client with {@code subject_type} set to {@code pairwise}, so that its
- * pairwise {@code sub} values cannot be computed for another organization's sector, see
+ * Checks the registration of a client with {@code subject_type} set to {@code pairwise}, so that its pairwise
+ * {@code sub} values cannot be computed for another organization's sector, see
  * <a href="https://openid.net/specs/openid-connect-core-1_0.html#PairwiseAlg">OpenID Connect Core 1.0, Section 8.1</a>
  * and <a href="https://openid.net/specs/openid-connect-registration-1_0.html#SectorIdentifierValidation">OpenID
  * Connect Dynamic Client Registration 1.0, Section 5</a>.
@@ -52,6 +52,10 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * <p>
  * A successful check is remembered as a {@link VerifiedSector}, and the document is not fetched again until the
  * combination of {@code sector_identifier_uri} and redirect URIs changes.
+ * </p>
+ * <p>
+ * Clients from the configuration or a client repository are always checked with the {@code sector_identifier_uri}
+ * check turned off, see {@link ClientMetadataValidator}.
  * </p>
  *
  * @author Martin Lindström
@@ -158,7 +162,7 @@ public class PairwiseClientCheck {
   }
 
   /**
-   * Logs a registration error and creates the outcome for it.
+   * Creates the outcome of a registration error. The error is logged by the caller.
    *
    * @param clientId the {@code client_id} of the client
    * @param reason why the client is invalid
@@ -167,8 +171,7 @@ public class PairwiseClientCheck {
    */
   private @NonNull Outcome invalid(final @NonNull String clientId, final @NonNull String reason,
       final boolean temporary) {
-    log.warn("The pairwise client '{}' is marked as invalid{} - {}", clientId,
-        temporary ? " for a while" : " until it is resolved again", reason);
+    log.debug("The pairwise client '{}' has a registration error - {}", clientId, reason);
     return new Outcome(reason, temporary, null);
   }
 
@@ -178,7 +181,7 @@ public class PairwiseClientCheck {
    * @param invalidReason why the client is invalid, or {@code null} if it is valid
    * @param temporary whether the client is invalid only for a while, since the document at its
    *     {@code sector_identifier_uri} could not be fetched. Otherwise an invalid client stays invalid until it is
-   *     resolved again
+   *     validated again
    * @param verifiedSector the successful check to remember for the client, or {@code null}
    */
   public record Outcome(@Nullable String invalidReason, boolean temporary, @Nullable VerifiedSector verifiedSector) {

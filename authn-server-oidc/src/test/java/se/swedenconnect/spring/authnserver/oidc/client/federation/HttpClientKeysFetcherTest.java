@@ -36,6 +36,8 @@ import org.junit.jupiter.api.Test;
 import com.nimbusds.jose.jwk.ECKey;
 import com.sun.net.httpserver.HttpServer;
 
+import se.swedenconnect.spring.authnserver.oidc.client.HttpClientKeysFetcher;
+
 /**
  * Tests for {@link HttpClientKeysFetcher}.
  *

@@ -21,8 +21,6 @@ import jakarta.servlet.Filter;
 import jakarta.servlet.RequestDispatcher;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPublicKey;
@@ -48,9 +46,7 @@ import java.util.regex.Pattern;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -95,7 +91,6 @@ import com.nimbusds.oauth2.sdk.pkce.CodeVerifier;
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
 import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
-import com.sun.net.httpserver.HttpServer;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -119,15 +114,15 @@ import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.audit.AuditCollector;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
 import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.ClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientValidator;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationResolver;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.ResolvedClient;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
@@ -173,6 +168,12 @@ class OidcCodeFlowTest {
   private static final String ENC_CLIENT = "https://enc.example.com";
 
   private static final String BAD_ENC_CLIENT = "https://bad-enc.example.com";
+
+  private static final String STATIC_BAD_ENC_CLIENT = "https://static-bad-enc.example.com";
+
+  private static final String NO_REDIRECT_CLIENT = "https://no-redirect.example.com";
+
+  private static final String JWKS_URI = "https://jwks-uri.example.com/jwks";
 
   private static final String BASIC_CLIENT = "https://basic.example.com";
 
@@ -224,9 +225,8 @@ class OidcCodeFlowTest {
 
   private static final InMemoryAccessTokenStore ACCESS_TOKENS = new InMemoryAccessTokenStore();
 
-  private static HttpServer jwksServer;
-
-  private static String jwksUri;
+  /** Gives the keys at the jwks_uri of the configured clients. */
+  private static final CountingKeysFetcher CLIENT_KEYS = new CountingKeysFetcher();
 
   private static List<AbstractUserAuthenticationProvider> providers;
 
@@ -249,7 +249,7 @@ class OidcCodeFlowTest {
           .protocol(new OidcProviderConfigurer()
               .signingKeys(List.of(SigningKey.activeDefault(OP_RSA), SigningKey.active(OP_EC)))
               .scopes(List.of("openid", "profile", PNR_SCOPE))
-              .authnRequestProcessor(c -> c.accessTokenStore(ACCESS_TOKENS)));
+              .authnRequestProcessor(c -> c.accessTokenStore(ACCESS_TOKENS).clientKeysFetcher(CLIENT_KEYS)));
       providers.forEach(configurer::authenticationProvider);
       AuthnServerConfigurer.applyDefaultSecurity(http, configurer);
       customizer.accept(configurer);
@@ -267,30 +267,11 @@ class OidcCodeFlowTest {
     }
   }
 
-  @BeforeAll
-  static void startJwksServer() throws Exception {
-    jwksServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-    jwksServer.createContext("/jwks", exchange -> {
-      final byte[] body = new JWKSet(List.of(ecJwk(CLIENT_EC, "ec-key"), rsaJwk(CLIENT_RSA, "rsa-key", null)))
-          .toString().getBytes(StandardCharsets.UTF_8);
-      exchange.getResponseHeaders().add("Content-Type", "application/json");
-      exchange.sendResponseHeaders(200, body.length);
-      try (final OutputStream out = exchange.getResponseBody()) {
-        out.write(body);
-      }
-    });
-    jwksServer.start();
-    jwksUri = "http://localhost:" + jwksServer.getAddress().getPort() + "/jwks";
-  }
-
-  @AfterAll
-  static void stopJwksServer() {
-    jwksServer.stop(0);
-  }
-
   @BeforeEach
   void setUp() {
     this.session = new MockHttpSession();
+    CLIENT_KEYS.keys = new JWKSet(List.of(ecJwk(CLIENT_EC, "ec-key"), rsaJwk(CLIENT_RSA, "rsa-key", null)));
+    CLIENT_KEYS.calls = 0;
   }
 
   @AfterEach
@@ -444,7 +425,8 @@ class OidcCodeFlowTest {
 
   @Test
   void aClientAskingForEncryptionThatCannotBeUsedEndsAtAnErrorPage() throws Exception {
-    this.start(c -> {}, new TestProvider("direct", LOA3));
+    // The client comes from a backend of the application's own, whose clients are not validated
+    this.start(c -> c.clientRegistryBackend(new OwnClientBackend()), new TestProvider("direct", LOA3));
     final MockHttpServletRequest request = get(AUTHZ_PATH, params(BAD_ENC_CLIENT));
     final MockHttpServletResponse response = this.send(request);
     assertThat(response.getStatus()).isEqualTo(500);
@@ -669,7 +651,8 @@ class OidcCodeFlowTest {
   @Test
   void aClientWhoseUserInfoEncryptionCannotBeUsedGetsAnErrorAndNoClaims() throws Exception {
     final ListAppender<ILoggingEvent> appender = appender(ClientEncryption.class);
-    this.start(c -> {}, new TestProvider("direct", LOA3));
+    // The client comes from a backend of the application's own, whose clients are not validated
+    this.start(c -> c.clientRegistryBackend(new OwnClientBackend()), new TestProvider("direct", LOA3));
     final Map<String, String> params = params(USERINFO_BAD_ENC_CLIENT);
     params.put("scope", "openid profile");
     final Map<String, Object> json = this.tokenJson(params);
@@ -863,6 +846,61 @@ class OidcCodeFlowTest {
     assertThat(response.get("error_description")).contains(backend.reason);
     assertThat(response.get("state")).isEqualTo("state-1");
     assertThat(this.audit().getTypes()).containsExactly("authn_request_received", "authn_error_response");
+  }
+
+  @Test
+  void aConfiguredClientWithAFaultGetsInvalidClientAtBothEndpoints() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+
+    final Map<String, String> response = query(this.send(get(AUTHZ_PATH, params(STATIC_BAD_ENC_CLIENT))));
+    assertThat(response.get("error")).isEqualTo("invalid_client");
+    assertThat(response.get("error_description"))
+        .contains("the id_token_encrypted_response_alg RSA1_5 is not supported");
+    assertThat(response.get("state")).isEqualTo("state-1");
+
+    assertTokenError(this.token(privateKeyJwt(STATIC_BAD_ENC_CLIENT, CLIENT_RSA, "rsa-key"), "a-code", REDIRECT_URI,
+        null), 401, "invalid_client");
+  }
+
+  @Test
+  void aConfiguredClientWithoutARedirectUriEndsAtTheErrorPage() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+
+    final MockHttpServletRequest request = get(AUTHZ_PATH, params(NO_REDIRECT_CLIENT));
+    final MockHttpServletResponse response = this.send(request);
+    assertThat(response.getStatus()).isEqualTo(500);
+    assertThat(response.getRedirectedUrl()).isNull();
+    assertThat(request.getAttribute(RequestDispatcher.ERROR_EXCEPTION))
+        .isInstanceOfSatisfying(UnrecoverableErrorException.class,
+            e -> assertThat(e.getError()).isEqualTo(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION));
+
+    assertTokenError(this.token(privateKeyJwt(NO_REDIRECT_CLIENT, CLIENT_RSA, "rsa-key"), "a-code", REDIRECT_URI,
+        null), 401, "invalid_client");
+  }
+
+  @Test
+  void aConfiguredClientUsesTheKeysHeldFromItsJwksUriAndReadsThemAgainForAnUnknownKey() throws Exception {
+    this.start(c -> {}, new TestProvider("direct", LOA3));
+
+    // The keys are read at startup, and a request makes no fetch
+    assertThat(CLIENT_KEYS.calls).isEqualTo(1);
+    String code = this.authorize(params(JWKS_URI_CLIENT)).get("code");
+    assertThat(this.token(privateKeyJwt(JWKS_URI_CLIENT, CLIENT_EC, "ec-key"), code, REDIRECT_URI, null).getStatus())
+        .isEqualTo(200);
+    assertThat(CLIENT_KEYS.calls).isEqualTo(1);
+
+    // The client rolls over its keys
+    CLIENT_KEYS.keys = new JWKSet(rsaJwk(OTHER, "new-key", null));
+    code = this.authorize(params(JWKS_URI_CLIENT)).get("code");
+    assertThat(this.token(privateKeyJwt(JWKS_URI_CLIENT, OTHER, "new-key"), code, REDIRECT_URI, null).getStatus())
+        .isEqualTo(200);
+    assertThat(CLIENT_KEYS.calls).isEqualTo(2);
+
+    // A made-up key makes no new fetch within a minute
+    code = this.authorize(params(JWKS_URI_CLIENT)).get("code");
+    assertTokenError(this.token(privateKeyJwt(JWKS_URI_CLIENT, CLIENT_RSA, "made-up"), code, REDIRECT_URI, null),
+        401, "invalid_client");
+    assertThat(CLIENT_KEYS.calls).isEqualTo(2);
   }
 
   // Federation clients
@@ -1196,11 +1234,14 @@ class OidcCodeFlowTest {
   }
 
   @Test
-  void secretBasedMethodsAreRejectedWhenNotEnabled() throws Exception {
+  void aClientWithASecretBasedMethodThatIsNotEnabledIsMarkedAsInvalid() throws Exception {
     this.start(c -> {}, new TestProvider("direct", LOA3));
-    final String code = this.authorize(params(POST_CLIENT)).get("code");
-    assertTokenError(this.token(Map.of("client_id", POST_CLIENT, "client_secret", SECRET), code, REDIRECT_URI, null),
-        401, "invalid_client");
+    final Map<String, String> response = query(this.send(get(AUTHZ_PATH, params(POST_CLIENT))));
+    assertThat(response.get("error")).isEqualTo("invalid_client");
+    assertThat(response.get("error_description"))
+        .contains("the token_endpoint_auth_method client_secret_post is not supported");
+    assertTokenError(this.token(Map.of("client_id", POST_CLIENT, "client_secret", SECRET), "a-code", REDIRECT_URI,
+        null), 401, "invalid_client");
   }
 
   // Configuration
@@ -1732,7 +1773,7 @@ class OidcCodeFlowTest {
     clients.add(OidcClientRecord.of(EC_CLIENT, ec));
 
     final OIDCClientMetadata jwksUriClient = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null);
-    jwksUriClient.setJWKSetURI(URI.create(jwksUri));
+    jwksUriClient.setJWKSetURI(URI.create(JWKS_URI));
     clients.add(OidcClientRecord.of(JWKS_URI_CLIENT, jwksUriClient));
 
     final OIDCClientMetadata enc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT,
@@ -1742,9 +1783,13 @@ class OidcCodeFlowTest {
     enc.setIDTokenJWEEnc(EncryptionMethod.A256GCM);
     clients.add(OidcClientRecord.of(ENC_CLIENT, enc));
 
-    final OIDCClientMetadata badEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
-    badEnc.setIDTokenJWEAlg(JWEAlgorithm.RSA1_5);
-    clients.add(OidcClientRecord.of(BAD_ENC_CLIENT, badEnc));
+    final OIDCClientMetadata staticBadEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
+    staticBadEnc.setIDTokenJWEAlg(JWEAlgorithm.RSA1_5);
+    clients.add(OidcClientRecord.of(STATIC_BAD_ENC_CLIENT, staticBadEnc));
+
+    final OIDCClientMetadata noRedirect = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
+    noRedirect.setRedirectionURIs(null);
+    clients.add(OidcClientRecord.of(NO_REDIRECT_CLIENT, noRedirect));
 
     final OIDCClientMetadata userInfoEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT,
         new JWKSet(List.of(rsaJwk(CLIENT_RSA, "rsa-key", KeyUse.SIGNATURE),
@@ -1752,10 +1797,6 @@ class OidcCodeFlowTest {
     userInfoEnc.setUserInfoJWEAlg(JWEAlgorithm.RSA_OAEP_256);
     userInfoEnc.setUserInfoJWEEnc(EncryptionMethod.A256GCM);
     clients.add(OidcClientRecord.of(USERINFO_ENC_CLIENT, userInfoEnc));
-
-    final OIDCClientMetadata userInfoBadEnc = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
-    userInfoBadEnc.setUserInfoJWEAlg(JWEAlgorithm.RSA1_5);
-    clients.add(OidcClientRecord.of(USERINFO_BAD_ENC_CLIENT, userInfoBadEnc));
 
     for (final Map.Entry<String, String> e : Map.of(PAIRWISE_ONE, "https://sector.example.com/redirects.json",
         PAIRWISE_TWO, "https://sector.example.com/redirects.json",
@@ -1831,7 +1872,7 @@ class OidcCodeFlowTest {
       };
       this.backend = new FederationClientBackend(resolver, (id, type) -> null, new InMemoryFederationCache(this.clock),
           FederationCacheSettings.defaults(), this.clock);
-      this.backend.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), this.keysFetcher));
+      this.backend.setValidator(new ClientMetadataValidator(new PairwiseClientCheck(null), this.keysFetcher));
     }
   }
 
@@ -1908,6 +1949,36 @@ class OidcCodeFlowTest {
       }
       return OidcClientRecord.of(INVALID_CLIENT, metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT,
           new JWKSet(rsaJwk(CLIENT_RSA, "rsa-key", null)))).toRequesterRecord().withInvalidReason(this.reason);
+    }
+  }
+
+  /** A backend of the application's own, whose clients ask for encryption that cannot be used. */
+  private static final class OwnClientBackend implements ClientRegistryBackend {
+
+    @Override
+    public @NonNull String getName() {
+      return "own";
+    }
+
+    @Override
+    public @NonNull AuthenticationProtocol getProtocol() {
+      return AuthenticationProtocol.OIDC;
+    }
+
+    @Override
+    public @Nullable RequesterRecord lookup(final @NonNull String identifier) {
+      final JWKSet keys = new JWKSet(List.of(rsaJwk(CLIENT_RSA, "rsa-key", null), ecJwk(CLIENT_EC, "ec-key")));
+      final OIDCClientMetadata metadata = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, keys);
+      if (BAD_ENC_CLIENT.equals(identifier)) {
+        metadata.setIDTokenJWEAlg(JWEAlgorithm.RSA1_5);
+      }
+      else if (USERINFO_BAD_ENC_CLIENT.equals(identifier)) {
+        metadata.setUserInfoJWEAlg(JWEAlgorithm.RSA1_5);
+      }
+      else {
+        return null;
+      }
+      return OidcClientRecord.of(identifier, metadata).toRequesterRecord();
     }
   }
 

@@ -15,6 +15,7 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.config;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,6 +27,11 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -51,8 +57,19 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetch
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationConverter;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientKeyHolder;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientKeysRefresher;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientValidation;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientValidationStore;
+import se.swedenconnect.spring.authnserver.oidc.client.HeldKeysClientKeyResolver;
+import se.swedenconnect.spring.authnserver.oidc.client.HttpClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientValidationStore;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
+import se.swedenconnect.spring.authnserver.oidc.client.ValidatingClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientKeyResolver;
 import se.swedenconnect.spring.authnserver.oidc.federation.OidcEntityMetadata;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
@@ -75,14 +92,15 @@ import se.swedenconnect.spring.authnserver.oidc.token.InMemoryAccessTokenStore;
 import se.swedenconnect.spring.authnserver.oidc.token.InMemoryAuthorizationCodeStore;
 import se.swedenconnect.spring.authnserver.oidc.token.InMemoryClientAssertionReplayCache;
 import se.swedenconnect.spring.authnserver.oidc.token.TokenRequestProcessor;
+import se.swedenconnect.spring.authnserver.oidc.userinfo.UserInfoRequestProcessor;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcAuthnRequestProcessingFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcErrorResponseProcessingFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcJwksEndpointFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcResumedAuthenticationHandler;
-import se.swedenconnect.spring.authnserver.oidc.userinfo.UserInfoRequestProcessor;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcTokenEndpointFilter;
-import se.swedenconnect.spring.authnserver.oidc.web.OidcUserInfoEndpointFilter;
 import se.swedenconnect.spring.authnserver.oidc.web.OidcUserAuthenticationProcessingFilter;
+import se.swedenconnect.spring.authnserver.oidc.web.OidcUserInfoEndpointFilter;
+import se.swedenconnect.spring.authnserver.registry.ClientRegistryBackend;
 import se.swedenconnect.spring.authnserver.web.ResumedAuthenticationHandler;
 import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
 
@@ -109,6 +127,12 @@ import se.swedenconnect.spring.authnserver.web.UserAuthenticationFlow;
  * {@link OidcAuthnRequestAuthenticationConverter} and {@link OidcAuthnRequestAuthenticationProvider}. The clients are
  * found in the client registry. The settings for PKCE, signed request objects and {@code state} are held here, and
  * the processing components can be replaced with {@link #authnRequestProcessor(Customizer)}.
+ * </p>
+ * <p>
+ * Every client is validated against what the OpenID Provider supports, see {@link ClientMetadataValidator}. The
+ * configurer assigns a {@link ClientValidation} to each {@link ValidatingClientBackend} that has been added, which
+ * validates the clients from the configuration and the clients that a client repository can list, and starts the
+ * {@link ClientKeysRefresher}.
  * </p>
  * <p>
  * A processed request is handed to the authentication providers through the {@link UserAuthenticationFlow}, and the
@@ -196,6 +220,12 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   private Set<ClientAuthenticationMethod> clientAuthenticationMethods =
       Set.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
 
+  /** How often the keys of clients from the configuration and client repositories are read again. */
+  private Duration clientKeysRefreshInterval = ClientKeysRefresher.DEFAULT_INTERVAL;
+
+  /** How long a client from the configuration or a client repository whose keys cannot be read is marked invalid. */
+  private Duration clientKeysFailureTimeToLive = FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE;
+
   /** The signing keys. */
   private List<SigningKey> signingKeys;
 
@@ -266,6 +296,9 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
 
   /** Finds the keys of clients, created at initialization. */
   private ClientKeyResolver clientKeyResolver;
+
+  /** Reads the keys of clients from the configuration and client repositories again, or {@code null}. */
+  private ClientKeysRefresher clientKeysRefresher;
 
   /** The authorization code store, created at initialization. */
   private AuthorizationCodeStore authorizationCodeStore;
@@ -618,6 +651,51 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
   }
 
   /**
+   * Assigns how often the keys at the {@code jwks_uri} of clients from the configuration and from client repositories
+   * are read again, see {@link ClientKeysRefresher}. Defaults to one hour. The value must be positive.
+   *
+   * @param interval the interval
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer clientKeysRefreshInterval(final @NonNull Duration interval) {
+    this.clientKeysRefreshInterval = Objects.requireNonNull(interval, "interval must not be null");
+    return this;
+  }
+
+  /**
+   * Gets how often the keys of clients from the configuration and from client repositories are read again.
+   *
+   * @return the interval
+   */
+  public @NonNull Duration getClientKeysRefreshInterval() {
+    return this.clientKeysRefreshInterval;
+  }
+
+  /**
+   * Assigns how long a client from the configuration or a client repository is marked as invalid when its keys cannot
+   * be read on the first check. The client is validated again after that. Defaults to
+   * {@link FederationCacheSettings#DEFAULT_NOT_FOUND_TIME_TO_LIVE}, the same as for federation clients. The value must
+   * be positive.
+   *
+   * @param timeToLive the time
+   * @return this configurer
+   */
+  public @NonNull OidcProviderConfigurer clientKeysFailureTimeToLive(final @NonNull Duration timeToLive) {
+    this.clientKeysFailureTimeToLive = Objects.requireNonNull(timeToLive, "timeToLive must not be null");
+    return this;
+  }
+
+  /**
+   * Gets how long a client from the configuration or a client repository whose keys cannot be read is marked as
+   * invalid.
+   *
+   * @return the time
+   */
+  public @NonNull Duration getClientKeysFailureTimeToLive() {
+    return this.clientKeysFailureTimeToLive;
+  }
+
+  /**
    * Gets the access token store. Available after initialization.
    *
    * @return the access token store
@@ -955,16 +1033,25 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     this.clientKeyResolver =
         Objects.requireNonNullElseGet(components.getClientKeyResolver(), DefaultClientKeyResolver::new);
 
-    // Federation clients are validated against what the OpenID Provider supports, and hold their keys ...
+    // Clients are validated against what the OpenID Provider supports, and hold their keys ...
     //
-    final List<FederationClientBackend> federationBackends = this.getServer().getClientRegistryBackends().stream()
+    final OIDCProviderMetadata providerMetadata = this.discoveryEndpointConfigurer.getProviderMetadata();
+    final List<ClientRegistryBackend> backends = this.getServer().getClientRegistryBackends();
+    final List<FederationClientBackend> federationBackends = backends.stream()
         .filter(FederationClientBackend.class::isInstance)
         .map(FederationClientBackend.class::cast)
         .toList();
-    if (!federationBackends.isEmpty()) {
-      final OIDCProviderMetadata providerMetadata = this.discoveryEndpointConfigurer.getProviderMetadata();
-      federationBackends.forEach(b -> b.getValidator().setProviderMetadata(providerMetadata));
-      this.clientKeyResolver = new FederationClientKeyResolver(federationBackends, this.clientKeyResolver);
+    federationBackends.forEach(b -> b.getValidator().setProviderMetadata(providerMetadata));
+    this.setUpClientValidation(http, backends.stream()
+        .filter(ValidatingClientBackend.class::isInstance)
+        .map(ValidatingClientBackend.class::cast)
+        .toList(), federationBackends, providerMetadata);
+    final List<ClientKeyHolder> keyHolders = backends.stream()
+        .filter(ClientKeyHolder.class::isInstance)
+        .map(ClientKeyHolder.class::cast)
+        .toList();
+    if (!keyHolders.isEmpty()) {
+      this.clientKeyResolver = new HeldKeysClientKeyResolver(keyHolders, this.clientKeyResolver);
     }
     this.authorizationCodeStore =
         Objects.requireNonNullElseGet(components.getAuthorizationCodeStore(), InMemoryAuthorizationCodeStore::new);
@@ -985,6 +1072,58 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     log.info("OpenID Provider '{}' - signing keys: {}, decryption keys: {}, client authentication methods: {}",
         this.getIssuer(), this.keys.getSigningKeys(), this.keys.getDecryptionKeys(),
         this.clientAuthenticationMethods);
+  }
+
+  /**
+   * Sets up the validation of the clients from the configuration and from client repositories, which validates the
+   * clients that can be listed, and starts the job that reads their keys again. The job is stopped when the
+   * application context is closed.
+   *
+   * @param http the HTTP security object
+   * @param backends the backends whose clients are validated
+   * @param federationBackends the federation backends, whose key fetcher is used unless one is assigned
+   * @param providerMetadata the discovery document of the OpenID Provider
+   */
+  private void setUpClientValidation(final @NonNull HttpSecurity http,
+      final @NonNull List<ValidatingClientBackend> backends,
+      final @NonNull List<FederationClientBackend> federationBackends,
+      final @NonNull OIDCProviderMetadata providerMetadata) {
+    if (backends.isEmpty()) {
+      return;
+    }
+    final ApplicationContext context = http.getSharedObject(ApplicationContext.class);
+    final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
+    ClientKeysFetcher keysFetcher = components.getClientKeysFetcher();
+    if (keysFetcher == null && !federationBackends.isEmpty()) {
+      keysFetcher = federationBackends.getFirst().getValidator().getKeysFetcher();
+    }
+    if (keysFetcher == null) {
+      final HttpClientKeysFetcher httpFetcher = new HttpClientKeysFetcher();
+      httpFetcher.setApplicationEventPublisher(context);
+      keysFetcher = httpFetcher;
+    }
+    final ClientMetadataValidator validator = new ClientMetadataValidator(new PairwiseClientCheck(null), keysFetcher);
+    validator.setProviderMetadata(providerMetadata);
+    final ClientValidationStore store =
+        Objects.requireNonNullElseGet(components.getClientValidationStore(), InMemoryClientValidationStore::new);
+    for (final ValidatingClientBackend backend : backends) {
+      backend.setClientValidation(new ClientValidation(backend.getName(), validator, store,
+          this.clientKeysFailureTimeToLive, Clock.systemUTC()));
+    }
+    if (this.clientKeysRefresher != null) {
+      this.clientKeysRefresher.close();
+    }
+    final ClientKeysRefresher refresher =
+        new ClientKeysRefresher(backends, store.getJobLock(), this.clientKeysRefreshInterval);
+    refresher.start();
+    this.clientKeysRefresher = refresher;
+    if (context instanceof final ConfigurableApplicationContext configurable) {
+      configurable.addApplicationListener((ApplicationListener<ApplicationEvent>) event -> {
+        if (event instanceof ContextClosedEvent) {
+          refresher.close();
+        }
+      });
+    }
   }
 
   /** {@inheritDoc} */
@@ -1183,6 +1322,8 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     assertPositive(this.accessTokenLifetime, "access token lifetime");
     assertPositive(this.idTokenLifetime, "ID token lifetime");
     assertPositive(this.maxJwtAge, "maximum JWT age");
+    assertPositive(this.clientKeysRefreshInterval, "client keys refresh interval");
+    assertPositive(this.clientKeysFailureTimeToLive, "client keys failure time to live");
     if (this.clientAuthenticationMethods.isEmpty()) {
       throw new IllegalArgumentException("At least one OIDC client authentication method must be enabled");
     }

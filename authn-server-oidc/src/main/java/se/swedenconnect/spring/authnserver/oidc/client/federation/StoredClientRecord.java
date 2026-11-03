@@ -30,6 +30,9 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
+import se.swedenconnect.spring.authnserver.oidc.client.HeldKeys;
+import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
+
 /**
  * A {@link CachedClientRecord} as it is written outside the memory of the server, to Redis or to a file. The client
  * metadata is kept as the JSON that the metadata gives.

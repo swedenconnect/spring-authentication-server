@@ -28,6 +28,10 @@ import org.jspecify.annotations.Nullable;
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.HeldKeys;
+import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
+
 /**
  * An entry of the {@link FederationCache}: what the resolver answered about a client, or that it does not know the
  * client, and for how long the answer is kept.
@@ -38,7 +42,7 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @param onDemandTrustMarks the trust marks that have been asked for on demand, keyed by type
  * @param expiresAt when the entry is no longer valid
  * @param invalidReason why the client is marked as invalid, or {@code null} if it is not, see
- *     {@link FederationClientValidator}
+ *     {@link ClientMetadataValidator}
  * @param verifiedSector the successful check of the client's {@code sector_identifier_uri} that is remembered, or
  *     {@code null}
  * @param heldKeys the keys fetched from the client's {@code jwks_uri} or {@code signed_jwks_uri}, or {@code null}
@@ -173,7 +177,7 @@ public record CachedClientRecord(
    * @param temporaryMark how long a temporary mark lasts
    * @return a {@link CachedClientRecord}
    */
-  public @NonNull CachedClientRecord withOutcome(final FederationClientValidator.@NonNull Outcome outcome,
+  public @NonNull CachedClientRecord withOutcome(final ClientMetadataValidator.@NonNull Outcome outcome,
       final @NonNull Instant now, final @NonNull Duration temporaryMark) {
     Objects.requireNonNull(outcome, "outcome must not be null");
     Instant expiry = this.expiresAt;

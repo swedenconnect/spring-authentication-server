@@ -43,6 +43,7 @@ import com.nimbusds.oauth2.sdk.id.Identifier;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
 import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import net.minidev.json.JSONObject;
 
@@ -50,7 +51,9 @@ import se.oidc.nimbus.claims.ParameterConstants;
 import se.swedenconnect.spring.authnserver.attributes.AttributeIdentifiers;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
+import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientRepository;
+import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
 import se.swedenconnect.spring.authnserver.oidc.client.RepositoryClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
@@ -195,6 +198,12 @@ class OidcProviderConfigurerTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.idTokenLifetime(Duration.ZERO)))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("ID token lifetime");
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(
+        c -> c.clientKeysRefreshInterval(Duration.ZERO)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(
+        c -> c.clientKeysFailureTimeToLive(Duration.ofSeconds(-1))))
+        .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.maxJwtAge(Duration.ZERO)))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("maximum JWT age");
     assertThatThrownBy(() -> new OidcProviderConfigurerTest().buildWith(c -> c.maxJwtAge(Duration.ofSeconds(-1))))
@@ -367,6 +376,37 @@ class OidcProviderConfigurerTest {
         .protocol(this.oidc);
     this.server.init(mock(HttpSecurity.class));
     assertThat(this.server.getClientRegistry()).isNotNull();
+  }
+
+  @Test
+  void theClientsOfTheConfigurationAndOfRepositoriesAreValidatedAgainstWhatTheProviderSupports() {
+    final OIDCClientMetadata metadata = new OIDCClientMetadata();
+    metadata.setRedirectionURI(URI.create("https://client.example.com/callback"));
+    metadata.setTokenEndpointAuthMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+    metadata.setCustomField(OidcClientRecord.CLIENT_SECRET, "a-secret");
+    final ConfigurationClientBackend configuration =
+        new ConfigurationClientBackend(List.of(OidcClientRecord.of("https://client.example.com", metadata)));
+    final RepositoryClientBackend repository = new RepositoryClientBackend(
+        new InMemoryClientRepository(List.of(OidcClientRecord.of("https://stored.example.com", metadata))));
+    this.server.clientRegistryBackend(configuration).clientRegistryBackend(repository)
+        .protocol(this.oidc.clientKeysRefreshInterval(Duration.ofMinutes(30)));
+    this.server.init(mock(HttpSecurity.class));
+
+    assertThat(configuration.getClientValidation()).isNotNull();
+    assertThat(repository.getClientValidation()).isNotNull();
+    // Only private_key_jwt is enabled
+    assertThat(configuration.lookup("https://client.example.com").invalidReason())
+        .isEqualTo("the token_endpoint_auth_method client_secret_basic is not supported");
+    assertThat(repository.lookup("https://stored.example.com").invalidReason())
+        .isEqualTo("the token_endpoint_auth_method client_secret_basic is not supported");
+
+    final OidcProviderConfigurerTest other = new OidcProviderConfigurerTest();
+    final ConfigurationClientBackend enabled =
+        new ConfigurationClientBackend(List.of(OidcClientRecord.of("https://client.example.com", metadata)));
+    other.server.clientRegistryBackend(enabled).protocol(other.oidc.clientAuthenticationMethods(
+        Set.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT, ClientAuthenticationMethod.CLIENT_SECRET_BASIC)));
+    other.server.init(mock(HttpSecurity.class));
+    assertThat(enabled.lookup("https://client.example.com").isValid()).isTrue();
   }
 
   @Test

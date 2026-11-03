@@ -48,6 +48,9 @@ import org.springframework.session.data.redis.config.annotation.web.http.RedisHt
 import org.springframework.util.ClassUtils;
 
 import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerConfigurationProperties;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientValidationStore;
+import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientValidationStore;
+import se.swedenconnect.spring.authnserver.oidc.client.RedisClientValidationStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceStateStore;
@@ -83,8 +86,9 @@ import se.swedenconnect.spring.authnserver.saml.authnrequest.validation.replay.R
  * its session module is present and by this class otherwise, with the key prefix as the default namespace.
  * </p>
  * <p>
- * The record of known clients follows the shared setting. In memory, it and the federation cache are kept in the
- * cache directory, {@code authn-server.cache-directory}, when one is given, so that they survive a restart.
+ * The record of known clients and the store of the outcomes of the validation of OpenID Connect clients follow the
+ * shared setting. In memory, the record of known clients and the federation cache are kept in the cache directory,
+ * {@code authn-server.cache-directory}, when one is given, so that they survive a restart.
  * </p>
  * <p>
  * Startup fails when something is to be kept in Redis and Spring Data Redis or a working Redis connection is missing,
@@ -279,6 +283,19 @@ public class AuthnServerStorageAutoConfiguration {
     }
 
     /**
+     * Creates the store of the outcomes of the validation of clients from the configuration and client repositories in
+     * memory. It follows the shared storage setting.
+     *
+     * @return an {@link InMemoryClientValidationStore}
+     */
+    @Bean
+    @ConditionalOnMissingBean(ClientValidationStore.class)
+    @ConditionalOnStorageType(StorageType.MEMORY)
+    ClientValidationStore authnServerClientValidationStore() {
+      return new InMemoryClientValidationStore();
+    }
+
+    /**
      * Creates the store of the state of the federation services in memory. It follows the federation cache.
      *
      * @return an {@link InMemoryFederationServiceStateStore}
@@ -385,6 +402,20 @@ public class AuthnServerStorageAutoConfiguration {
       @ConditionalOnStorageType(store = StorageSettings.OIDC_FEDERATION_CACHE, value = StorageType.REDIS)
       FederationEntityStore authnServerFederationEntityStore(final RedisStorage storage) {
         return new RedisFederationEntityStore(storage.getRedisTemplate(), storage.getKeyPrefix());
+      }
+
+      /**
+       * Creates the store of the outcomes of the validation of clients from the configuration and client
+       * repositories, so that all nodes share the outcomes and the held keys. It follows the shared storage setting.
+       *
+       * @param storage the Redis storage
+       * @return a {@link RedisClientValidationStore}
+       */
+      @Bean
+      @ConditionalOnMissingBean(ClientValidationStore.class)
+      @ConditionalOnStorageType(StorageType.REDIS)
+      ClientValidationStore authnServerClientValidationStore(final RedisStorage storage) {
+        return new RedisClientValidationStore(storage.getRedisTemplate(), storage.getKeyPrefix());
       }
 
       /**

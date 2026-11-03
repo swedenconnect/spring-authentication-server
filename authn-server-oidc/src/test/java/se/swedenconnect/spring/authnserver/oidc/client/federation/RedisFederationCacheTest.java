@@ -41,6 +41,9 @@ import com.nimbusds.jose.jwk.JWKMatcher;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.oidc.RedisTestNodes;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
+import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
 import se.swedenconnect.spring.authnserver.registry.ClientUpdateResult;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 
@@ -319,8 +322,8 @@ class RedisFederationCacheTest extends FederationTestSupport {
         FederationCacheSettings.defaults(), this.clock);
     final FederationClientBackend backendB = new FederationClientBackend(resolver, (id, type) -> null, this.cacheB,
         FederationCacheSettings.defaults(), this.clock);
-    backendA.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), fetcher));
-    backendB.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), fetcher));
+    backendA.setValidator(new ClientMetadataValidator(new PairwiseClientCheck(null), fetcher));
+    backendB.setValidator(new ClientMetadataValidator(new PairwiseClientCheck(null), fetcher));
 
     // Node A resolves the client and fetches its keys, node B uses them without a fetch
     final OIDCClientMetadata held = backendA.lookup(CLIENT_ID).getProtocolMetadata(OIDCClientMetadata.class);
