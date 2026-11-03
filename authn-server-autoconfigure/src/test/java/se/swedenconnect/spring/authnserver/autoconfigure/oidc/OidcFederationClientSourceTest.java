@@ -78,6 +78,7 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClie
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCollectorSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceMonitor;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationServiceState;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpClientKeysFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationServiceStateStore;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistry;
@@ -440,6 +441,9 @@ class OidcFederationClientSourceTest {
       assertThat(context).hasNotFailed();
       assertThat(context.getBean(OidcFederationClientSource.class).getBackend().getPairwiseClientCheck()
           .isSectorIdentifierUriChecked()).isTrue();
+      // The pairwise check is part of the validator, which fetches client keys over HTTP
+      assertThat(context.getBean(OidcFederationClientSource.class).getBackend().getValidator().getKeysFetcher())
+          .isInstanceOf(HttpClientKeysFetcher.class);
     });
     this.runner().withPropertyValues("authn-server.oidc.federation.clients.check-sector-identifier-uri=false")
         .run(context -> {

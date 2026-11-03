@@ -36,6 +36,7 @@ import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
+import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.provider.UserAuthenticationProvider;
@@ -50,6 +51,8 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetch
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationConverter;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.OidcAuthnRequestAuthenticationProvider;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestObjectDecoder;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientKeyResolver;
 import se.swedenconnect.spring.authnserver.oidc.federation.OidcEntityMetadata;
 import se.swedenconnect.spring.authnserver.oidc.keys.DecryptionKey;
 import se.swedenconnect.spring.authnserver.oidc.keys.OidcKeys;
@@ -951,6 +954,18 @@ public class OidcProviderConfigurer extends AbstractProtocolConfigurer<OidcProvi
     final OidcAuthnRequestProcessorConfigurer components = this.authnRequestProcessorConfigurer;
     this.clientKeyResolver =
         Objects.requireNonNullElseGet(components.getClientKeyResolver(), DefaultClientKeyResolver::new);
+
+    // Federation clients are validated against what the OpenID Provider supports, and hold their keys ...
+    //
+    final List<FederationClientBackend> federationBackends = this.getServer().getClientRegistryBackends().stream()
+        .filter(FederationClientBackend.class::isInstance)
+        .map(FederationClientBackend.class::cast)
+        .toList();
+    if (!federationBackends.isEmpty()) {
+      final OIDCProviderMetadata providerMetadata = this.discoveryEndpointConfigurer.getProviderMetadata();
+      federationBackends.forEach(b -> b.getValidator().setProviderMetadata(providerMetadata));
+      this.clientKeyResolver = new FederationClientKeyResolver(federationBackends, this.clientKeyResolver);
+    }
     this.authorizationCodeStore =
         Objects.requireNonNullElseGet(components.getAuthorizationCodeStore(), InMemoryAuthorizationCodeStore::new);
     this.accessTokenStore =

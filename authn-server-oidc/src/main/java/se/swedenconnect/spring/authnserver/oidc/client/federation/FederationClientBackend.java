@@ -15,15 +15,24 @@
  */
 package se.swedenconnect.spring.authnserver.oidc.client.federation;
 
+import java.net.URI;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.JWKMatcher;
+import com.nimbusds.jose.jwk.JWKSelector;
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.authentication.AuthenticationProtocol;
 import se.swedenconnect.spring.authnserver.authentication.Requester;
@@ -55,9 +64,14 @@ import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
  * normally found in the cache. A client that is not is resolved at its request.
  * </p>
  * <p>
- * Each time a client is resolved, a client with {@code subject_type} set to {@code pairwise} is checked by the
- * {@link PairwiseClientCheck}. A client with a registration error stays in the cache, marked as invalid, and is never
- * authenticated. It is reported to the {@link ClientChangeTracker} as invalid.
+ * Each time a client is resolved, its metadata is checked by the {@link FederationClientValidator}. A client with a
+ * registration error stays in the cache, marked as invalid, and is never authenticated. It is reported to the
+ * {@link ClientChangeTracker} as invalid.
+ * </p>
+ * <p>
+ * The keys at the {@code jwks_uri} or {@code signed_jwks_uri} of a client are fetched when it is resolved, and held in
+ * its cache entry. The {@link FederationClientKeyResolver} gives them out, see
+ * {@link #resolveKeys(String, OIDCClientMetadata, JWKMatcher)}, so that a request does not cause a fetch.
  * </p>
  *
  * @author Martin Lindström
@@ -69,6 +83,12 @@ public class FederationClientBackend implements ClientRegistryBackend {
 
   /** The default backend name. */
   public static final String DEFAULT_NAME = "federation";
+
+  /**
+   * How often the keys of a client are fetched again at the most, when a JWT names a key that the held keys do not
+   * hold.
+   */
+  public static final Duration KEY_REFRESH_INTERVAL = Duration.ofMinutes(1);
 
   /** The reason given when a client is removed because the resolver does not know it. */
   public static final String NOT_FOUND_REASON = "the resolver reports the client as not found";
@@ -97,8 +117,12 @@ public class FederationClientBackend implements ClientRegistryBackend {
   /** When a client was last resolved by this node, or {@code null}. */
   private volatile Instant lastResolved;
 
-  /** Checks the registration of pairwise clients. */
-  private volatile PairwiseClientCheck pairwiseClientCheck = new PairwiseClientCheck(new HttpSectorIdentifierFetcher());
+  /** Checks the metadata of resolved clients. */
+  private volatile FederationClientValidator validator = new FederationClientValidator(
+      new PairwiseClientCheck(new HttpSectorIdentifierFetcher()), new HttpClientKeysFetcher());
+
+  /** When the keys of each client were last fetched again because a JWT named an unknown key, by {@code client_id}. */
+  private final Map<String, Instant> keyRefreshes = new ConcurrentHashMap<>();
 
   /**
    * Constructor.
@@ -149,13 +173,32 @@ public class FederationClientBackend implements ClientRegistryBackend {
   }
 
   /**
-   * Assigns the check of pairwise clients. The default checks the {@code sector_identifier_uri} with an
-   * {@link HttpSectorIdentifierFetcher}.
+   * Assigns the validator of resolved clients. The default checks the {@code sector_identifier_uri} with an
+   * {@link HttpSectorIdentifierFetcher} and fetches keys with an {@link HttpClientKeysFetcher}.
+   *
+   * @param validator the validator
+   */
+  public void setValidator(final @NonNull FederationClientValidator validator) {
+    this.validator = Objects.requireNonNull(validator, "validator must not be null");
+  }
+
+  /**
+   * Gets the validator of resolved clients.
+   *
+   * @return the validator
+   */
+  public @NonNull FederationClientValidator getValidator() {
+    return this.validator;
+  }
+
+  /**
+   * Assigns the check of pairwise clients, which is part of the validator. The default checks the
+   * {@code sector_identifier_uri} with an {@link HttpSectorIdentifierFetcher}.
    *
    * @param pairwiseClientCheck the check
    */
   public void setPairwiseClientCheck(final @NonNull PairwiseClientCheck pairwiseClientCheck) {
-    this.pairwiseClientCheck = Objects.requireNonNull(pairwiseClientCheck, "pairwiseClientCheck must not be null");
+    this.validator.setPairwiseClientCheck(pairwiseClientCheck);
   }
 
   /**
@@ -164,7 +207,7 @@ public class FederationClientBackend implements ClientRegistryBackend {
    * @return the check
    */
   public @NonNull PairwiseClientCheck getPairwiseClientCheck() {
-    return this.pairwiseClientCheck;
+    return this.validator.getPairwiseClientCheck();
   }
 
   /** {@inheritDoc} */
@@ -248,11 +291,72 @@ public class FederationClientBackend implements ClientRegistryBackend {
     return entry != null && entry.isFound() ? this.toRegisteredClient(entry, this.clock.instant()) : null;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Gets the metadata of a cached client. A client whose metadata cannot be parsed has none.
+   */
   @Override
   public @Nullable String getMetadata(final @NonNull String identifier) {
     final CachedClientRecord entry = this.cache.get(Objects.requireNonNull(identifier, "identifier must not be null"));
-    return entry != null && entry.metadata() != null ? OidcClientRecord.toJson(entry.metadata()) : null;
+    return entry != null && entry.metadata() != null && !entry.metadata().toJSONObject().isEmpty()
+        ? OidcClientRecord.toJson(entry.metadata())
+        : null;
+  }
+
+  /**
+   * Finds the held keys of a federation client that match a matcher. The keys are those fetched from the client's
+   * {@code jwks_uri} or {@code signed_jwks_uri} when it was resolved.
+   * <p>
+   * When the matcher names a key that the held keys do not hold, the keys are fetched again, so that a client can roll
+   * over its keys. The new keys replace the held keys if they pass the checks of the {@link FederationClientValidator}.
+   * This is done at most once per {@link #KEY_REFRESH_INTERVAL} for each client, and never for a client marked as
+   * invalid.
+   * </p>
+   *
+   * @param clientId the {@code client_id} of the client
+   * @param metadata the client metadata
+   * @param matcher the matcher
+   * @return the matching keys, possibly empty, or {@code null} if the client is not a cached federation client whose
+   *     keys are fetched from the same URI as the metadata gives
+   */
+  public @Nullable List<JWK> resolveKeys(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
+      final @NonNull JWKMatcher matcher) {
+    final URI uri = FederationClientValidator.getKeysUri(metadata);
+    if (uri == null) {
+      return null;
+    }
+    final CachedClientRecord entry = this.cache.get(clientId);
+    if (entry == null || entry.metadata() == null
+        || !uri.equals(FederationClientValidator.getKeysUri(entry.metadata()))) {
+      return null;
+    }
+    final HeldKeys held = entry.heldKeys();
+    final boolean signed = metadata.getSignedJWKSetURI() != null;
+    if (held == null || !held.isFrom(uri.toString(), signed)) {
+      log.debug("The client '{}' holds no keys from {}", clientId, uri);
+      return List.of();
+    }
+    final JWKSelector selector = new JWKSelector(matcher);
+    final List<JWK> keys = selector.select(held.keys());
+    if (!keys.isEmpty() || !entry.isValid() || matcher.getKeyIDs() == null || matcher.getKeyIDs().isEmpty()
+        || held.keys().getKeys().stream().anyMatch(k -> matcher.getKeyIDs().contains(k.getKeyID()))) {
+      return keys;
+    }
+    final Instant now = this.clock.instant();
+    final Instant last = this.keyRefreshes.get(clientId);
+    if (last != null && now.isBefore(last.plus(KEY_REFRESH_INTERVAL))) {
+      log.debug("The keys of the client '{}' do not hold the key {} - they were fetched again at {}", clientId,
+          matcher.getKeyIDs(), last);
+      return keys;
+    }
+    this.keyRefreshes.put(clientId, now);
+    log.debug("The keys of the client '{}' do not hold the key {} - they are fetched again from {}", clientId,
+        matcher.getKeyIDs(), uri);
+    final HeldKeys refreshed = this.validator.refreshKeys(clientId, entry.metadata(), held);
+    if (refreshed == null) {
+      return keys;
+    }
+    this.cache.put(entry.withHeldKeys(refreshed));
+    return selector.select(refreshed.keys());
   }
 
   /**
@@ -322,19 +426,18 @@ public class FederationClientBackend implements ClientRegistryBackend {
   }
 
   /**
-   * Creates the cache entry of a client that the resolver knows, with the outcome of the check of a pairwise client.
+   * Creates the cache entry of a client that the resolver knows, with the outcome of the validation of the client.
    *
    * @param resolved what the resolver answered
-   * @param earlier the earlier entry of the client, whose remembered check is used, or {@code null}
+   * @param earlier the earlier entry of the client, whose held keys and remembered check are used, or {@code null}
    * @param now the current time
    * @return a {@link CachedClientRecord}
    */
   @NonNull CachedClientRecord found(final @NonNull ResolvedClient resolved,
       final @Nullable CachedClientRecord earlier, final @NonNull Instant now) {
-    final PairwiseClientCheck.Outcome outcome = this.pairwiseClientCheck.check(resolved.clientId(),
-        resolved.metadata(), earlier != null ? earlier.verifiedSector() : null);
+    final FederationClientValidator.Outcome outcome = this.validator.validate(resolved, earlier);
     return CachedClientRecord.found(resolved, now, this.settings.maximumAge())
-        .withCheck(outcome, now, this.settings.notFoundTimeToLive());
+        .withOutcome(outcome, now, this.settings.notFoundTimeToLive());
   }
 
   /**

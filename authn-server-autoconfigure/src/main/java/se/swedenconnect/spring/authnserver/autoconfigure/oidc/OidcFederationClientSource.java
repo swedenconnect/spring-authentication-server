@@ -43,9 +43,11 @@ import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCach
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientCollector;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientValidator;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCollectorSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationSettings;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpClientKeysFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationResolver;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpSectorIdentifierFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpTrustMarkRequester;
@@ -95,7 +97,7 @@ public class OidcFederationClientSource implements DisposableBean {
   /** The client making the federation calls. */
   private final FederationClient federationClient;
 
-  /** Publishes the failures to find an endpoint and the trust mark alerts, or {@code null}. */
+  /** Publishes the failures to find an endpoint, the client key fetches and the trust mark alerts, or {@code null}. */
   private final ApplicationEventPublisher eventPublisher;
 
   /** The source, or {@code null} until it has been added. */
@@ -114,7 +116,8 @@ public class OidcFederationClientSource implements DisposableBean {
    * @param cache where resolved clients are kept
    * @param entityStore where the resolve results of the federation entities are kept
    * @param federationClient the client making the federation calls
-   * @param eventPublisher publishes the failures to find an endpoint and the trust mark alerts, or {@code null}
+   * @param eventPublisher publishes the failures to find an endpoint, the fetches of client keys and the trust mark
+   *     alerts, or {@code null}
    */
   public OidcFederationClientSource(final OidcConfigurationProperties.@NonNull FederationProperties properties,
       final @NonNull FederationCache cache, final @NonNull FederationEntityStore entityStore,
@@ -163,7 +166,10 @@ public class OidcFederationClientSource implements DisposableBean {
         new HttpTrustMarkRequester(settings, this.federationClient, endpoints),
         this.cache, createCacheSettings(this.properties.getClients().getCache()));
     source.setName(NAME);
-    source.setPairwiseClientCheck(createPairwiseClientCheck(this.properties.getClients()));
+    final HttpClientKeysFetcher keysFetcher = new HttpClientKeysFetcher();
+    keysFetcher.setApplicationEventPublisher(this.eventPublisher);
+    source.setValidator(
+        new FederationClientValidator(createPairwiseClientCheck(this.properties.getClients()), keysFetcher));
     server.clientRegistryBackend(source);
     this.backend = source;
 

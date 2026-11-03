@@ -28,8 +28,8 @@ import org.jspecify.annotations.Nullable;
  *          {@code null} for no limit. No limit is the default
  * @param notFoundTimeToLive how long the answer that the resolver does not know a client is kept, so that repeated
  *          requests for the same unknown {@code client_id} do not each reach the resolver. A resolver that fails is
- *          never cached. It is also how long a pairwise client is marked as invalid when its
- *          {@code sector_identifier_uri} cannot be fetched
+ *          never cached. It is also how long a client is marked as invalid when its keys, or the document at its
+ *          {@code sector_identifier_uri}, cannot be fetched
  * @author Martin Lindström
  */
 public record FederationCacheSettings(

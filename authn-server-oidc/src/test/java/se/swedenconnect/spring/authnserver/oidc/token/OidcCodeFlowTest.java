@@ -20,18 +20,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.servlet.Filter;
 import jakarta.servlet.RequestDispatcher;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,6 +121,14 @@ import se.swedenconnect.spring.authnserver.error.UnrecoverableErrorException;
 import se.swedenconnect.spring.authnserver.oidc.audit.AuditCollector;
 import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.ClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationResolver;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.InMemoryFederationCache;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.PairwiseClientCheck;
+import se.swedenconnect.spring.authnserver.oidc.client.federation.ResolvedClient;
 import se.swedenconnect.spring.authnserver.oidc.config.OidcProviderConfigurer;
 import se.swedenconnect.spring.authnserver.oidc.error.OidcUnrecoverableError;
 import se.swedenconnect.spring.authnserver.oidc.keys.KeyTestSupport;
@@ -176,6 +189,10 @@ class OidcCodeFlowTest {
   private static final String PAIRWISE_OTHER_SECTOR = "https://pairwise-other.example.com";
 
   private static final String INVALID_CLIENT = "https://invalid.example.com";
+
+  private static final String FED_CLIENT = "https://fed.example.com";
+
+  private static final String FED_UNPARSABLE = "https://fed-unparsable.example.com";
 
   private static final String LOA3 = "http://id.elegnamnden.se/loa/1.0/loa3";
 
@@ -846,6 +863,99 @@ class OidcCodeFlowTest {
     assertThat(response.get("error_description")).contains(backend.reason);
     assertThat(response.get("state")).isEqualTo("state-1");
     assertThat(this.audit().getTypes()).containsExactly("authn_request_received", "authn_error_response");
+  }
+
+  // Federation clients
+
+  @Test
+  void aFederationClientUsesItsHeldKeysAndTheyAreFetchedAgainForAnUnknownKey() throws Exception {
+    final FederationFixture federation = new FederationFixture();
+    federation.keysFetcher.keys = new JWKSet(rsaJwk(CLIENT_RSA, "rsa-key", null));
+    federation.clients.put(FED_CLIENT, federationMetadata(FED_CLIENT));
+    this.start(c -> c.clientRegistryBackend(federation.backend), new TestProvider("direct", LOA3));
+
+    // The keys are fetched when the client is resolved, and the token request makes no fetch
+    String code = this.authorize(params(FED_CLIENT)).get("code");
+    assertThat(federation.keysFetcher.calls).isEqualTo(1);
+    assertThat(this.token(privateKeyJwt(FED_CLIENT, CLIENT_RSA, "rsa-key"), code, REDIRECT_URI, null).getStatus())
+        .isEqualTo(200);
+    assertThat(federation.keysFetcher.calls).isEqualTo(1);
+
+    // The client rolls over its keys
+    federation.keysFetcher.keys = new JWKSet(ecJwk(CLIENT_EC, "new-key"));
+    code = this.authorize(params(FED_CLIENT)).get("code");
+    assertThat(this.token(privateKeyJwt(FED_CLIENT, CLIENT_EC, "new-key"), code, REDIRECT_URI, null).getStatus())
+        .isEqualTo(200);
+    assertThat(federation.keysFetcher.calls).isEqualTo(2);
+
+    // A made-up key makes no new fetch within a minute
+    code = this.authorize(params(FED_CLIENT)).get("code");
+    assertTokenError(this.token(privateKeyJwt(FED_CLIENT, OTHER, "made-up"), code, REDIRECT_URI, null), 401,
+        "invalid_client");
+    assertThat(federation.keysFetcher.calls).isEqualTo(2);
+    federation.clock.advance(Duration.ofSeconds(61));
+    code = this.authorize(params(FED_CLIENT)).get("code");
+    assertTokenError(this.token(privateKeyJwt(FED_CLIENT, OTHER, "made-up"), code, REDIRECT_URI, null), 401,
+        "invalid_client");
+    assertThat(federation.keysFetcher.calls).isEqualTo(3);
+  }
+
+  @Test
+  void aFederationClientMarkedAsInvalidWithARedirectUriGetsInvalidClientAtBothEndpoints() throws Exception {
+    final FederationFixture federation = new FederationFixture();
+    federation.keysFetcher.keys = new JWKSet(rsaJwk(CLIENT_RSA, "rsa-key", null));
+    final OIDCClientMetadata metadata = federationMetadata(FED_CLIENT);
+    metadata.setTokenEndpointAuthMethod(null);
+    federation.clients.put(FED_CLIENT, metadata);
+    this.start(c -> c.clientRegistryBackend(federation.backend), new TestProvider("direct", LOA3));
+
+    final Map<String, String> response = query(this.send(get(AUTHZ_PATH, params(FED_CLIENT))));
+    assertThat(response.get("error")).isEqualTo("invalid_client");
+    assertThat(response.get("error_description")).contains("client_secret_basic");
+    assertThat(response.get("state")).isEqualTo("state-1");
+
+    assertTokenError(this.token(privateKeyJwt(FED_CLIENT, CLIENT_RSA, "rsa-key"), "a-code", REDIRECT_URI, null), 401,
+        "invalid_client");
+  }
+
+  @Test
+  void federationClientsAreCheckedAgainstWhatTheProviderSupports() throws Exception {
+    final FederationFixture federation = new FederationFixture();
+    federation.keysFetcher.keys = new JWKSet(rsaJwk(CLIENT_RSA, "rsa-key", null));
+    final OIDCClientMetadata metadata = federationMetadata(FED_CLIENT);
+    metadata.setIDTokenJWSAlg(JWSAlgorithm.ES512);
+    federation.clients.put(FED_CLIENT, metadata);
+    this.start(c -> c.clientRegistryBackend(federation.backend), new TestProvider("direct", LOA3));
+
+    // The provider signs with RS256 and ES256 only
+    final Map<String, String> response = query(this.send(get(AUTHZ_PATH, params(FED_CLIENT))));
+    assertThat(response.get("error")).isEqualTo("invalid_client");
+    assertThat(response.get("error_description")).contains("id_token_signed_response_alg ES512");
+  }
+
+  @Test
+  void aFederationClientMarkedAsInvalidWithoutARedirectUriEndsAtTheErrorPage() throws Exception {
+    final FederationFixture federation = new FederationFixture();
+    final OIDCClientMetadata noRedirect = federationMetadata(FED_CLIENT);
+    noRedirect.setRedirectionURIs(null);
+    federation.clients.put(FED_CLIENT, noRedirect);
+    federation.unparsable.add(FED_UNPARSABLE);
+    this.start(c -> c.clientRegistryBackend(federation.backend), new TestProvider("direct", LOA3));
+
+    for (final String clientId : List.of(FED_CLIENT, FED_UNPARSABLE)) {
+      this.audit().clear();
+      final MockHttpServletRequest request = get(AUTHZ_PATH, params(clientId));
+      final MockHttpServletResponse response = this.send(request);
+      assertThat(response.getStatus()).as(clientId).isEqualTo(500);
+      assertThat(response.getRedirectedUrl()).as(clientId).isNull();
+      assertThat(request.getAttribute(RequestDispatcher.ERROR_EXCEPTION))
+          .isInstanceOfSatisfying(UnrecoverableErrorException.class,
+              e -> assertThat(e.getError()).isEqualTo(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION));
+      assertThat(this.audit().getTypes()).containsExactly("authn_request_received", "authn_unrecoverable_error");
+
+      assertTokenError(this.token(privateKeyJwt(clientId, CLIENT_RSA, "rsa-key"), "a-code", REDIRECT_URI, null),
+          401, "invalid_client");
+    }
   }
 
   // Token endpoint failures
@@ -1683,6 +1793,96 @@ class OidcCodeFlowTest {
         GenericAttribute.of(AttributeIdentifiers.GIVEN_NAME, "Kalle"),
         GenericAttribute.of(AttributeIdentifiers.SURNAME, "Kula")),
         AttributeIdentifiers.PERSONAL_IDENTITY_NUMBER, authnContext, Instant.now(), "127.0.0.1");
+  }
+
+  private static OIDCClientMetadata federationMetadata(final String clientId) {
+    final OIDCClientMetadata metadata = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null);
+    metadata.setJWKSetURI(URI.create(clientId + "/jwks"));
+    return metadata;
+  }
+
+  /** A federation backend whose resolver answers with the clients of the test, and whose keys are given by it. */
+  private static final class FederationFixture {
+
+    /** The clock of the backend. */
+    final MovableClock clock = new MovableClock();
+
+    /** The metadata of the clients that the resolver knows. */
+    final Map<String, OIDCClientMetadata> clients = new HashMap<>();
+
+    /** The clients whose metadata cannot be parsed. */
+    final Set<String> unparsable = new HashSet<>();
+
+    /** Gives the keys at every URI. */
+    final CountingKeysFetcher keysFetcher = new CountingKeysFetcher();
+
+    /** The backend. */
+    final FederationClientBackend backend;
+
+    FederationFixture() {
+      final FederationResolver resolver = id -> {
+        final Instant expiresAt = this.clock.instant().plus(Duration.ofHours(1));
+        if (this.unparsable.contains(id)) {
+          return new ResolvedClient(id, new OIDCClientMetadata(), Set.of(), expiresAt, "unexpected redirect_uris",
+              null);
+        }
+        final OIDCClientMetadata metadata = this.clients.get(id);
+        return metadata != null ? new ResolvedClient(id, metadata, Set.of(), expiresAt) : null;
+      };
+      this.backend = new FederationClientBackend(resolver, (id, type) -> null, new InMemoryFederationCache(this.clock),
+          FederationCacheSettings.defaults(), this.clock);
+      this.backend.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), this.keysFetcher));
+    }
+  }
+
+  /** A {@link ClientKeysFetcher} that gives the same keys at every URI and counts the fetches. */
+  private static final class CountingKeysFetcher implements ClientKeysFetcher {
+
+    /** The keys, or {@code null} for keys that cannot be fetched. */
+    volatile JWKSet keys;
+
+    /** The number of fetches. */
+    volatile int calls;
+
+    @Override
+    public @NonNull JWKSet fetchJwks(final @NonNull URI jwksUri) throws IOException {
+      this.calls++;
+      if (this.keys == null) {
+        throw new IOException("unreachable");
+      }
+      return this.keys;
+    }
+
+    @Override
+    public @NonNull SignedJWT fetchSignedJwks(final @NonNull URI signedJwksUri) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  /** A clock that the test moves forward. */
+  private static final class MovableClock extends Clock {
+
+    /** The current time. */
+    private volatile Instant instant = Instant.now();
+
+    void advance(final Duration duration) {
+      this.instant = this.instant.plus(duration);
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return ZoneOffset.UTC;
+    }
+
+    @Override
+    public Clock withZone(final ZoneId zone) {
+      return this;
+    }
+
+    @Override
+    public Instant instant() {
+      return this.instant;
+    }
   }
 
   /** A client registry backend that holds one client, which the test may mark as invalid. */

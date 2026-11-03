@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.openid.connect.sdk.federation.entities.EntityType;
@@ -51,6 +52,14 @@ import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
  * <p>
  * A client is resolved asking for its relying party metadata only. An entity of the federation, see
  * {@link #resolveEntity(String)}, is resolved asking for both its relying party and its federation entity metadata.
+ * </p>
+ * <p>
+ * Relying party metadata that cannot be parsed does not make the resolution fail. The client is resolved with empty
+ * metadata and the reason, see {@link ResolvedClient#metadataError()}, so that it can be marked as invalid. The
+ * client's Federation Entity Keys are read from its entity configuration, which comes first in the
+ * {@code trust_chain} of the response, see
+ * <a href="https://openid.net/specs/openid-federation-1_0.html#section-8.3.2">OpenID Federation 1.0, Section
+ * 8.3.2</a>.
  * </p>
  *
  * @author Martin Lindström
@@ -116,13 +125,14 @@ public class HttpFederationResolver implements FederationResolver {
       log.debug("The resolver does not know the client '{}'", clientId);
       return null;
     }
-    final OIDCClientMetadata metadata = clientMetadata(claims, clientId);
+    final ClientMetadata metadata = clientMetadata(claims, clientId);
     if (metadata == null) {
       return null;
     }
     final Instant expiresAt = claims.getExpirationTime().toInstant();
     log.debug("Resolved the client '{}', valid until {}", clientId, expiresAt);
-    return new ResolvedClient(clientId, metadata, trustMarkTypes(claims), expiresAt);
+    return new ResolvedClient(clientId, metadata.metadata(), trustMarkTypes(claims), expiresAt, metadata.error(),
+        entityKeys(claims, clientId));
   }
 
   /**
@@ -140,7 +150,7 @@ public class HttpFederationResolver implements FederationResolver {
       return null;
     }
     final Map<String, Object> federationEntity = federationEntityMetadata(claims, entityId);
-    final OIDCClientMetadata metadata = clientMetadata(claims, entityId);
+    final ClientMetadata metadata = clientMetadata(claims, entityId);
     if (metadata == null && federationEntity == null) {
       log.debug("The resolved entity '{}' has none of the asked for entity types", entityId);
       return null;
@@ -152,7 +162,8 @@ public class HttpFederationResolver implements FederationResolver {
         : null;
     final Instant expiresAt = claims.getExpirationTime().toInstant();
     log.debug("Resolved the entity '{}', valid until {}", entityId, expiresAt);
-    return new ResolvedEntity(entityId, metadata, listEndpoint, trustMarkTypes(claims), expiresAt);
+    return new ResolvedEntity(entityId, metadata != null ? metadata.metadata() : null, listEndpoint,
+        trustMarkTypes(claims), expiresAt, metadata != null ? metadata.error() : null, entityKeys(claims, entityId));
   }
 
   /**
@@ -207,31 +218,73 @@ public class HttpFederationResolver implements FederationResolver {
   }
 
   /**
-   * Gets the relying party metadata of the resolve response.
+   * Gets the relying party metadata of the resolve response. Metadata that cannot be parsed gives empty metadata and
+   * the reason.
    *
    * @param claims the claims of the resolve response
    * @param clientId the {@code client_id} of the client
    * @return the client metadata, or {@code null} if the entity is not an OpenID Connect client
-   * @throws ClientRegistryException if the metadata cannot be parsed
+   * @throws ClientRegistryException if the {@code metadata} claim cannot be read
    */
-  private static @Nullable OIDCClientMetadata clientMetadata(
+  private static @Nullable ClientMetadata clientMetadata(
       final @NonNull JWTClaimsSet claims, final @NonNull String clientId) throws ClientRegistryException {
+    final Map<String, Object> metadata;
     try {
-      final Map<String, Object> metadata = claims.getJSONObjectClaim("metadata");
-      final Object relyingParty = metadata != null
-          ? metadata.get(EntityType.OPENID_RELYING_PARTY.getValue())
-          : null;
-      if (!(relyingParty instanceof final Map<?, ?> map)) {
-        log.debug("The resolved entity '{}' is not an OpenID Connect client", clientId);
-        return null;
-      }
+      metadata = claims.getJSONObjectClaim("metadata");
+    }
+    catch (final java.text.ParseException e) {
+      throw new ClientRegistryException(
+          "Failed to read the metadata of the resolve response for '%s' - %s".formatted(clientId, e.getMessage()), e);
+    }
+    final Object relyingParty = metadata != null ? metadata.get(EntityType.OPENID_RELYING_PARTY.getValue()) : null;
+    if (relyingParty == null) {
+      log.debug("The resolved entity '{}' is not an OpenID Connect client", clientId);
+      return null;
+    }
+    if (!(relyingParty instanceof final Map<?, ?> map)) {
+      log.debug("The relying party metadata of '{}' is not a JSON object", clientId);
+      return new ClientMetadata(new OIDCClientMetadata(), "the openid_relying_party metadata is not a JSON object");
+    }
+    try {
       final JSONObject json = new JSONObject();
       map.forEach((key, value) -> json.put(String.valueOf(key), value));
-      return OIDCClientMetadata.parse(json);
+      return new ClientMetadata(OIDCClientMetadata.parse(json), null);
     }
     catch (final Exception e) {
-      throw new ClientRegistryException(
-          "Failed to parse the metadata of the resolve response for '%s' - %s".formatted(clientId, e.getMessage()), e);
+      log.debug("The relying party metadata of '{}' cannot be parsed: {}", clientId, e.getMessage());
+      return new ClientMetadata(new OIDCClientMetadata(), Objects.requireNonNullElse(e.getMessage(),
+          e.getClass().getSimpleName()));
+    }
+  }
+
+  /**
+   * Gets the Federation Entity Keys of the subject from its entity configuration, which comes first in the
+   * {@code trust_chain} of the resolve response. The resolver has verified the trust chain.
+   *
+   * @param claims the claims of the resolve response
+   * @param entityId the entity identifier of the subject
+   * @return the keys, or {@code null} if the response has no usable {@code trust_chain}
+   */
+  static @Nullable JWKSet entityKeys(final @NonNull JWTClaimsSet claims, final @NonNull String entityId) {
+    try {
+      final List<Object> chain = claims.getListClaim("trust_chain");
+      if (chain == null || chain.isEmpty() || !(chain.getFirst() instanceof final String first)) {
+        log.debug("The resolve response for '{}' has no trust_chain", entityId);
+        return null;
+      }
+      final JWTClaimsSet configuration = SignedJWT.parse(first).getJWTClaimsSet();
+      if (!entityId.equals(configuration.getIssuer()) || !entityId.equals(configuration.getSubject())) {
+        log.debug("The trust_chain of the resolve response for '{}' does not start with its entity configuration",
+            entityId);
+        return null;
+      }
+      final Map<String, Object> jwks = configuration.getJSONObjectClaim("jwks");
+      final JWKSet keys = jwks != null ? JWKSet.parse(jwks) : null;
+      return keys != null && !keys.isEmpty() ? keys : null;
+    }
+    catch (final java.text.ParseException | RuntimeException e) {
+      log.debug("The trust_chain of the resolve response for '{}' cannot be read: {}", entityId, e.getMessage());
+      return null;
     }
   }
 
@@ -262,6 +315,15 @@ public class HttpFederationResolver implements FederationResolver {
       }
     }
     return types;
+  }
+
+  /**
+   * The relying party metadata of a resolve response.
+   *
+   * @param metadata the metadata, empty if it cannot be parsed
+   * @param error why the metadata cannot be parsed, or {@code null} if it can
+   */
+  private record ClientMetadata(@NonNull OIDCClientMetadata metadata, @Nullable String error) {
   }
 
 }

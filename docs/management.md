@@ -152,6 +152,10 @@ resolves and checks it again at once:
 }
 ```
 
+A client whose metadata cannot be parsed is shown in the same way, with its `id` and an `invalid-reason` that starts
+with `the metadata cannot be parsed`. It has no organisation number and no marks taken from the metadata, and its
+metadata path answers 404, since there is no metadata to show.
+
 The answer of an update tells what happened in `outcome`, with a description in `message`:
 
 | Outcome | Description |
@@ -351,7 +355,9 @@ When the trust marks are kept in Redis, every server instance reports the same.
 
 The OpenID Federation services that the server calls: the resolver, each trust mark issuer, whether it is called
 for the OpenID Provider's own trust marks, for a trust mark that a client is asked to hold, for a trust mark status
-check or for a listing of trust marked entities, each entity that is asked to list its subordinates, and each entity
+check or for a listing of trust marked entities, each entity that is asked to list its subordinates, each
+`jwks_uri` and `signed_jwks_uri` that the keys of a federation client are fetched from, see
+[Section 6.8, "Keys of federation clients"](client-registry.html#client-keys) of [The client registry](client-registry.html), and each entity
 whose entity configuration is fetched to find an endpoint that is not configured, see
 [Section 6.11, "Clients from OpenID Federation"](configuration.html#oidc-federation-clients) of [Configuration](configuration.html). An entity configuration that cannot be
 fetched or verified, or that does not publish a needed endpoint, counts as a failure.
@@ -399,7 +405,9 @@ expires. The list is left out when it is empty.
 
 A resolver is identified by its endpoint, and a trust mark issuer, an entity whose entity configuration is fetched
 (type `entity-configuration`) and an entity that lists its subordinates (type `subordinate-listing`) by their entity
-identifiers. A listing call made without the entity identifier of the called entity is identified by its endpoint.
+identifiers. A listing call made without the entity identifier of the called entity is identified by its endpoint, and
+the keys of a client (type `client-keys`) by their URI. A resolve response whose relying party metadata cannot be
+parsed is a successful call; the client is marked as invalid instead.
 When the federation cache is kept in Redis, so is this state, and every server instance reports the same.
 
 The calls are recorded by the `HttpFederationClient` bean that the auto-configuration declares. An application that

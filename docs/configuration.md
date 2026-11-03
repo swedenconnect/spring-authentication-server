@@ -1016,7 +1016,7 @@ federation that it is not a member of is not supported.
 | `clients.trust-mark-issuers[]` | The issuers that are asked for a trust mark that a client does not hold, one per trust mark type, see below. | - |
 | `clients.trust-mark-status-interval` | The interval between two checks of the status of the trust marks obtained from the issuers. | 1 hour |
 | `clients.cache.maximum-age` | How long a resolved client is kept at the most, regardless of what the resolve response says. | No limit |
-| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. A made-up `client_id` is remembered for this time too. It is also how long a pairwise client is marked as invalid when the document at its `sector_identifier_uri` cannot be fetched. | 5 minutes |
+| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. A made-up `client_id` is remembered for this time too. It is also how long a client is marked as invalid when its keys at `jwks_uri` or `signed_jwks_uri`, or the document at its `sector_identifier_uri`, cannot be fetched, see [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of [The client registry](client-registry.html). | 5 minutes |
 | `clients.check-sector-identifier-uri` | Whether the document at the `sector_identifier_uri` of a pairwise client is fetched and checked to list all the client's `redirect_uris`, see below. | `true` |
 | `clients.collector.enabled` | Whether the background job that fills the cache with the clients of the federation runs, see below. | `true` |
 | `clients.collector.interval` | How often the job runs. | 30 minutes |

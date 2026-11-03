@@ -26,8 +26,9 @@ import org.springframework.context.ApplicationEvent;
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 
 /**
- * Published by the {@link HttpFederationClient} for every call it makes to a federation service, telling how the call
- * went. It is what the health of the federation services is built from, see {@link FederationServiceMonitor}.
+ * Published by the {@link HttpFederationClient} for every call it makes to a federation service, and by the
+ * {@link HttpClientKeysFetcher} for every fetch of the keys of a client, telling how the call went. It is what the
+ * health of the federation services is built from, see {@link FederationServiceMonitor}.
  *
  * @author Martin Lindström
  */
@@ -141,6 +142,7 @@ public class FederationCallEvent extends ApplicationEvent {
       case ENTITY_CONFIGURATION -> ServiceType.ENTITY_CONFIGURATION;
       case TRUST_MARK, TRUST_MARK_STATUS, TRUST_MARKED_LISTING -> ServiceType.TRUST_MARK_ISSUER;
       case SUBORDINATE_LISTING -> ServiceType.SUBORDINATE_LISTING;
+      case CLIENT_KEYS -> ServiceType.CLIENT_KEYS;
     };
   }
 
@@ -148,7 +150,8 @@ public class FederationCallEvent extends ApplicationEvent {
    * Gets the identity of the service that was called: the endpoint of a resolver, the entity identifier of a trust
    * mark issuer, so that the trust mark, status and listing endpoints of an issuer count as one service, the entity
    * identifier of an entity whose entity configuration is fetched, and the entity identifier of an entity that is asked
-   * for its subordinates. A call that does not name the entity is identified by its endpoint.
+   * for its subordinates. A call that does not name the entity, such as a fetch of the keys of a client, is identified
+   * by its endpoint.
    *
    * @return the identity of the service
    */
@@ -180,7 +183,10 @@ public class FederationCallEvent extends ApplicationEvent {
     SUBORDINATE_LISTING,
 
     /** A trust marked entities listing request, OpenID Federation 1.0, Section 8.5. */
-    TRUST_MARKED_LISTING
+    TRUST_MARKED_LISTING,
+
+    /** A fetch of the keys at the {@code jwks_uri} or {@code signed_jwks_uri} of a client. */
+    CLIENT_KEYS
 
   }
 
@@ -199,7 +205,10 @@ public class FederationCallEvent extends ApplicationEvent {
     ENTITY_CONFIGURATION,
 
     /** An entity that lists its subordinates, a trust anchor or an intermediate. */
-    SUBORDINATE_LISTING
+    SUBORDINATE_LISTING,
+
+    /** The {@code jwks_uri} or {@code signed_jwks_uri} of a client, identified by the URI. */
+    CLIENT_KEYS
 
   }
 

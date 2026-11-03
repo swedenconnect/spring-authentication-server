@@ -21,7 +21,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -376,6 +378,93 @@ class HttpFederationResolverTest extends FederationTestSupport {
     assertThatThrownBy(() -> backend.lookup(CLIENT_ID)).isInstanceOf(ClientRegistryException.class);
     assertThat(client.resolveCalls).isZero();
     assertThat(client.entityConfigurationRequests).containsExactly(TRUST_ANCHOR, TRUST_ANCHOR);
+  }
+
+  @Test
+  void relyingPartyMetadataThatCannotBeParsedGivesAClientWithTheReason() {
+    final ECKey trustAnchorKey = key("ta");
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, RESOLVE_ENDPOINT, null));
+    final StubFederationClient client = new StubFederationClient();
+    client.resolveResponse = sign(trustAnchorKey, HttpFederationResolver.RESOLVE_RESPONSE_TYPE,
+        resolveClaims(CLIENT_ID, Map.of(
+            EntityType.OPENID_RELYING_PARTY.getValue(), Map.of("redirect_uris", "not a list"),
+            EntityType.FEDERATION_ENTITY.getValue(), Map.of("federation_list_endpoint", CLIENT_ID + "/list")))
+            .build());
+    final HttpFederationResolver resolver = new HttpFederationResolver(settings, client);
+
+    final ResolvedClient resolved = resolver.resolve(CLIENT_ID);
+    assertThat(resolved).isNotNull();
+    assertThat(resolved.metadataError()).contains("redirect_uris");
+    assertThat(resolved.metadata().toJSONObject()).isEmpty();
+
+    // An entity with such metadata is still walked into
+    final ResolvedEntity entity = resolver.resolveEntity(CLIENT_ID);
+    assertThat(entity).isNotNull();
+    assertThat(entity.listEndpoint()).isEqualTo(CLIENT_ID + "/list");
+    assertThat(entity.toClient()).isNotNull().satisfies(c -> assertThat(c.metadataError()).contains("redirect_uris"));
+
+    // Relying party metadata that is not an object
+    client.resolveResponse = sign(trustAnchorKey, HttpFederationResolver.RESOLVE_RESPONSE_TYPE,
+        resolveClaims(CLIENT_ID, Map.of(EntityType.OPENID_RELYING_PARTY.getValue(), "not an object")).build());
+    assertThat(resolver.resolve(CLIENT_ID).metadataError()).isEqualTo(
+        "the openid_relying_party metadata is not a JSON object");
+
+    // At the backend, the client is marked as invalid and the lookup does not fail
+    final FederationClientBackend backend = new FederationClientBackend(resolver, (id, type) -> null,
+        new InMemoryFederationCache(), FederationCacheSettings.defaults());
+    assertThat(backend.lookup(CLIENT_ID).invalidReason()).startsWith("the metadata cannot be parsed");
+  }
+
+  @Test
+  void theFederationEntityKeysAreTakenFromTheTrustChain() {
+    final ECKey trustAnchorKey = key("ta");
+    final ECKey entityKey = key("entity");
+    final FederationSettings settings = FederationSettings.of(
+        new FederationSettings.TrustAnchor(TRUST_ANCHOR, publicKeys(trustAnchorKey)),
+        new FederationSettings.Resolver(TRUST_ANCHOR, RESOLVE_ENDPOINT, null));
+    final StubFederationClient client = new StubFederationClient();
+    final HttpFederationResolver resolver = new HttpFederationResolver(settings, client);
+    final Map<String, Object> metadata =
+        Map.of(EntityType.OPENID_RELYING_PARTY.getValue(), clientMetadata("RP").toJSONObject());
+    final String configuration = this.entityStatement(entityKey, CLIENT_ID, CLIENT_ID);
+    final String subordinate = this.entityStatement(trustAnchorKey, TRUST_ANCHOR, CLIENT_ID);
+
+    client.resolveResponse = sign(trustAnchorKey, HttpFederationResolver.RESOLVE_RESPONSE_TYPE,
+        resolveClaims(CLIENT_ID, metadata).claim("trust_chain", List.of(configuration, subordinate)).build());
+    assertThat(resolver.resolve(CLIENT_ID).entityKeys()).isNotNull()
+        .satisfies(k -> assertThat(k.getKeyByKeyId(entityKey.getKeyID())).isNotNull());
+    assertThat(resolver.resolveEntity(CLIENT_ID).entityKeys()).isNotNull();
+
+    // No trust_chain, one that does not start with the entity configuration, and one that cannot be read
+    for (final Object chain : Arrays.asList(null, List.of(subordinate), List.of("not a JWT"), List.of())) {
+      final JWTClaimsSet.Builder claims = resolveClaims(CLIENT_ID, metadata);
+      if (chain != null) {
+        claims.claim("trust_chain", chain);
+      }
+      client.resolveResponse = sign(trustAnchorKey, HttpFederationResolver.RESOLVE_RESPONSE_TYPE, claims.build());
+      assertThat(resolver.resolve(CLIENT_ID).entityKeys()).as(String.valueOf(chain)).isNull();
+    }
+  }
+
+  private static JWTClaimsSet.Builder resolveClaims(final String subject, final Map<String, Object> metadata) {
+    return new JWTClaimsSet.Builder()
+        .issuer(TRUST_ANCHOR)
+        .subject(subject)
+        .issueTime(new Date())
+        .expirationTime(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
+        .claim("metadata", metadata);
+  }
+
+  private String entityStatement(final ECKey key, final String issuer, final String subject) {
+    return sign(key, "entity-statement+jwt", new JWTClaimsSet.Builder()
+        .issuer(issuer)
+        .subject(subject)
+        .issueTime(new Date())
+        .expirationTime(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
+        .claim("jwks", publicKeys(key).toJSONObject())
+        .build()).serialize();
   }
 
 }
