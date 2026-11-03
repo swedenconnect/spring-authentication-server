@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,6 +33,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEvent;
+
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
@@ -526,6 +529,76 @@ class FederationClientCollectorTest extends FederationTestSupport {
     assertThat(fixture.cache.get(RP_ONE).isValid()).isTrue();
   }
 
+  // Validation of the clients
+
+  @Test
+  void aClientWhoseMetadataCannotBeParsedIsMarkedAndTheRunStaysComplete() {
+    final Fixture fixture = new Fixture(FederationCollectorSettings.defaults());
+    fixture.lister(TRUST_ANCHOR, RP_ONE);
+    // RP_ONE has relying party metadata that cannot be parsed, and lists subordinates
+    fixture.resolver.entities.put(RP_ONE, new ResolvedEntity(RP_ONE, new OIDCClientMetadata(), RP_ONE + "/list",
+        Set.of(), Instant.EPOCH, "Unexpected type of redirect_uris", null));
+    fixture.resolver.validity.put(RP_ONE, Duration.ofHours(2));
+    fixture.client.listings.put(RP_ONE, List.of(RP_TWO));
+    fixture.rp(RP_TWO);
+    // A cached client that the walk does not find, which is checked only when the run is complete
+    fixture.rp(RP_THREE);
+    fixture.cache.put(CachedClientRecord.found(new ResolvedClient(RP_THREE, clientMetadata("Client " + RP_THREE),
+        Set.of(), fixture.clock.instant().plus(Duration.ofHours(2))), fixture.clock.instant(), null));
+
+    final FederationClientCollector.RunResult result = fixture.collector.collect();
+
+    assertThat(result.complete()).isTrue();
+    assertThat(fixture.listedEntities()).containsExactly(TRUST_ANCHOR, RP_ONE);
+    assertThat(fixture.cache.get(RP_ONE).invalidReason())
+        .isEqualTo("the metadata cannot be parsed - Unexpected type of redirect_uris");
+    assertThat(fixture.cache.get(RP_TWO).isValid()).isTrue();
+    assertThat(fixture.resolver.calls).contains(RP_THREE);
+    assertThat(this.events).filteredOn(ClientInvalidEvent.class::isInstance).singleElement()
+        .satisfies(e -> assertThat(((ClientInvalidEvent) e).getClient().identifier()).isEqualTo(RP_ONE));
+  }
+
+  @Test
+  void aFaultyClientIsMarkedByTheCollectorAndItsKeysAreHeld() {
+    final Fixture fixture = new Fixture(FederationCollectorSettings.defaults());
+    final StubClientKeysFetcher keysFetcher = new StubClientKeysFetcher();
+    fixture.backend.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), keysFetcher));
+    keysFetcher.jwks.put(RP_TWO + "/jwks", publicKeys(CLIENT_KEY));
+    fixture.lister(TRUST_ANCHOR, RP_ONE, RP_TWO, RP_THREE);
+    final OIDCClientMetadata noMethod = clientMetadata("Client " + RP_ONE);
+    noMethod.setTokenEndpointAuthMethod(null);
+    fixture.client(RP_ONE, noMethod);
+    fixture.client(RP_TWO, jwksUriMetadata(RP_TWO));
+    fixture.client(RP_THREE, jwksUriMetadata(RP_THREE));
+
+    final FederationClientCollector.RunResult result = fixture.collector.collect();
+
+    assertThat(result.complete()).isTrue();
+    assertThat(fixture.cache.get(RP_ONE).invalidReason()).contains("client_secret_basic");
+    assertThat(fixture.cache.get(RP_ONE).expiresAt()).isEqualTo(fixture.clock.instant().plus(Duration.ofHours(2)));
+    assertThat(fixture.cache.get(RP_TWO).isValid()).isTrue();
+    assertThat(fixture.cache.get(RP_TWO).heldKeys().uri()).isEqualTo(RP_TWO + "/jwks");
+    // Keys that cannot be fetched give a temporary mark
+    assertThat(fixture.cache.get(RP_THREE).invalidReason()).contains("cannot be fetched");
+    assertThat(fixture.cache.get(RP_THREE).expiresAt())
+        .isEqualTo(fixture.clock.instant().plus(FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE));
+    assertThat(this.events).filteredOn(ClientInvalidEvent.class::isInstance).hasSize(2);
+
+    // A renewal keeps the held keys of a client whose keys cannot be fetched again
+    keysFetcher.jwks.clear();
+    fixture.clock.advance(Duration.ofMinutes(100));
+    fixture.collector.collect();
+    assertThat(fixture.cache.get(RP_TWO).isValid()).isTrue();
+    assertThat(fixture.cache.get(RP_TWO).heldKeys()).isNotNull();
+  }
+
+  private static OIDCClientMetadata jwksUriMetadata(final String entityId) {
+    final OIDCClientMetadata metadata = clientMetadata("Client " + entityId);
+    metadata.setJWKSet(null);
+    metadata.setJWKSetURI(URI.create(entityId + "/jwks"));
+    return metadata;
+  }
+
   private class Fixture {
 
     final TestClock clock;
@@ -590,6 +663,11 @@ class FederationClientCollectorTest extends FederationTestSupport {
     void pairwiseRp(final String entityId, final String sectorIdentifierUri, final String... redirectUris) {
       this.resolver.entities.put(entityId, new ResolvedEntity(entityId,
           pairwiseMetadata("Client " + entityId, sectorIdentifierUri, redirectUris), null, Set.of(), Instant.EPOCH));
+      this.resolver.validity.put(entityId, Duration.ofHours(2));
+    }
+
+    void client(final String entityId, final OIDCClientMetadata metadata) {
+      this.resolver.entities.put(entityId, new ResolvedEntity(entityId, metadata, null, Set.of(), Instant.EPOCH));
       this.resolver.validity.put(entityId, Duration.ofHours(2));
     }
 
@@ -660,7 +738,7 @@ class FederationClientCollectorTest extends FederationTestSupport {
         return null;
       }
       return new ResolvedEntity(entityId, entity.clientMetadata(), entity.listEndpoint(), entity.trustMarkTypes(),
-          this.clock.instant().plus(this.validity.get(entityId)));
+          this.clock.instant().plus(this.validity.get(entityId)), entity.clientMetadataError(), entity.entityKeys());
     }
 
   }

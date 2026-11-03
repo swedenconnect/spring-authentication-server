@@ -1194,6 +1194,33 @@ class OidcAuthnRequestProcessingTest {
     this.assertUnrecoverable(get(params), OidcUnrecoverableError.INVALID_REDIRECT_URI, 400);
   }
 
+  @Test
+  void aClientMarkedAsInvalidWhoseRequestObjectCannotBeVerifiedGetsInvalidClient() throws Exception {
+    this.start(c -> {});
+    backend.invalidReason = "the keys at the jwks_uri cannot be fetched - HTTP status 503";
+
+    // The plain parameters hold a registered redirect URI, which is answered at
+    final Map<String, String> params = params();
+    params.put("request", sign(requestObjectClaims().build(), OTHER_KEY));
+    final MockHttpServletResponse response = this.send(post(params));
+    assertError(response, "invalid_client", "state-1");
+    assertThat(query(response).get("error_description")).contains(backend.invalidReason);
+
+    // Without a redirect URI in the plain parameters, the request ends at the provider
+    final Map<String, String> noRedirect = new HashMap<>(params);
+    noRedirect.remove("redirect_uri");
+    this.assertUnrecoverable(post(noRedirect), OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION, 500);
+  }
+
+  @Test
+  void aClientMarkedAsInvalidWithoutRedirectUrisEndsAtTheProvider() throws Exception {
+    this.start(c -> {});
+    backend.invalidReason = "the metadata cannot be parsed - Unexpected type of redirect_uris";
+    backend.noRedirectUris = true;
+
+    this.assertUnrecoverable(get(params()), OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION, 500);
+  }
+
   // Helpers
 
   private void start(final Consumer<AuthnServerConfigurer> c) {
@@ -1405,6 +1432,8 @@ class OidcAuthnRequestProcessingTest {
 
     String invalidReason;
 
+    boolean noRedirectUris = false;
+
     final List<String> obtainableMarks = new ArrayList<>();
 
     final List<String> requestedMarks = new ArrayList<>();
@@ -1427,9 +1456,14 @@ class OidcAuthnRequestProcessingTest {
       final Set<String> marks = Set.copyOf(this.obtainableMarks.stream()
           .filter(this.requestedMarks::contains).toList());
       return switch (identifier) {
-        case CLIENT_ID -> new OidcClientRecord(CLIENT_ID,
-            metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null, true), marks).toRequesterRecord()
-            .withInvalidReason(this.invalidReason);
+        case CLIENT_ID -> {
+          final OIDCClientMetadata metadata = metadata(ClientAuthenticationMethod.PRIVATE_KEY_JWT, null, true);
+          if (this.noRedirectUris) {
+            metadata.setRedirectionURIs(null);
+          }
+          yield new OidcClientRecord(CLIENT_ID, metadata, marks).toRequesterRecord()
+              .withInvalidReason(this.invalidReason);
+        }
         case OTHER_CLIENT_ID -> new OidcClientRecord(OTHER_CLIENT_ID,
             metadata(ClientAuthenticationMethod.CLIENT_SECRET_BASIC, null, false), marks).toRequesterRecord();
         case PUBLIC_CLIENT_ID -> new OidcClientRecord(PUBLIC_CLIENT_ID,

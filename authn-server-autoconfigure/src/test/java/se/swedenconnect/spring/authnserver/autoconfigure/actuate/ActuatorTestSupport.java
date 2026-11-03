@@ -30,6 +30,11 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.jwk.Curve;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
@@ -151,7 +156,8 @@ final class ActuatorTestSupport {
   }
 
   /**
-   * Creates client metadata.
+   * Creates client metadata, for a client that authenticates with {@code private_key_jwt} and gives its key as
+   * {@code jwks}.
    *
    * @param name the client name
    * @return the metadata
@@ -160,6 +166,13 @@ final class ActuatorTestSupport {
     final OIDCClientMetadata metadata = new OIDCClientMetadata();
     metadata.setName(name);
     metadata.setRedirectionURI(URI.create("https://client.example.com/callback"));
+    metadata.setTokenEndpointAuthMethod(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
+    try {
+      metadata.setJWKSet(new JWKSet(new ECKeyGenerator(Curve.P_256).keyID("client-key").generate().toPublicJWK()));
+    }
+    catch (final JOSEException e) {
+      throw new IllegalStateException(e);
+    }
     return metadata;
   }
 

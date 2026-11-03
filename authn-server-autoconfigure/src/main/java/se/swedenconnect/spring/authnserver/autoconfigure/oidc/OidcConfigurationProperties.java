@@ -1440,8 +1440,8 @@ public class OidcConfigurationProperties {
     private Duration maximumAge;
 
     /**
-     * How long the answer that the resolver does not know a client is kept, and how long a pairwise client is
-     * marked as invalid when its sector_identifier_uri cannot be fetched. Defaults to 5 minutes.
+     * How long the answer that the resolver does not know a client is kept, and how long a client is marked as
+     * invalid when its keys or the document at its sector_identifier_uri cannot be fetched. Defaults to 5 minutes.
      */
     private Duration notFoundTimeToLive;
 

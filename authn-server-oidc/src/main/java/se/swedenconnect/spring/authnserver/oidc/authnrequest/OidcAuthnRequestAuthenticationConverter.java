@@ -79,7 +79,10 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
  * </p>
  * <p>
  * A client that the client registry has marked as invalid, see {@link RequesterRecord#isValid()}, gets
- * {@code invalid_client} at its redirect URI, with an {@code error_description} saying what is wrong.
+ * {@code invalid_client} at its redirect URI, with an {@code error_description} saying what is wrong. This holds also
+ * when its request object cannot be decoded, and the error is then sent as for such a request object. A client marked
+ * as invalid that has no registered redirect URI cannot be answered, and its request ends at the OpenID Provider as an
+ * {@link OidcUnrecoverableError#INVALID_CLIENT_CONFIGURATION}.
  * </p>
  *
  * @author Martin Lindström
@@ -154,6 +157,15 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
     final AuditRequestContext auditContext =
         AuditRequestContext.get(request).setRequester(AuditRequester.of(record, false));
 
+    // A client marked as invalid that has no registered redirect URI cannot be answered ...
+    //
+    if (!record.isValid() && (metadata.getRedirectionURIs() == null || metadata.getRedirectionURIs().isEmpty())) {
+      log.info("The client is marked as invalid and has no registered redirect URI - {} [{}]",
+          record.invalidReason(), logString);
+      throw new UnrecoverableErrorException(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION,
+          "The client is marked as invalid: " + record.invalidReason());
+    }
+
     // Public clients are not supported ...
     //
     if (ClientAuthenticationMethod.NONE.equals(metadata.getTokenEndpointAuthMethod())) {
@@ -176,6 +188,16 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
         checkResponseType(parameters, requestObject, logString);
       }
       catch (final OidcErrorResponseException e) {
+        if (!record.isValid()) {
+          // The request object of a client marked as invalid may fail since the client's keys are what is wrong ...
+          log.info("The client is marked as invalid - {} [{}]", record.invalidReason(), logString);
+          if (fallback == null) {
+            throw new UnrecoverableErrorException(OidcUnrecoverableError.INVALID_CLIENT_CONFIGURATION,
+                "The client is marked as invalid: " + record.invalidReason());
+          }
+          throw new OidcErrorResponseException(OAuth2Error.INVALID_CLIENT,
+              "The client is marked as invalid: " + record.invalidReason());
+        }
         if (fallback == null) {
           // The cause is left out, since an authentication exception in the cause chain would be handled by
           // Spring Security's exception translation ...
@@ -210,10 +232,10 @@ public class OidcAuthnRequestAuthenticationConverter implements AuthenticationCo
     OidcResponseTarget.setOnRequest(request, target);
     auditContext.setRequester(AuditRequester.of(record, true));
 
-    // A client marked as invalid is never authenticated. The error is deliberately sent to the redirect URI: only the
-    // client's pairwise setup failed, and its redirect_uri is still trusted. OpenID Federation 1.0, Section 12.1.3,
-    // can be read as forbidding a redirect when the RP metadata is invalid, but the RP needs to learn what is wrong,
-    // and the user is not helped by being shown the error.
+    // A client marked as invalid is never authenticated. The error is deliberately sent to the redirect URI: another
+    // part of the client's registration has an error, and its redirect_uri is still trusted. OpenID Federation 1.0,
+    // Section 12.1.3, can be read as forbidding a redirect when the RP metadata is invalid, but the RP needs to learn
+    // what is wrong, and the user is not helped by being shown the error.
     //
     if (!record.isValid()) {
       log.info("The client is marked as invalid - {} [{}]", record.invalidReason(), logString);

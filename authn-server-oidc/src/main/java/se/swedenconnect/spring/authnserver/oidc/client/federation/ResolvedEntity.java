@@ -22,6 +22,7 @@ import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 /**
@@ -30,10 +31,13 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  *
  * @param entityId the entity identifier
  * @param clientMetadata the relying party metadata, after the metadata policies of the trust chain have been applied,
- *     or {@code null} if the entity is not an OpenID Connect client
+ *     or {@code null} if the entity is not an OpenID Connect client. Empty when the metadata cannot be parsed
  * @param listEndpoint the {@code federation_list_endpoint} of the entity, or {@code null} if it lists no subordinates
  * @param trustMarkTypes the types of the trust marks that the response holds. The resolver has checked them
  * @param expiresAt when the resolved data is no longer valid
+ * @param clientMetadataError why the relying party metadata cannot be parsed, or {@code null} if it can
+ * @param entityKeys the entity's Federation Entity Keys from the {@code trust_chain} of the resolve response, or
+ *     {@code null}, see {@link ResolvedClient#entityKeys()}
  * @author Martin Lindström
  */
 public record ResolvedEntity(
@@ -41,7 +45,9 @@ public record ResolvedEntity(
     @Nullable OIDCClientMetadata clientMetadata,
     @Nullable String listEndpoint,
     @NonNull Set<String> trustMarkTypes,
-    @NonNull Instant expiresAt) {
+    @NonNull Instant expiresAt,
+    @Nullable String clientMetadataError,
+    @Nullable JWKSet entityKeys) {
 
   /**
    * Constructor.
@@ -51,11 +57,29 @@ public record ResolvedEntity(
    * @param listEndpoint the {@code federation_list_endpoint} of the entity, or {@code null}
    * @param trustMarkTypes the types of the trust marks that the response holds
    * @param expiresAt when the resolved data is no longer valid
+   * @param clientMetadataError why the relying party metadata cannot be parsed, or {@code null}
+   * @param entityKeys the entity's Federation Entity Keys, or {@code null}
    */
   public ResolvedEntity {
     Objects.requireNonNull(entityId, "entityId must not be null");
     Objects.requireNonNull(expiresAt, "expiresAt must not be null");
     trustMarkTypes = Set.copyOf(Objects.requireNonNull(trustMarkTypes, "trustMarkTypes must not be null"));
+  }
+
+  /**
+   * Constructor for an entity whose relying party metadata, if any, could be parsed, and whose Federation Entity Keys
+   * are not known.
+   *
+   * @param entityId the entity identifier
+   * @param clientMetadata the relying party metadata, or {@code null}
+   * @param listEndpoint the {@code federation_list_endpoint} of the entity, or {@code null}
+   * @param trustMarkTypes the types of the trust marks that the response holds
+   * @param expiresAt when the resolved data is no longer valid
+   */
+  public ResolvedEntity(final @NonNull String entityId, final @Nullable OIDCClientMetadata clientMetadata,
+      final @Nullable String listEndpoint, final @NonNull Set<String> trustMarkTypes,
+      final @NonNull Instant expiresAt) {
+    this(entityId, clientMetadata, listEndpoint, trustMarkTypes, expiresAt, null, null);
   }
 
   /**
@@ -67,7 +91,7 @@ public record ResolvedEntity(
   public static @NonNull ResolvedEntity of(final @NonNull ResolvedClient client) {
     Objects.requireNonNull(client, "client must not be null");
     return new ResolvedEntity(client.clientId(), client.metadata(), null, client.trustMarkTypes(),
-        client.expiresAt());
+        client.expiresAt(), client.metadataError(), client.entityKeys());
   }
 
   /**
@@ -77,7 +101,8 @@ public record ResolvedEntity(
    */
   public @Nullable ResolvedClient toClient() {
     return this.clientMetadata != null
-        ? new ResolvedClient(this.entityId, this.clientMetadata, this.trustMarkTypes, this.expiresAt)
+        ? new ResolvedClient(this.entityId, this.clientMetadata, this.trustMarkTypes, this.expiresAt,
+            this.clientMetadataError, this.entityKeys)
         : null;
   }
 

@@ -100,7 +100,7 @@ public record FederationEntityRecord(
       return null;
     }
     return new ResolvedClient(this.entityId, this.entity.clientMetadata(), this.entity.trustMarkTypes(),
-        this.expiresAt);
+        this.expiresAt, this.entity.clientMetadataError(), this.entity.entityKeys());
   }
 
   /**

@@ -280,6 +280,7 @@ public class HttpFederationClient implements FederationClient, ApplicationEventP
       case ENTITY_CONFIGURATION -> "entity configuration";
       case SUBORDINATE_LISTING -> "subordinate listing";
       case TRUST_MARKED_LISTING -> "trust marked entities listing";
+      case CLIENT_KEYS -> "client keys";
     };
   }
 

@@ -54,7 +54,8 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Subordi
  * </p>
  * <p>
  * Each client that is put in the cache is checked as when it is resolved at its request, see
- * {@link PairwiseClientCheck}.
+ * {@link FederationClientValidator}. A client whose metadata cannot be parsed is put in the cache marked as invalid,
+ * and an entity whose relying party metadata cannot be parsed is still asked for its subordinates.
  * </p>
  * <p>
  * A run then renews every cached client whose entry expires before the next run, keeping the trust marks that have
@@ -441,8 +442,8 @@ public class FederationClientCollector implements Runnable, AutoCloseable {
     }
 
     /**
-     * Puts a client in the cache, keeping the trust marks of the earlier entry that have been asked for on demand. A
-     * pairwise client is checked, see {@link PairwiseClientCheck}.
+     * Puts a client in the cache, keeping the trust marks of the earlier entry that have been asked for on demand. The
+     * client is checked, see {@link FederationClientValidator}.
      *
      * @param client the resolved client
      * @param earlier the earlier entry, or {@code null}

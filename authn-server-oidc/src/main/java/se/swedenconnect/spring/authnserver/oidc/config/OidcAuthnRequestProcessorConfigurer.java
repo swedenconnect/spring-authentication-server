@@ -92,7 +92,9 @@ public class OidcAuthnRequestProcessorConfigurer {
 
   /**
    * Assigns the component that finds the keys of clients, for verifying signed request objects. The default is a
-   * {@link DefaultClientKeyResolver}.
+   * {@link DefaultClientKeyResolver}. A client resolved through OpenID Federation whose keys are at a URI uses the keys
+   * held with it instead, see
+   * {@link se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientKeyResolver}.
    *
    * @param clientKeyResolver the resolver
    * @return this configurer

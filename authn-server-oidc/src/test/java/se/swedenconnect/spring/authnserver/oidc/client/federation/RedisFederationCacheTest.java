@@ -34,7 +34,10 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.jwk.JWKMatcher;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.oidc.RedisTestNodes;
@@ -302,6 +305,37 @@ class RedisFederationCacheTest extends FederationTestSupport {
   }
 
   @Test
+  void theHeldKeysAreSharedByTheNodes() {
+    final String jwksUri = "https://client.example.com/jwks";
+    final ECKey rolled = key("rolled");
+    final StubClientKeysFetcher fetcher = new StubClientKeysFetcher();
+    fetcher.jwks.put(jwksUri, publicKeys(CLIENT_KEY));
+    final OIDCClientMetadata metadata = clientMetadata("The Client");
+    metadata.setJWKSet(null);
+    metadata.setJWKSetURI(URI.create(jwksUri));
+    final FederationResolver resolver = id -> new ResolvedClient(id, metadata, Set.of(),
+        this.clock.instant().plus(VALIDITY));
+    final FederationClientBackend backendA = new FederationClientBackend(resolver, (id, type) -> null, this.cacheA,
+        FederationCacheSettings.defaults(), this.clock);
+    final FederationClientBackend backendB = new FederationClientBackend(resolver, (id, type) -> null, this.cacheB,
+        FederationCacheSettings.defaults(), this.clock);
+    backendA.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), fetcher));
+    backendB.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), fetcher));
+
+    // Node A resolves the client and fetches its keys, node B uses them without a fetch
+    final OIDCClientMetadata held = backendA.lookup(CLIENT_ID).getProtocolMetadata(OIDCClientMetadata.class);
+    assertThat(backendB.resolveKeys(CLIENT_ID, held, matcher(CLIENT_KEY.getKeyID()))).hasSize(1);
+    assertThat(fetcher.calls).hasSize(1);
+
+    // A rollover seen by node B is held for node A too
+    fetcher.jwks.put(jwksUri, publicKeys(rolled));
+    assertThat(backendB.resolveKeys(CLIENT_ID, held, matcher(rolled.getKeyID()))).hasSize(1);
+    assertThat(backendA.resolveKeys(CLIENT_ID, held, matcher(rolled.getKeyID()))).hasSize(1);
+    assertThat(fetcher.calls).hasSize(2);
+    assertThat(this.cacheA.get(CLIENT_ID).heldKeys().uri()).isEqualTo(jwksUri);
+  }
+
+  @Test
   void invalidArguments() {
     assertThatThrownBy(() -> new RedisFederationCache(null)).isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> new RedisFederationCache(this.template, "")).isInstanceOf(IllegalArgumentException.class);
@@ -311,6 +345,10 @@ class RedisFederationCacheTest extends FederationTestSupport {
   private CachedClientRecord found(final String clientId, final Duration validity) {
     return CachedClientRecord.found(new ResolvedClient(clientId, clientMetadata("The Client"), Set.of(),
         this.clock.instant().plus(validity)), this.clock.instant(), null);
+  }
+
+  private static JWKMatcher matcher(final String keyId) {
+    return JWKMatcher.forJWSHeader(new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(keyId).build());
   }
 
 }

@@ -38,9 +38,10 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * @param onDemandTrustMarks the trust marks that have been asked for on demand, keyed by type
  * @param expiresAt when the entry is no longer valid
  * @param invalidReason why the client is marked as invalid, or {@code null} if it is not, see
- *     {@link PairwiseClientCheck}
+ *     {@link FederationClientValidator}
  * @param verifiedSector the successful check of the client's {@code sector_identifier_uri} that is remembered, or
  *     {@code null}
+ * @param heldKeys the keys fetched from the client's {@code jwks_uri} or {@code signed_jwks_uri}, or {@code null}
  * @author Martin Lindström
  */
 public record CachedClientRecord(
@@ -50,7 +51,8 @@ public record CachedClientRecord(
     @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
     @NonNull Instant expiresAt,
     @Nullable String invalidReason,
-    @Nullable VerifiedSector verifiedSector) {
+    @Nullable VerifiedSector verifiedSector,
+    @Nullable HeldKeys heldKeys) {
 
   /**
    * Constructor.
@@ -62,6 +64,7 @@ public record CachedClientRecord(
    * @param expiresAt when the entry is no longer valid
    * @param invalidReason why the client is marked as invalid, or {@code null}
    * @param verifiedSector the successful check of the client's {@code sector_identifier_uri}, or {@code null}
+   * @param heldKeys the keys fetched from the client's {@code jwks_uri} or {@code signed_jwks_uri}, or {@code null}
    */
   public CachedClientRecord {
     Objects.requireNonNull(clientId, "clientId must not be null");
@@ -72,7 +75,25 @@ public record CachedClientRecord(
   }
 
   /**
-   * Constructor for an entry of a client that is not marked as invalid and has no remembered check.
+   * Constructor for an entry of a client that holds no keys.
+   *
+   * @param clientId the {@code client_id} of the client
+   * @param metadata the client metadata, or {@code null}
+   * @param trustMarkTypes the trust mark types of the resolve response
+   * @param onDemandTrustMarks the trust marks that have been asked for on demand
+   * @param expiresAt when the entry is no longer valid
+   * @param invalidReason why the client is marked as invalid, or {@code null}
+   * @param verifiedSector the successful check of the client's {@code sector_identifier_uri}, or {@code null}
+   */
+  public CachedClientRecord(final @NonNull String clientId, final @Nullable OIDCClientMetadata metadata,
+      final @NonNull Set<String> trustMarkTypes, final @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
+      final @NonNull Instant expiresAt, final @Nullable String invalidReason,
+      final @Nullable VerifiedSector verifiedSector) {
+    this(clientId, metadata, trustMarkTypes, onDemandTrustMarks, expiresAt, invalidReason, verifiedSector, null);
+  }
+
+  /**
+   * Constructor for an entry of a client that is not marked as invalid, has no remembered check and holds no keys.
    *
    * @param clientId the {@code client_id} of the client
    * @param metadata the client metadata, or {@code null}
@@ -83,7 +104,7 @@ public record CachedClientRecord(
   public CachedClientRecord(final @NonNull String clientId, final @Nullable OIDCClientMetadata metadata,
       final @NonNull Set<String> trustMarkTypes, final @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
       final @NonNull Instant expiresAt) {
-    this(clientId, metadata, trustMarkTypes, onDemandTrustMarks, expiresAt, null, null);
+    this(clientId, metadata, trustMarkTypes, onDemandTrustMarks, expiresAt, null, null, null);
   }
 
   /**
@@ -143,16 +164,16 @@ public record CachedClientRecord(
   }
 
   /**
-   * Creates a copy of the entry with the outcome of the check of a pairwise client. A temporary mark makes the entry
+   * Creates a copy of the entry with the outcome of the validation of the client. A temporary mark makes the entry
    * expire after the given time, unless it expires before that, so that the client is checked again when it is next
    * resolved.
    *
-   * @param outcome the outcome of the check
+   * @param outcome the outcome of the validation
    * @param now the current time
    * @param temporaryMark how long a temporary mark lasts
    * @return a {@link CachedClientRecord}
    */
-  public @NonNull CachedClientRecord withCheck(final PairwiseClientCheck.@NonNull Outcome outcome,
+  public @NonNull CachedClientRecord withOutcome(final FederationClientValidator.@NonNull Outcome outcome,
       final @NonNull Instant now, final @NonNull Duration temporaryMark) {
     Objects.requireNonNull(outcome, "outcome must not be null");
     Instant expiry = this.expiresAt;
@@ -163,7 +184,18 @@ public record CachedClientRecord(
       }
     }
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, this.onDemandTrustMarks, expiry,
-        outcome.invalidReason(), outcome.verifiedSector());
+        outcome.invalidReason(), outcome.verifiedSector(), outcome.heldKeys());
+  }
+
+  /**
+   * Creates a copy of the entry holding other keys, after the keys have been fetched again.
+   *
+   * @param heldKeys the keys
+   * @return a {@link CachedClientRecord}
+   */
+  public @NonNull CachedClientRecord withHeldKeys(final @Nullable HeldKeys heldKeys) {
+    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, this.onDemandTrustMarks,
+        this.expiresAt, this.invalidReason, this.verifiedSector, heldKeys);
   }
 
   /**
@@ -235,7 +267,7 @@ public record CachedClientRecord(
     final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
     marks.put(trustMark.type(), trustMark);
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt,
-        this.invalidReason, this.verifiedSector);
+        this.invalidReason, this.verifiedSector, this.heldKeys);
   }
 
   /**
@@ -253,7 +285,7 @@ public record CachedClientRecord(
     final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
     marks.remove(type);
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt,
-        this.invalidReason, this.verifiedSector);
+        this.invalidReason, this.verifiedSector, this.heldKeys);
   }
 
   /**

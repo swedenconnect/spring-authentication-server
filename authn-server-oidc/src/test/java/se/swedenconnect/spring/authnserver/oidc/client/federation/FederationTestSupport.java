@@ -41,6 +41,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.federation.entities.EntityType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
@@ -83,6 +84,9 @@ abstract class FederationTestSupport {
   /** Another trust mark type. */
   static final String MARK_TWO = "https://example.com/mark-two";
 
+  /** The key of the clients of the tests, given as {@code jwks}. */
+  static final ECKey CLIENT_KEY = key("client-key");
+
   /**
    * Creates a key for signing.
    *
@@ -109,7 +113,8 @@ abstract class FederationTestSupport {
   }
 
   /**
-   * Creates client metadata with the supplied name.
+   * Creates client metadata with the supplied name, for a client that passes the {@link FederationClientValidator}:
+   * it authenticates with {@code private_key_jwt} and gives its key as {@code jwks}.
    *
    * @param name the {@code client_name}
    * @return an {@link OIDCClientMetadata}
@@ -118,6 +123,8 @@ abstract class FederationTestSupport {
     final OIDCClientMetadata metadata = new OIDCClientMetadata();
     metadata.setName(name);
     metadata.setRedirectionURI(URI.create("https://client.example.com/callback"));
+    metadata.setTokenEndpointAuthMethod(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
+    metadata.setJWKSet(publicKeys(CLIENT_KEY));
     return metadata;
   }
 
@@ -140,6 +147,8 @@ abstract class FederationTestSupport {
       }
     };
     metadata.setName(name);
+    metadata.setTokenEndpointAuthMethod(ClientAuthenticationMethod.PRIVATE_KEY_JWT);
+    metadata.setJWKSet(publicKeys(CLIENT_KEY));
     metadata.setSubjectType(SubjectType.PAIRWISE);
     if (sectorIdentifierUri != null && https) {
       metadata.setSectorIDURI(URI.create(sectorIdentifierUri));
@@ -238,6 +247,23 @@ abstract class FederationTestSupport {
         .issueTime(new Date())
         .claim("trust_mark", trustMark)
         .claim("status", status)
+        .build());
+  }
+
+  /**
+   * Creates a signed JWK Set, as published at a {@code signed_jwks_uri}.
+   *
+   * @param key the Federation Entity Key to sign with
+   * @param issuer the entity identifier of the issuer and subject
+   * @param keys the JWK Set
+   * @return a {@link SignedJWT}
+   */
+  static SignedJWT signedJwks(final ECKey key, final String issuer, final JWKSet keys) {
+    return sign(key, FederationClientValidator.SIGNED_JWKS_TYPE, new JWTClaimsSet.Builder()
+        .issuer(issuer)
+        .subject(issuer)
+        .issueTime(new Date())
+        .claim("keys", keys.toJSONObject(true).get("keys"))
         .build());
   }
 
@@ -396,6 +422,42 @@ abstract class FederationTestSupport {
         throw this.failure;
       }
       return this.documents.get(sectorIdentifierUri.toString());
+    }
+
+  }
+
+  /**
+   * A {@link ClientKeysFetcher} that answers with the keys of the test.
+   */
+  static class StubClientKeysFetcher implements ClientKeysFetcher {
+
+    /** The JWK Sets by {@code jwks_uri}. A URI without a JWK Set cannot be fetched. */
+    final Map<String, JWKSet> jwks = new HashMap<>();
+
+    /** The signed JWK Sets by {@code signed_jwks_uri}. A URI without one cannot be fetched. */
+    final Map<String, SignedJWT> signedJwks = new HashMap<>();
+
+    /** The URIs that have been fetched. */
+    final List<String> calls = new ArrayList<>();
+
+    @Override
+    public JWKSet fetchJwks(final URI jwksUri) throws IOException {
+      this.calls.add(jwksUri.toString());
+      final JWKSet keys = this.jwks.get(jwksUri.toString());
+      if (keys == null) {
+        throw new IOException("HTTP status 503");
+      }
+      return keys;
+    }
+
+    @Override
+    public SignedJWT fetchSignedJwks(final URI signedJwksUri) throws IOException {
+      this.calls.add(signedJwksUri.toString());
+      final SignedJWT jwt = this.signedJwks.get(signedJwksUri.toString());
+      if (jwt == null) {
+        throw new IOException("HTTP status 503");
+      }
+      return jwt;
     }
 
   }

@@ -364,6 +364,11 @@ What the OpenID Provider reads from the client metadata when it processes a requ
 | `id_token_signed_response_alg` | The algorithm the ID token is signed with, see [Section 3, "Choosing the signing key for a client"](#choosing-the-signing-key-for-a-client). |
 | `id_token_encrypted_response_alg` and `id_token_encrypted_response_enc` | Whether and how the ID token is encrypted, see [Section 6.5, "The ID token"](#the-id-token). |
 
+For a client resolved through OpenID Federation, the metadata is checked when the client is resolved, and the keys at
+`jwks_uri`, or at `signed_jwks_uri`, which such a client may also use, are fetched then and held with it, see
+[Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) and
+[Section 6.8, "Keys of federation clients"](client-registry.html#client-keys) of [The client registry](client-registry.html).
+
 An unknown client and a client registry that fails end at the OpenID Provider, and are logged differently: the first
 at `INFO`, since it is a normal outcome, and the second at `ERROR`, since a dependency is not working.
 
