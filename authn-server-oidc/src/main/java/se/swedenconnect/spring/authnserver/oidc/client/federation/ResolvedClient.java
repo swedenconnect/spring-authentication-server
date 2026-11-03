@@ -29,7 +29,7 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
  * What a resolve response tells about an OpenID Connect client.
  * <p>
  * Relying party metadata that cannot be parsed does not make the resolution fail. The client is then given empty
- * metadata and the reason, and the {@link ClientMetadataValidator} marks it as invalid.
+ * metadata and the reason, and the {@link se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator ClientMetadataValidator} marks it as invalid.
  * </p>
  *
  * @param clientId the {@code client_id} of the client, which is its entity identifier
