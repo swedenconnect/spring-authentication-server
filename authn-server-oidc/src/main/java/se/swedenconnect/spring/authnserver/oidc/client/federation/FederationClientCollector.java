@@ -54,7 +54,7 @@ import se.swedenconnect.oidf.common.entity.entity.integration.federation.Subordi
  * </p>
  * <p>
  * Each client that is put in the cache is checked as when it is resolved at its request, see
- * {@link ClientMetadataValidator}. A client whose metadata cannot be parsed is put in the cache marked as invalid,
+ * {@link se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator ClientMetadataValidator}. A client whose metadata cannot be parsed is put in the cache marked as invalid,
  * and an entity whose relying party metadata cannot be parsed is still asked for its subordinates.
  * </p>
  * <p>
@@ -443,7 +443,7 @@ public class FederationClientCollector implements Runnable, AutoCloseable {
 
     /**
      * Puts a client in the cache, keeping the trust marks of the earlier entry that have been asked for on demand. The
-     * client is checked, see {@link ClientMetadataValidator}.
+     * client is checked, see {@link se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator ClientMetadataValidator}.
      *
      * @param client the resolved client
      * @param earlier the earlier entry, or {@code null}

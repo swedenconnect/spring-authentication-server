@@ -27,7 +27,7 @@ import se.swedenconnect.spring.authnserver.LibraryVersion;
 
 /**
  * Published by the {@link HttpFederationClient} for every call it makes to a federation service, and by the
- * {@link HttpClientKeysFetcher} for every fetch of the keys of a client, telling how the call went. It is what the
+ * {@link se.swedenconnect.spring.authnserver.oidc.client.HttpClientKeysFetcher HttpClientKeysFetcher} for every fetch of the keys of a client, telling how the call went. It is what the
  * health of the federation services is built from, see {@link FederationServiceMonitor}.
  *
  * @author Martin Lindström
