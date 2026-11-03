@@ -97,6 +97,8 @@ equals "from main: the release notes are not touched by the script" "${SANDBOX_N
 equals "from main: the working tree is clean" "" "$(in_work "$dir" git status --porcelain)"
 equals "from main: main is untouched" "First commit" "$(in_work "$dir" git log -1 --format=%s main)"
 equals "from main: the project is built once" "1" "$(grep -c 'clean install' "$dir/mvn.log")"
+equals "from main: the build uses the release profile without signing" "-Prelease -Dgpg.skip=true clean install" \
+  "$(grep 'clean install' "$dir/mvn.log")"
 equals "from main: the version is set once" "1" "$(grep -c 'versions:set' "$dir/mvn.log")"
 contains "from main: the bump script is pointed at" "$dir/output" "internal/post-release-bump.sh"
 contains "from main: the merge is explained" "$dir/output" "Create a merge"
@@ -164,6 +166,23 @@ for tag_answer in n "" yes-please; do
   contains "no tag on '${tag_answer}': the state is explained" "$dir/output" "Stopped before tagging."
   contains "no tag on '${tag_answer}': the bump script is pointed at" "$dir/output" "internal/post-release-bump.sh"
 done
+
+# --- a failing build stops the release before anything is committed, pushed or tagged -------------
+
+dir="$(new_sandbox 0.1.1-SNAPSHOT v0.1.0)"
+remote_before="$(in_work "$dir" git ls-remote origin | sort)"
+export MVN_FAIL="clean install"
+run_in_sandbox "$dir" "$RELEASE" "$ANSWER_FULL_RELEASE"
+status=$?
+unset MVN_FAIL
+
+equals "a failing build: the script stops with an error" "1" "$status"
+contains "a failing build: the build output is shown" "$dir/output" "BUILD FAILURE"
+absent "a failing build: the release notes are not asked for" "$dir/output" "Update docs/release-notes.md"
+absent "a failing build: the tag is not asked for" "$dir/output" "Create the tag"
+equals "a failing build: nothing is committed" "First commit" "$(in_work "$dir" git log -1 --format=%s)"
+equals "a failing build: nothing is tagged" "" "$(in_work "$dir" git tag -l v0.1.1)"
+equals "a failing build: nothing is pushed" "$remote_before" "$(in_work "$dir" git ls-remote origin | sort)"
 
 # --- checks that stop the release before anything changes ------------------------------------------
 
