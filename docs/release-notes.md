@@ -6,9 +6,9 @@
 
 -----
 
-### Version 1.0.4
+### Version 1.1.0
 
-**Date:** _Not yet released_
+**Date:** 2026-11-03
 
 - The discovery document of the Sweden Connect reference server holds `service_documentation`, which links to a page for Relying Party developers that describes the service. See [#38](https://github.com/swedenconnect/spring-authentication-server/issues/38).
 - `authn-server.oidc.max-jwt-age` now defaults to 10 minutes and cannot be turned off, so the OP rejects a signed request object, signature request or client assertion issued longer ago than that. A deployment whose clients reuse a signed request object through `request_uri` must set a longer value. See [#37](https://github.com/swedenconnect/spring-authentication-server/issues/37).

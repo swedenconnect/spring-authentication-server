@@ -23,8 +23,8 @@ package se.swedenconnect.spring.authnserver;
 public final class LibraryVersion {
 
   private static final int MAJOR = 1;
-  private static final int MINOR = 0;
-  private static final int PATCH = 4;
+  private static final int MINOR = 1;
+  private static final int PATCH = 0;
 
   /**
    * Global serialization value for Spring Authentication Server classes.
