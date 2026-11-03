@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.oidc.client.federation;
+package se.swedenconnect.spring.authnserver.oidc.client;
 
 import java.util.Objects;
 
@@ -23,8 +23,9 @@ import org.jspecify.annotations.Nullable;
 import com.nimbusds.jose.jwk.JWKSet;
 
 /**
- * The keys of a federation client that were fetched from its {@code jwks_uri} or {@code signed_jwks_uri} when the
- * client was resolved. They are kept with the client's cache entry, so that a request does not cause a fetch.
+ * The keys of a client that were fetched from its {@code jwks_uri} or {@code signed_jwks_uri} when the client was
+ * validated. They are kept with the client, in the cache entry of a federation client and in the
+ * {@link ClientValidationStore} for other clients, so that a request does not cause a fetch.
  *
  * @param uri the URI that the keys were fetched from
  * @param signed whether the URI is a {@code signed_jwks_uri}

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.oidc.client.federation;
+package se.swedenconnect.spring.authnserver.oidc.client;
 
 import java.util.List;
 import java.util.Objects;
@@ -28,17 +28,17 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.ClientKeyResolver;
 
 /**
- * A {@link ClientKeyResolver} that gives the keys that federation clients hold, see
- * {@link FederationClientBackend#resolveKeys(String, OIDCClientMetadata, JWKMatcher)}, so that a request does not
- * cause a fetch of a key that is held. Other clients, and federation clients with {@code jwks}, get their keys from
- * another resolver.
+ * A {@link ClientKeyResolver} that gives the keys that clients hold, see {@link ClientKeyHolder}, so that a request
+ * does not cause a fetch of a key that is held. The backends are asked in the order of the client registry, and the
+ * first that holds the client answers. A client of a backend that holds no keys, such as a backend of the
+ * application's own, gets its keys from another resolver.
  *
  * @author Martin Lindström
  */
-public class FederationClientKeyResolver implements ClientKeyResolver {
+public class HeldKeysClientKeyResolver implements ClientKeyResolver {
 
-  /** The federation backends whose clients hold keys. */
-  private final List<FederationClientBackend> backends;
+  /** The backends whose clients hold keys. */
+  private final List<ClientKeyHolder> holders;
 
   /** The resolver for other clients. */
   private final ClientKeyResolver delegate;
@@ -46,12 +46,12 @@ public class FederationClientKeyResolver implements ClientKeyResolver {
   /**
    * Constructor.
    *
-   * @param backends the federation backends whose clients hold keys
+   * @param holders the backends whose clients hold keys, in the order of the client registry
    * @param delegate the resolver for other clients
    */
-  public FederationClientKeyResolver(final @NonNull List<FederationClientBackend> backends,
+  public HeldKeysClientKeyResolver(final @NonNull List<? extends ClientKeyHolder> holders,
       final @NonNull ClientKeyResolver delegate) {
-    this.backends = List.copyOf(Objects.requireNonNull(backends, "backends must not be null"));
+    this.holders = List.copyOf(Objects.requireNonNull(holders, "holders must not be null"));
     this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
   }
 
@@ -59,8 +59,8 @@ public class FederationClientKeyResolver implements ClientKeyResolver {
   @Override
   public @NonNull List<JWK> resolve(final @NonNull String clientId, final @NonNull OIDCClientMetadata metadata,
       final @NonNull JWKMatcher matcher) throws KeySourceException {
-    for (final FederationClientBackend backend : this.backends) {
-      final List<JWK> keys = backend.resolveKeys(clientId, metadata, matcher);
+    for (final ClientKeyHolder holder : this.holders) {
+      final List<JWK> keys = holder.resolveKeys(clientId, metadata, matcher);
       if (keys != null) {
         return keys;
       }

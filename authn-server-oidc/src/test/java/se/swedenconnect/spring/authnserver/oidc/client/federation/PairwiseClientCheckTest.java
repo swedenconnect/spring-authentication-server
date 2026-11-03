@@ -26,6 +26,9 @@ import org.junit.jupiter.api.Test;
 import com.nimbusds.openid.connect.sdk.SubjectType;
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
+import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
+
 /**
  * Tests for {@link PairwiseClientCheck}.
  *

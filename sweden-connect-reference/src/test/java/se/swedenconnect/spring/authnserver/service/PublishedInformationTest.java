@@ -34,7 +34,7 @@ import se.swedenconnect.spring.authnserver.registry.RequesterRecord;
 
 /**
  * Tests what the reference publishes about itself, with display names per protocol and a shared description, and that
- * the OpenID Connect clients of {@code authn-server.oidc.clients} are found.
+ * the OpenID Connect clients of {@code authn-server.oidc.clients} are found and valid.
  *
  * @author Martin Lindström
  */
@@ -124,6 +124,16 @@ class PublishedInformationTest extends AbstractCompleteProfileTest {
         .containsExactly("properties");
     assertThat(this.server.getClientRegistry().lookup(AuthenticationProtocol.OIDC, OidcFlowTest.CLIENT_ID))
         .isNotNull();
+  }
+
+  @Test
+  void theOidcClientsOfThePropertiesAreValid() {
+    assertThat(this.server.getClientRegistryBackends().stream()
+        .filter(b -> b.getProtocol() == AuthenticationProtocol.OIDC)
+        .flatMap(b -> b.getClients().stream())
+        .toList())
+        .isNotEmpty()
+        .allSatisfy(c -> assertThat(c.invalidReason()).as(c.requester().identifier()).isNull());
   }
 
 }

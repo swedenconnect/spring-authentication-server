@@ -15,6 +15,7 @@
  */
 /**
  * The client registry backends for OpenID Connect: clients given in the configuration, clients held in a repository
- * and clients resolved through OpenID Federation.
+ * and clients resolved through OpenID Federation. Also the validation of client metadata, which applies to the clients
+ * of all three, and the keys that the clients hold.
  */
 package se.swedenconnect.spring.authnserver.oidc.client;

@@ -462,6 +462,30 @@ class OidcAutoConfigurationTest {
   }
 
   @Test
+  void theClientKeySettingsHaveDefaultsAndAreAppliedWhenAssigned() {
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final OidcProviderConfigurer oidc =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class);
+          assertThat(oidc.getClientKeysRefreshInterval()).isEqualTo(Duration.ofHours(1));
+          assertThat(oidc.getClientKeysFailureTimeToLive()).isEqualTo(Duration.ofMinutes(5));
+        });
+    this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))
+        .withPropertyValues("authn-server.oidc.client-keys-refresh-interval=20m",
+            "authn-server.oidc.federation.clients.cache.not-found-time-to-live=2m")
+        .withUserConfiguration(CaptureConfiguration.class)
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          final OidcProviderConfigurer oidc =
+              CaptureConfiguration.CONFIGURER.get().getProtocolConfigurer(OidcProviderConfigurer.class);
+          assertThat(oidc.getClientKeysRefreshInterval()).isEqualTo(Duration.ofMinutes(20));
+          assertThat(oidc.getClientKeysFailureTimeToLive()).isEqualTo(Duration.ofMinutes(2));
+        });
+  }
+
+  @Test
   void aZeroOrNegativeMaximumJwtAgeFailsStartup() {
     for (final String value : List.of("0s", "-1m")) {
       this.runner.withPropertyValues(signingKey(0, "rsa-sign", "active", false))

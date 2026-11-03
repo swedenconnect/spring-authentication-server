@@ -24,6 +24,10 @@ import se.swedenconnect.spring.authnserver.oidc.authnrequest.ClientKeyResolver;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.DefaultClientKeyResolver;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.HttpRequestUriFetcher;
 import se.swedenconnect.spring.authnserver.oidc.authnrequest.RequestUriFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientValidationStore;
+import se.swedenconnect.spring.authnserver.oidc.client.HttpClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.InMemoryClientValidationStore;
 import se.swedenconnect.spring.authnserver.oidc.response.ResponsePage;
 import se.swedenconnect.spring.authnserver.oidc.token.AccessTokenStore;
 import se.swedenconnect.spring.authnserver.oidc.token.AuthorizationCodeStore;
@@ -31,8 +35,9 @@ import se.swedenconnect.spring.authnserver.oidc.token.ClientAssertionReplayCache
 
 /**
  * Configurer for the components that process OpenID Connect authentication requests, send responses and serve the
- * token endpoint, and for the stores of authorization codes, access tokens and client assertions. Each
- * component has a default, built from the values of the {@link OidcProviderConfigurer}; assign one here to replace it.
+ * token endpoint, and for the stores of authorization codes, access tokens, client assertions and client validation.
+ * Each component has a default, built from the values of the {@link OidcProviderConfigurer}; assign one here to
+ * replace it.
  *
  * @author Martin Lindström
  */
@@ -61,6 +66,12 @@ public class OidcAuthnRequestProcessorConfigurer {
 
   /** The client assertion replay cache. */
   private ClientAssertionReplayCache clientAssertionReplayCache;
+
+  /** Where the outcomes of the validation of clients are kept. */
+  private ClientValidationStore clientValidationStore;
+
+  /** Fetches the keys at the jwks_uri of clients from the configuration and client repositories. */
+  private ClientKeysFetcher clientKeysFetcher;
 
   /**
    * Constructor.
@@ -91,10 +102,10 @@ public class OidcAuthnRequestProcessorConfigurer {
   }
 
   /**
-   * Assigns the component that finds the keys of clients, for verifying signed request objects. The default is a
-   * {@link DefaultClientKeyResolver}. A client resolved through OpenID Federation whose keys are at a URI uses the keys
-   * held with it instead, see
-   * {@link se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientKeyResolver}.
+   * Assigns the component that finds the keys of clients that do not hold their keys, that is, clients of a backend of
+   * the application's own. The default is a {@link DefaultClientKeyResolver}. Clients from the configuration, from a
+   * client repository and from OpenID Federation use the keys held with them instead, see
+   * {@link se.swedenconnect.spring.authnserver.oidc.client.HeldKeysClientKeyResolver}.
    *
    * @param clientKeyResolver the resolver
    * @return this configurer
@@ -247,6 +258,52 @@ public class OidcAuthnRequestProcessorConfigurer {
    */
   public @Nullable ClientAssertionReplayCache getClientAssertionReplayCache() {
     return this.clientAssertionReplayCache;
+  }
+
+  /**
+   * Assigns where the outcomes of the validation of clients from the configuration and from client repositories are
+   * kept, together with the keys read from their {@code jwks_uri}. The default is an
+   * {@link InMemoryClientValidationStore}.
+   *
+   * @param clientValidationStore the store
+   * @return this configurer
+   */
+  public @NonNull OidcAuthnRequestProcessorConfigurer clientValidationStore(
+      final @Nullable ClientValidationStore clientValidationStore) {
+    this.clientValidationStore = clientValidationStore;
+    return this;
+  }
+
+  /**
+   * Gets where the outcomes of the validation of clients are kept.
+   *
+   * @return the store, or {@code null} for the default
+   */
+  public @Nullable ClientValidationStore getClientValidationStore() {
+    return this.clientValidationStore;
+  }
+
+  /**
+   * Assigns the component that reads the keys at the {@code jwks_uri} of clients from the configuration and from
+   * client repositories. The default is the fetcher of the federation backend, if there is one, and otherwise an
+   * {@link HttpClientKeysFetcher}.
+   *
+   * @param clientKeysFetcher the fetcher
+   * @return this configurer
+   */
+  public @NonNull OidcAuthnRequestProcessorConfigurer clientKeysFetcher(
+      final @Nullable ClientKeysFetcher clientKeysFetcher) {
+    this.clientKeysFetcher = clientKeysFetcher;
+    return this;
+  }
+
+  /**
+   * Gets the component that reads the keys at the {@code jwks_uri} of clients.
+   *
+   * @return the fetcher, or {@code null} for the default
+   */
+  public @Nullable ClientKeysFetcher getClientKeysFetcher() {
+    return this.clientKeysFetcher;
   }
 
 }

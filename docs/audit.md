@@ -560,12 +560,20 @@ not want them leaves them out with `audit.repository.exclude-events`.
 
 **Type:** `client_invalid`
 
-**Description:** A client resolved through OpenID Federation was marked as invalid when it was resolved, since its
-registration has an error. The client stays in the client registry and in the clients endpoint, but is never
-authenticated, and its requests get `invalid_client`. The `reason` tells what is wrong. One such error is a client with
-`subject_type` set to `pairwise` whose document at its `sector_identifier_uri` does not list all its `redirect_uris`.
-See [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of [The client registry](client-registry.html).
+**Description:** An OpenID Connect client was marked as invalid, since its registration has an error. The client
+stays in the client registry and in the clients endpoint, but is never authenticated, and its requests get
+`invalid_client`. The `reason` tells what is wrong. One such error is a client with `subject_type` set to `pairwise`
+whose document at its `sector_identifier_uri` does not list all its `redirect_uris`.
+
+A client resolved through OpenID Federation is checked when it is resolved, see
+[Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of [The client registry](client-registry.html).
 The event is written by the node that resolved the client, each time the client is resolved and marked.
+
+A client from the configuration or from a client repository is checked when it is validated: at startup, at its first
+lookup, when its metadata has changed, and when a temporary mark has run out, see
+[Section 5.1, "Validation of configured and repository clients"](client-registry.html#static-client-validation) of
+[The client registry](client-registry.html). The event is written by the node that validated the client, each time
+the client is validated and marked. The `source` of the client tells where it comes from.
 
 **Audit data:**
 

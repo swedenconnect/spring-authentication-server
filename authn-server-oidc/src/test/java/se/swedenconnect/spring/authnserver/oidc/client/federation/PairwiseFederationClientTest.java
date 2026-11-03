@@ -32,6 +32,8 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata;
 
 import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
+import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
 import se.swedenconnect.spring.authnserver.registry.ClientUpdateResult;
 import se.swedenconnect.spring.authnserver.registry.RegisteredClient;
 import se.swedenconnect.spring.authnserver.registry.RequesterRecord;

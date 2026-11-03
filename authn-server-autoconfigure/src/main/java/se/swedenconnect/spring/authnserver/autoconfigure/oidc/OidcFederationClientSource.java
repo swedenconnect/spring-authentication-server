@@ -38,20 +38,20 @@ import com.nimbusds.jose.jwk.JWKSet;
 
 import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationClient;
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.HttpClientKeysFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.HttpSectorIdentifierFetcher;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.EntityConfigurationEndpoints;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCache;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCacheSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientCollector;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationClientValidator;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCollectorSettings;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationEntityStore;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationSettings;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpClientKeysFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpFederationResolver;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpSectorIdentifierFetcher;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.HttpTrustMarkRequester;
-import se.swedenconnect.spring.authnserver.oidc.client.federation.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.oidc.client.federation.TrustMarkStatusChecker;
 
 /**
@@ -169,7 +169,7 @@ public class OidcFederationClientSource implements DisposableBean {
     final HttpClientKeysFetcher keysFetcher = new HttpClientKeysFetcher();
     keysFetcher.setApplicationEventPublisher(this.eventPublisher);
     source.setValidator(
-        new FederationClientValidator(createPairwiseClientCheck(this.properties.getClients()), keysFetcher));
+        new ClientMetadataValidator(createPairwiseClientCheck(this.properties.getClients()), keysFetcher));
     server.clientRegistryBackend(source);
     this.backend = source;
 

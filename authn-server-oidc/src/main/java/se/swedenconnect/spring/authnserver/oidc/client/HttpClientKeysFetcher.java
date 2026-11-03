@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package se.swedenconnect.spring.authnserver.oidc.client.federation;
+package se.swedenconnect.spring.authnserver.oidc.client;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,6 +37,8 @@ import org.springframework.context.ApplicationEventPublisherAware;
 
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jwt.SignedJWT;
+
+import se.swedenconnect.spring.authnserver.oidc.client.federation.FederationCallEvent;
 
 /**
  * A {@link ClientKeysFetcher} that fetches the keys with an HTTP GET request.

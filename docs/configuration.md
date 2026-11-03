@@ -646,6 +646,7 @@ The OpenID Connect properties are placed under `authn-server.oidc`. How the Open
 | `requester-acceptance.*` | Which clients are accepted, see [Section 6.5, "Requester acceptance"](#oidc-requester-acceptance). | Every known client |
 | `tokens.*` | The lifetimes of codes and tokens, see [Section 6.6, "The token endpoint and tokens"](#oidc-token-endpoint). | See below |
 | `client-authentication-methods[]` | The client authentication methods enabled at the token endpoint, see [Section 6.6, "The token endpoint and tokens"](#oidc-token-endpoint). | `private_key_jwt` |
+| `client-keys-refresh-interval` | How often the keys at the `jwks_uri` of the clients from `clients[]` and from client repositories are read again, see [Section 6.2, "Clients"](#oidc-clients). | 1 hour |
 | `sign-user-info` | Whether UserInfo responses are signed. When they are, a client that has not registered `userinfo_signed_response_alg` still gets a signed response. When they are not, only a client that has registered it gets a signed response, see [Section 6.6, "The UserInfo endpoint"](openid-provider.html#the-userinfo-endpoint) of [The OpenID Provider](openid-provider.html). | `true` |
 | `scopes[]` | The offered scopes, see [Section 6.7, "Scopes and claims"](#oidc-scopes-and-claims). | Derived from the authentication providers |
 | `claims[]` | Claims supported on top of those of the authentication providers, see [Section 6.7, "Scopes and claims"](#oidc-scopes-and-claims). | - |
@@ -774,6 +775,20 @@ source is asked before any OpenID Connect client source added in code. Two clien
 have the same name, so a source added in code may not be named `properties`.
 
 The clients are read once, at startup. A changed file has no effect until the server is restarted.
+
+**Validation.** The clients are validated at startup, with the same rules as clients resolved through OpenID
+Federation, against what the OpenID Provider supports. A client with an error does not stop the server. It is logged
+at error level, gives a `client_invalid` audit event, and is shown as invalid with the reason in the
+[clients endpoint](management.html#the-clients-endpoint). It is never authenticated, and its requests get
+`invalid_client`. A client that authenticates with a client secret needs one, and its method must be enabled in
+`authn-server.oidc.client-authentication-methods`. The document at a `sector_identifier_uri` is never fetched, so the
+operator makes sure that it lists the client's redirect URIs. A `jwks_uri` must use `https`. Its keys are read at
+startup and held, and read again every `authn-server.oidc.client-keys-refresh-interval`, and when a client names a key
+that is not held. A client whose keys cannot be read at startup is marked as invalid for
+`authn-server.oidc.federation.clients.cache.not-found-time-to-live`, and validated again after that. The same holds for
+the clients of a client repository. See
+[Section 5.1, "Validation of configured and repository clients"](client-registry.html#static-client-validation) of
+[The client registry](client-registry.html) for the rules and how they differ from those for federation clients.
 
 <a name="oidc-endpoints"></a>
 ### 6.3. OIDC endpoints
@@ -1016,7 +1031,7 @@ federation that it is not a member of is not supported.
 | `clients.trust-mark-issuers[]` | The issuers that are asked for a trust mark that a client does not hold, one per trust mark type, see below. | - |
 | `clients.trust-mark-status-interval` | The interval between two checks of the status of the trust marks obtained from the issuers. | 1 hour |
 | `clients.cache.maximum-age` | How long a resolved client is kept at the most, regardless of what the resolve response says. | No limit |
-| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. A made-up `client_id` is remembered for this time too. It is also how long a client is marked as invalid when its keys at `jwks_uri` or `signed_jwks_uri`, or the document at its `sector_identifier_uri`, cannot be fetched, see [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of [The client registry](client-registry.html). | 5 minutes |
+| `clients.cache.not-found-time-to-live` | How long the answer that the resolver does not know a client is kept. A made-up `client_id` is remembered for this time too. It is also how long a client is marked as invalid when its keys at `jwks_uri` or `signed_jwks_uri`, or the document at its `sector_identifier_uri`, cannot be fetched, see [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients) of [The client registry](client-registry.html). This includes the clients from `authn-server.oidc.clients` and from client repositories whose keys cannot be read. | 5 minutes |
 | `clients.check-sector-identifier-uri` | Whether the document at the `sector_identifier_uri` of a pairwise client is fetched and checked to list all the client's `redirect_uris`, see below. | `true` |
 | `clients.collector.enabled` | Whether the background job that fills the cache with the clients of the federation runs, see below. | `true` |
 | `clients.collector.interval` | How often the job runs. | 30 minutes |
@@ -1188,6 +1203,9 @@ setting.
 
 The record of known clients, which tells which clients have been [added and removed](management.html#clients-added-and-removed)
 since the previous start, follows `authn-server.storage.type`. In Redis it is the hash `<prefix>:known-clients`. The
+outcomes of the validation of the OpenID Connect clients from the configuration and from client repositories, and the
+keys that they hold, also follow `authn-server.storage.type`. In Redis they are the hash
+`<prefix>:oidc:client-validation:<source>`. The
 state of the federation services that the `oidc-federation` health indicator reports follows
 `authn-server.oidc.storage.federation-cache`.
 
@@ -1337,6 +1355,14 @@ The application sets up the federation backend and its jobs, see
 declared according to `authn-server.oidc.storage.federation-cache`, together with a `FederationEntityStore` bean, and
 the backend and the jobs are built from them.
 Kept in memory, the cache is written to `authn-server.cache-directory`, when given, so that it survives a restart.
+
+**The keys of configured and repository clients.** The job that reads the keys of the OpenID Connect clients from the
+configuration and from client repositories again, every `authn-server.oidc.client-keys-refresh-interval`, works on
+the outcomes of their validation, see
+[Section 5.1, "Validation of configured and repository clients"](client-registry.html#static-client-validation) of
+[The client registry](client-registry.html). When `authn-server.storage.type` is `redis`, all nodes share the outcomes
+and the keys, and each round runs on one node, with the same kind of lock. With `memory`, every node validates its
+clients and reads their keys itself.
 
 **The trust marks of the OpenID Provider.** When they are kept in Redis:
 

@@ -68,6 +68,10 @@ authn-server:
       signing:
         - credential:
             bundle: oidc-sign
+    # The inline client authenticates with its client secret, so the method must be enabled for it to be valid
+    client-authentication-methods:
+      - private_key_jwt
+      - client_secret_basic
     clients:
       - location: classpath:complete/oidc-clients.json
       - client-id: https://inline.test.local

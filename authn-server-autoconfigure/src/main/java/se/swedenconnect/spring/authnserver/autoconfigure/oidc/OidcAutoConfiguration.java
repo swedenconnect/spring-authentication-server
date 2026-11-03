@@ -45,6 +45,7 @@ import org.springframework.context.annotation.Bean;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod;
 
+import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationClient;
 import se.swedenconnect.security.credential.PkiCredential;
 import se.swedenconnect.security.credential.config.properties.PkiCredentialConfigurationProperties;
 import se.swedenconnect.security.credential.factory.PkiCredentialFactory;
@@ -54,7 +55,7 @@ import se.swedenconnect.spring.authnserver.autoconfigure.AuthnServerProtocolConf
 import se.swedenconnect.spring.authnserver.config.AuthnServerConfigurer;
 import se.swedenconnect.spring.authnserver.entity.EntityInformation;
 import se.swedenconnect.spring.authnserver.oidc.attributes.OidcAttributeMapping;
-import se.swedenconnect.oidf.common.entity.entity.integration.federation.FederationClient;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientValidationStore;
 import se.swedenconnect.spring.authnserver.oidc.client.ConfigurationClientBackend;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientReader;
 import se.swedenconnect.spring.authnserver.oidc.client.OidcClientRecord;
@@ -91,8 +92,9 @@ import se.swedenconnect.spring.authnserver.registry.acceptance.WhitelistRequeste
  * default one.
  * </p>
  * <p>
- * An {@link AuthorizationCodeStore}, an {@link AccessTokenStore} or a {@link ClientAssertionReplayCache} bean replaces
- * the in-memory store. When a store is kept in Redis, the bean is declared by the storage autoconfiguration.
+ * An {@link AuthorizationCodeStore}, an {@link AccessTokenStore}, a {@link ClientAssertionReplayCache} or a
+ * {@link ClientValidationStore} bean replaces the in-memory store. When a store is kept in Redis, the bean is declared
+ * by the storage autoconfiguration.
  * </p>
  * <p>
  * The clients of {@code authn-server.oidc.clients} are read at startup into a {@link ConfigurationClientBackend}
@@ -142,6 +144,7 @@ public class OidcAutoConfiguration {
    * @param authorizationCodeStore an authorization code store, if declared as a bean
    * @param accessTokenStore an access token store, if declared as a bean
    * @param clientAssertionReplayCache a cache of used client assertions, if declared as a bean
+   * @param clientValidationStore where the outcomes of the validation of clients are kept, if declared as a bean
    * @param federationClientSource the client source that resolves clients through the federation, when federation
    *     is enabled
    * @return an {@link AuthnServerProtocolConfigurerFactory}
@@ -157,6 +160,7 @@ public class OidcAutoConfiguration {
       final ObjectProvider<AuthorizationCodeStore> authorizationCodeStore,
       final ObjectProvider<AccessTokenStore> accessTokenStore,
       final ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache,
+      final ObjectProvider<ClientValidationStore> clientValidationStore,
       final ObjectProvider<OidcFederationClientSource> federationClientSource) {
 
     return new AuthnServerProtocolConfigurerFactory() {
@@ -166,7 +170,7 @@ public class OidcAutoConfiguration {
           throws Exception {
         return createProviderConfigurer(server, properties, credentialFactory,
             scopeRegistry, attributeMapping, subjectGeneratorFactory, providerTrustMarks, authorizationCodeStore,
-            accessTokenStore, clientAssertionReplayCache);
+            accessTokenStore, clientAssertionReplayCache, clientValidationStore);
       }
 
       @Override
@@ -192,6 +196,7 @@ public class OidcAutoConfiguration {
    * @param authorizationCodeStore an authorization code store, if declared as a bean
    * @param accessTokenStore an access token store, if declared as a bean
    * @param clientAssertionReplayCache a cache of used client assertions, if declared as a bean
+   * @param clientValidationStore where the outcomes of the validation of clients are kept, if declared as a bean
    * @return the configurer
    * @throws Exception for errors loading the keys or the clients
    */
@@ -203,7 +208,8 @@ public class OidcAutoConfiguration {
       final @NonNull ObjectProvider<ProviderTrustMarks> providerTrustMarks,
       final @NonNull ObjectProvider<AuthorizationCodeStore> authorizationCodeStore,
       final @NonNull ObjectProvider<AccessTokenStore> accessTokenStore,
-      final @NonNull ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache) throws Exception {
+      final @NonNull ObjectProvider<ClientAssertionReplayCache> clientAssertionReplayCache,
+      final @NonNull ObjectProvider<ClientValidationStore> clientValidationStore) throws Exception {
     final List<FederationKey> federationKeys =
         loadFederationKeys(properties.getFederation().getKeys(), credentialFactory);
     final ConfigurationClientBackend clients = createClientBackend(properties.getClients());
@@ -219,7 +225,8 @@ public class OidcAutoConfiguration {
         .authnRequestProcessor(c -> c
             .authorizationCodeStore(authorizationCodeStore.getIfUnique())
             .accessTokenStore(accessTokenStore.getIfUnique())
-            .clientAssertionReplayCache(clientAssertionReplayCache.getIfUnique()))
+            .clientAssertionReplayCache(clientAssertionReplayCache.getIfUnique())
+            .clientValidationStore(clientValidationStore.getIfUnique()))
         .federation(f -> f
             .keys(federationKeys)
             .providerTrustMarks(providerTrustMarks.getIfUnique()));
@@ -403,6 +410,13 @@ public class OidcAutoConfiguration {
     }
     if (tokens.getIdTokenLifetime() != null) {
       configurer.idTokenLifetime(tokens.getIdTokenLifetime());
+    }
+    if (properties.getClientKeysRefreshInterval() != null) {
+      configurer.clientKeysRefreshInterval(properties.getClientKeysRefreshInterval());
+    }
+    final Duration notFoundTimeToLive = properties.getFederation().getClients().getCache().getNotFoundTimeToLive();
+    if (notFoundTimeToLive != null) {
+      configurer.clientKeysFailureTimeToLive(notFoundTimeToLive);
     }
     if (properties.getClientAuthenticationMethods() != null) {
       configurer.clientAuthenticationMethods(properties.getClientAuthenticationMethods().stream()

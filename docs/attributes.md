@@ -583,10 +583,11 @@ as that organization's clients, and correlate their users. This is checked when 
   [Section 6.7, "Pairwise clients"](client-registry.html#pairwise-clients) of [The client registry](client-registry.html).
   A client with a registration error is marked as invalid and never authenticated, see
   [Section 6.6, "Invalid clients"](client-registry.html#invalid-clients).
-- A client from the configuration or from a client repository is not checked. Its `subject_type`,
-  `sector_identifier_uri` and `redirect_uris` are expected to be correct with respect to each other, and to the
-  document, since the server does not check them. A client with several redirect hosts and no `sector_identifier_uri`
-  gets an error after the user has logged in.
+- A client from the configuration or from a client repository with several redirect hosts and no
+  `sector_identifier_uri` is marked as invalid when it is validated. The document at its `sector_identifier_uri` is
+  never fetched, so the operator, or a repository whose clients register themselves, must make sure that the document
+  lists the redirect URIs, see
+  [Section 5.1, "Validation of configured and repository clients"](client-registry.html#static-client-validation).
 
 <a name="supplying-a-generator-of-your-own"></a>
 ### 5.4. Supplying a generator of your own

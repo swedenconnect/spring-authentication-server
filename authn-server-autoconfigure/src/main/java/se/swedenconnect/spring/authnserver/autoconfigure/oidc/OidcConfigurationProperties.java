@@ -149,6 +149,12 @@ public class OidcConfigurationProperties {
   private List<ClientProperties> clients;
 
   /**
+   * How often the keys at the jwks_uri of the clients from the configuration and from client repositories are read
+   * again. Defaults to 1 hour.
+   */
+  private Duration clientKeysRefreshInterval;
+
+  /**
    * The rules for which clients are accepted. Without rules, every client that the client registry knows is accepted.
    */
   private final RequesterAcceptanceProperties requesterAcceptance = new RequesterAcceptanceProperties();
@@ -428,6 +434,24 @@ public class OidcConfigurationProperties {
    */
   public void setClientAuthenticationMethods(final @Nullable List<String> clientAuthenticationMethods) {
     this.clientAuthenticationMethods = clientAuthenticationMethods;
+  }
+
+  /**
+   * Gets how often the keys of the clients from the configuration and from client repositories are read again.
+   *
+   * @return the interval, or {@code null} for the default
+   */
+  public @Nullable Duration getClientKeysRefreshInterval() {
+    return this.clientKeysRefreshInterval;
+  }
+
+  /**
+   * Assigns how often the keys of the clients from the configuration and from client repositories are read again.
+   *
+   * @param clientKeysRefreshInterval the interval, or {@code null} for the default
+   */
+  public void setClientKeysRefreshInterval(final @Nullable Duration clientKeysRefreshInterval) {
+    this.clientKeysRefreshInterval = clientKeysRefreshInterval;
   }
 
   /**
@@ -1441,7 +1465,8 @@ public class OidcConfigurationProperties {
 
     /**
      * How long the answer that the resolver does not know a client is kept, and how long a client is marked as
-     * invalid when its keys or the document at its sector_identifier_uri cannot be fetched. Defaults to 5 minutes.
+     * invalid when its keys or the document at its sector_identifier_uri cannot be fetched. It also applies to the
+     * clients from the configuration and from client repositories whose keys cannot be read. Defaults to 5 minutes.
      */
     private Duration notFoundTimeToLive;
 

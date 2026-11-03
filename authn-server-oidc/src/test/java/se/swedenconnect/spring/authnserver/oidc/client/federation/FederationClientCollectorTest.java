@@ -40,6 +40,8 @@ import se.swedenconnect.spring.authnserver.audit.events.ClientAddedEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientInvalidEvent;
 import se.swedenconnect.spring.authnserver.audit.events.ClientRemovedEvent;
 import se.swedenconnect.spring.authnserver.job.JobLock;
+import se.swedenconnect.spring.authnserver.oidc.client.ClientMetadataValidator;
+import se.swedenconnect.spring.authnserver.oidc.client.PairwiseClientCheck;
 import se.swedenconnect.spring.authnserver.registry.ClientRegistryException;
 import se.swedenconnect.spring.authnserver.registry.changes.ClientChangeTracker;
 import se.swedenconnect.spring.authnserver.registry.changes.InMemoryKnownClientStore;
@@ -562,7 +564,7 @@ class FederationClientCollectorTest extends FederationTestSupport {
   void aFaultyClientIsMarkedByTheCollectorAndItsKeysAreHeld() {
     final Fixture fixture = new Fixture(FederationCollectorSettings.defaults());
     final StubClientKeysFetcher keysFetcher = new StubClientKeysFetcher();
-    fixture.backend.setValidator(new FederationClientValidator(new PairwiseClientCheck(null), keysFetcher));
+    fixture.backend.setValidator(new ClientMetadataValidator(new PairwiseClientCheck(null), keysFetcher));
     keysFetcher.jwks.put(RP_TWO + "/jwks", publicKeys(CLIENT_KEY));
     fixture.lister(TRUST_ANCHOR, RP_ONE, RP_TWO, RP_THREE);
     final OIDCClientMetadata noMethod = clientMetadata("Client " + RP_ONE);
