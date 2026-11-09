@@ -33,7 +33,7 @@
 
   <properties>
     <flexmark.version>0.64.8</flexmark.version>
-    <jsoup.version>1.23.2</jsoup.version>
+    <jsoup.version>1.24.1</jsoup.version>
     <!-- The architecture of the image that jib:dockerBuild@local builds. Set by the profiles below. -->
     <jib.local.architecture>amd64</jib.local.architecture>
   </properties>
