@@ -729,7 +729,7 @@ key-value list that the SAML attribute holds.
 | `attribute.zone-info` | String | - | `zoneinfo` |
 | `attribute.locale` | String | - | `locale` |
 | `attribute.updated-at` | Instant | - | `updated_at` |
-| `attribute.`<br />`eidas-person-identifier` | String | `urn:oid:1.2.752.201.3.7`<br />`eidasPersonIdentifier` | `https://id.swedenconnect.se/claim/`<br />`eidasPersonIdentifier` |
+| `attribute.`<br />`eidas-person-identifier` | String | `urn:oid:1.2.752.201.3.7`<br />`eidasPersonIdentifier` | `http://eidas.europa.eu/attributes/`<br />`naturalperson/PersonIdentifier` |
 | `attribute.eidas-country` | String | `urn:oid:2.5.4.6`<br />`c`,<br />only when no country is known | `https://id.swedenconnect.se/claim/`<br />`eidasCountry` |
 | `attribute.prid` | String | `urn:oid:1.2.752.201.3.4`<br />`prid` | `https://id.swedenconnect.se/claim/`<br />`prid` |
 | `attribute.prid-persistence` | String | `urn:oid:1.2.752.201.3.5`<br />`pridPersistence` | `https://id.swedenconnect.se/claim/`<br />`pridPersistence` |

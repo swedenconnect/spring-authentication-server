@@ -10,7 +10,7 @@
 
 **Date:** _Not yet released_
 
--
+- The eIDAS person identifier is released under the claim name `http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier`, as version 1.1 of the OpenID Connect Claims and Scopes Specification for Sweden Connect requires. See [#61](https://github.com/swedenconnect/spring-authentication-server/issues/61).
 
 -----
 
