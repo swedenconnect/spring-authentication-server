@@ -208,7 +208,7 @@
                   <div class="col-sm-12">
                     <label for="selectError" th:text="#{idp.msg.simerror.error.label}">Select error:</label>
                     <select class="form-control" name="error" id="selectError">
-                      <option th:each="e : ${errors}" th:value="${e.name()}" th:text="${e.name()}">AUTHN_FAILED</option>
+                      <option th:each="e : ${errors.keySet()}" th:value="${e}" th:text="${e}">AUTHN_FAILED</option>
                     </select>
                   </div>
                 </div>

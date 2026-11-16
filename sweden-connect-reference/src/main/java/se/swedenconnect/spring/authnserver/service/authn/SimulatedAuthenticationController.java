@@ -17,8 +17,11 @@ package se.swedenconnect.spring.authnserver.service.authn;
 
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
@@ -93,16 +96,8 @@ public class SimulatedAuthenticationController
   /** Logger. */
   private static final Logger log = LoggerFactory.getLogger(SimulatedAuthenticationController.class);
 
-  /** The errors that a tester may simulate. */
-  public static final List<AuthenticationError> SIMULATED_ERRORS = List.of(
-      AuthenticationError.AUTHN_FAILED,
-      AuthenticationError.CANCEL,
-      AuthenticationError.FRAUD,
-      AuthenticationError.POSSIBLE_FRAUD,
-      AuthenticationError.UNKNOWN_PRINCIPAL,
-      AuthenticationError.NO_AUTHN_CONTEXT,
-      AuthenticationError.NOT_AUTHORIZED,
-      AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED);
+  /** The errors that a tester may simulate, by the name shown in the user picker. */
+  public static final Map<String, AuthenticationError> SIMULATED_ERRORS = simulatedErrors();
 
   /** The value that the user list posts when no user is selected. */
   private static final String NO_USER = "NONE";
@@ -257,10 +252,9 @@ public class SimulatedAuthenticationController
       return this.cancel(request);
     }
     if ("error".equals(action)) {
-      final AuthenticationError error = SIMULATED_ERRORS.stream()
-          .filter(e -> e.name().equals(result.getError()))
-          .findFirst()
-          .orElse(AuthenticationError.AUTHN_FAILED);
+      final AuthenticationError error = result.getError() != null
+          ? SIMULATED_ERRORS.getOrDefault(result.getError(), AuthenticationError.AUTHN_FAILED)
+          : AuthenticationError.AUTHN_FAILED;
       final String description = StringUtils.hasText(result.getErrorMessage())
           ? result.getErrorMessage()
           : "Simulated error";
@@ -467,6 +461,24 @@ public class SimulatedAuthenticationController
       final @NonNull String language) {
     final LocalizedMessage localized = message.getMessage(language);
     return localized != null ? localized : message.getMessages().getFirst();
+  }
+
+  /**
+   * Creates the errors that a tester may simulate, in the order they are shown.
+   *
+   * @return the errors by name
+   */
+  private static @NonNull Map<String, AuthenticationError> simulatedErrors() {
+    final Map<String, AuthenticationError> errors = new LinkedHashMap<>();
+    errors.put("AUTHN_FAILED", AuthenticationError.AUTHN_FAILED);
+    errors.put("CANCEL", AuthenticationError.CANCEL);
+    errors.put("FRAUD", AuthenticationError.FRAUD);
+    errors.put("POSSIBLE_FRAUD", AuthenticationError.POSSIBLE_FRAUD);
+    errors.put("UNKNOWN_PRINCIPAL", AuthenticationError.UNKNOWN_PRINCIPAL);
+    errors.put("NO_AUTHN_CONTEXT", AuthenticationError.NO_AUTHN_CONTEXT);
+    errors.put("NOT_AUTHORIZED", AuthenticationError.NOT_AUTHORIZED);
+    errors.put("SIGN_MESSAGE_NOT_DISPLAYED", AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED);
+    return Collections.unmodifiableMap(errors);
   }
 
 }

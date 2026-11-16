@@ -18,10 +18,14 @@ package se.swedenconnect.spring.authnserver.saml.error;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.opensaml.saml.saml2.core.StatusCode;
 
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
+import se.swedenconnect.spring.authnserver.error.AuthenticationErrorException;
 
 /**
  * Tests for {@link SamlErrorStatus}.
@@ -30,6 +34,16 @@ import se.swedenconnect.spring.authnserver.error.AuthenticationError;
  */
 @SuppressWarnings("HttpUrlsUsage")
 class SamlErrorStatusTest {
+
+  /** The built-in errors. */
+  private static final List<AuthenticationError> BUILT_IN = List.of(AuthenticationError.AUTHN_FAILED,
+      AuthenticationError.CANCEL, AuthenticationError.FRAUD, AuthenticationError.POSSIBLE_FRAUD,
+      AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED, AuthenticationError.UNKNOWN_PRINCIPAL,
+      AuthenticationError.PASSIVE_NOT_POSSIBLE, AuthenticationError.NO_AUTHN_CONTEXT, AuthenticationError.NOT_AUTHORIZED);
+
+  /** A status of the application. */
+  private static final SamlErrorStatus NO_AVAILABLE_IDP =
+      new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.NO_AVAILABLE_IDP);
 
   @Test
   void everyErrorMapsToItsSamlStatus() {
@@ -55,11 +69,40 @@ class SamlErrorStatusTest {
 
   @Test
   void everyErrorHasAMapping() {
-    for (final AuthenticationError error : AuthenticationError.values()) {
+    for (final AuthenticationError error : BUILT_IN) {
       final SamlErrorStatus status = SamlErrorStatus.of(error);
       assertThat(status.statusCode()).isIn(StatusCode.RESPONDER, StatusCode.REQUESTER);
       assertThat(status.subStatusCode()).isNotEmpty();
     }
+  }
+
+  @Test
+  void anErrorOfTheApplicationIsReportedWithItsOwnStatus() {
+    final SamlError error = new SamlError(NO_AVAILABLE_IDP);
+    assertThat(SamlErrorStatus.of(error)).isEqualTo(NO_AVAILABLE_IDP);
+
+    final SamlErrorStatusException exception =
+        SamlErrorStatusException.of(new AuthenticationErrorException(error, "No IdP for the country"));
+    assertThat(exception.getStatus()).isEqualTo(NO_AVAILABLE_IDP);
+    assertThat(exception.getStatusMessageCode()).isEqualTo("app.error.no-service");
+    assertThat(exception.getDescription()).isEqualTo("No IdP for the country");
+  }
+
+  @Test
+  void anErrorOfTheApplicationWithoutASamlStatusIsReportedAsAuthnFailed() {
+    final AuthenticationError error = new AuthenticationError() {
+      @Override
+      public @NonNull String getMessageCode() {
+        return "app.error.other";
+      }
+
+      @Override
+      public @NonNull String getDefaultMessage() {
+        return "Other error";
+      }
+    };
+    assertThat(SamlErrorStatus.of(error)).isEqualTo(SamlErrorStatus.DEFAULT)
+        .isEqualTo(new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED));
   }
 
   @Test
@@ -81,6 +124,30 @@ class SamlErrorStatusTest {
     assertThatExceptionOfType(NullPointerException.class)
         .isThrownBy(() -> SamlErrorStatus.of(null))
         .withMessage("error must not be null");
+  }
+
+  /**
+   * An error of the application with a SAML status.
+   *
+   * @param status the SAML status
+   */
+  record SamlError(SamlErrorStatus status) implements SamlAuthenticationError {
+
+    @Override
+    public @NonNull SamlErrorStatus getSamlErrorStatus() {
+      return this.status;
+    }
+
+    @Override
+    public @NonNull String getMessageCode() {
+      return "app.error.no-service";
+    }
+
+    @Override
+    public @NonNull String getDefaultMessage() {
+      return "No authentication service available";
+    }
+
   }
 
 }

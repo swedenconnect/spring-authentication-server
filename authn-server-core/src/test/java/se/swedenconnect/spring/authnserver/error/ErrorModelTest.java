@@ -18,9 +18,12 @@ package se.swedenconnect.spring.authnserver.error;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import java.util.List;
+
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 
+import se.swedenconnect.spring.authnserver.SerializationTestSupport;
 import se.swedenconnect.spring.authnserver.sso.SsoDenialReason;
 
 /**
@@ -32,11 +35,27 @@ class ErrorModelTest {
 
   @Test
   void everyErrorHasAMessageCodeAndADefaultMessage() {
-    for (final AuthenticationError error : AuthenticationError.values()) {
+    for (final AuthenticationError error : BuiltInAuthenticationError.values()) {
       assertThat(error.getMessageCode()).startsWith("authn-server.error.");
       assertThat(error.getDefaultMessage()).isNotEmpty();
     }
     assertThat(AuthenticationError.AUTHN_FAILED.getMessageCode()).isEqualTo("authn-server.error.authn-failed");
+  }
+
+  @Test
+  void theConstantsAreTheBuiltInErrors() {
+    assertThat(List.of(AuthenticationError.AUTHN_FAILED, AuthenticationError.CANCEL, AuthenticationError.FRAUD,
+        AuthenticationError.POSSIBLE_FRAUD, AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED,
+        AuthenticationError.UNKNOWN_PRINCIPAL, AuthenticationError.PASSIVE_NOT_POSSIBLE,
+        AuthenticationError.NO_AUTHN_CONTEXT, AuthenticationError.NOT_AUTHORIZED))
+        .containsExactly(BuiltInAuthenticationError.values());
+  }
+
+  @Test
+  void aBuiltInErrorIsTheSameInstanceAfterSerialization() throws Exception {
+    for (final AuthenticationError error : BuiltInAuthenticationError.values()) {
+      assertThat(SerializationTestSupport.roundTrip(error)).isSameAs(error);
+    }
   }
 
   @Test

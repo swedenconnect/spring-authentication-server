@@ -28,6 +28,7 @@ import java.time.Instant;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
@@ -233,6 +234,33 @@ class SessionBasedRedirectAuthenticationRepositoryTest {
   }
 
   @Test
+  void anErrorOfTheApplicationSurvivesTheSerializationOfTheState() throws Exception {
+    final RedirectAuthenticationState state =
+        new RedirectAuthenticationState(redirectToken("one", SP), Instant.now());
+    final ApplicationError error = new ApplicationError("app.error.no-service", "No authentication service");
+    state.complete(new AuthenticationErrorException(error, "No service for the user's country"));
+
+    final RedirectAuthenticationState restored = SerializationTestSupport.roundTrip(state);
+
+    assertThat(restored.getError()).isNotNull();
+    assertThat(restored.getError().getError()).isEqualTo(error);
+    assertThat(restored.getError().getMessageCode()).isEqualTo("app.error.no-service");
+    assertThat(restored.getError().getDescription()).isEqualTo("No service for the user's country");
+  }
+
+  @Test
+  void aBuiltInErrorIsTheSameInstanceAfterTheSerializationOfTheState() throws Exception {
+    final RedirectAuthenticationState state =
+        new RedirectAuthenticationState(redirectToken("one", SP), Instant.now());
+    state.complete(new AuthenticationErrorException(AuthenticationError.CANCEL));
+
+    final RedirectAuthenticationState restored = SerializationTestSupport.roundTrip(state);
+
+    assertThat(restored.getError()).isNotNull();
+    assertThat(restored.getError().getError()).isSameAs(AuthenticationError.CANCEL);
+  }
+
+  @Test
   void anOutcomeReplacesAnEarlierOne() {
     final RedirectAuthenticationState state =
         new RedirectAuthenticationState(redirectToken("one", SP), Instant.now());
@@ -266,6 +294,26 @@ class SessionBasedRedirectAuthenticationRepositoryTest {
     assertThatExceptionOfType(UnrecoverableErrorException.class)
         .isThrownBy(callable)
         .satisfies(e -> assertThat(e.getError()).isEqualTo(CommonUnrecoverableError.INVALID_SESSION));
+  }
+
+  /**
+   * An authentication error of the application.
+   *
+   * @param messageCode the message code
+   * @param defaultMessage the default message
+   */
+  record ApplicationError(String messageCode, String defaultMessage) implements AuthenticationError {
+
+    @Override
+    public @NonNull String getMessageCode() {
+      return this.messageCode;
+    }
+
+    @Override
+    public @NonNull String getDefaultMessage() {
+      return this.defaultMessage;
+    }
+
   }
 
 }
