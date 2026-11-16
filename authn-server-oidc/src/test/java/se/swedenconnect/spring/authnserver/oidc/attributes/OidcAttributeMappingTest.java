@@ -209,6 +209,17 @@ class OidcAttributeMappingTest {
   }
 
   @Test
+  void theEidasPersonIdentifierHasTheNameOfTheEidasAttribute() {
+    assertThat(this.claim(this.mapping.toClaims(
+        List.of(GenericAttribute.of(AttributeIdentifiers.EIDAS_PERSON_IDENTIFIER, "ES/SE/12345")), null),
+        "http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier"))
+        .isEqualTo("ES/SE/12345");
+    assertThat(this.identifiers(this.mapping.toGeneric(List.of(requested(
+        "http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier", true, ClaimDeliveryTarget.USER_INFO)))))
+        .containsExactly(AttributeIdentifiers.EIDAS_PERSON_IDENTIFIER);
+  }
+
+  @Test
   void aDateBecomesAnIsoStringAndAnInstantSecondsSinceEpoch() {
     assertThat(this.claim(this.mapping.toClaims(
         List.of(GenericAttribute.of(AttributeIdentifiers.DATE_OF_BIRTH, LocalDate.of(1950, 6, 26))), null),

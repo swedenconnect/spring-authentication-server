@@ -18,8 +18,8 @@ package se.swedenconnect.spring.authnserver.oidc.attributes;
 /**
  * Claim names that are not available as constants from Nimbus or from the OIDC Sweden Nimbus extensions.
  * <p>
- * These are the claims of the {@value #SWEDEN_CONNECT_CLAIMS_PREFIX} namespace, defined by the OpenID Connect Claims
- * and Scopes Specification for Sweden Connect, and the {@code txn} claim of RFC 8417.
+ * These are the claims defined by the OpenID Connect Claims and Scopes Specification for Sweden Connect, and the
+ * {@code txn} claim of RFC 8417.
  * </p>
  * <p>
  * The claims of the {@code https://id.oidc.se/claim/} namespace are found in
@@ -51,9 +51,12 @@ public class OidcClaimConstants {
   /** The binding processes used to obtain a mapped identity number. */
   public static final String IDENTITY_BINDING_CLAIM_NAME = SWEDEN_CONNECT_CLAIMS_PREFIX + "identityBinding";
 
-  /** The eIDAS person identifier issued by the foreign eIDAS node. */
+  /**
+   * The eIDAS person identifier issued by the foreign eIDAS node. The claim name is the URI of the eIDAS
+   * PersonIdentifier attribute.
+   */
   public static final String EIDAS_PERSON_IDENTIFIER_CLAIM_NAME =
-      SWEDEN_CONNECT_CLAIMS_PREFIX + "eidasPersonIdentifier";
+      "http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier";
 
   /** The eIDAS member state that provided the identity of the user. */
   public static final String EIDAS_COUNTRY_CLAIM_NAME = SWEDEN_CONNECT_CLAIMS_PREFIX + "eidasCountry";
