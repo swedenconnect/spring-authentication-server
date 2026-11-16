@@ -1471,6 +1471,12 @@ public class OidcConfigurationProperties {
     private Duration notFoundTimeToLive;
 
     /**
+     * How long the answer from a trust mark issuer that it has not issued a trust mark to a client is kept, so that
+     * the issuer is not asked again for each request. Never longer than the client's cache entry. Defaults to 1 hour.
+     */
+    private Duration trustMarkNotFoundTimeToLive;
+
+    /**
      * Gets the maximum age.
      *
      * @return the maximum age, or {@code null} if not assigned
@@ -1504,6 +1510,24 @@ public class OidcConfigurationProperties {
      */
     public void setNotFoundTimeToLive(final @Nullable Duration notFoundTimeToLive) {
       this.notFoundTimeToLive = notFoundTimeToLive;
+    }
+
+    /**
+     * Gets the time to live of the answer that a trust mark issuer has no trust mark for a client.
+     *
+     * @return the time to live, or {@code null} if not assigned
+     */
+    public @Nullable Duration getTrustMarkNotFoundTimeToLive() {
+      return this.trustMarkNotFoundTimeToLive;
+    }
+
+    /**
+     * Assigns the time to live of the answer that a trust mark issuer has no trust mark for a client.
+     *
+     * @param trustMarkNotFoundTimeToLive the time to live
+     */
+    public void setTrustMarkNotFoundTimeToLive(final @Nullable Duration trustMarkNotFoundTimeToLive) {
+      this.trustMarkNotFoundTimeToLive = trustMarkNotFoundTimeToLive;
     }
 
 

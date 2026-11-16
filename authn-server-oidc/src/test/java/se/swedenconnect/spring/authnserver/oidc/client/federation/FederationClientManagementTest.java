@@ -191,7 +191,8 @@ class FederationClientManagementTest extends FederationTestSupport {
     final InMemoryFederationCache cache = new InMemoryFederationCache(file, clock);
     final OIDCClientMetadata metadata = clientMetadata("The Client");
     cache.put(new CachedClientRecord(CLIENT_ID, metadata, Set.of(MARK_ONE), Map.of(),
-        clock.instant().plus(Duration.ofHours(1))).withTrustMark(MARK_TWO, clock.instant().plus(Duration.ofHours(2))));
+        clock.instant().plus(Duration.ofHours(1))).withTrustMark(MARK_TWO, clock.instant().plus(Duration.ofHours(2)))
+        .withMissingTrustMark("https://example.com/mark/three", clock.instant()));
     cache.put(CachedClientRecord.notFound("https://unknown.example.com", clock.instant(), Duration.ofMinutes(10)));
     cache.put(new CachedClientRecord("https://short.example.com", metadata, Set.of(), Map.of(),
         clock.instant().plus(Duration.ofMinutes(5))));
@@ -206,6 +207,7 @@ class FederationClientManagementTest extends FederationTestSupport {
     assertThat(entry).isNotNull();
     assertThat(entry.metadata().getName()).isEqualTo("The Client");
     assertThat(entry.getMarks(clock.instant())).containsExactlyInAnyOrder(MARK_ONE, MARK_TWO);
+    assertThat(entry.missingTrustMarks()).containsOnlyKeys("https://example.com/mark/three");
     assertThat(restarted.get("https://unknown.example.com")).isNotNull();
     assertThat(restarted.get("https://short.example.com")).isNull();
     restarted.close();

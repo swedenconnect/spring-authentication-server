@@ -48,12 +48,14 @@ import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
  * @param keysSigned whether the held keys come from a {@code signed_jwks_uri}, or {@code null}
  * @param keys the held keys as a JWK Set, or {@code null}
  * @param entityKeys the Federation Entity Keys that verify a signed JWK Set, as a JWK Set, or {@code null}
+ * @param missingTrustMarks the trust mark types that the issuer had not issued to the client, with when they were
+ *     asked for, or {@code null}
  * @author Martin Lindström
  */
 record StoredClientRecord(@NonNull String clientId, @Nullable String metadata, @Nullable Set<String> trustMarkTypes,
     @Nullable List<OnDemandTrustMark> onDemandTrustMarks, @NonNull Instant expiresAt, @Nullable String invalidReason,
     @Nullable VerifiedSector verifiedSector, @Nullable String keysUri, @Nullable Boolean keysSigned,
-    @Nullable String keys, @Nullable String entityKeys) {
+    @Nullable String keys, @Nullable String entityKeys, @Nullable Map<String, Instant> missingTrustMarks) {
 
   /**
    * Creates the stored form of a cache record.
@@ -68,7 +70,7 @@ record StoredClientRecord(@NonNull String clientId, @Nullable String metadata, @
         record.trustMarkTypes(), List.copyOf(record.onDemandTrustMarks().values()), record.expiresAt(),
         record.invalidReason(), record.verifiedSector(), held != null ? held.uri() : null,
         held != null ? held.signed() : null, held != null ? write(held.keys()) : null,
-        held != null ? write(held.entityKeys()) : null);
+        held != null ? write(held.entityKeys()) : null, record.missingTrustMarks());
   }
 
   /**
@@ -88,7 +90,8 @@ record StoredClientRecord(@NonNull String clientId, @Nullable String metadata, @
         this.verifiedSector, this.keysUri != null && this.keys != null
             ? new HeldKeys(this.keysUri, Boolean.TRUE.equals(this.keysSigned), readKeys(this.keys),
                 readKeys(this.entityKeys))
-            : null);
+            : null,
+        this.missingTrustMarks != null ? this.missingTrustMarks : Map.of());
   }
 
   /**

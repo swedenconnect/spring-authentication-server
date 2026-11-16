@@ -102,7 +102,8 @@ class RedisFederationCacheTest extends FederationTestSupport {
     final CachedClientRecord record = CachedClientRecord.found(
         new ResolvedClient(CLIENT_ID, metadata, Set.of(MARK_ONE), this.clock.instant().plus(VALIDITY)),
         this.clock.instant(), null)
-        .withTrustMark(new TrustMarkRequester.TrustMark(MARK_TWO, this.clock.instant().plusSeconds(120), "a.b.c"));
+        .withTrustMark(new TrustMarkRequester.TrustMark(MARK_TWO, this.clock.instant().plusSeconds(120), "a.b.c"))
+        .withMissingTrustMark("https://example.com/mark/three", this.clock.instant());
     this.cacheA.put(record);
 
     final CachedClientRecord read = this.cacheB.get(CLIENT_ID);
@@ -113,6 +114,7 @@ class RedisFederationCacheTest extends FederationTestSupport {
         .isEqualTo("urn:glue:iso6523:0007:5566778899");
     assertThat(read.trustMarkTypes()).containsExactly(MARK_ONE);
     assertThat(read.onDemandTrustMarks()).isEqualTo(record.onDemandTrustMarks());
+    assertThat(read.missingTrustMarks()).isEqualTo(record.missingTrustMarks());
     assertThat(read.expiresAt()).isEqualTo(record.expiresAt());
     assertThat(read.getMarks(this.clock.instant())).containsExactlyInAnyOrder(MARK_ONE, MARK_TWO);
 

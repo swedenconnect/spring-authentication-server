@@ -201,6 +201,81 @@ class FederationClientBackendTest extends FederationTestSupport {
   }
 
   @Test
+  void aTrustMarkThatTheIssuerHasNotIssuedIsNotAskedForAgain() {
+    final Fixture fixture = new Fixture(FederationCacheSettings.defaults());
+    fixture.resolver.answer = fixture.resolved(Duration.ofHours(2), Set.of(MARK_ONE));
+
+    assertThat(fixture.backend.requestMark(CLIENT_ID, MARK_TWO).marks()).containsExactly(MARK_ONE);
+    assertThat(fixture.backend.requestMark(CLIENT_ID, MARK_TWO).marks()).containsExactly(MARK_ONE);
+
+    assertThat(fixture.trustMarkRequester.calls).isEqualTo(1);
+    assertThat(fixture.cache.get(CLIENT_ID).missingTrustMarks()).containsOnlyKeys(MARK_TWO);
+  }
+
+  @Test
+  void aMissingTrustMarkIsAskedForAgainWhenTheTimeToLiveHasPassed() {
+    final Fixture fixture = new Fixture(new FederationCacheSettings(null,
+        FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE, Duration.ofMinutes(10)));
+    fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
+
+    fixture.backend.requestMark(CLIENT_ID, MARK_TWO);
+    fixture.clock.advance(Duration.ofMinutes(9));
+    fixture.backend.requestMark(CLIENT_ID, MARK_TWO);
+    assertThat(fixture.trustMarkRequester.calls).isEqualTo(1);
+
+    fixture.clock.advance(Duration.ofMinutes(2));
+    fixture.trustMarkRequester.answer = new TrustMarkRequester.TrustMark(MARK_TWO, null);
+    assertThat(fixture.backend.requestMark(CLIENT_ID, MARK_TWO).marks()).containsExactly(MARK_TWO);
+    assertThat(fixture.trustMarkRequester.calls).isEqualTo(2);
+    assertThat(fixture.cache.get(CLIENT_ID).missingTrustMarks()).isEmpty();
+  }
+
+  @Test
+  void aMissingTrustMarkIsOnlyRecordedForItsType() {
+    final Fixture fixture = new Fixture(FederationCacheSettings.defaults());
+    fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
+
+    fixture.backend.requestMark(CLIENT_ID, MARK_ONE);
+    fixture.trustMarkRequester.answer = new TrustMarkRequester.TrustMark(MARK_TWO, null);
+
+    assertThat(fixture.backend.requestMark(CLIENT_ID, MARK_TWO).marks()).containsExactly(MARK_TWO);
+    assertThat(fixture.trustMarkRequester.calls).isEqualTo(2);
+  }
+
+  @Test
+  void aFailedCallToTheIssuerIsNotRecordedAndIsRetried() {
+    final Fixture fixture = new Fixture(FederationCacheSettings.defaults());
+    fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
+    fixture.trustMarkRequester.failure = new ClientRegistryException("the issuer could not be reached");
+
+    assertThatThrownBy(() -> fixture.backend.requestMark(CLIENT_ID, MARK_TWO))
+        .isInstanceOf(ClientRegistryException.class);
+    assertThat(fixture.cache.get(CLIENT_ID).missingTrustMarks()).isEmpty();
+
+    fixture.trustMarkRequester.failure = null;
+    fixture.trustMarkRequester.answer = new TrustMarkRequester.TrustMark(MARK_TWO, null);
+    assertThat(fixture.backend.requestMark(CLIENT_ID, MARK_TWO).marks()).containsExactly(MARK_TWO);
+    assertThat(fixture.trustMarkRequester.calls).isEqualTo(2);
+  }
+
+  @Test
+  void aRenewalOfTheRecordClearsAMissingTrustMark() {
+    final Fixture fixture = new Fixture(FederationCacheSettings.defaults());
+    fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
+
+    fixture.backend.requestMark(CLIENT_ID, MARK_TWO);
+    assertThat(fixture.cache.get(CLIENT_ID).missingTrustMarks()).containsOnlyKeys(MARK_TWO);
+
+    fixture.resolver.answer = fixture.resolved(Duration.ofHours(1), Set.of());
+    fixture.backend.update(CLIENT_ID);
+    assertThat(fixture.cache.get(CLIENT_ID).missingTrustMarks()).isEmpty();
+
+    fixture.trustMarkRequester.answer = new TrustMarkRequester.TrustMark(MARK_TWO, null);
+    assertThat(fixture.backend.requestMark(CLIENT_ID, MARK_TWO).marks()).containsExactly(MARK_TWO);
+    assertThat(fixture.trustMarkRequester.calls).isEqualTo(2);
+  }
+
+  @Test
   void askingForAMarkForAnUnknownClientGivesNothing() {
     final Fixture fixture = new Fixture(FederationCacheSettings.defaults());
 

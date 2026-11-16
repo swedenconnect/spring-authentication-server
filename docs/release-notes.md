@@ -11,6 +11,7 @@
 **Date:** _Not yet released_
 
 - The eIDAS person identifier is released under the claim name `http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier`, as version 1.1 of the OpenID Connect Claims and Scopes Specification for Sweden Connect requires. See [#61](https://github.com/swedenconnect/spring-authentication-server/issues/61).
+- When a trust mark issuer has not issued a requested trust mark to a client, the answer is remembered, and the issuer is not asked again until `authn-server.oidc.federation.clients.cache.trust-mark-not-found-time-to-live` (1 hour by default) has passed or the client is resolved again. See [#63](https://github.com/swedenconnect/spring-authentication-server/issues/63).
 
 -----
 
