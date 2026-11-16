@@ -152,7 +152,7 @@ public class SelectedUserModel {
   }
 
   /**
-   * Gets the name of the error to simulate, an {@code AuthenticationError} name.
+   * Gets the name of the error to simulate, a key of {@code SimulatedAuthenticationController.SIMULATED_ERRORS}.
    *
    * @return the error name
    */

@@ -17,16 +17,23 @@ package se.swedenconnect.spring.authnserver.saml.error;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Map;
 import java.util.Objects;
 
 import org.jspecify.annotations.NonNull;
 import org.opensaml.saml.saml2.core.StatusCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import se.swedenconnect.spring.authnserver.LibraryVersion;
 import se.swedenconnect.spring.authnserver.error.AuthenticationError;
 
 /**
  * The SAML {@code Status} that an {@link AuthenticationError} is reported as.
+ * <p>
+ * The built-in errors have fixed statuses. An error of the application implements {@link SamlAuthenticationError} to
+ * be reported with a status of its own.
+ * </p>
  *
  * @param statusCode the main status code
  * @param subStatusCode the subordinate status code
@@ -36,6 +43,9 @@ public record SamlErrorStatus(@NonNull String statusCode, @NonNull String subSta
 
   @Serial
   private static final long serialVersionUID = LibraryVersion.SERIAL_VERSION_UID;
+
+  /** Logger. */
+  private static final Logger log = LoggerFactory.getLogger(SamlErrorStatus.class);
 
   /** The Sweden Connect status code for a cancelled operation. */
   @SuppressWarnings("HttpUrlsUsage")
@@ -97,6 +107,22 @@ public record SamlErrorStatus(@NonNull String statusCode, @NonNull String subSta
   /** The message code for {@link #HOLDER_OF_KEY_NO_CERTIFICATE}. */
   public static final String HOLDER_OF_KEY_NO_CERTIFICATE_MESSAGE_CODE = "authn-server.error.saml.hok-no-certificate";
 
+  /** The status reported for an error of the application that has no status of its own. */
+  public static final SamlErrorStatus DEFAULT = new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED);
+
+  /** The statuses of the built-in errors. */
+  private static final Map<AuthenticationError, SamlErrorStatus> BUILT_IN = Map.of(
+      AuthenticationError.AUTHN_FAILED, new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED),
+      AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED,
+      new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED),
+      AuthenticationError.NOT_AUTHORIZED, new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.REQUEST_DENIED),
+      AuthenticationError.CANCEL, new SamlErrorStatus(StatusCode.RESPONDER, CANCEL),
+      AuthenticationError.FRAUD, new SamlErrorStatus(StatusCode.RESPONDER, FRAUD),
+      AuthenticationError.POSSIBLE_FRAUD, new SamlErrorStatus(StatusCode.RESPONDER, POSSIBLE_FRAUD),
+      AuthenticationError.UNKNOWN_PRINCIPAL, new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.UNKNOWN_PRINCIPAL),
+      AuthenticationError.PASSIVE_NOT_POSSIBLE, new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.NO_PASSIVE),
+      AuthenticationError.NO_AUTHN_CONTEXT, new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.NO_AUTHN_CONTEXT));
+
   /**
    * Constructor.
    *
@@ -109,7 +135,8 @@ public record SamlErrorStatus(@NonNull String statusCode, @NonNull String subSta
   }
 
   /**
-   * Gets the SAML status for the supplied error.
+   * Gets the SAML status for the supplied error: the status of a built-in error, the status of an error that
+   * implements {@link SamlAuthenticationError}, and {@link #DEFAULT} for any other error.
    * <p>
    * The status message is not part of the status. Resolve it from the error's message code, falling back on its default
    * message.
@@ -120,17 +147,18 @@ public record SamlErrorStatus(@NonNull String statusCode, @NonNull String subSta
    */
   public static @NonNull SamlErrorStatus of(final @NonNull AuthenticationError error) {
     Objects.requireNonNull(error, "error must not be null");
-    return switch (error) {
-      case AUTHN_FAILED, SIGN_MESSAGE_NOT_DISPLAYED ->
-          new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.AUTHN_FAILED);
-      case NOT_AUTHORIZED -> new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.REQUEST_DENIED);
-      case CANCEL -> new SamlErrorStatus(StatusCode.RESPONDER, CANCEL);
-      case FRAUD -> new SamlErrorStatus(StatusCode.RESPONDER, FRAUD);
-      case POSSIBLE_FRAUD -> new SamlErrorStatus(StatusCode.RESPONDER, POSSIBLE_FRAUD);
-      case UNKNOWN_PRINCIPAL -> new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.UNKNOWN_PRINCIPAL);
-      case PASSIVE_NOT_POSSIBLE -> new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.NO_PASSIVE);
-      case NO_AUTHN_CONTEXT -> new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.NO_AUTHN_CONTEXT);
-    };
+    final SamlErrorStatus builtIn = BUILT_IN.get(error);
+    if (builtIn != null) {
+      return builtIn;
+    }
+    if (error instanceof final SamlAuthenticationError samlError) {
+      final SamlErrorStatus status = samlError.getSamlErrorStatus();
+      if (status != null) {
+        return status;
+      }
+      log.warn("The authentication error {} gives no SAML status - {} is used", error, DEFAULT);
+    }
+    return DEFAULT;
   }
 
 }

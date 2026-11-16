@@ -190,6 +190,27 @@ class UserAuthenticationFlowTest {
   }
 
   @Test
+  void anErrorOfTheApplicationRemovesTheSessionAuthentication() {
+    final MockHttpServletRequest request = sessionWithAuthentication();
+    final AuthenticationError error = new AuthenticationError() {
+      @Override
+      public @NonNull String getMessageCode() {
+        return "app.error.no-service";
+      }
+
+      @Override
+      public @NonNull String getDefaultMessage() {
+        return "No authentication service available";
+      }
+    };
+    final UserAuthenticationFlow flow = new UserAuthenticationFlow(List.of(failing(error)));
+    assertThatExceptionOfType(AuthenticationErrorException.class)
+        .isThrownBy(() -> flow.authenticate(token(), request, new MockHttpServletResponse()))
+        .satisfies(e -> assertThat(e.getError()).isSameAs(error));
+    assertThat(request.getSession().getAttribute(CONTEXT_KEY)).isNull();
+  }
+
+  @Test
   void aNewAuthenticationThatDoesNotMatchEssentialRequestedValuesFailsAndRemovesTheSessionAuthentication() {
     final MockHttpServletRequest request = sessionWithAuthentication();
     final UserAuthenticationFlow flow = new UserAuthenticationFlow(
@@ -224,7 +245,7 @@ class UserAuthenticationFlowTest {
       final UserAuthenticationFlow flow = new UserAuthenticationFlow(List.of(failing(error)));
       assertThatExceptionOfType(AuthenticationErrorException.class)
           .isThrownBy(() -> flow.authenticate(token(), request, new MockHttpServletResponse()));
-      assertThat(request.getSession().getAttribute(CONTEXT_KEY)).as(error.name()).isNotNull();
+      assertThat(request.getSession().getAttribute(CONTEXT_KEY)).as(error.toString()).isNotNull();
     }
   }
 

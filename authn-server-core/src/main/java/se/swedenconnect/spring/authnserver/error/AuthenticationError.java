@@ -15,81 +15,72 @@
  */
 package se.swedenconnect.spring.authnserver.error;
 
+import java.io.Serializable;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
 
 /**
- * The errors that the user authentication step can produce. Each of them can be reported to the requester, in SAML as a
- * {@code Status} and in OpenID Connect as an error response. The protocol modules map them.
+ * An error that the user authentication step can produce, and that is reported to the requester, in SAML as a
+ * {@code Status} and in OpenID Connect as an error response. The protocol modules map the errors.
+ * <p>
+ * The built-in errors are the constants of this interface. An application adds errors of its own by implementing the
+ * interface of each protocol that the error is to be reported in, {@code SamlAuthenticationError} of the SAML module
+ * and {@code OidcAuthenticationError} of the OpenID Connect module. An error that does not implement the interface
+ * of a protocol is reported with that protocol's default error. The status or error of a built-in error cannot be
+ * changed.
+ * </p>
+ * <p>
+ * The error is kept in the session while the user is redirected, so an implementation must be serializable.
+ * </p>
  * <p>
  * Errors from the validation of a request, such as an invalid request or a message that cannot be decrypted, are not
- * here. They belong to the protocol module that parses the request.
+ * authentication errors. They belong to the protocol module that parses the request.
  * </p>
  *
  * @author Martin Lindström
  */
-public enum AuthenticationError {
+public interface AuthenticationError extends Serializable {
 
   /** The authentication of the user failed. */
-  AUTHN_FAILED("authn-server.error.authn-failed", "User authentication failed"),
+  AuthenticationError AUTHN_FAILED = BuiltInAuthenticationError.AUTHN_FAILED;
 
   /** The user cancelled the authentication. */
-  CANCEL("authn-server.error.cancel", "User cancelled authentication"),
+  AuthenticationError CANCEL = BuiltInAuthenticationError.CANCEL;
 
   /** Fraud was detected during the authentication. */
-  FRAUD("authn-server.error.fraud", "Fraud was detected"),
+  AuthenticationError FRAUD = BuiltInAuthenticationError.FRAUD;
 
   /** Possible fraud was detected during the authentication. */
-  POSSIBLE_FRAUD("authn-server.error.possible-fraud", "Possible fraud was detected"),
+  AuthenticationError POSSIBLE_FRAUD = BuiltInAuthenticationError.POSSIBLE_FRAUD;
 
   /** A sign message had to be displayed for the user, but was not. */
-  SIGN_MESSAGE_NOT_DISPLAYED("authn-server.error.sign-message-not-displayed", "Sign message could not be displayed"),
+  AuthenticationError SIGN_MESSAGE_NOT_DISPLAYED = BuiltInAuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED;
 
   /** The authenticated user does not match the attribute values that the requester asked for. */
-  UNKNOWN_PRINCIPAL("authn-server.error.unknown-principal", "Unknown principal"),
+  AuthenticationError UNKNOWN_PRINCIPAL = BuiltInAuthenticationError.UNKNOWN_PRINCIPAL;
 
   /** The request required that the user was not interacted with, and no previous authentication could be reused. */
-  PASSIVE_NOT_POSSIBLE("authn-server.error.passive-not-possible", "Passive authentication could not be performed"),
+  AuthenticationError PASSIVE_NOT_POSSIBLE = BuiltInAuthenticationError.PASSIVE_NOT_POSSIBLE;
 
   /** None of the requested authentication contexts can be delivered. */
-  NO_AUTHN_CONTEXT("authn-server.error.no-authn-context", "Requested authentication contexts are not supported"),
+  AuthenticationError NO_AUTHN_CONTEXT = BuiltInAuthenticationError.NO_AUTHN_CONTEXT;
 
   /** The requester may not use the server, or may not use the feature it asked for. */
-  NOT_AUTHORIZED("authn-server.error.not-authorized", "Not authorized");
-
-  /** The message code for resolving the error message. */
-  private final String messageCode;
-
-  /** The message to use when the message code resolves to nothing. */
-  private final String defaultMessage;
-
-  /**
-   * Constructor.
-   *
-   * @param messageCode the message code for resolving the error message
-   * @param defaultMessage the message to use when the message code resolves to nothing
-   */
-  AuthenticationError(final String messageCode, final String defaultMessage) {
-    this.messageCode = messageCode;
-    this.defaultMessage = defaultMessage;
-  }
+  AuthenticationError NOT_AUTHORIZED = BuiltInAuthenticationError.NOT_AUTHORIZED;
 
   /**
    * Gets the message code to resolve the error message with, against a {@link MessageSource}.
    *
    * @return the message code
    */
-  public @NonNull String getMessageCode() {
-    return this.messageCode;
-  }
+  @NonNull String getMessageCode();
 
   /**
    * Gets the message to use when the message code resolves to nothing.
    *
    * @return the default message
    */
-  public @NonNull String getDefaultMessage() {
-    return this.defaultMessage;
-  }
+  @NonNull String getDefaultMessage();
 
 }

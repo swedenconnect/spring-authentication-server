@@ -12,6 +12,7 @@
 
 - The eIDAS person identifier is released under the claim name `http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier`, as version 1.1 of the OpenID Connect Claims and Scopes Specification for Sweden Connect requires. See [#61](https://github.com/swedenconnect/spring-authentication-server/issues/61).
 - When a trust mark issuer has not issued a requested trust mark to a client, the answer is remembered, and the issuer is not asked again until `authn-server.oidc.federation.clients.cache.trust-mark-not-found-time-to-live` (1 hour by default) has passed or the client is resolved again. See [#63](https://github.com/swedenconnect/spring-authentication-server/issues/63).
+- Applications can define authentication errors of their own, with a SAML status and an OpenID Connect error of their choice. `AuthenticationError` is now an interface, so code that uses it as an enum (`switch` with case labels, `values()`, `valueOf()`, `name()`, `ordinal()`, `EnumSet` or `EnumMap`) must be changed, and code compiled against an earlier version must be recompiled. See [#62](https://github.com/swedenconnect/spring-authentication-server/issues/62).
 
 -----
 

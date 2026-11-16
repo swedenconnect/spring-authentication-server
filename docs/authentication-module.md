@@ -69,9 +69,11 @@ Source links in this guide point to the `main` branch of the
 
 5. [**Errors**](#errors)
 
-    5.1. [The passive case](#the-passive-case)
+    5.1. [Errors of the application](#errors-of-the-application)
 
-    5.2. [Errors that cannot be reported](#errors-that-cannot-be-reported)
+    5.2. [The passive case](#the-passive-case)
+
+    5.3. [Errors that cannot be reported](#errors-that-cannot-be-reported)
 
 6. [**Modules with pages of their own**](#modules-with-pages-of-their-own)
 
@@ -554,7 +556,7 @@ The second argument is a description for logs. In OpenID Connect it becomes the 
 OpenID Connect Profile, Section 2.3, asks to be something the Relying Party can put in its application logs. It is
 never shown to the user, so write it for an operator, not for an end user.
 
-These are the errors and how they reach the requester:
+These are the built-in errors and how they reach the requester:
 
 | Error | SAML status | OpenID Connect error |
 | :--- | :--- | :--- |
@@ -576,10 +578,59 @@ server that detects fraud must not issue an assertion.
 the user chose to stop, and the fraud codes when a security check alerted, not when the authentication merely failed.
 
 The mappings live in the protocol modules, [`SamlErrorStatus`][SamlErrorStatus] and
-[`OidcErrorMapping`][OidcErrorMapping], and a module does not call them.
+[`OidcErrorMapping`][OidcErrorMapping], and a module does not call them. The status or error of a built-in error cannot
+be changed.
+
+<a name="errors-of-the-application"></a>
+### 5.1. Errors of the application
+
+`AuthenticationError` is an interface, and an application adds errors of its own by implementing it. The core only
+knows the message code and the default message of an error. What the error is reported as is given by an interface of
+each protocol module:
+
+- [`SamlAuthenticationError`][SamlAuthenticationError] gives the SAML status.
+- [`OidcAuthenticationError`][OidcAuthenticationError] gives the OpenID Connect error.
+
+An error that is used with both protocols implements both interfaces, typically as an enum:
+
+```java
+public enum MyErrors implements SamlAuthenticationError, OidcAuthenticationError {
+
+  NO_SERVICE_AVAILABLE("my.error.no-service", "No authentication service available",
+      new SamlErrorStatus(StatusCode.RESPONDER, StatusCode.NO_AVAILABLE_IDP), OAuth2Error.ACCESS_DENIED),
+
+  REQUEST_UNSUPPORTED("my.error.unsupported", "The request is not supported",
+      new SamlErrorStatus(StatusCode.REQUESTER, StatusCode.REQUEST_UNSUPPORTED), OAuth2Error.INVALID_REQUEST);
+
+  // The constructor and the four getters.
+}
+```
+
+It is thrown like a built-in error:
+
+```java
+throw new AuthenticationErrorException(MyErrors.NO_SERVICE_AVAILABLE, "No eID service for the user's country");
+```
+
+An error that does not implement the interface of a protocol is reported with that protocol's default:
+`Responder` / `AuthnFailed` in SAML and `access_denied` in OpenID Connect. An application that only serves one
+protocol implements only that protocol's interface.
+
+The OpenID Connect error code must be one that the authorization endpoint may return, as listed by OAuth 2.0, Section
+4.1.2.1, and OpenID Connect Core, Section 3.1.2.6, or `unmet_authentication_requirements`. Another code is replaced by
+`access_denied`, and a warning is logged. The `error_description` is the description of the exception, as for the
+built-in errors.
+
+When the status or error is only known at runtime, make the error a record or a class that holds it, instead of an
+enum constant. The error is kept in the session while the user is redirected to a page of the module, so it must be
+serializable. `SamlErrorStatus` and the Nimbus `ErrorObject` both are.
+
+The message code is resolved against the application's `MessageSource`, as for the built-in errors. After an error of
+the application, the authentication in the session is removed, as after every built-in error except
+`NO_AUTHN_CONTEXT` and `PASSIVE_NOT_POSSIBLE`.
 
 <a name="the-passive-case"></a>
-### 5.1. The passive case
+### 5.2. The passive case
 
 `PASSIVE_NOT_POSSIBLE` is the one error whose OpenID Connect code depends on why it happened, so the exception carries
 the `SsoDenialReason` that refused single sign-on. A request that could have been answered except that the requester
@@ -589,7 +640,7 @@ Section 2.2.1, requires. Every other reason gets `login_required`. SAML has one 
 The base class raises this error, so a module does not.
 
 <a name="errors-that-cannot-be-reported"></a>
-### 5.2. Errors that cannot be reported
+### 5.3. Errors that cannot be reported
 
 Some failures make it impossible to send the user back to the requester at all, for instance when the request cannot be
 tied to a session. The user is shown an error page instead. Those are an
@@ -807,6 +858,7 @@ provider.getPostAuthenticationProcessors().add(authentication -> {
 [GenericUserMessage]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/GenericUserMessage.java
 [LocalizedMessage]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/LocalizedMessage.java
 [MessageMimeType]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/message/MessageMimeType.java
+[OidcAuthenticationError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcAuthenticationError.java
 [OidcErrorMapping]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-oidc/src/main/java/se/swedenconnect/spring/authnserver/oidc/error/OidcErrorMapping.java
 [OriginalRequester]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/OriginalRequester.java
 [PostAuthenticationProcessor]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/PostAuthenticationProcessor.java
@@ -815,6 +867,7 @@ provider.getPostAuthenticationProcessors().add(authentication -> {
 [RedirectFlowRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/RedirectFlowRepository.java
 [RedirectForAuthenticationToken]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/RedirectForAuthenticationToken.java
 [SamlAuthenticationRequirements]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/authentication/SamlAuthenticationRequirements.java
+[SamlAuthenticationError]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/error/SamlAuthenticationError.java
 [SamlErrorStatus]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-saml/src/main/java/se/swedenconnect/spring/authnserver/saml/error/SamlErrorStatus.java
 [SessionBasedRedirectAuthenticationRepository]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/authentication/provider/redirect/SessionBasedRedirectAuthenticationRepository.java
 [SsoDenialReason]: https://github.com/swedenconnect/spring-authentication-server/blob/main/authn-server-core/src/main/java/se/swedenconnect/spring/authnserver/sso/SsoDenialReason.java

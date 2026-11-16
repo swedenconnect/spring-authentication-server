@@ -18,8 +18,16 @@ package se.swedenconnect.spring.authnserver.oidc.error;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.List;
+
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 
+import com.nimbusds.oauth2.sdk.ErrorObject;
 import com.nimbusds.oauth2.sdk.OAuth2Error;
 import com.nimbusds.openid.connect.sdk.OIDCError;
 
@@ -74,7 +82,10 @@ class OidcErrorMappingTest {
 
   @Test
   void everyErrorCarriesADescriptionForTheRequestersLogs() {
-    for (final AuthenticationError error : AuthenticationError.values()) {
+    for (final AuthenticationError error : List.of(AuthenticationError.AUTHN_FAILED, AuthenticationError.CANCEL,
+        AuthenticationError.FRAUD, AuthenticationError.POSSIBLE_FRAUD, AuthenticationError.SIGN_MESSAGE_NOT_DISPLAYED,
+        AuthenticationError.UNKNOWN_PRINCIPAL, AuthenticationError.PASSIVE_NOT_POSSIBLE,
+        AuthenticationError.NO_AUTHN_CONTEXT, AuthenticationError.NOT_AUTHORIZED)) {
       assertThat(OidcErrorMapping.of(error, null).getDescription()).isEqualTo(error.getDefaultMessage());
     }
   }
@@ -97,6 +108,61 @@ class OidcErrorMappingTest {
   }
 
   @Test
+  void anErrorOfTheApplicationIsReportedWithItsOwnError() {
+    final AuthenticationErrorException exception = new AuthenticationErrorException(
+        new OidcError(OAuth2Error.INVALID_REQUEST), "The request asks for something the application does not do");
+
+    final ErrorObject error = OidcErrorMapping.of(exception);
+
+    assertThat(error.getCode()).isEqualTo(OAuth2Error.INVALID_REQUEST_CODE);
+    assertThat(error.getDescription()).isEqualTo("The request asks for something the application does not do");
+  }
+
+  @Test
+  void anErrorOfTheApplicationWithACodeThatTheAuthorizationEndpointMayNotReturnIsAccessDenied() {
+    assertThat(OidcErrorMapping.of(new OidcError(OAuth2Error.INVALID_GRANT), null).getCode())
+        .isEqualTo(OAuth2Error.ACCESS_DENIED_CODE);
+    assertThat(OidcErrorMapping.of(new OidcError(new ErrorObject("my_error")), null).getCode())
+        .isEqualTo(OAuth2Error.ACCESS_DENIED_CODE);
+  }
+
+  @Test
+  void anErrorOfTheApplicationWithoutAnOidcErrorIsAccessDenied() {
+    final AuthenticationError error = new AuthenticationError() {
+      @Override
+      public @NonNull String getMessageCode() {
+        return "app.error.other";
+      }
+
+      @Override
+      public @NonNull String getDefaultMessage() {
+        return "Other error";
+      }
+    };
+    final ErrorObject errorObject = OidcErrorMapping.of(error, null);
+    assertThat(errorObject.getCode()).isEqualTo(OAuth2Error.ACCESS_DENIED_CODE);
+    assertThat(errorObject.getDescription()).isEqualTo("Other error");
+  }
+
+  @Test
+  void anErrorOfTheApplicationSurvivesSerialization() throws Exception {
+    final AuthenticationErrorException exception =
+        new AuthenticationErrorException(new OidcError(OAuth2Error.INVALID_REQUEST), "Unsupported");
+
+    final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (final ObjectOutputStream out = new ObjectOutputStream(bytes)) {
+      out.writeObject(exception);
+    }
+    final AuthenticationErrorException restored;
+    try (final ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+      restored = (AuthenticationErrorException) in.readObject();
+    }
+
+    assertThat(restored.getError()).isEqualTo(exception.getError());
+    assertThat(OidcErrorMapping.of(restored).getCode()).isEqualTo(OAuth2Error.INVALID_REQUEST_CODE);
+  }
+
+  @Test
   @SuppressWarnings("DataFlowIssue")
   void theMappingNeedsAnError() {
     assertThatExceptionOfType(NullPointerException.class)
@@ -105,6 +171,30 @@ class OidcErrorMappingTest {
     assertThatExceptionOfType(NullPointerException.class)
         .isThrownBy(() -> OidcErrorMapping.of(null))
         .withMessage("exception must not be null");
+  }
+
+  /**
+   * An error of the application with an OpenID Connect error.
+   *
+   * @param error the error
+   */
+  record OidcError(ErrorObject error) implements OidcAuthenticationError {
+
+    @Override
+    public @NonNull ErrorObject getOidcError() {
+      return this.error;
+    }
+
+    @Override
+    public @NonNull String getMessageCode() {
+      return "app.error.unsupported";
+    }
+
+    @Override
+    public @NonNull String getDefaultMessage() {
+      return "The request is not supported";
+    }
+
   }
 
 }
