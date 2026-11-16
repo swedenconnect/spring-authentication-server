@@ -414,9 +414,11 @@ class OidcFederationClientSourceTest {
 
     properties.setMaximumAge(Duration.ofHours(12));
     properties.setNotFoundTimeToLive(Duration.ofMinutes(2));
+    properties.setTrustMarkNotFoundTimeToLive(Duration.ofMinutes(15));
     final FederationCacheSettings settings = OidcFederationClientSource.createCacheSettings(properties);
     assertThat(settings.maximumAge()).isEqualTo(Duration.ofHours(12));
     assertThat(settings.notFoundTimeToLive()).isEqualTo(Duration.ofMinutes(2));
+    assertThat(settings.trustMarkNotFoundTimeToLive()).isEqualTo(Duration.ofMinutes(15));
   }
 
   @Test
@@ -480,7 +482,7 @@ class OidcFederationClientSourceTest {
           .isInstanceOf(ClassNotFoundException.class);
     }
     assertThat(Arrays.stream(FederationCacheSettings.class.getRecordComponents()).map(c -> c.getName()))
-        .containsExactly("maximumAge", "notFoundTimeToLive");
+        .containsExactly("maximumAge", "notFoundTimeToLive", "trustMarkNotFoundTimeToLive");
   }
 
   @Test

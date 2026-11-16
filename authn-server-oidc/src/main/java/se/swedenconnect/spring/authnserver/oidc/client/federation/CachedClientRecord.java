@@ -46,6 +46,8 @@ import se.swedenconnect.spring.authnserver.oidc.client.VerifiedSector;
  * @param verifiedSector the successful check of the client's {@code sector_identifier_uri} that is remembered, or
  *     {@code null}
  * @param heldKeys the keys fetched from the client's {@code jwks_uri} or {@code signed_jwks_uri}, or {@code null}
+ * @param missingTrustMarks the trust mark types that have been asked for on demand and that the issuer had not issued
+ *     to the client, with when they were asked for
  * @author Martin Lindström
  */
 public record CachedClientRecord(
@@ -56,7 +58,8 @@ public record CachedClientRecord(
     @NonNull Instant expiresAt,
     @Nullable String invalidReason,
     @Nullable VerifiedSector verifiedSector,
-    @Nullable HeldKeys heldKeys) {
+    @Nullable HeldKeys heldKeys,
+    @NonNull Map<String, Instant> missingTrustMarks) {
 
   /**
    * Constructor.
@@ -69,6 +72,8 @@ public record CachedClientRecord(
    * @param invalidReason why the client is marked as invalid, or {@code null}
    * @param verifiedSector the successful check of the client's {@code sector_identifier_uri}, or {@code null}
    * @param heldKeys the keys fetched from the client's {@code jwks_uri} or {@code signed_jwks_uri}, or {@code null}
+   * @param missingTrustMarks the trust mark types that the issuer had not issued to the client, with when they were
+   *     asked for
    */
   public CachedClientRecord {
     Objects.requireNonNull(clientId, "clientId must not be null");
@@ -76,6 +81,28 @@ public record CachedClientRecord(
     trustMarkTypes = Set.copyOf(Objects.requireNonNull(trustMarkTypes, "trustMarkTypes must not be null"));
     onDemandTrustMarks =
         Map.copyOf(Objects.requireNonNull(onDemandTrustMarks, "onDemandTrustMarks must not be null"));
+    missingTrustMarks =
+        Map.copyOf(Objects.requireNonNull(missingTrustMarks, "missingTrustMarks must not be null"));
+  }
+
+  /**
+   * Constructor for an entry where no trust mark has been found missing.
+   *
+   * @param clientId the {@code client_id} of the client
+   * @param metadata the client metadata, or {@code null}
+   * @param trustMarkTypes the trust mark types of the resolve response
+   * @param onDemandTrustMarks the trust marks that have been asked for on demand
+   * @param expiresAt when the entry is no longer valid
+   * @param invalidReason why the client is marked as invalid, or {@code null}
+   * @param verifiedSector the successful check of the client's {@code sector_identifier_uri}, or {@code null}
+   * @param heldKeys the keys fetched from the client's {@code jwks_uri} or {@code signed_jwks_uri}, or {@code null}
+   */
+  public CachedClientRecord(final @NonNull String clientId, final @Nullable OIDCClientMetadata metadata,
+      final @NonNull Set<String> trustMarkTypes, final @NonNull Map<String, OnDemandTrustMark> onDemandTrustMarks,
+      final @NonNull Instant expiresAt, final @Nullable String invalidReason,
+      final @Nullable VerifiedSector verifiedSector, final @Nullable HeldKeys heldKeys) {
+    this(clientId, metadata, trustMarkTypes, onDemandTrustMarks, expiresAt, invalidReason, verifiedSector, heldKeys,
+        Map.of());
   }
 
   /**
@@ -188,7 +215,7 @@ public record CachedClientRecord(
       }
     }
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, this.onDemandTrustMarks, expiry,
-        outcome.invalidReason(), outcome.verifiedSector(), outcome.heldKeys());
+        outcome.invalidReason(), outcome.verifiedSector(), outcome.heldKeys(), this.missingTrustMarks);
   }
 
   /**
@@ -199,7 +226,7 @@ public record CachedClientRecord(
    */
   public @NonNull CachedClientRecord withHeldKeys(final @Nullable HeldKeys heldKeys) {
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, this.onDemandTrustMarks,
-        this.expiresAt, this.invalidReason, this.verifiedSector, heldKeys);
+        this.expiresAt, this.invalidReason, this.verifiedSector, heldKeys, this.missingTrustMarks);
   }
 
   /**
@@ -262,7 +289,8 @@ public record CachedClientRecord(
   }
 
   /**
-   * Creates a copy of the entry where a trust mark that was asked for on demand has been added or replaced.
+   * Creates a copy of the entry where a trust mark that was asked for on demand has been added or replaced. The type
+   * is no longer recorded as missing.
    *
    * @param trustMark the trust mark
    * @return a {@link CachedClientRecord}
@@ -270,8 +298,41 @@ public record CachedClientRecord(
   private @NonNull CachedClientRecord withTrustMark(final @NonNull OnDemandTrustMark trustMark) {
     final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
     marks.put(trustMark.type(), trustMark);
+    final Map<String, Instant> missing = new LinkedHashMap<>(this.missingTrustMarks);
+    missing.remove(trustMark.type());
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt,
-        this.invalidReason, this.verifiedSector, this.heldKeys);
+        this.invalidReason, this.verifiedSector, this.heldKeys, missing);
+  }
+
+  /**
+   * Creates a copy of the entry where a trust mark type is recorded as missing: it was asked for on demand and the
+   * issuer had not issued it to the client.
+   *
+   * @param type the trust mark type
+   * @param askedAt when the trust mark was asked for
+   * @return a {@link CachedClientRecord}
+   */
+  public @NonNull CachedClientRecord withMissingTrustMark(final @NonNull String type, final @NonNull Instant askedAt) {
+    Objects.requireNonNull(type, "type must not be null");
+    Objects.requireNonNull(askedAt, "askedAt must not be null");
+    final Map<String, Instant> missing = new LinkedHashMap<>(this.missingTrustMarks);
+    missing.put(type, askedAt);
+    return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, this.onDemandTrustMarks,
+        this.expiresAt, this.invalidReason, this.verifiedSector, this.heldKeys, missing);
+  }
+
+  /**
+   * Tells whether a trust mark type is recorded as missing and was asked for less than the given time ago.
+   *
+   * @param type the trust mark type
+   * @param now the current time
+   * @param timeToLive how long the answer that the trust mark is missing is kept
+   * @return {@code true} if the type should not be asked for again and {@code false} otherwise
+   */
+  public boolean isTrustMarkMissing(
+      final @NonNull String type, final @NonNull Instant now, final @NonNull Duration timeToLive) {
+    final Instant askedAt = this.missingTrustMarks.get(type);
+    return askedAt != null && now.isBefore(askedAt.plus(timeToLive));
   }
 
   /**
@@ -289,12 +350,13 @@ public record CachedClientRecord(
     final Map<String, OnDemandTrustMark> marks = new LinkedHashMap<>(this.onDemandTrustMarks);
     marks.remove(type);
     return new CachedClientRecord(this.clientId, this.metadata, this.trustMarkTypes, marks, this.expiresAt,
-        this.invalidReason, this.verifiedSector, this.heldKeys);
+        this.invalidReason, this.verifiedSector, this.heldKeys, this.missingTrustMarks);
   }
 
   /**
    * Creates a copy of the entry where the trust marks that were asked for on demand for an earlier entry have been
-   * carried over. Marks that have expired, and marks that the resolve response now carries, are left out.
+   * carried over. Marks that have expired, and marks that the resolve response now carries, are left out. Trust mark
+   * types that were recorded as missing are not carried over, so that they are asked for again.
    *
    * @param earlier the earlier entry, or {@code null}
    * @param now the current time

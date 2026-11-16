@@ -317,7 +317,9 @@ public class OidcFederationClientSource implements DisposableBean {
     return new FederationCacheSettings(
         properties.getMaximumAge(),
         Optional.ofNullable(properties.getNotFoundTimeToLive())
-            .orElse(FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE));
+            .orElse(FederationCacheSettings.DEFAULT_NOT_FOUND_TIME_TO_LIVE),
+        Optional.ofNullable(properties.getTrustMarkNotFoundTimeToLive())
+            .orElse(FederationCacheSettings.DEFAULT_TRUST_MARK_NOT_FOUND_TIME_TO_LIVE));
   }
 
   /**

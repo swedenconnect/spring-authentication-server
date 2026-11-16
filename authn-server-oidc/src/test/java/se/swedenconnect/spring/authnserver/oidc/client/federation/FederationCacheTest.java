@@ -107,6 +107,39 @@ class FederationCacheTest extends FederationTestSupport {
   }
 
   @Test
+  void aMissingTrustMarkIsNotCarriedOver() {
+    final Instant now = Instant.now();
+    final CachedClientRecord earlier = CachedClientRecord
+        .found(new ResolvedClient(CLIENT_ID, clientMetadata("The Client"), Set.of(),
+            now.plus(Duration.ofHours(1))), now, null)
+        .withTrustMark(MARK_ONE, now.plus(Duration.ofMinutes(30)))
+        .withMissingTrustMark(MARK_TWO, now);
+
+    final CachedClientRecord later = CachedClientRecord
+        .found(new ResolvedClient(CLIENT_ID, clientMetadata("The Client"), Set.of(),
+            now.plus(Duration.ofHours(2))), now, null)
+        .carryOverTrustMarks(earlier, now);
+
+    assertThat(later.onDemandTrustMarks()).containsOnlyKeys(MARK_ONE);
+    assertThat(later.missingTrustMarks()).isEmpty();
+  }
+
+  @Test
+  void aMissingTrustMarkIsKeptForItsTimeToLive() {
+    final Instant now = Instant.now();
+    final CachedClientRecord record = CachedClientRecord
+        .found(new ResolvedClient(CLIENT_ID, clientMetadata("The Client"), Set.of(),
+            now.plus(Duration.ofHours(1))), now, null)
+        .withMissingTrustMark(MARK_TWO, now);
+
+    assertThat(record.isTrustMarkMissing(MARK_TWO, now.plus(Duration.ofMinutes(9)), Duration.ofMinutes(10))).isTrue();
+    assertThat(record.isTrustMarkMissing(MARK_TWO, now.plus(Duration.ofMinutes(10)), Duration.ofMinutes(10)))
+        .isFalse();
+    assertThat(record.isTrustMarkMissing(MARK_ONE, now, Duration.ofMinutes(10))).isFalse();
+    assertThat(record.withTrustMark(MARK_TWO, null).missingTrustMarks()).isEmpty();
+  }
+
+  @Test
   void aTrustMarkThatTheResolveResponseNowCarriesIsNotCarriedOver() {
     final Instant now = Instant.now();
     final CachedClientRecord earlier = CachedClientRecord

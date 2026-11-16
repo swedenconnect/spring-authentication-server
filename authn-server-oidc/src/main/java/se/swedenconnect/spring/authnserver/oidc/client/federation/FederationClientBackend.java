@@ -80,6 +80,13 @@ import se.swedenconnect.spring.authnserver.registry.changes.KnownClient;
  * its cache entry. The {@link HeldKeysClientKeyResolver} gives them out, see
  * {@link #resolveKeys(String, OIDCClientMetadata, JWKMatcher)}, so that a request does not cause a fetch.
  * </p>
+ * <p>
+ * A trust mark that a client does not hold can be asked for from its issuer, see
+ * {@link #requestMark(String, String)}. When the issuer has not issued the trust mark to the client, this is recorded
+ * in the cache entry, and the issuer is not asked again for the same type until
+ * {@link FederationCacheSettings#trustMarkNotFoundTimeToLive()} has passed or the client is resolved again. A call to
+ * the issuer that fails is not recorded.
+ * </p>
  *
  * @author Martin Lindström
  */
@@ -240,11 +247,18 @@ public class FederationClientBackend implements ClientRegistryBackend, ClientKey
     if (!entry.isFound()) {
       return null;
     }
-    if (entry.getMarks(this.clock.instant()).contains(mark)) {
+    final Instant now = this.clock.instant();
+    if (entry.getMarks(now).contains(mark)) {
+      return this.toRecord(entry);
+    }
+    if (entry.isTrustMarkMissing(mark, now, this.settings.trustMarkNotFoundTimeToLive())) {
+      log.debug("The trust mark '{}' was not issued to '{}' when asked for at {} - it is not asked for again", mark,
+          identifier, entry.missingTrustMarks().get(mark));
       return this.toRecord(entry);
     }
     final TrustMarkRequester.TrustMark trustMark = this.trustMarkRequester.request(identifier, mark);
     if (trustMark == null) {
+      this.cache.put(entry.withMissingTrustMark(mark, now));
       return this.toRecord(entry);
     }
     entry = entry.withTrustMark(trustMark);

@@ -478,6 +478,12 @@ if (record != null && record.hasMark(trustMarkType)) {
   renewal of the record carries the trust mark over while it is still valid.
 - A trust mark without `exp`, or with a long one, stays trusted after the issuer has withdrawn it, unless its status is
   checked, see [Section 6.4, "Checking the status of trust marks"](#trust-mark-status-checks).
+- When the issuer has not issued the trust mark to the client, this is recorded in the client's cached record, and the
+  issuer is not asked again for that type until `clients.cache.trust-mark-not-found-time-to-live` (1 hour by default)
+  has passed or the record is renewed, whichever comes first. A trust mark issued later is found the first time it is
+  asked for after that.
+- A call to the issuer that fails, because the issuer cannot be reached, answers with an error or sends a trust mark
+  that does not verify, is not recorded, and the trust mark is asked for again at the next request.
 
 For SAML, asking for a mark never finds anything. It gives the requester's record unchanged.
 
