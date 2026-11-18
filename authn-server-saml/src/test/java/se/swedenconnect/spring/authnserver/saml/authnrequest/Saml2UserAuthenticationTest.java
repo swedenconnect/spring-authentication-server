@@ -710,6 +710,39 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
     assertThat(attribute(second, AttributeConstants.ATTRIBUTE_NAME_MAIL)).isEqualTo("kalle@example.com");
   }
 
+  @Test
+  void theEidasCountryIsReleasedAsCountryWhenTheUserHasNoCountry() throws Exception {
+    assertThat(this.releasedCountry(GenericAttribute.of(AttributeIdentifiers.EIDAS_COUNTRY, "DE"))).isEqualTo("DE");
+  }
+
+  @Test
+  void theCountryIsReleasedAsCountry() throws Exception {
+    assertThat(this.releasedCountry(GenericAttribute.of(AttributeIdentifiers.COUNTRY, "SE"))).isEqualTo("SE");
+  }
+
+  @Test
+  void theCountryWinsOverTheEidasCountry() throws Exception {
+    assertThat(this.releasedCountry(GenericAttribute.of(AttributeIdentifiers.COUNTRY, "SE"),
+        GenericAttribute.of(AttributeIdentifiers.EIDAS_COUNTRY, "DE"))).isEqualTo("SE");
+  }
+
+  /**
+   * Authenticates a user with the given attributes for a Service Provider whose metadata requests {@code c}.
+   *
+   * @param attributes the country attributes of the user
+   * @return the released {@code c}, or {@code null}
+   */
+  private @Nullable String releasedCountry(final GenericAttribute<?>... attributes) throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    provider.extraAttributes.addAll(List.of(attributes));
+    this.start(spMetadata(sp -> sp.attributeConsumingServices(AttributeConsumingServiceBuilder.builder()
+        .index(0).isDefault(true)
+        .requestedAttributes(RequestedAttributeBuilder.builder(AttributeConstants.ATTRIBUTE_NAME_C).build())
+        .build())), c -> {}, provider);
+    return attribute(assertion(parseResponse(this.send(toHttpRequest(this.request(r -> {}))))),
+        AttributeConstants.ATTRIBUTE_NAME_C);
+  }
+
   // Requested attribute values
 
   @Test
@@ -776,6 +809,18 @@ class Saml2UserAuthenticationTest extends OpenSamlTestBase {
                 .build())
             .build()).build()))))));
     assertThat(attribute(assertion, AttributeConstants.ATTRIBUTE_NAME_PERSONAL_IDENTITY_NUMBER)).isEqualTo(PNR);
+  }
+
+  @Test
+  void aPrincipalSelectionOfCountryWithAValueReleasesTheEidasCountry() throws Exception {
+    final TestProvider provider = new TestProvider("direct", LOA3);
+    provider.extraAttributes.add(GenericAttribute.of(AttributeIdentifiers.EIDAS_COUNTRY, "DE"));
+    this.start(spMetadata(sp -> {}), c -> {}, provider);
+    final Assertion assertion = assertion(parseResponse(this.send(toHttpRequest(this.request(r -> r.setExtensions(
+        ExtensionsBuilder.builder().extension(PrincipalSelectionBuilder.builder()
+            .matchValues(MatchValueBuilder.builder().name(AttributeConstants.ATTRIBUTE_NAME_C).value("DE").build())
+            .build()).build()))))));
+    assertThat(attribute(assertion, AttributeConstants.ATTRIBUTE_NAME_C)).isEqualTo("DE");
   }
 
   @Test

@@ -171,7 +171,6 @@ public class SamlAttributeMapping {
     simple(mappers, AttributeConstants.ATTRIBUTE_NAME_POST_OFFICE_BOX, AttributeIdentifiers.POST_OFFICE_BOX);
     simple(mappers, AttributeConstants.ATTRIBUTE_NAME_POSTAL_CODE, AttributeIdentifiers.POSTAL_CODE);
     simple(mappers, AttributeConstants.ATTRIBUTE_NAME_L, AttributeIdentifiers.LOCALITY);
-    simple(mappers, AttributeConstants.ATTRIBUTE_NAME_C, AttributeIdentifiers.COUNTRY);
     simple(mappers, AttributeConstants.ATTRIBUTE_NAME_COUNTRY_OF_CITIZENSHIP,
         AttributeIdentifiers.COUNTRY_OF_CITIZENSHIP);
     simple(mappers, AttributeConstants.ATTRIBUTE_NAME_COUNTRY_OF_RESIDENCE,
@@ -210,6 +209,8 @@ public class SamlAttributeMapping {
     mappers.add(new SamlFromProtocolMapper(AttributeConstants.ATTRIBUTE_NAME_PLACE_OF_BIRTH,
         AttributeIdentifiers.PLACE_OF_BIRTH, AttributeIdentifiers.PLACE_OF_BIRTH_COUNTRY,
         AttributeIdentifiers.PLACE_OF_BIRTH_REGION, AttributeIdentifiers.PLACE_OF_BIRTH_LOCALITY));
+    mappers.add(new SamlFromProtocolMapper(AttributeConstants.ATTRIBUTE_NAME_C,
+        AttributeIdentifiers.COUNTRY, AttributeIdentifiers.EIDAS_COUNTRY));
 
     // Civic registration numbers, where the SAML attribute may be either kind of number.
     //
