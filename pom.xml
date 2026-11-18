@@ -63,7 +63,7 @@
 
     <spring.boot.version>4.1.2</spring.boot.version>
     <spring.version>7.0.10</spring.version>
-    <bc.version>1.86</bc.version>
+    <bc.version>1.87</bc.version>
     <credentials-support.version>2.3.0</credentials-support.version>
     <lombok.version>1.18.48</lombok.version>
     <audit-support.version>1.0.2</audit-support.version>
