@@ -128,6 +128,19 @@ class SamlAttributeMappingTest extends OpenSamlTestBase {
   }
 
   @Test
+  void aRequestedCountryBecomesTheCountryAndTheEidasCountry() {
+    assertThat(this.identifiers(this.mapping.toGenericFromRequestedAttributes(
+        List.of(requested(AttributeConstants.ATTRIBUTE_NAME_C, false)))))
+        .containsExactlyInAnyOrder(AttributeIdentifiers.COUNTRY, AttributeIdentifiers.EIDAS_COUNTRY);
+
+    assertThat(this.mapping.toGenericFromRequestedAttributes(
+        List.of(requested(AttributeConstants.ATTRIBUTE_NAME_C, false, "DE"))))
+        .hasSize(2)
+        .extracting(GenericRequestedAttribute::getRequestedValues)
+        .containsOnly(List.of("DE"));
+  }
+
+  @Test
   void aRequestedEidasAddressBecomesAllItsParts() {
     assertThat(this.identifiers(this.mapping.toGenericFromRequestedAttributes(
         List.of(requested(AttributeConstants.ATTRIBUTE_NAME_EIDAS_NATURAL_PERSON_ADDRESS, false)))))
