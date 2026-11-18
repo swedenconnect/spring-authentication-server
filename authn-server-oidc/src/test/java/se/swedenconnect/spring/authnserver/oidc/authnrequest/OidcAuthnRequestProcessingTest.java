@@ -27,6 +27,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
@@ -962,6 +963,49 @@ class OidcAuthnRequestProcessingTest {
         .claim("prompt", "login consent")
         .claim(ParameterConstants.SIGN_REQUEST_PARAM_NAME, signRequest(false)).build()).serialize());
     assertError(this.send(post(params)), "invalid_request", "state-1");
+  }
+
+  @Test
+  void aSignRequestRequiresPromptToHoldLoginAndConsent() throws Exception {
+    this.start(c -> {});
+    final Map<String, Boolean> scopes = Map.of(SIGN_SCOPE, true, SIGN_APPROVAL_SCOPE, false);
+    final List<String> invalidPrompts = Arrays.asList("consent", "login", null);
+
+    for (final Map.Entry<String, Boolean> scope : scopes.entrySet()) {
+      final String signRequestJwt = sign(signRequestClaims(signRequest(scope.getValue())).build(), CLIENT_KEY);
+
+      // As plain parameters
+      for (final String prompt : invalidPrompts) {
+        final Map<String, String> params = params();
+        params.put("scope", "openid " + scope.getKey());
+        if (prompt != null) {
+          params.put("prompt", prompt);
+        }
+        params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, signRequestJwt);
+        assertError(this.send(post(params)), "invalid_request", "state-1");
+      }
+      final Map<String, String> params = params();
+      params.put("scope", "openid " + scope.getKey());
+      params.put("prompt", "login consent");
+      params.put(ParameterConstants.SIGN_REQUEST_PARAM_NAME, signRequestJwt);
+      assertThat(requirements(this.process(post(params))).getSignMessage()).isNotNull();
+
+      // In a signed request object
+      for (final String prompt : invalidPrompts) {
+        final Map<String, String> roParams = params();
+        roParams.put("request", sign(requestObjectClaims()
+            .claim("scope", "openid " + scope.getKey())
+            .claim("prompt", prompt)
+            .claim(ParameterConstants.SIGN_REQUEST_PARAM_NAME, signRequest(scope.getValue())).build(), CLIENT_KEY));
+        assertError(this.send(post(roParams)), "invalid_request", "state-1");
+      }
+      final Map<String, String> roParams = params();
+      roParams.put("request", sign(requestObjectClaims()
+          .claim("scope", "openid " + scope.getKey())
+          .claim("prompt", "login consent")
+          .claim(ParameterConstants.SIGN_REQUEST_PARAM_NAME, signRequest(scope.getValue())).build(), CLIENT_KEY));
+      assertThat(requirements(this.process(post(roParams))).getSignMessage()).isNotNull();
+    }
   }
 
   @Test
